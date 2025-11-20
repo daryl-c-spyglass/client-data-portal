@@ -6,6 +6,31 @@ This is a professional real estate IDX (Internet Data Exchange) platform powered
 
 ## Recent Changes (November 20, 2025)
 
+### Comprehensive Property Search Fields Added
+
+**Database Schema Expansion**: Added 50+ searchable property fields to match Bramlett Partners comprehensive search interface:
+
+1. **Property Details**: mainLevelBedrooms, storiesTotal, propertyCondition, garageParkingSpaces, totalParkingSpaces
+2. **Location**: countyOrParish
+3. **Amenities**: poolPrivateYN, poolFeatures, spaFeatures, waterfrontYN, waterfrontFeatures, viewYN, view, horseYN, horseAmenities, associationYN
+4. **Interior Features**: interiorFeatures, flooring, fireplaceFeatures, windowFeatures, accessibilityFeatures, securityFeatures
+5. **Exterior Features**: exteriorFeatures, foundationDetails, lotFeatures, fencing, patioAndPorchFeatures, parkingFeatures
+6. **Community**: communityFeatures
+7. **Utilities**: heating, cooling, waterSource, sewer, utilities
+8. **Green/Sustainability**: greenEnergyEfficient, greenSustainability, greenBuildingVerificationType, greenVerificationMetric, greenVerificationStatus, greenVerificationRating, greenVerificationYear
+9. **Listing Conditions**: flexListingYN, propertySaleContingency, specialListingConditions, showingRequirements, occupantType, possession, buyerFinancing
+10. **Remarks**: privateRemarks (added to existing publicRemarks)
+
+**Search Criteria**: Extended searchCriteriaSchema to support all new fields with And/Or/Not logical operators for array-based filters (poolFeatures, view, utilities, etc.)
+
+**MLS Grid Sync**: Updated property data transformation to map all 50+ new fields from MLS Grid API to database columns
+
+**Storage Layer**: Enhanced DbStorage.getProperties() with filters for all new searchable fields
+
+**Performance Note**: Adding database columns does NOT slow down queries—PostgreSQL only loads requested columns. Proper column structure is faster than JSON querying.
+
+
+
 ### Completed Features (Tasks 1-5) ✅
 
 **Quick Seller Update System (Tasks 1-4)**

@@ -239,6 +239,15 @@ export class MLSGridSyncService {
   }
 
   /**
+   * Helper function to ensure array fields are always arrays
+   */
+  private ensureArray(value: any): string[] | undefined {
+    if (value === undefined || value === null) return undefined;
+    if (Array.isArray(value)) return value;
+    return [value];
+  }
+
+  /**
    * Transform MLS Grid RESO property data to our schema
    */
   private transformPropertyData(mlsData: any): InsertProperty {
@@ -285,12 +294,12 @@ export class MLSGridSyncService {
       lotSizeAcres: mlsData.LotSizeAcres?.toString(),
       yearBuilt: mlsData.YearBuilt,
       storiesTotal: mlsData.StoriesTotal,
-      propertyCondition: mlsData.PropertyCondition,
+      propertyCondition: this.ensureArray(mlsData.PropertyCondition),
       
       // Parking & Garage
       garageParkingSpaces: mlsData.GarageSpaces,
       totalParkingSpaces: mlsData.TotalParkingSpaces,
-      parkingFeatures: mlsData.ParkingFeatures,
+      parkingFeatures: this.ensureArray(mlsData.ParkingFeatures),
       
       // Listing Details
       daysOnMarket: mlsData.DaysOnMarket,
@@ -317,56 +326,56 @@ export class MLSGridSyncService {
       // Listing Conditions & Contingencies
       flexListingYN: mlsData.FlexListingYN,
       propertySaleContingency: mlsData.PropertySaleContingency,
-      specialListingConditions: mlsData.SpecialListingConditions,
-      showingRequirements: mlsData.ShowingRequirements,
+      specialListingConditions: this.ensureArray(mlsData.SpecialListingConditions),
+      showingRequirements: this.ensureArray(mlsData.ShowingRequirements),
       occupantType: mlsData.OccupantType,
       possession: mlsData.Possession,
-      buyerFinancing: mlsData.BuyerFinancing,
+      buyerFinancing: this.ensureArray(mlsData.BuyerFinancing),
       
       // Property Features & Amenities
       associationYN: mlsData.AssociationYN,
       ownershipType: mlsData.OwnershipType,
       poolPrivateYN: mlsData.PoolPrivateYN,
-      poolFeatures: mlsData.PoolFeatures,
-      spaFeatures: mlsData.SpaFeatures,
+      poolFeatures: this.ensureArray(mlsData.PoolFeatures),
+      spaFeatures: this.ensureArray(mlsData.SpaFeatures),
       waterfrontYN: mlsData.WaterfrontYN,
-      waterfrontFeatures: mlsData.WaterfrontFeatures,
+      waterfrontFeatures: this.ensureArray(mlsData.WaterfrontFeatures),
       viewYN: mlsData.ViewYN,
-      view: mlsData.View,
+      view: this.ensureArray(mlsData.View),
       horseYN: mlsData.HorseYN,
-      horseAmenities: mlsData.HorseAmenities,
+      horseAmenities: this.ensureArray(mlsData.HorseAmenities),
       
       // Interior Features
-      interiorFeatures: mlsData.InteriorFeatures,
-      flooring: mlsData.Flooring,
-      fireplaceFeatures: mlsData.FireplaceFeatures,
-      windowFeatures: mlsData.WindowFeatures,
-      accessibilityFeatures: mlsData.AccessibilityFeatures,
-      securityFeatures: mlsData.SecurityFeatures,
+      interiorFeatures: this.ensureArray(mlsData.InteriorFeatures),
+      flooring: this.ensureArray(mlsData.Flooring),
+      fireplaceFeatures: this.ensureArray(mlsData.FireplaceFeatures),
+      windowFeatures: this.ensureArray(mlsData.WindowFeatures),
+      accessibilityFeatures: this.ensureArray(mlsData.AccessibilityFeatures),
+      securityFeatures: this.ensureArray(mlsData.SecurityFeatures),
       
       // Exterior Features
-      exteriorFeatures: mlsData.ExteriorFeatures,
-      foundationDetails: mlsData.FoundationDetails,
-      lotFeatures: mlsData.LotFeatures,
-      fencing: mlsData.Fencing,
-      patioAndPorchFeatures: mlsData.PatioAndPorchFeatures,
+      exteriorFeatures: this.ensureArray(mlsData.ExteriorFeatures),
+      foundationDetails: this.ensureArray(mlsData.FoundationDetails),
+      lotFeatures: this.ensureArray(mlsData.LotFeatures),
+      fencing: this.ensureArray(mlsData.Fencing),
+      patioAndPorchFeatures: this.ensureArray(mlsData.PatioAndPorchFeatures),
       
       // Community & Location Features
-      communityFeatures: mlsData.CommunityFeatures,
+      communityFeatures: this.ensureArray(mlsData.CommunityFeatures),
       
       // Utilities & Systems
-      heating: mlsData.Heating,
-      cooling: mlsData.Cooling,
-      waterSource: mlsData.WaterSource,
-      sewer: mlsData.Sewer,
-      utilities: mlsData.Utilities,
+      heating: this.ensureArray(mlsData.Heating),
+      cooling: this.ensureArray(mlsData.Cooling),
+      waterSource: this.ensureArray(mlsData.WaterSource),
+      sewer: this.ensureArray(mlsData.Sewer),
+      utilities: this.ensureArray(mlsData.Utilities),
       
       // Green/Sustainability
-      greenEnergyEfficient: mlsData.GreenEnergyEfficient,
-      greenSustainability: mlsData.GreenSustainability,
-      greenBuildingVerificationType: mlsData.GreenBuildingVerificationType,
+      greenEnergyEfficient: this.ensureArray(mlsData.GreenEnergyEfficient),
+      greenSustainability: this.ensureArray(mlsData.GreenSustainability),
+      greenBuildingVerificationType: this.ensureArray(mlsData.GreenBuildingVerificationType),
       greenVerificationMetric: mlsData.GreenVerificationMetric,
-      greenVerificationStatus: mlsData.GreenVerificationStatus,
+      greenVerificationStatus: this.ensureArray(mlsData.GreenVerificationStatus),
       greenVerificationRating: mlsData.GreenVerificationRating,
       greenVerificationYear: mlsData.GreenVerificationYear,
       
