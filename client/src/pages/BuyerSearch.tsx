@@ -98,26 +98,112 @@ interface SearchFilters {
   maxHalfBaths?: number;
   minTotalBaths?: number;
   maxTotalBaths?: number;
+  minGarageSpaces?: number;
+  maxGarageSpaces?: number;
+  minTotalParkingSpaces?: number;
+  maxTotalParkingSpaces?: number;
   
-  // Features
-  selectLevels?: string;
-  selectLevelsMode?: string;
-  newConstruction?: string;
-  builderName?: string;
-  builderNameMode?: string;
-  roofType?: string;
-  roofTypeMode?: string;
-  minFireplaces?: number;
-  maxFireplaces?: number;
+  // Location Extended
+  county?: string;
+  countyMode?: string;
+  
+  // Property Condition & HOA
   propertyCondition?: string;
-  utilities?: string;
-  utilitiesMode?: string;
+  propertyConditionMode?: string;
+  hoa?: string;
+  hoaMode?: string;
+  
+  // Levels
+  levels?: string;
+  levelsMode?: string;
+  primaryBedOnMain?: string;
+  
+  // Pool & Waterfront
+  privatePool?: string;
+  privatePoolMode?: string;
+  poolFeatures?: string;
+  poolFeaturesMode?: string;
+  waterfront?: string;
+  waterfrontMode?: string;
+  waterfrontFeatures?: string;
+  waterfrontFeaturesMode?: string;
+  view?: string;
+  viewMode?: string;
+  viewFeatures?: string;
+  viewFeaturesMode?: string;
+  
+  // Horse
+  horse?: string;
+  horseMode?: string;
+  horseAmenities?: string;
+  horseAmenitiesMode?: string;
+  
+  // Features Extended
   interiorFeatures?: string;
   interiorFeaturesMode?: string;
-  directionFaces?: string;
-  directionFacesMode?: string;
-  restrictions?: string;
-  restrictionsMode?: string;
+  flooring?: string;
+  flooringMode?: string;
+  fireplaceFeatures?: string;
+  fireplaceMode?: string;
+  windowFeatures?: string;
+  windowFeaturesMode?: string;
+  accessibilityFeatures?: string;
+  accessibilityMode?: string;
+  securityFeatures?: string;
+  securityMode?: string;
+  
+  // Exterior
+  exteriorFeatures?: string;
+  exteriorFeaturesMode?: string;
+  foundation?: string;
+  foundationMode?: string;
+  lotFeatures?: string;
+  lotFeaturesMode?: string;
+  fencing?: string;
+  fencingMode?: string;
+  patioAndPorchFeatures?: string;
+  patioAndPorchMode?: string;
+  spaFeatures?: string;
+  spaFeaturesMode?: string;
+  
+  // Community
+  communityFeatures?: string;
+  communityFeaturesMode?: string;
+  parkingFeatures?: string;
+  parkingFeaturesMode?: string;
+  
+  // Utilities Extended
+  heating?: string;
+  heatingMode?: string;
+  cooling?: string;
+  coolingMode?: string;
+  waterSource?: string;
+  waterSourceMode?: string;
+  sewer?: string;
+  sewerMode?: string;
+  utilities?: string;
+  utilitiesMode?: string;
+  
+  // Green Building
+  greenEnergyEfficient?: string;
+  greenEnergyEfficientMode?: string;
+  greenSustainability?: string;
+  greenSustainabilityMode?: string;
+  greenBuildingVerificationType?: string;
+  greenVerificationStatus?: string;
+  greenVerificationStatusMode?: string;
+  greenVerificationRating?: string;
+  greenVerificationYear?: number;
+  
+  // Listing Conditions
+  flexListing?: string;
+  specialListingConditions?: string;
+  specialListingConditionsMode?: string;
+  showingRequirements?: string;
+  showingRequirementsMode?: string;
+  occupantType?: string;
+  possession?: string;
+  possessionMode?: string;
   acceptableFinancing?: string;
   acceptableFinancingMode?: string;
   
@@ -143,12 +229,18 @@ export default function BuyerSearch() {
       maxPrice: 'listPriceMax',
       minBeds: 'bedroomsMin',
       maxBeds: 'bedroomsMax',
+      minMainLevelBeds: 'mainLevelBedroomsMin',
+      maxMainLevelBeds: 'mainLevelBedroomsMax',
       minFullBaths: 'fullBathsMin',
       maxFullBaths: 'fullBathsMax',
       minHalfBaths: 'halfBathsMin',
       maxHalfBaths: 'halfBathsMax',
       minTotalBaths: 'totalBathsMin',
       maxTotalBaths: 'totalBathsMax',
+      minGarageSpaces: 'garageSpacesMin',
+      maxGarageSpaces: 'garageSpacesMax',
+      minTotalParkingSpaces: 'totalParkingSpacesMin',
+      maxTotalParkingSpaces: 'totalParkingSpacesMax',
       minLivingArea: 'livingArea.min',
       maxLivingArea: 'livingArea.max',
       minYearBuilt: 'yearBuilt.min',
@@ -157,6 +249,12 @@ export default function BuyerSearch() {
       maxLotSizeSqFt: 'lotSizeSquareFeet.max',
       minLotSizeAcres: 'lotSizeAcres.min',
       maxLotSizeAcres: 'lotSizeAcres.max',
+      hoa: 'associationYN',
+      privatePool: 'poolPrivateYN',
+      waterfront: 'waterfrontYN',
+      view: 'viewYN',
+      horse: 'horseYN',
+      flexListing: 'flexListingYN',
     };
     
     Object.entries(filters).forEach(([key, value]) => {
@@ -868,6 +966,172 @@ export default function BuyerSearch() {
                       />
                     </div>
                   </div>
+                </div>
+
+                {/* Garage Spaces */}
+                <div className="space-y-3">
+                  <Label className="text-base font-semibold"># Garage Spaces</Label>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <Label className="text-xs text-muted-foreground">Min</Label>
+                      <Input
+                        type="number"
+                        placeholder="Min"
+                        value={filters.minGarageSpaces || ''}
+                        onChange={(e) => updateFilter('minGarageSpaces', e.target.value ? Number(e.target.value) : undefined)}
+                        data-testid="input-minGarageSpaces"
+                        className="h-10"
+                      />
+                    </div>
+                    <div>
+                      <Label className="text-xs text-muted-foreground">Max</Label>
+                      <Input
+                        type="number"
+                        placeholder="Max"
+                        value={filters.maxGarageSpaces || ''}
+                        onChange={(e) => updateFilter('maxGarageSpaces', e.target.value ? Number(e.target.value) : undefined)}
+                        data-testid="input-maxGarageSpaces"
+                        className="h-10"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Total Parking Spaces */}
+                <div className="space-y-3">
+                  <Label className="text-base font-semibold">Total Parking Spaces</Label>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <Label className="text-xs text-muted-foreground">Min</Label>
+                      <Input
+                        type="number"
+                        placeholder="Min"
+                        value={filters.minTotalParkingSpaces || ''}
+                        onChange={(e) => updateFilter('minTotalParkingSpaces', e.target.value ? Number(e.target.value) : undefined)}
+                        data-testid="input-minTotalParkingSpaces"
+                        className="h-10"
+                      />
+                    </div>
+                    <div>
+                      <Label className="text-xs text-muted-foreground">Max</Label>
+                      <Input
+                        type="number"
+                        placeholder="Max"
+                        value={filters.maxTotalParkingSpaces || ''}
+                        onChange={(e) => updateFilter('maxTotalParkingSpaces', e.target.value ? Number(e.target.value) : undefined)}
+                        data-testid="input-maxTotalParkingSpaces"
+                        className="h-10"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                <Separator className="my-4" />
+
+                {/* Property Condition */}
+                <div className="space-y-3">
+                  <Label className="text-base font-semibold">Property Condition</Label>
+                  <div className="space-y-2">
+                    <RadioGroup
+                      value={filters.propertyConditionMode || 'Or'}
+                      onValueChange={(value) => updateFilter('propertyConditionMode', value)}
+                    >
+                      <div className="flex gap-4">
+                        <div className="flex items-center space-x-2">
+                          <RadioGroupItem value="And" id="propertyCondition-and" />
+                          <Label htmlFor="propertyCondition-and" className="font-normal cursor-pointer">And</Label>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <RadioGroupItem value="Or" id="propertyCondition-or" />
+                          <Label htmlFor="propertyCondition-or" className="font-normal cursor-pointer">Or</Label>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <RadioGroupItem value="Not" id="propertyCondition-not" />
+                          <Label htmlFor="propertyCondition-not" className="font-normal cursor-pointer">Not</Label>
+                        </div>
+                      </div>
+                    </RadioGroup>
+                    <Input
+                      type="text"
+                      placeholder="e.g., Excellent, Good, Average"
+                      value={filters.propertyCondition || ''}
+                      onChange={(e) => updateFilter('propertyCondition', e.target.value)}
+                      data-testid="input-propertyCondition"
+                      className="h-10"
+                    />
+                  </div>
+                </div>
+
+                {/* HOA */}
+                <div className="space-y-3">
+                  <Label className="text-base font-semibold">HOA?</Label>
+                  <div className="space-y-2">
+                    <RadioGroup
+                      value={filters.hoaMode || 'Or'}
+                      onValueChange={(value) => updateFilter('hoaMode', value)}
+                    >
+                      <div className="flex gap-4">
+                        <div className="flex items-center space-x-2">
+                          <RadioGroupItem value="And" id="hoa-and" />
+                          <Label htmlFor="hoa-and" className="font-normal cursor-pointer">And</Label>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <RadioGroupItem value="Or" id="hoa-or" />
+                          <Label htmlFor="hoa-or" className="font-normal cursor-pointer">Or</Label>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <RadioGroupItem value="Not" id="hoa-not" />
+                          <Label htmlFor="hoa-not" className="font-normal cursor-pointer">Not</Label>
+                        </div>
+                      </div>
+                    </RadioGroup>
+                    <Select
+                      value={filters.hoa || ''}
+                      onValueChange={(value) => updateFilter('hoa', value)}
+                    >
+                      <SelectTrigger className="h-10" data-testid="select-hoa">
+                        <SelectValue placeholder="Select" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="true">Yes</SelectItem>
+                        <SelectItem value="false">No</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+
+                {/* Private Pool */}
+                <div className="space-y-3">
+                  <Label className="text-base font-semibold">Private Pool?</Label>
+                  <Select
+                    value={filters.privatePool || ''}
+                    onValueChange={(value) => updateFilter('privatePool', value)}
+                  >
+                    <SelectTrigger className="h-10" data-testid="select-privatePool">
+                      <SelectValue placeholder="Select" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="true">Yes</SelectItem>
+                      <SelectItem value="false">No</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {/* Waterfront */}
+                <div className="space-y-3">
+                  <Label className="text-base font-semibold">Waterfront?</Label>
+                  <Select
+                    value={filters.waterfront || ''}
+                    onValueChange={(value) => updateFilter('waterfront', value)}
+                  >
+                    <SelectTrigger className="h-10" data-testid="select-waterfront">
+                      <SelectValue placeholder="Select" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="true">Yes</SelectItem>
+                      <SelectItem value="false">No</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
 
                 <div className="pt-4">
