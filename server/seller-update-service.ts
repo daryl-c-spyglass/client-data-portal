@@ -131,6 +131,23 @@ export function calculateMarketSummary(properties: Property[]) {
     .filter(p => p.daysOnMarket !== null && p.daysOnMarket !== undefined)
     .reduce((sum, p, _, arr) => sum + (p.daysOnMarket! / arr.length), 0);
   
+  // Calculate average price per square foot
+  const propertiesWithArea = properties.filter(p => 
+    p.livingArea !== null && 
+    p.livingArea !== undefined && 
+    parseFloat(p.livingArea) > 0 &&
+    p.listPrice !== null &&
+    p.listPrice !== undefined
+  );
+  
+  const avgPricePerSqft = propertiesWithArea.length > 0
+    ? propertiesWithArea.reduce((sum, p) => {
+        const price = parseFloat(p.listPrice!);
+        const area = parseFloat(p.livingArea!);
+        return sum + (price / area);
+      }, 0) / propertiesWithArea.length
+    : 0;
+  
   return {
     totalListings: properties.length,
     activeListings: properties.filter(p => p.standardStatus === 'Active').length,
@@ -142,5 +159,6 @@ export function calculateMarketSummary(properties: Property[]) {
     avgDaysOnMarket: Math.round(avgDaysOnMarket),
     lowestPrice: prices.length > 0 ? Math.min(...prices) : 0,
     highestPrice: prices.length > 0 ? Math.max(...prices) : 0,
+    avgPricePerSqft: Math.round(avgPricePerSqft),
   };
 }

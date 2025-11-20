@@ -314,12 +314,37 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/seller-updates", async (req, res) => {
     try {
       const updateData = insertSellerUpdateSchema.parse(req.body);
-      const update = await storage.createSellerUpdate(updateData);
+      
+      // For embeddable widgets: create or find user by email if userId is "guest"
+      let userId = updateData.userId;
+      if (userId === "guest") {
+        const email = updateData.email;
+        let user = await storage.getUserByEmail(email);
+        
+        if (!user) {
+          // Create a new user with minimal info from the form
+          user = await storage.createUser({
+            email,
+            passwordHash: "", // Empty for guest users created from embed forms
+            role: "client",
+            firstName: updateData.name.split(' ')[0],
+            lastName: updateData.name.split(' ').slice(1).join(' ') || "",
+          });
+        }
+        
+        userId = user.id;
+      }
+      
+      const update = await storage.createSellerUpdate({
+        ...updateData,
+        userId,
+      });
       res.status(201).json(update);
     } catch (error) {
       if (error instanceof z.ZodError) {
         res.status(400).json({ error: "Invalid seller update data", details: error.errors });
       } else {
+        console.error("Error creating seller update:", error);
         res.status(500).json({ error: "Failed to create seller update" });
       }
     }
@@ -377,6 +402,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(schools.slice(0, 50)); // Limit to 50 results for autocomplete
     } catch (error) {
       res.status(500).json({ error: "Failed to fetch elementary schools" });
+    }
+  });
+
+  app.get("/api/properties/types", async (req, res) => {
+    try {
+      const allProperties = await storage.getAllProperties();
+      
+      // Get unique property subtypes and sort
+      const types = Array.from(new Set(
+        allProperties
+          .map(p => p.propertySubType)
+          .filter((type): type is string => 
+            type !== null && 
+            type !== undefined && 
+            type.trim() !== ''
+          )
+      )).sort();
+      
+      res.json(types);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch property types" });
     }
   });
 

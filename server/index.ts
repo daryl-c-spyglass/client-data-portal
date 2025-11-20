@@ -9,6 +9,7 @@ import { seedData } from "./seed-data";
 import { setupAuth } from "./auth";
 import { createMLSGridClient } from "./mlsgrid-client";
 import { startMLSGridSync } from "./mlsgrid-sync";
+import { startEmailScheduler } from "./email-scheduler";
 
 const app = express();
 
@@ -98,6 +99,12 @@ app.use((req, res, next) => {
   } else if (!process.env.MLSGRID_API_TOKEN) {
     // Seed sample data for development when MLS Grid is not configured
     await seedData();
+  }
+  
+  // Start email scheduler for seller updates
+  if (process.env.DATABASE_URL) {
+    console.log('📧 Starting email scheduler for seller updates...');
+    startEmailScheduler();
   }
   
   const server = await registerRoutes(app);

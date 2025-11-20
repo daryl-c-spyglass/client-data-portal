@@ -12,6 +12,11 @@ import CMAs from "@/pages/CMAs";
 import CMANew from "@/pages/CMANew";
 import PropertyDetailPage from "@/pages/PropertyDetailPage";
 import CMADetailPage from "@/pages/CMADetailPage";
+import SellerUpdates from "@/pages/SellerUpdates";
+import SellerUpdateNew from "@/pages/SellerUpdateNew";
+import SellerUpdateEmbed from "@/pages/SellerUpdateEmbed";
+import EmbedCodeGenerator from "@/pages/EmbedCodeGenerator";
+import BuyerSearch from "@/pages/BuyerSearch";
 
 function Router() {
   return (
@@ -22,6 +27,10 @@ function Router() {
       <Route path="/cmas" component={CMAs} />
       <Route path="/cmas/new" component={CMANew} />
       <Route path="/cmas/:id" component={CMADetailPage} />
+      <Route path="/seller-updates" component={SellerUpdates} />
+      <Route path="/seller-updates/new" component={SellerUpdateNew} />
+      <Route path="/buyer-search" component={BuyerSearch} />
+      <Route path="/embed-code" component={EmbedCodeGenerator} />
       <Route path="/clients" component={() => <div className="p-6">Clients page coming soon</div>} />
       <Route path="/analytics" component={() => <div className="p-6">Analytics page coming soon</div>} />
       <Route path="/settings" component={() => <div className="p-6">Settings page coming soon</div>} />
@@ -40,24 +49,32 @@ export default function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
-        <SidebarProvider style={style as React.CSSProperties}>
-          <div className="flex h-screen w-full">
-            <AppSidebar />
-            <div className="flex flex-col flex-1 overflow-hidden">
-              <header className="flex items-center justify-between p-4 border-b bg-background">
-                <SidebarTrigger data-testid="button-sidebar-toggle" />
-                <div className="text-sm text-muted-foreground">
-                  MLS Grid IDX Platform
+        <Switch>
+          {/* Embed route without sidebar */}
+          <Route path="/embed/seller-update" component={SellerUpdateEmbed} />
+          
+          {/* All other routes with sidebar */}
+          <Route>
+            <SidebarProvider style={style as React.CSSProperties}>
+              <div className="flex h-screen w-full">
+                <AppSidebar />
+                <div className="flex flex-col flex-1 overflow-hidden">
+                  <header className="flex items-center justify-between p-4 border-b bg-background">
+                    <SidebarTrigger data-testid="button-sidebar-toggle" />
+                    <div className="text-sm text-muted-foreground">
+                      MLS Grid IDX Platform
+                    </div>
+                  </header>
+                  <main className="flex-1 overflow-auto p-6">
+                    <div className="max-w-7xl mx-auto">
+                      <Router />
+                    </div>
+                  </main>
                 </div>
-              </header>
-              <main className="flex-1 overflow-auto p-6">
-                <div className="max-w-7xl mx-auto">
-                  <Router />
-                </div>
-              </main>
-            </div>
-          </div>
-        </SidebarProvider>
+              </div>
+            </SidebarProvider>
+          </Route>
+        </Switch>
         <Toaster />
       </TooltipProvider>
     </QueryClientProvider>

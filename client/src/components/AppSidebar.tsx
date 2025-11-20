@@ -1,4 +1,4 @@
-import { Home, Search, FileText, Users, Settings, BarChart3 } from "lucide-react";
+import { Home, Search, FileText, Users, Settings, BarChart3, Mail, Code2, Filter } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import {
   Sidebar,
@@ -30,6 +30,24 @@ const menuItems = [
     url: "/cmas",
     icon: FileText,
     testId: "link-cmas",
+  },
+  {
+    title: "Seller Updates",
+    url: "/seller-updates",
+    icon: Mail,
+    testId: "link-seller-updates",
+  },
+  {
+    title: "Buyer Search",
+    url: "/buyer-search",
+    icon: Filter,
+    testId: "link-buyer-search",
+  },
+  {
+    title: "Embed Code",
+    url: "/embed-code",
+    icon: Code2,
+    testId: "link-embed-code",
   },
   {
     title: "Clients",
