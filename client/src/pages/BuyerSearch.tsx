@@ -137,9 +137,33 @@ export default function BuyerSearch() {
   const buildQueryString = () => {
     const params = new URLSearchParams();
     
+    // Map frontend filter names to backend search criteria names
+    const fieldMapping: Record<string, string> = {
+      minPrice: 'listPriceMin',
+      maxPrice: 'listPriceMax',
+      minBeds: 'bedroomsMin',
+      maxBeds: 'bedroomsMax',
+      minFullBaths: 'fullBathsMin',
+      maxFullBaths: 'fullBathsMax',
+      minHalfBaths: 'halfBathsMin',
+      maxHalfBaths: 'halfBathsMax',
+      minTotalBaths: 'totalBathsMin',
+      maxTotalBaths: 'totalBathsMax',
+      minLivingArea: 'livingArea.min',
+      maxLivingArea: 'livingArea.max',
+      minYearBuilt: 'yearBuilt.min',
+      maxYearBuilt: 'yearBuilt.max',
+      minLotSizeSqFt: 'lotSizeSquareFeet.min',
+      maxLotSizeSqFt: 'lotSizeSquareFeet.max',
+      minLotSizeAcres: 'lotSizeAcres.min',
+      maxLotSizeAcres: 'lotSizeAcres.max',
+    };
+    
     Object.entries(filters).forEach(([key, value]) => {
       if (value !== undefined && value !== '' && value !== null) {
-        params.set(key, String(value));
+        // Use mapped name if available, otherwise use original key
+        const mappedKey = fieldMapping[key] || key;
+        params.set(mappedKey, String(value));
       }
     });
     
