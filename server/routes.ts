@@ -104,8 +104,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
         delete criteria['lotSizeAcres.max'];
       }
       
-      const properties = await storage.getProperties(criteria);
-      res.json(properties);
+      const allMatchingProperties = await storage.getProperties(criteria);
+      
+      // Limit to 1000 properties by default to prevent OOM errors
+      // Supports optional limit and offset query parameters for pagination
+      const limit = parseInt(req.query.limit as string) || 1000;
+      const offset = parseInt(req.query.offset as string) || 0;
+      
+      const paginatedProperties = allMatchingProperties.slice(offset, offset + limit);
+      
+      res.json(paginatedProperties);
     } catch (error) {
       if (error instanceof z.ZodError) {
         console.error("Search validation error:", error.errors);
