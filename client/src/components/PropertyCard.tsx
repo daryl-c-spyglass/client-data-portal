@@ -2,7 +2,7 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
-import { ShoppingCart, Bed, Bath, Maximize } from "lucide-react";
+import { ShoppingCart, Bed, Bath, Maximize, MapPin, Calendar, TrendingUp, Home } from "lucide-react";
 import type { Property, Media } from "@shared/schema";
 
 interface PropertyCardProps {
@@ -14,12 +14,12 @@ interface PropertyCardProps {
   onClick?: () => void;
 }
 
-const statusColors = {
-  Active: "bg-green-500",
-  "Under Contract": "bg-yellow-500",
-  Closed: "bg-red-500",
-  Pending: "bg-blue-500",
-};
+const statusConfig = {
+  Active: { color: "bg-emerald-500", textColor: "text-white" },
+  "Under Contract": { color: "bg-amber-500", textColor: "text-white" },
+  Closed: { color: "bg-slate-500", textColor: "text-white" },
+  Pending: { color: "bg-blue-500", textColor: "text-white" },
+} as const;
 
 export function PropertyCard({ 
   property, 
@@ -65,7 +65,7 @@ export function PropertyCard({
         {property.standardStatus && (
           <div className="absolute top-4 right-4">
             <Badge 
-              className={`${statusColors[property.standardStatus as keyof typeof statusColors] || 'bg-gray-500'} text-white`}
+              className={`${(statusConfig[property.standardStatus as keyof typeof statusConfig]?.color || 'bg-slate-500')} ${(statusConfig[property.standardStatus as keyof typeof statusConfig]?.textColor || 'text-white')}`}
               data-testid={`badge-status-${property.id}`}
             >
               {property.standardStatus}
@@ -101,39 +101,73 @@ export function PropertyCard({
       </div>
       
       {/* Property Details */}
-      <div className="p-4 space-y-2" onClick={onClick}>
-        {/* Key Stats */}
-        <div className="flex items-center gap-4 text-sm text-muted-foreground">
+      <div className="p-4 space-y-3" onClick={onClick}>
+        {/* Key Stats Row */}
+        <div className="flex items-center gap-3 text-sm text-muted-foreground flex-wrap">
           {property.bedroomsTotal !== null && (
-            <div className="flex items-center gap-1" data-testid={`text-beds-${property.id}`}>
+            <div className="flex items-center gap-1.5" data-testid={`text-beds-${property.id}`}>
               <Bed className="w-4 h-4" />
-              <span>{property.bedroomsTotal} beds</span>
+              <span className="font-medium">{property.bedroomsTotal}</span>
             </div>
           )}
           {property.bathroomsTotalInteger !== null && (
-            <div className="flex items-center gap-1" data-testid={`text-baths-${property.id}`}>
+            <div className="flex items-center gap-1.5" data-testid={`text-baths-${property.id}`}>
               <Bath className="w-4 h-4" />
-              <span>{property.bathroomsTotalInteger} baths</span>
+              <span className="font-medium">{property.bathroomsTotalInteger}</span>
             </div>
           )}
           {property.livingArea && (
-            <div className="flex items-center gap-1" data-testid={`text-sqft-${property.id}`}>
+            <div className="flex items-center gap-1.5" data-testid={`text-sqft-${property.id}`}>
               <Maximize className="w-4 h-4" />
-              <span>{Number(property.livingArea).toLocaleString()} sqft</span>
+              <span className="font-medium">{Number(property.livingArea).toLocaleString()} sqft</span>
             </div>
           )}
         </div>
         
         {/* Address */}
-        <h3 className="font-semibold text-base line-clamp-2" data-testid={`text-address-${property.id}`}>
+        <h3 className="font-semibold text-base line-clamp-2 leading-tight" data-testid={`text-address-${property.id}`}>
           {property.unparsedAddress || `${property.streetNumber || ''} ${property.streetName || ''}, ${property.city || ''}, ${property.stateOrProvince || ''} ${property.postalCode || ''}`.trim()}
         </h3>
         
-        {/* Additional Info */}
-        {property.daysOnMarket !== null && (
-          <p className="text-xs text-muted-foreground">
-            {property.daysOnMarket} days on market
-          </p>
+        {/* Location & Property Type */}
+        <div className="flex items-center justify-between gap-2 text-xs text-muted-foreground">
+          {property.city && property.stateOrProvince && (
+            <div className="flex items-center gap-1">
+              <MapPin className="w-3 h-3" />
+              <span className="line-clamp-1">{property.city}, {property.stateOrProvince}</span>
+            </div>
+          )}
+          {property.propertySubType && (
+            <div className="flex items-center gap-1">
+              <Home className="w-3 h-3" />
+              <span className="line-clamp-1">{property.propertySubType}</span>
+            </div>
+          )}
+        </div>
+        
+        {/* Additional Metrics */}
+        <div className="flex items-center justify-between gap-2 text-xs">
+          {property.daysOnMarket !== null && (
+            <div className="flex items-center gap-1 text-muted-foreground">
+              <Calendar className="w-3 h-3" />
+              <span>{property.daysOnMarket} days on market</span>
+            </div>
+          )}
+          {property.livingArea && property.listPrice && (
+            <div className="flex items-center gap-1 text-muted-foreground">
+              <TrendingUp className="w-3 h-3" />
+              <span className="font-medium">
+                ${Math.round(Number(property.listPrice) / Number(property.livingArea)).toLocaleString()}/sqft
+              </span>
+            </div>
+          )}
+        </div>
+        
+        {/* Year Built */}
+        {property.yearBuilt && (
+          <div className="text-xs text-muted-foreground">
+            Built in {property.yearBuilt}
+          </div>
         )}
       </div>
     </Card>
