@@ -29,7 +29,45 @@ This is a professional real estate IDX (Internet Data Exchange) platform powered
 
 **Performance Note**: Adding database columns does NOT slow down queries—PostgreSQL only loads requested columns. Proper column structure is faster than JSON querying.
 
+### Comprehensive Buyer Search UI Expansion (November 20, 2025)
 
+**Added 20+ New Filter Controls** matching Bramlett Partners interface:
+1. **Parking**: Garage Spaces (min/max), Total Parking Spaces (min/max)
+2. **Bedrooms**: Main Level Bedrooms (min/max)
+3. **Property Attributes**: Property Condition (text with And/Or/Not), HOA (Yes/No with And/Or/Not), Levels/Stories (comma-separated with And/Or/Not)
+4. **Amenities**: Private Pool (Yes/No), Waterfront (Yes/No), View (Yes/No), Horse Property (Yes/No), Primary Bedroom on Main (Yes/No)
+5. **Features (Array-based with And/Or/Not)**:
+   - Pool Features (e.g., "Heated, In Ground, Salt Water")
+   - Waterfront Features (e.g., "Lake, River, Ocean")
+   - View Features (e.g., "Mountain, City, Water")
+   - Horse Amenities (e.g., "Barn, Arena, Stalls")
+   - Interior Features (e.g., "Vaulted Ceiling, Walk-In Closet")
+   - Flooring (e.g., "Hardwood, Tile, Carpet")
+   - Fireplace Features (e.g., "Gas, Wood Burning")
+6. **Utilities (Array-based with And/Or/Not)**:
+   - Utilities (e.g., "Electric, Gas, Water")
+   - Heating (e.g., "Central, Heat Pump")
+   - Cooling (e.g., "Central Air, Window Units")
+
+**Query String Builder Enhancements**:
+- Implemented smart array handling: comma-separated values split into multiple `.values` parameters
+- Mode parameter mapping: Applied field mappings to mode keys (e.g., `hoaMode` → `associationYN.mode`)
+- Proper handling for both array and non-array filters with And/Or/Not operators
+- Field name normalization: Frontend names (hoa, privatePool) mapped to backend schema (associationYN, poolPrivateYN)
+
+**Critical Bug Fixes**:
+1. **OOM Crash Prevention**: Added pagination to `/api/properties/search` endpoint (default 1000 property limit) to prevent Node.js heap out-of-memory errors when serializing large result sets
+2. **Mode Parameter Regression**: Fixed buildQueryString to properly send mode parameters for non-array fields (city, postalCode, schools)
+3. **Field Mapping Consistency**: Applied fieldMapping lookup to mode keys for mapped boolean fields (HOA, pool, waterfront, etc.)
+
+**Testing**:
+- ✅ End-to-end tested with run_test tool:
+  - Price filters work without OOM crashes
+  - HOA filter with "Not" mode sends correct query parameters
+  - Pool Features array filter with "And" mode properly splits values
+  - All searches return 200 status with proper pagination
+
+**UI Coverage**: ~30+ of 50+ new fields now have UI controls exposed to users
 
 ### Completed Features (Tasks 1-5) ✅
 
