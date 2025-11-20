@@ -188,11 +188,15 @@ export async function seedData() {
 
   for (const property of sampleProperties) {
     try {
-      await storage.createProperty(property);
+      const existing = await storage.getPropertyByListingId(property.listingId);
+      if (!existing) {
+        await storage.createProperty(property);
+      }
     } catch (error) {
       console.error("Failed to seed property:", error);
     }
   }
 
-  console.log(`✅ Seeded ${sampleProperties.length} sample properties for development`);
+  const count = await storage.getAllProperties();
+  console.log(`✅ Seeded sample properties for development (${count.length} total)`);
 }

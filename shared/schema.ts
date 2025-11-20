@@ -90,9 +90,33 @@ export const insertMediaSchema = createInsertSchema(media).omit({ id: true });
 export type InsertMedia = z.infer<typeof insertMediaSchema>;
 export type Media = typeof media.$inferSelect;
 
+// Users Schema
+export const users = pgTable("users", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  email: text("email").notNull().unique(),
+  passwordHash: text("password_hash").notNull(),
+  role: text("role").notNull().default("client"),
+  firstName: text("first_name"),
+  lastName: text("last_name"),
+  phone: text("phone"),
+  company: text("company"),
+  licenseNumber: text("license_number"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+export const insertUserSchema = createInsertSchema(users).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export type InsertUser = z.infer<typeof insertUserSchema>;
+export type User = typeof users.$inferSelect;
+
 // Saved Searches Schema
 export const savedSearches = pgTable("saved_searches", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id),
   name: text("name").notNull(),
   criteria: json("criteria").notNull(),
   createdAt: timestamp("created_at").notNull().defaultNow(),
@@ -110,6 +134,7 @@ export type SavedSearch = typeof savedSearches.$inferSelect;
 // CMA Schema
 export const cmas = pgTable("cmas", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id),
   name: text("name").notNull(),
   subjectPropertyId: text("subject_property_id"),
   comparablePropertyIds: json("comparable_property_ids").$type<string[]>().notNull(),

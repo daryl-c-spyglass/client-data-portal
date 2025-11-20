@@ -10,10 +10,13 @@ import {
   type SearchCriteria,
   type PropertyStatistics,
   type TimelineDataPoint,
+  type User,
+  type InsertUser,
   properties,
   media,
   savedSearches,
-  cmas
+  cmas,
+  users
 } from "@shared/schema";
 import { randomUUID } from "crypto";
 import { drizzle } from "drizzle-orm/neon-serverless";
@@ -24,6 +27,13 @@ import ws from "ws";
 neonConfig.webSocketConstructor = ws;
 
 export interface IStorage {
+  // User operations
+  getUser(id: string): Promise<User | undefined>;
+  getUserByEmail(email: string): Promise<User | undefined>;
+  createUser(user: InsertUser): Promise<User>;
+  updateUser(id: string, user: Partial<User>): Promise<User | undefined>;
+  deleteUser(id: string): Promise<boolean>;
+  
   // Property operations
   getProperty(id: string): Promise<Property | undefined>;
   getPropertyByListingId(listingId: string): Promise<Property | undefined>;
@@ -41,6 +51,7 @@ export interface IStorage {
   
   // Saved search operations
   getSavedSearch(id: string): Promise<SavedSearch | undefined>;
+  getSavedSearchesByUser(userId: string): Promise<SavedSearch[]>;
   getAllSavedSearches(): Promise<SavedSearch[]>;
   createSavedSearch(search: InsertSavedSearch): Promise<SavedSearch>;
   updateSavedSearch(id: string, search: Partial<SavedSearch>): Promise<SavedSearch | undefined>;
@@ -48,6 +59,7 @@ export interface IStorage {
   
   // CMA operations
   getCma(id: string): Promise<Cma | undefined>;
+  getCmasByUser(userId: string): Promise<Cma[]>;
   getAllCmas(): Promise<Cma[]>;
   createCma(cma: InsertCma): Promise<Cma>;
   updateCma(id: string, cma: Partial<Cma>): Promise<Cma | undefined>;
@@ -59,16 +71,52 @@ export interface IStorage {
 }
 
 export class MemStorage implements IStorage {
+  private users: Map<string, User>;
   private properties: Map<string, Property>;
   private media: Map<string, Media>;
   private savedSearches: Map<string, SavedSearch>;
   private cmas: Map<string, Cma>;
 
   constructor() {
+    this.users = new Map();
     this.properties = new Map();
     this.media = new Map();
     this.savedSearches = new Map();
     this.cmas = new Map();
+  }
+
+  // User operations
+  async getUser(id: string): Promise<User | undefined> {
+    return this.users.get(id);
+  }
+
+  async getUserByEmail(email: string): Promise<User | undefined> {
+    return Array.from(this.users.values()).find(u => u.email === email);
+  }
+
+  async createUser(insertUser: InsertUser): Promise<User> {
+    const id = randomUUID();
+    const user: User = {
+      ...insertUser as any,
+      id,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+    this.users.set(id, user);
+    return user;
+  }
+
+  async updateUser(id: string, updates: Partial<User>): Promise<User | undefined> {
+    const user = this.users.get(id);
+    if (!user) return undefined;
+
+    const updated = { ...user, ...updates, updatedAt: new Date() };
+    this.users.set(id, updated);
+    return updated;
+  }
+
+  async deleteUser(id: string): Promise<boolean> {
+    return this.users.delete(id);
   }
 
   // Property operations
@@ -227,6 +275,10 @@ export class MemStorage implements IStorage {
     return this.savedSearches.get(id);
   }
 
+  async getSavedSearchesByUser(userId: string): Promise<SavedSearch[]> {
+    return Array.from(this.savedSearches.values()).filter(s => s.userId === userId);
+  }
+
   async getAllSavedSearches(): Promise<SavedSearch[]> {
     return Array.from(this.savedSearches.values());
   }
@@ -259,6 +311,10 @@ export class MemStorage implements IStorage {
   // CMA operations
   async getCma(id: string): Promise<Cma | undefined> {
     return this.cmas.get(id);
+  }
+
+  async getCmasByUser(userId: string): Promise<Cma[]> {
+    return Array.from(this.cmas.values()).filter(c => c.userId === userId);
   }
 
   async getAllCmas(): Promise<Cma[]> {
@@ -359,7 +415,33 @@ export class DbStorage implements IStorage {
 
   constructor(connectionString: string) {
     const pool = new Pool({ connectionString });
-    this.db = drizzle(pool, { schema: { properties, media, savedSearches, cmas } });
+    this.db = drizzle(pool, { schema: { users, properties, media, savedSearches, cmas } });
+  }
+
+  // User operations
+  async getUser(id: string): Promise<User | undefined> {
+    const result = await this.db.select().from(users).where(eq(users.id, id)).limit(1);
+    return result[0];
+  }
+
+  async getUserByEmail(email: string): Promise<User | undefined> {
+    const result = await this.db.select().from(users).where(eq(users.email, email)).limit(1);
+    return result[0];
+  }
+
+  async createUser(insertUser: InsertUser): Promise<User> {
+    const result = await this.db.insert(users).values(insertUser).returning();
+    return result[0];
+  }
+
+  async updateUser(id: string, updates: Partial<User>): Promise<User | undefined> {
+    const result = await this.db.update(users).set({ ...updates, updatedAt: new Date() }).where(eq(users.id, id)).returning();
+    return result[0];
+  }
+
+  async deleteUser(id: string): Promise<boolean> {
+    const result = await this.db.delete(users).where(eq(users.id, id));
+    return result.rowCount! > 0;
   }
 
   async getProperty(id: string): Promise<Property | undefined> {
@@ -467,6 +549,10 @@ export class DbStorage implements IStorage {
     return result[0];
   }
 
+  async getSavedSearchesByUser(userId: string): Promise<SavedSearch[]> {
+    return await this.db.select().from(savedSearches).where(eq(savedSearches.userId, userId));
+  }
+
   async getAllSavedSearches(): Promise<SavedSearch[]> {
     return await this.db.select().from(savedSearches);
   }
@@ -489,6 +575,10 @@ export class DbStorage implements IStorage {
   async getCma(id: string): Promise<Cma | undefined> {
     const result = await this.db.select().from(cmas).where(eq(cmas.id, id)).limit(1);
     return result[0];
+  }
+
+  async getCmasByUser(userId: string): Promise<Cma[]> {
+    return await this.db.select().from(cmas).where(eq(cmas.userId, userId));
   }
 
   async getAllCmas(): Promise<Cma[]> {

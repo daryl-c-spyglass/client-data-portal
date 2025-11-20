@@ -2,11 +2,57 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { createMLSGridClient } from "./mlsgrid-client";
-import { searchCriteriaSchema, insertCmaSchema } from "@shared/schema";
+import { searchCriteriaSchema, insertCmaSchema, insertUserSchema } from "@shared/schema";
 import { z } from "zod";
+import bcrypt from "bcryptjs";
+import passport from "passport";
+import { requireAuth, requireRole } from "./auth";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   const mlsGridClient = createMLSGridClient();
+
+  // Auth routes
+  app.post("/api/auth/register", async (req, res) => {
+    try {
+      // Rename passwordHash field to password for client-facing API
+      const { passwordHash, ...rest } = insertUserSchema.parse(req.body);
+      
+      const existingUser = await storage.getUserByEmail(rest.email);
+      if (existingUser) {
+        res.status(400).json({ error: "Email already in use" });
+        return;
+      }
+
+      const hashedPassword = await bcrypt.hash(passwordHash, 10);
+      const user = await storage.createUser({ ...rest, passwordHash: hashedPassword });
+      
+      // SECURITY: Never return password hash to client
+      const { passwordHash: _, ...safeUser } = user;
+      res.json(safeUser);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        res.status(400).json({ error: "Invalid data", details: error.errors });
+      } else {
+        res.status(500).json({ error: "Failed to register user" });
+      }
+    }
+  });
+
+  app.post("/api/auth/login", passport.authenticate("local"), (req, res) => {
+    // req.user is already sanitized by passport.deserializeUser
+    res.json(req.user);
+  });
+
+  app.post("/api/auth/logout", (req, res) => {
+    req.logout(() => {
+      res.json({ message: "Logged out successfully" });
+    });
+  });
+
+  app.get("/api/auth/me", requireAuth, (req, res) => {
+    // req.user is already sanitized by passport.deserializeUser
+    res.json(req.user);
+  });
 
   // Property routes
   app.get("/api/properties/search", async (req, res) => {

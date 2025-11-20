@@ -1,7 +1,12 @@
 import express, { type Request, Response, NextFunction } from "express";
+import session from "express-session";
+import passport from "passport";
+import ConnectPgSimple from "connect-pg-simple";
+import { Pool } from "@neondatabase/serverless";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 import { seedData } from "./seed-data";
+import { setupAuth } from "./auth";
 
 const app = express();
 
@@ -16,6 +21,39 @@ app.use(express.json({
   }
 }));
 app.use(express.urlencoded({ extended: false }));
+
+// Configure production-ready session store
+const PgSession = ConnectPgSimple(session);
+
+// In production, always require a persistent session store
+if (process.env.NODE_ENV === "production" && !process.env.DATABASE_URL) {
+  throw new Error("DATABASE_URL is required for production session storage");
+}
+
+const sessionStore = process.env.DATABASE_URL 
+  ? new PgSession({
+      pool: new Pool({ connectionString: process.env.DATABASE_URL }),
+      createTableIfMissing: true,
+    })
+  : undefined;
+
+app.use(
+  session({
+    store: sessionStore,
+    secret: process.env.SESSION_SECRET || "development-secret-change-in-production",
+    resave: false,
+    saveUninitialized: false,
+    cookie: {
+      secure: process.env.NODE_ENV === "production",
+      maxAge: 1000 * 60 * 60 * 24 * 7,
+    },
+  })
+);
+
+app.use(passport.initialize());
+app.use(passport.session());
+
+setupAuth();
 
 app.use((req, res, next) => {
   const start = Date.now();
