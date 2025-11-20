@@ -1,9 +1,11 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Grid3x3, List, Table as TableIcon } from "lucide-react";
 import { PropertyCard } from "./PropertyCard";
+import { PropertyListCard } from "./PropertyListCard";
+import { PropertyTable } from "./PropertyTable";
 import type { Property, Media } from "@shared/schema";
 
 interface PropertyResultsProps {
@@ -28,6 +30,9 @@ export function PropertyResults({
   const [viewMode, setViewMode] = useState<'grid' | 'list' | 'table'>('grid');
   const [sortBy, setSortBy] = useState('status');
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'pending' | 'under-contract' | 'closed'>('all');
+  const [displayCount, setDisplayCount] = useState(20);
+  
+  const ITEMS_PER_PAGE = 20;
 
   // Sort properties based on selected sort option
   const sortedProperties = [...properties].sort((a, b) => {
@@ -69,6 +74,27 @@ export function PropertyResults({
     : statusFilter === 'under-contract'
     ? statusGroups.underContract
     : statusGroups.closed;
+  
+  // Paginate the filtered properties
+  const displayedProperties = filteredProperties.slice(0, displayCount);
+  const hasMore = filteredProperties.length > displayCount;
+  
+  // Load more handler
+  const loadMore = () => {
+    setDisplayCount(prev => Math.min(prev + ITEMS_PER_PAGE, filteredProperties.length));
+  };
+  
+  // Reset pagination when filters, sort, or properties array changes
+  useEffect(() => {
+    setDisplayCount(ITEMS_PER_PAGE);
+  }, [statusFilter, sortBy, properties]);
+  
+  // Clamp display count if it exceeds filtered properties
+  useEffect(() => {
+    if (displayCount > filteredProperties.length && filteredProperties.length > 0) {
+      setDisplayCount(filteredProperties.length);
+    }
+  }, [displayCount, filteredProperties.length]);
 
   return (
     <div className="space-y-4">
@@ -97,6 +123,10 @@ export function PropertyResults({
         </div>
 
         <div className="flex items-center gap-4 flex-wrap">
+          <span className="text-sm text-muted-foreground" data-testid="text-results-count">
+            Showing {displayedProperties.length} of {filteredProperties.length}
+          </span>
+          
           <div className="flex items-center gap-2">
             <Button 
               variant="outline" 
@@ -156,13 +186,13 @@ export function PropertyResults({
       {/* Results Grid */}
       {viewMode === 'grid' && (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-          {filteredProperties.map(property => (
+          {displayedProperties.map(property => (
             <PropertyCard
               key={property.id}
               property={property}
               media={mediaMap.get(property.listingId)}
               selected={selectedIds.has(property.id)}
-              onSelect={(selected) => onToggleSelect(property.id)}
+              onSelect={() => onToggleSelect(property.id)}
               onAddToCart={() => onAddToCart(property)}
               onClick={() => onPropertyClick(property)}
             />
@@ -172,14 +202,14 @@ export function PropertyResults({
 
       {/* List View */}
       {viewMode === 'list' && (
-        <div className="space-y-4">
-          {filteredProperties.map(property => (
-            <PropertyCard
+        <div className="space-y-3">
+          {displayedProperties.map(property => (
+            <PropertyListCard
               key={property.id}
               property={property}
               media={mediaMap.get(property.listingId)}
               selected={selectedIds.has(property.id)}
-              onSelect={(selected) => onToggleSelect(property.id)}
+              onSelect={() => onToggleSelect(property.id)}
               onAddToCart={() => onAddToCart(property)}
               onClick={() => onPropertyClick(property)}
             />
@@ -187,10 +217,29 @@ export function PropertyResults({
         </div>
       )}
 
-      {/* Table View - placeholder for now */}
+      {/* Table View */}
       {viewMode === 'table' && (
-        <div className="text-center py-12 text-muted-foreground">
-          Table view - Coming soon
+        <PropertyTable
+          properties={displayedProperties}
+          selectedIds={selectedIds}
+          sortBy={sortBy}
+          onToggleSelect={onToggleSelect}
+          onSelectAll={onSelectAll}
+          onPropertyClick={onPropertyClick}
+          onAddToCart={onAddToCart}
+        />
+      )}
+      
+      {/* Load More Button */}
+      {hasMore && (
+        <div className="flex justify-center py-6">
+          <Button
+            variant="outline"
+            onClick={loadMore}
+            data-testid="button-load-more"
+          >
+            Load More ({filteredProperties.length - displayCount} remaining)
+          </Button>
         </div>
       )}
 
