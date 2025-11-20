@@ -42,6 +42,7 @@ export interface IStorage {
   updateProperty(id: string, property: Partial<Property>): Promise<Property | undefined>;
   deleteProperty(id: string): Promise<boolean>;
   getAllProperties(): Promise<Property[]>;
+  getPropertyCount(): Promise<number>;
   
   // Media operations
   getMedia(id: string): Promise<Media | undefined>;
@@ -245,6 +246,10 @@ export class MemStorage implements IStorage {
 
   async getAllProperties(): Promise<Property[]> {
     return Array.from(this.properties.values()).filter(p => p.mlgCanView);
+  }
+
+  async getPropertyCount(): Promise<number> {
+    return Array.from(this.properties.values()).filter(p => p.mlgCanView).length;
   }
 
   // Media operations
@@ -537,6 +542,14 @@ export class DbStorage implements IStorage {
 
   async getAllProperties(): Promise<Property[]> {
     return await this.db.select().from(properties).where(eq(properties.mlgCanView, true));
+  }
+
+  async getPropertyCount(): Promise<number> {
+    const result = await this.db
+      .select({ count: drizzleSql<number>`count(*)::int` })
+      .from(properties)
+      .where(eq(properties.mlgCanView, true));
+    return result[0]?.count || 0;
   }
 
   async getMedia(id: string): Promise<Media | undefined> {

@@ -6,7 +6,7 @@ import { Bed, Bath, Maximize, MapPin, Home, Calendar, DollarSign, ShoppingCart }
 
 interface PropertyListCardProps {
   property: Property;
-  media?: { MediaURL: string }[];
+  media?: { mediaURL: string; localPath?: string | null }[];
   selected?: boolean;
   onSelect?: (selected: boolean) => void;
   onClick?: () => void;
@@ -21,7 +21,7 @@ export function PropertyListCard({
   onClick,
   onAddToCart 
 }: PropertyListCardProps) {
-  const primaryImage = media?.[0]?.MediaURL;
+  const primaryImage = media?.[0]?.mediaURL || media?.[0]?.localPath;
   
   // Get status badge color
   const getStatusColor = (status: string | null) => {

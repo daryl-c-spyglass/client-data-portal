@@ -116,6 +116,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/properties/count", async (req, res) => {
+    try {
+      const count = await storage.getPropertyCount();
+      res.json({ count });
+    } catch (error) {
+      console.error("Failed to fetch property count:", error);
+      res.status(500).json({ error: "Failed to fetch property count" });
+    }
+  });
+
   app.get("/api/properties/:id", async (req, res) => {
     try {
       const property = await storage.getProperty(req.params.id);

@@ -14,10 +14,11 @@ export default function Properties() {
   const [searchCriteria, setSearchCriteria] = useState<SearchCriteria | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
-  // Fetch all properties for the count display
-  const { data: allProperties = [] } = useQuery<Property[]>({
-    queryKey: ['/api/properties'],
+  // Fetch total property count
+  const { data: countData } = useQuery<{ count: number }>({
+    queryKey: ['/api/properties/count'],
   });
+  const totalCount = countData?.count ?? 0;
 
   // Fetch properties with search criteria if available
   const { data: properties = [], isLoading, error } = useQuery<Property[]>({
@@ -67,8 +68,8 @@ export default function Properties() {
         <div>
           <h1 className="text-3xl font-bold mb-2" data-testid="text-properties-title">Properties</h1>
           <p className="text-muted-foreground">
-            {allProperties.length > 0 
-              ? `${allProperties.length} properties available in MLS Grid`
+            {totalCount > 0 
+              ? `${totalCount.toLocaleString()} properties available in MLS Grid`
               : 'Search and browse MLS Grid listings'
             }
           </p>
