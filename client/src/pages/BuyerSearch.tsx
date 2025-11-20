@@ -256,9 +256,51 @@ export default function BuyerSearch() {
       horse: 'horseYN',
       flexListing: 'flexListingYN',
     };
+
+    // Array-based fields that need special handling (comma-separated values → arrays)
+    const arrayFields = [
+      'propertyCondition', 'levels', 'poolFeatures', 'waterfrontFeatures', 
+      'viewFeatures', 'horseAmenities', 'interiorFeatures', 'flooring',
+      'fireplaceFeatures', 'windowFeatures', 'accessibilityFeatures',
+      'securityFeatures', 'exteriorFeatures', 'foundation', 'lotFeatures',
+      'fencing', 'patioAndPorchFeatures', 'spaFeatures', 'communityFeatures',
+      'parkingFeatures', 'heating', 'cooling', 'waterSource', 'sewer',
+      'utilities', 'greenEnergyEfficient', 'greenSustainability',
+      'specialListingConditions', 'showingRequirements', 'possession',
+      'acceptableFinancing'
+    ];
     
     Object.entries(filters).forEach(([key, value]) => {
       if (value !== undefined && value !== '' && value !== null) {
+        // Handle mode fields for non-array fields (city, postalCode, schools, etc.)
+        if (key.endsWith('Mode')) {
+          // Get the base field name (e.g., "city" from "cityMode")
+          const baseField = key.replace(/Mode$/, '');
+          
+          // Only add mode if this is NOT an array field (array fields handle their own modes)
+          if (!arrayFields.includes(baseField)) {
+            // Apply field mapping to mode key (e.g., hoa → associationYN)
+            const mappedField = fieldMapping[baseField] || baseField;
+            params.set(`${mappedField}.mode`, String(value));
+          }
+          return;
+        }
+        
+        // Handle array-based fields with comma-separated values
+        if (arrayFields.includes(key) && typeof value === 'string') {
+          const values = value.split(',').map(v => v.trim()).filter(v => v);
+          if (values.length > 0) {
+            // Get the mode for this field (And/Or/Not) - use 'OR' as default
+            const modeKey = `${key}Mode` as keyof SearchFilters;
+            const mode = filters[modeKey] || 'OR';
+            
+            // Add values array and mode
+            values.forEach(v => params.append(`${key}.values`, v));
+            params.set(`${key}.mode`, String(mode));
+          }
+          return;
+        }
+        
         // Use mapped name if available, otherwise use original key
         const mappedKey = fieldMapping[key] || key;
         params.set(mappedKey, String(value));
@@ -910,6 +952,35 @@ export default function BuyerSearch() {
                   </div>
                 </div>
 
+                {/* Main Level Bedrooms */}
+                <div className="space-y-3">
+                  <Label className="text-base font-semibold">Main Level Bedrooms</Label>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <Label className="text-xs text-muted-foreground">Min</Label>
+                      <Input
+                        type="number"
+                        placeholder="Min"
+                        value={filters.minMainLevelBeds || ''}
+                        onChange={(e) => updateFilter('minMainLevelBeds', e.target.value ? Number(e.target.value) : undefined)}
+                        data-testid="input-minMainLevelBeds"
+                        className="h-10"
+                      />
+                    </div>
+                    <div>
+                      <Label className="text-xs text-muted-foreground">Max</Label>
+                      <Input
+                        type="number"
+                        placeholder="Max"
+                        value={filters.maxMainLevelBeds || ''}
+                        onChange={(e) => updateFilter('maxMainLevelBeds', e.target.value ? Number(e.target.value) : undefined)}
+                        data-testid="input-maxMainLevelBeds"
+                        className="h-10"
+                      />
+                    </div>
+                  </div>
+                </div>
+
                 {/* Full Baths */}
                 <div className="space-y-3">
                   <Label className="text-base font-semibold"># Full Baths</Label>
@@ -1132,6 +1203,435 @@ export default function BuyerSearch() {
                       <SelectItem value="false">No</SelectItem>
                     </SelectContent>
                   </Select>
+                </div>
+
+                <Separator className="my-4" />
+
+                {/* Levels/Stories */}
+                <div className="space-y-3">
+                  <Label className="text-base font-semibold">Levels/Stories</Label>
+                  <div className="space-y-2">
+                    <RadioGroup
+                      value={filters.levelsMode || 'Or'}
+                      onValueChange={(value) => updateFilter('levelsMode', value)}
+                    >
+                      <div className="flex gap-4">
+                        <div className="flex items-center space-x-2">
+                          <RadioGroupItem value="And" id="levels-and" />
+                          <Label htmlFor="levels-and" className="font-normal cursor-pointer">And</Label>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <RadioGroupItem value="Or" id="levels-or" />
+                          <Label htmlFor="levels-or" className="font-normal cursor-pointer">Or</Label>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <RadioGroupItem value="Not" id="levels-not" />
+                          <Label htmlFor="levels-not" className="font-normal cursor-pointer">Not</Label>
+                        </div>
+                      </div>
+                    </RadioGroup>
+                    <Input
+                      type="text"
+                      placeholder="e.g., 1, 2, 3 (comma-separated)"
+                      value={filters.levels || ''}
+                      onChange={(e) => updateFilter('levels', e.target.value)}
+                      data-testid="input-levels"
+                      className="h-10"
+                    />
+                  </div>
+                </div>
+
+                {/* Primary Bedroom on Main */}
+                <div className="space-y-3">
+                  <Label className="text-base font-semibold">Primary Bedroom on Main?</Label>
+                  <Select
+                    value={filters.primaryBedOnMain || ''}
+                    onValueChange={(value) => updateFilter('primaryBedOnMain', value)}
+                  >
+                    <SelectTrigger className="h-10" data-testid="select-primaryBedOnMain">
+                      <SelectValue placeholder="Select" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="true">Yes</SelectItem>
+                      <SelectItem value="false">No</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {/* Pool Features */}
+                <div className="space-y-3">
+                  <Label className="text-base font-semibold">Pool Features</Label>
+                  <div className="space-y-2">
+                    <RadioGroup
+                      value={filters.poolFeaturesMode || 'Or'}
+                      onValueChange={(value) => updateFilter('poolFeaturesMode', value)}
+                    >
+                      <div className="flex gap-4">
+                        <div className="flex items-center space-x-2">
+                          <RadioGroupItem value="And" id="poolFeatures-and" />
+                          <Label htmlFor="poolFeatures-and" className="font-normal cursor-pointer">And</Label>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <RadioGroupItem value="Or" id="poolFeatures-or" />
+                          <Label htmlFor="poolFeatures-or" className="font-normal cursor-pointer">Or</Label>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <RadioGroupItem value="Not" id="poolFeatures-not" />
+                          <Label htmlFor="poolFeatures-not" className="font-normal cursor-pointer">Not</Label>
+                        </div>
+                      </div>
+                    </RadioGroup>
+                    <Input
+                      type="text"
+                      placeholder="e.g., Heated, In Ground, Salt Water (comma-separated)"
+                      value={filters.poolFeatures || ''}
+                      onChange={(e) => updateFilter('poolFeatures', e.target.value)}
+                      data-testid="input-poolFeatures"
+                      className="h-10"
+                    />
+                  </div>
+                </div>
+
+                {/* Waterfront Features */}
+                <div className="space-y-3">
+                  <Label className="text-base font-semibold">Waterfront Features</Label>
+                  <div className="space-y-2">
+                    <RadioGroup
+                      value={filters.waterfrontFeaturesMode || 'Or'}
+                      onValueChange={(value) => updateFilter('waterfrontFeaturesMode', value)}
+                    >
+                      <div className="flex gap-4">
+                        <div className="flex items-center space-x-2">
+                          <RadioGroupItem value="And" id="waterfrontFeatures-and" />
+                          <Label htmlFor="waterfrontFeatures-and" className="font-normal cursor-pointer">And</Label>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <RadioGroupItem value="Or" id="waterfrontFeatures-or" />
+                          <Label htmlFor="waterfrontFeatures-or" className="font-normal cursor-pointer">Or</Label>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <RadioGroupItem value="Not" id="waterfrontFeatures-not" />
+                          <Label htmlFor="waterfrontFeatures-not" className="font-normal cursor-pointer">Not</Label>
+                        </div>
+                      </div>
+                    </RadioGroup>
+                    <Input
+                      type="text"
+                      placeholder="e.g., Lake, River, Ocean (comma-separated)"
+                      value={filters.waterfrontFeatures || ''}
+                      onChange={(e) => updateFilter('waterfrontFeatures', e.target.value)}
+                      data-testid="input-waterfrontFeatures"
+                      className="h-10"
+                    />
+                  </div>
+                </div>
+
+                {/* View */}
+                <div className="space-y-3">
+                  <Label className="text-base font-semibold">View?</Label>
+                  <Select
+                    value={filters.view || ''}
+                    onValueChange={(value) => updateFilter('view', value)}
+                  >
+                    <SelectTrigger className="h-10" data-testid="select-view">
+                      <SelectValue placeholder="Select" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="true">Yes</SelectItem>
+                      <SelectItem value="false">No</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {/* View Features */}
+                <div className="space-y-3">
+                  <Label className="text-base font-semibold">View Features</Label>
+                  <div className="space-y-2">
+                    <RadioGroup
+                      value={filters.viewFeaturesMode || 'Or'}
+                      onValueChange={(value) => updateFilter('viewFeaturesMode', value)}
+                    >
+                      <div className="flex gap-4">
+                        <div className="flex items-center space-x-2">
+                          <RadioGroupItem value="And" id="viewFeatures-and" />
+                          <Label htmlFor="viewFeatures-and" className="font-normal cursor-pointer">And</Label>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <RadioGroupItem value="Or" id="viewFeatures-or" />
+                          <Label htmlFor="viewFeatures-or" className="font-normal cursor-pointer">Or</Label>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <RadioGroupItem value="Not" id="viewFeatures-not" />
+                          <Label htmlFor="viewFeatures-not" className="font-normal cursor-pointer">Not</Label>
+                        </div>
+                      </div>
+                    </RadioGroup>
+                    <Input
+                      type="text"
+                      placeholder="e.g., Mountain, City, Water (comma-separated)"
+                      value={filters.viewFeatures || ''}
+                      onChange={(e) => updateFilter('viewFeatures', e.target.value)}
+                      data-testid="input-viewFeatures"
+                      className="h-10"
+                    />
+                  </div>
+                </div>
+
+                {/* Horse */}
+                <div className="space-y-3">
+                  <Label className="text-base font-semibold">Horse Property?</Label>
+                  <Select
+                    value={filters.horse || ''}
+                    onValueChange={(value) => updateFilter('horse', value)}
+                  >
+                    <SelectTrigger className="h-10" data-testid="select-horse">
+                      <SelectValue placeholder="Select" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="true">Yes</SelectItem>
+                      <SelectItem value="false">No</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {/* Horse Amenities */}
+                <div className="space-y-3">
+                  <Label className="text-base font-semibold">Horse Amenities</Label>
+                  <div className="space-y-2">
+                    <RadioGroup
+                      value={filters.horseAmenitiesMode || 'Or'}
+                      onValueChange={(value) => updateFilter('horseAmenitiesMode', value)}
+                    >
+                      <div className="flex gap-4">
+                        <div className="flex items-center space-x-2">
+                          <RadioGroupItem value="And" id="horseAmenities-and" />
+                          <Label htmlFor="horseAmenities-and" className="font-normal cursor-pointer">And</Label>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <RadioGroupItem value="Or" id="horseAmenities-or" />
+                          <Label htmlFor="horseAmenities-or" className="font-normal cursor-pointer">Or</Label>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <RadioGroupItem value="Not" id="horseAmenities-not" />
+                          <Label htmlFor="horseAmenities-not" className="font-normal cursor-pointer">Not</Label>
+                        </div>
+                      </div>
+                    </RadioGroup>
+                    <Input
+                      type="text"
+                      placeholder="e.g., Barn, Arena, Stalls (comma-separated)"
+                      value={filters.horseAmenities || ''}
+                      onChange={(e) => updateFilter('horseAmenities', e.target.value)}
+                      data-testid="input-horseAmenities"
+                      className="h-10"
+                    />
+                  </div>
+                </div>
+
+                <Separator className="my-4" />
+
+                {/* Interior Features */}
+                <div className="space-y-3">
+                  <Label className="text-base font-semibold">Interior Features</Label>
+                  <div className="space-y-2">
+                    <RadioGroup
+                      value={filters.interiorFeaturesMode || 'Or'}
+                      onValueChange={(value) => updateFilter('interiorFeaturesMode', value)}
+                    >
+                      <div className="flex gap-4">
+                        <div className="flex items-center space-x-2">
+                          <RadioGroupItem value="And" id="interiorFeatures-and" />
+                          <Label htmlFor="interiorFeatures-and" className="font-normal cursor-pointer">And</Label>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <RadioGroupItem value="Or" id="interiorFeatures-or" />
+                          <Label htmlFor="interiorFeatures-or" className="font-normal cursor-pointer">Or</Label>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <RadioGroupItem value="Not" id="interiorFeatures-not" />
+                          <Label htmlFor="interiorFeatures-not" className="font-normal cursor-pointer">Not</Label>
+                        </div>
+                      </div>
+                    </RadioGroup>
+                    <Input
+                      type="text"
+                      placeholder="e.g., Vaulted Ceiling, Walk-In Closet (comma-separated)"
+                      value={filters.interiorFeatures || ''}
+                      onChange={(e) => updateFilter('interiorFeatures', e.target.value)}
+                      data-testid="input-interiorFeatures"
+                      className="h-10"
+                    />
+                  </div>
+                </div>
+
+                {/* Flooring */}
+                <div className="space-y-3">
+                  <Label className="text-base font-semibold">Flooring</Label>
+                  <div className="space-y-2">
+                    <RadioGroup
+                      value={filters.flooringMode || 'Or'}
+                      onValueChange={(value) => updateFilter('flooringMode', value)}
+                    >
+                      <div className="flex gap-4">
+                        <div className="flex items-center space-x-2">
+                          <RadioGroupItem value="And" id="flooring-and" />
+                          <Label htmlFor="flooring-and" className="font-normal cursor-pointer">And</Label>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <RadioGroupItem value="Or" id="flooring-or" />
+                          <Label htmlFor="flooring-or" className="font-normal cursor-pointer">Or</Label>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <RadioGroupItem value="Not" id="flooring-not" />
+                          <Label htmlFor="flooring-not" className="font-normal cursor-pointer">Not</Label>
+                        </div>
+                      </div>
+                    </RadioGroup>
+                    <Input
+                      type="text"
+                      placeholder="e.g., Hardwood, Tile, Carpet (comma-separated)"
+                      value={filters.flooring || ''}
+                      onChange={(e) => updateFilter('flooring', e.target.value)}
+                      data-testid="input-flooring"
+                      className="h-10"
+                    />
+                  </div>
+                </div>
+
+                {/* Fireplace Features */}
+                <div className="space-y-3">
+                  <Label className="text-base font-semibold">Fireplace Features</Label>
+                  <div className="space-y-2">
+                    <RadioGroup
+                      value={filters.fireplaceMode || 'Or'}
+                      onValueChange={(value) => updateFilter('fireplaceMode', value)}
+                    >
+                      <div className="flex gap-4">
+                        <div className="flex items-center space-x-2">
+                          <RadioGroupItem value="And" id="fireplace-and" />
+                          <Label htmlFor="fireplace-and" className="font-normal cursor-pointer">And</Label>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <RadioGroupItem value="Or" id="fireplace-or" />
+                          <Label htmlFor="fireplace-or" className="font-normal cursor-pointer">Or</Label>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <RadioGroupItem value="Not" id="fireplace-not" />
+                          <Label htmlFor="fireplace-not" className="font-normal cursor-pointer">Not</Label>
+                        </div>
+                      </div>
+                    </RadioGroup>
+                    <Input
+                      type="text"
+                      placeholder="e.g., Gas, Wood Burning (comma-separated)"
+                      value={filters.fireplaceFeatures || ''}
+                      onChange={(e) => updateFilter('fireplaceFeatures', e.target.value)}
+                      data-testid="input-fireplaceFeatures"
+                      className="h-10"
+                    />
+                  </div>
+                </div>
+
+                {/* Utilities */}
+                <div className="space-y-3">
+                  <Label className="text-base font-semibold">Utilities</Label>
+                  <div className="space-y-2">
+                    <RadioGroup
+                      value={filters.utilitiesMode || 'Or'}
+                      onValueChange={(value) => updateFilter('utilitiesMode', value)}
+                    >
+                      <div className="flex gap-4">
+                        <div className="flex items-center space-x-2">
+                          <RadioGroupItem value="And" id="utilities-and" />
+                          <Label htmlFor="utilities-and" className="font-normal cursor-pointer">And</Label>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <RadioGroupItem value="Or" id="utilities-or" />
+                          <Label htmlFor="utilities-or" className="font-normal cursor-pointer">Or</Label>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <RadioGroupItem value="Not" id="utilities-not" />
+                          <Label htmlFor="utilities-not" className="font-normal cursor-pointer">Not</Label>
+                        </div>
+                      </div>
+                    </RadioGroup>
+                    <Input
+                      type="text"
+                      placeholder="e.g., Electric, Gas, Water (comma-separated)"
+                      value={filters.utilities || ''}
+                      onChange={(e) => updateFilter('utilities', e.target.value)}
+                      data-testid="input-utilities"
+                      className="h-10"
+                    />
+                  </div>
+                </div>
+
+                {/* Heating */}
+                <div className="space-y-3">
+                  <Label className="text-base font-semibold">Heating</Label>
+                  <div className="space-y-2">
+                    <RadioGroup
+                      value={filters.heatingMode || 'Or'}
+                      onValueChange={(value) => updateFilter('heatingMode', value)}
+                    >
+                      <div className="flex gap-4">
+                        <div className="flex items-center space-x-2">
+                          <RadioGroupItem value="And" id="heating-and" />
+                          <Label htmlFor="heating-and" className="font-normal cursor-pointer">And</Label>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <RadioGroupItem value="Or" id="heating-or" />
+                          <Label htmlFor="heating-or" className="font-normal cursor-pointer">Or</Label>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <RadioGroupItem value="Not" id="heating-not" />
+                          <Label htmlFor="heating-not" className="font-normal cursor-pointer">Not</Label>
+                        </div>
+                      </div>
+                    </RadioGroup>
+                    <Input
+                      type="text"
+                      placeholder="e.g., Central, Heat Pump (comma-separated)"
+                      value={filters.heating || ''}
+                      onChange={(e) => updateFilter('heating', e.target.value)}
+                      data-testid="input-heating"
+                      className="h-10"
+                    />
+                  </div>
+                </div>
+
+                {/* Cooling */}
+                <div className="space-y-3">
+                  <Label className="text-base font-semibold">Cooling</Label>
+                  <div className="space-y-2">
+                    <RadioGroup
+                      value={filters.coolingMode || 'Or'}
+                      onValueChange={(value) => updateFilter('coolingMode', value)}
+                    >
+                      <div className="flex gap-4">
+                        <div className="flex items-center space-x-2">
+                          <RadioGroupItem value="And" id="cooling-and" />
+                          <Label htmlFor="cooling-and" className="font-normal cursor-pointer">And</Label>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <RadioGroupItem value="Or" id="cooling-or" />
+                          <Label htmlFor="cooling-or" className="font-normal cursor-pointer">Or</Label>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <RadioGroupItem value="Not" id="cooling-not" />
+                          <Label htmlFor="cooling-not" className="font-normal cursor-pointer">Not</Label>
+                        </div>
+                      </div>
+                    </RadioGroup>
+                    <Input
+                      type="text"
+                      placeholder="e.g., Central Air, Window Units (comma-separated)"
+                      value={filters.cooling || ''}
+                      onChange={(e) => updateFilter('cooling', e.target.value)}
+                      data-testid="input-cooling"
+                      className="h-10"
+                    />
+                  </div>
                 </div>
 
                 <div className="pt-4">
