@@ -27,27 +27,64 @@ export function PropertyResults({
 }: PropertyResultsProps) {
   const [viewMode, setViewMode] = useState<'grid' | 'list' | 'table'>('grid');
   const [sortBy, setSortBy] = useState('status');
+  const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'pending' | 'under-contract' | 'closed'>('all');
+
+  // Sort properties based on selected sort option
+  const sortedProperties = [...properties].sort((a, b) => {
+    switch (sortBy) {
+      case 'price-asc':
+        return (Number(a.listPrice) || 0) - (Number(b.listPrice) || 0);
+      case 'price-desc':
+        return (Number(b.listPrice) || 0) - (Number(a.listPrice) || 0);
+      case 'date-new':
+        return new Date(b.modificationTimestamp).getTime() - new Date(a.modificationTimestamp).getTime();
+      case 'date-old':
+        return new Date(a.modificationTimestamp).getTime() - new Date(b.modificationTimestamp).getTime();
+      case 'status':
+      default:
+        // Sort by status: Active -> Pending -> Under Contract -> Closed
+        const statusOrder = { 'Active': 0, 'Pending': 1, 'Under Contract': 2, 'Closed': 3 };
+        const aOrder = statusOrder[a.standardStatus as keyof typeof statusOrder] ?? 99;
+        const bOrder = statusOrder[b.standardStatus as keyof typeof statusOrder] ?? 99;
+        return aOrder - bOrder;
+    }
+  });
 
   // Group properties by status
   const statusGroups = {
-    all: properties,
-    active: properties.filter(p => p.standardStatus === 'Active'),
-    underContract: properties.filter(p => p.standardStatus === 'Under Contract'),
-    closed: properties.filter(p => p.standardStatus === 'Closed'),
+    all: sortedProperties,
+    active: sortedProperties.filter(p => p.standardStatus === 'Active'),
+    pending: sortedProperties.filter(p => p.standardStatus === 'Pending'),
+    underContract: sortedProperties.filter(p => p.standardStatus === 'Under Contract'),
+    closed: sortedProperties.filter(p => p.standardStatus === 'Closed'),
   };
+  
+  // Get current filtered properties
+  const filteredProperties = statusFilter === 'all' 
+    ? statusGroups.all
+    : statusFilter === 'active'
+    ? statusGroups.active
+    : statusFilter === 'pending'
+    ? statusGroups.pending
+    : statusFilter === 'under-contract'
+    ? statusGroups.underContract
+    : statusGroups.closed;
 
   return (
     <div className="space-y-4">
       {/* Header with counts and controls */}
       <div className="flex items-center justify-between flex-wrap gap-4 p-4 bg-muted/50 rounded-md">
         <div className="flex items-center gap-4">
-          <Tabs value="all" className="w-auto">
+          <Tabs value={statusFilter} onValueChange={(value) => setStatusFilter(value as typeof statusFilter)} className="w-auto">
             <TabsList>
               <TabsTrigger value="all" data-testid="tab-all">
                 {statusGroups.all.length} All
               </TabsTrigger>
               <TabsTrigger value="active" data-testid="tab-active">
                 {statusGroups.active.length} Active
+              </TabsTrigger>
+              <TabsTrigger value="pending" data-testid="tab-pending">
+                {statusGroups.pending.length} Pending
               </TabsTrigger>
               <TabsTrigger value="under-contract" data-testid="tab-under-contract">
                 {statusGroups.underContract.length} Under Contract
@@ -119,7 +156,7 @@ export function PropertyResults({
       {/* Results Grid */}
       {viewMode === 'grid' && (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-          {properties.map(property => (
+          {filteredProperties.map(property => (
             <PropertyCard
               key={property.id}
               property={property}
@@ -136,7 +173,7 @@ export function PropertyResults({
       {/* List View */}
       {viewMode === 'list' && (
         <div className="space-y-4">
-          {properties.map(property => (
+          {filteredProperties.map(property => (
             <PropertyCard
               key={property.id}
               property={property}
@@ -158,11 +195,14 @@ export function PropertyResults({
       )}
 
       {/* Empty State */}
-      {properties.length === 0 && (
+      {filteredProperties.length === 0 && (
         <div className="text-center py-12">
           <h3 className="text-lg font-semibold mb-2">No properties found</h3>
           <p className="text-muted-foreground">
-            Try adjusting your search criteria to see more results
+            {statusFilter !== 'all' 
+              ? `No ${statusFilter === 'under-contract' ? 'Under Contract' : statusFilter === 'pending' ? 'Pending' : statusFilter.charAt(0).toUpperCase() + statusFilter.slice(1)} properties. Try a different filter.`
+              : 'Try adjusting your search criteria to see more results'
+            }
           </p>
         </div>
       )}
