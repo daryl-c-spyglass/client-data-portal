@@ -154,6 +154,25 @@ export const insertCmaSchema = createInsertSchema(cmas).omit({
 export type InsertCma = z.infer<typeof insertCmaSchema>;
 export type Cma = typeof cmas.$inferSelect;
 
+// Sync Metadata Schema - Track MLS Grid sync state
+export const syncMetadata = pgTable("sync_metadata", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  syncType: text("sync_type").notNull().unique(), // 'properties' or 'media'
+  lastSyncTimestamp: timestamp("last_sync_timestamp"),
+  lastSyncStatus: text("last_sync_status"), // 'success', 'error', 'in_progress'
+  lastSyncMessage: text("last_sync_message"),
+  propertiesSynced: integer("properties_synced").default(0),
+  mediaSynced: integer("media_synced").default(0),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+export const insertSyncMetadataSchema = createInsertSchema(syncMetadata).omit({ 
+  id: true, 
+  updatedAt: true 
+});
+export type InsertSyncMetadata = z.infer<typeof insertSyncMetadataSchema>;
+export type SyncMetadata = typeof syncMetadata.$inferSelect;
+
 // Search Criteria Types (for validation) - All fields optional for flexible querying
 // Handle both single string and array for multi-select filters from query params
 const stringOrArray = z.union([z.string(), z.array(z.string())]).transform((val) => 

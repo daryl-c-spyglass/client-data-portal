@@ -45,8 +45,10 @@ export interface IStorage {
   
   // Media operations
   getMedia(id: string): Promise<Media | undefined>;
+  getMediaByKey(mediaKey: string): Promise<Media | undefined>;
   getMediaByResourceKey(resourceRecordKey: string): Promise<Media[]>;
   createMedia(media: InsertMedia): Promise<Media>;
+  updateMedia(id: string, media: Partial<Media>): Promise<Media | undefined>;
   deleteMedia(id: string): Promise<boolean>;
   
   // Saved search operations
@@ -250,6 +252,10 @@ export class MemStorage implements IStorage {
     return this.media.get(id);
   }
 
+  async getMediaByKey(mediaKey: string): Promise<Media | undefined> {
+    return Array.from(this.media.values()).find(m => m.mediaKey === mediaKey);
+  }
+
   async getMediaByResourceKey(resourceRecordKey: string): Promise<Media[]> {
     return Array.from(this.media.values()).filter(
       (m) => m.resourceRecordKey === resourceRecordKey
@@ -264,6 +270,15 @@ export class MemStorage implements IStorage {
     };
     this.media.set(id, mediaItem);
     return mediaItem;
+  }
+
+  async updateMedia(id: string, updates: Partial<Media>): Promise<Media | undefined> {
+    const mediaItem = this.media.get(id);
+    if (!mediaItem) return undefined;
+
+    const updated = { ...mediaItem, ...updates };
+    this.media.set(id, updated);
+    return updated;
   }
 
   async deleteMedia(id: string): Promise<boolean> {
@@ -529,6 +544,11 @@ export class DbStorage implements IStorage {
     return result[0];
   }
 
+  async getMediaByKey(mediaKey: string): Promise<Media | undefined> {
+    const result = await this.db.select().from(media).where(eq(media.mediaKey, mediaKey)).limit(1);
+    return result[0];
+  }
+
   async getMediaByResourceKey(resourceRecordKey: string): Promise<Media[]> {
     return await this.db.select().from(media).where(eq(media.resourceRecordKey, resourceRecordKey));
   }
@@ -536,6 +556,11 @@ export class DbStorage implements IStorage {
   async createMedia(insertMedia: InsertMedia): Promise<Media> {
     const id = randomUUID();
     const result = await this.db.insert(media).values({ ...insertMedia, id }).returning();
+    return result[0];
+  }
+
+  async updateMedia(id: string, updates: Partial<Media>): Promise<Media | undefined> {
+    const result = await this.db.update(media).set(updates).where(eq(media.id, id)).returning();
     return result[0];
   }
 

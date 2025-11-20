@@ -7,6 +7,8 @@ import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 import { seedData } from "./seed-data";
 import { setupAuth } from "./auth";
+import { createMLSGridClient } from "./mlsgrid-client";
+import { startMLSGridSync } from "./mlsgrid-sync";
 
 const app = express();
 
@@ -86,8 +88,15 @@ app.use((req, res, next) => {
 });
 
 (async () => {
-  // Seed sample data for development when MLS Grid is not configured
-  if (!process.env.MLSGRID_API_TOKEN) {
+  // Initialize MLS Grid sync or seed sample data
+  const mlsGridClient = createMLSGridClient();
+  
+  if (mlsGridClient && process.env.DATABASE_URL) {
+    // Start automatic background sync (every 60 minutes)
+    console.log('🚀 MLS Grid API configured - starting automatic sync...');
+    startMLSGridSync(mlsGridClient, 60);
+  } else if (!process.env.MLSGRID_API_TOKEN) {
+    // Seed sample data for development when MLS Grid is not configured
     await seedData();
   }
   
