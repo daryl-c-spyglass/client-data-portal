@@ -70,10 +70,16 @@ export class MLSGridSyncService {
     console.log('🔄 Starting MLS Grid sync...');
 
     try {
-      await Promise.all([
-        this.syncProperties(),
-        this.syncMedia()
-      ]);
+      // Sync properties (critical)
+      await this.syncProperties();
+      
+      // Sync media (optional - log errors but don't fail)
+      try {
+        await this.syncMedia();
+      } catch (mediaError) {
+        console.warn('⚠️  Media sync failed (non-critical):', mediaError instanceof Error ? mediaError.message : mediaError);
+      }
+      
       console.log('✅ MLS Grid sync completed successfully');
     } catch (error) {
       console.error('❌ MLS Grid sync failed:', error);

@@ -12,8 +12,8 @@ export const properties = pgTable("properties", {
   originatingSystemModificationTimestamp: timestamp("originating_system_modification_timestamp"),
   
   // Basic Info
-  listPrice: decimal("list_price", { precision: 12, scale: 2 }),
-  closePrice: decimal("close_price", { precision: 12, scale: 2 }),
+  listPrice: decimal("list_price", { precision: 14, scale: 2 }),
+  closePrice: decimal("close_price", { precision: 14, scale: 2 }),
   standardStatus: text("standard_status"),
   propertyType: text("property_type"),
   propertySubType: text("property_sub_type"),
@@ -39,7 +39,7 @@ export const properties = pgTable("properties", {
   bathroomsFull: integer("bathrooms_full"),
   bathroomsHalf: integer("bathrooms_half"),
   livingArea: decimal("living_area", { precision: 10, scale: 2 }),
-  lotSizeSquareFeet: decimal("lot_size_square_feet", { precision: 12, scale: 2 }),
+  lotSizeSquareFeet: decimal("lot_size_square_feet", { precision: 14, scale: 2 }),
   lotSizeAcres: decimal("lot_size_acres", { precision: 10, scale: 4 }),
   yearBuilt: integer("year_built"),
   

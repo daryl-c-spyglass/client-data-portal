@@ -14,19 +14,15 @@ export default function Properties() {
   const [searchCriteria, setSearchCriteria] = useState<SearchCriteria | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
-  // Fetch properties with search criteria if available, otherwise fetch all
-  const { data: properties = [], isLoading, error } = useQuery<Property[]>({
-    queryKey: ['/api/properties', 'search', searchCriteria],
-    queryFn: () => searchCriteria ? searchProperties(searchCriteria) : fetch('/api/properties').then(r => r.json()),
-  });
-
+  // Fetch all properties for the count display
   const { data: allProperties = [] } = useQuery<Property[]>({
     queryKey: ['/api/properties'],
-    queryFn: async () => {
-      const response = await fetch('/api/properties');
-      if (!response.ok) throw new Error('Failed to fetch properties');
-      return response.json();
-    },
+  });
+
+  // Fetch properties with search criteria if available
+  const { data: properties = [], isLoading, error } = useQuery<Property[]>({
+    queryKey: searchCriteria ? ['/api/properties/search', searchCriteria] : ['/api/properties'],
+    enabled: activeTab === 'results' || searchCriteria !== null,
   });
 
   // Mock media map - will be populated with real data in production
