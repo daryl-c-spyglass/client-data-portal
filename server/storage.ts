@@ -7,6 +7,8 @@ import {
   type InsertSavedSearch,
   type Cma,
   type InsertCma,
+  type SellerUpdate,
+  type InsertSellerUpdate,
   type SearchCriteria,
   type PropertyStatistics,
   type TimelineDataPoint,
@@ -16,6 +18,7 @@ import {
   media,
   savedSearches,
   cmas,
+  sellerUpdates,
   users
 } from "@shared/schema";
 import { randomUUID } from "crypto";
@@ -68,6 +71,15 @@ export interface IStorage {
   updateCma(id: string, cma: Partial<Cma>): Promise<Cma | undefined>;
   deleteCma(id: string): Promise<boolean>;
   
+  // Seller Update operations
+  getSellerUpdate(id: string): Promise<SellerUpdate | undefined>;
+  getSellerUpdatesByUser(userId: string): Promise<SellerUpdate[]>;
+  getAllSellerUpdates(): Promise<SellerUpdate[]>;
+  getActiveSellerUpdates(): Promise<SellerUpdate[]>;
+  createSellerUpdate(update: InsertSellerUpdate): Promise<SellerUpdate>;
+  updateSellerUpdate(id: string, update: Partial<SellerUpdate>): Promise<SellerUpdate | undefined>;
+  deleteSellerUpdate(id: string): Promise<boolean>;
+  
   // Statistics calculation
   calculateStatistics(propertyIds: string[]): Promise<PropertyStatistics>;
   getTimelineData(propertyIds: string[]): Promise<TimelineDataPoint[]>;
@@ -79,6 +91,7 @@ export class MemStorage implements IStorage {
   private media: Map<string, Media>;
   private savedSearches: Map<string, SavedSearch>;
   private cmas: Map<string, Cma>;
+  private sellerUpdates: Map<string, SellerUpdate>;
 
   constructor() {
     this.users = new Map();
@@ -86,6 +99,7 @@ export class MemStorage implements IStorage {
     this.media = new Map();
     this.savedSearches = new Map();
     this.cmas = new Map();
+    this.sellerUpdates = new Map();
   }
 
   // User operations
@@ -366,6 +380,49 @@ export class MemStorage implements IStorage {
     return this.cmas.delete(id);
   }
 
+  // Seller Update operations
+  async getSellerUpdate(id: string): Promise<SellerUpdate | undefined> {
+    return this.sellerUpdates.get(id);
+  }
+
+  async getSellerUpdatesByUser(userId: string): Promise<SellerUpdate[]> {
+    return Array.from(this.sellerUpdates.values()).filter(u => u.userId === userId);
+  }
+
+  async getAllSellerUpdates(): Promise<SellerUpdate[]> {
+    return Array.from(this.sellerUpdates.values());
+  }
+
+  async getActiveSellerUpdates(): Promise<SellerUpdate[]> {
+    return Array.from(this.sellerUpdates.values()).filter(u => u.isActive);
+  }
+
+  async createSellerUpdate(update: InsertSellerUpdate): Promise<SellerUpdate> {
+    const id = randomUUID();
+    const sellerUpdate: SellerUpdate = {
+      ...update as any,
+      id,
+      lastSentAt: null,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+    this.sellerUpdates.set(id, sellerUpdate);
+    return sellerUpdate;
+  }
+
+  async updateSellerUpdate(id: string, updates: Partial<SellerUpdate>): Promise<SellerUpdate | undefined> {
+    const update = this.sellerUpdates.get(id);
+    if (!update) return undefined;
+
+    const updatedSellerUpdate = { ...update, ...updates, updatedAt: new Date() };
+    this.sellerUpdates.set(id, updatedSellerUpdate);
+    return updatedSellerUpdate;
+  }
+
+  async deleteSellerUpdate(id: string): Promise<boolean> {
+    return this.sellerUpdates.delete(id);
+  }
+
   // Statistics calculation
   async calculateStatistics(propertyIds: string[]): Promise<PropertyStatistics> {
     const properties = propertyIds
@@ -635,6 +692,39 @@ export class DbStorage implements IStorage {
 
   async deleteCma(id: string): Promise<boolean> {
     const result = await this.db.delete(cmas).where(eq(cmas.id, id));
+    return result.rowCount! > 0;
+  }
+
+  // Seller Update operations
+  async getSellerUpdate(id: string): Promise<SellerUpdate | undefined> {
+    const result = await this.db.select().from(sellerUpdates).where(eq(sellerUpdates.id, id)).limit(1);
+    return result[0];
+  }
+
+  async getSellerUpdatesByUser(userId: string): Promise<SellerUpdate[]> {
+    return await this.db.select().from(sellerUpdates).where(eq(sellerUpdates.userId, userId));
+  }
+
+  async getAllSellerUpdates(): Promise<SellerUpdate[]> {
+    return await this.db.select().from(sellerUpdates);
+  }
+
+  async getActiveSellerUpdates(): Promise<SellerUpdate[]> {
+    return await this.db.select().from(sellerUpdates).where(eq(sellerUpdates.isActive, true));
+  }
+
+  async createSellerUpdate(update: InsertSellerUpdate): Promise<SellerUpdate> {
+    const result = await this.db.insert(sellerUpdates).values(update).returning();
+    return result[0];
+  }
+
+  async updateSellerUpdate(id: string, updates: Partial<SellerUpdate>): Promise<SellerUpdate | undefined> {
+    const result = await this.db.update(sellerUpdates).set({ ...updates, updatedAt: new Date() }).where(eq(sellerUpdates.id, id)).returning();
+    return result[0];
+  }
+
+  async deleteSellerUpdate(id: string): Promise<boolean> {
+    const result = await this.db.delete(sellerUpdates).where(eq(sellerUpdates.id, id));
     return result.rowCount! > 0;
   }
 

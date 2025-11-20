@@ -131,6 +131,33 @@ export const insertSavedSearchSchema = createInsertSchema(savedSearches).omit({
 export type InsertSavedSearch = z.infer<typeof insertSavedSearchSchema>;
 export type SavedSearch = typeof savedSearches.$inferSelect;
 
+// Seller Updates Schema - Quick Seller Update feature for automated market updates
+export const sellerUpdates = pgTable("seller_updates", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id),
+  name: text("name").notNull(), // Property address for identification
+  email: text("email").notNull(), // Email to send updates to
+  postalCode: text("postal_code").notNull(),
+  elementarySchool: text("elementary_school"),
+  propertySubType: text("property_sub_type"),
+  emailFrequency: text("email_frequency").notNull(), // 'daily', 'weekly', 'bi-weekly', 'monthly'
+  lastSentAt: timestamp("last_sent_at"),
+  isActive: boolean("is_active").notNull().default(true),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+export const insertSellerUpdateSchema = createInsertSchema(sellerUpdates).omit({ 
+  id: true, 
+  createdAt: true, 
+  updatedAt: true 
+}).extend({
+  emailFrequency: z.enum(['daily', 'weekly', 'bi-weekly', 'monthly']),
+  email: z.string().email(),
+});
+export type InsertSellerUpdate = z.infer<typeof insertSellerUpdateSchema>;
+export type SellerUpdate = typeof sellerUpdates.$inferSelect;
+
 // CMA Schema
 export const cmas = pgTable("cmas", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
