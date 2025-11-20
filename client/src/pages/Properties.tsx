@@ -21,9 +21,10 @@ export default function Properties() {
   const totalCount = countData?.count ?? 0;
 
   // Fetch properties with search criteria if available
+  // Only fetch when there's actual search criteria to prevent loading all 65K+ properties
   const { data: properties = [], isLoading, error } = useQuery<Property[]>({
-    queryKey: searchCriteria ? ['/api/properties/search', searchCriteria] : ['/api/properties'],
-    enabled: activeTab === 'results' || searchCriteria !== null,
+    queryKey: ['/api/properties/search', searchCriteria],
+    enabled: (activeTab === 'results' && searchCriteria !== null),
   });
 
   // Mock media map - will be populated with real data in production
@@ -111,7 +112,18 @@ export default function Properties() {
         </TabsContent>
 
         <TabsContent value="results">
-          {isLoading ? (
+          {!searchCriteria ? (
+            <div className="text-center py-12">
+              <Search className="w-12 h-12 mx-auto mb-4 text-muted-foreground" />
+              <p className="text-lg font-semibold mb-2">No search criteria</p>
+              <p className="text-sm text-muted-foreground mb-4">
+                Please use the Search Criteria tab to define your search
+              </p>
+              <Button onClick={() => setActiveTab("search")} data-testid="button-goto-search">
+                Go to Search
+              </Button>
+            </div>
+          ) : isLoading ? (
             <div className="space-y-6">
               <div className="flex items-center justify-between">
                 <Skeleton className="h-10 w-64" />
