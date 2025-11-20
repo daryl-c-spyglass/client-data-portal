@@ -14,6 +14,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Switch } from "@/components/ui/switch";
 import { 
   Search, 
   X, 
@@ -26,10 +27,12 @@ import { PropertyCard } from "@/components/PropertyCard";
 import type { Property } from "@shared/schema";
 
 interface SearchFilters {
-  // Status & Dates
-  status?: string;
-  statusDateFrom?: string;
-  statusDateTo?: string;
+  // Status & Dates (independent toggles)
+  statusActive?: boolean;
+  statusUnderContract?: boolean;
+  statusClosed?: boolean;
+  dateRangeFrom?: string;
+  dateRangeTo?: string;
   
   // Property Details
   propertySubType?: string;
@@ -223,6 +226,37 @@ export default function BuyerSearch() {
   const buildQueryString = () => {
     const params = new URLSearchParams();
     
+    // Handle status toggles - build array of enabled statuses
+    const statuses: string[] = [];
+    if (filters.statusActive) statuses.push('Active');
+    if (filters.statusUnderContract) statuses.push('Under Contract');
+    if (filters.statusClosed) statuses.push('Closed');
+    if (statuses.length > 0) {
+      statuses.forEach(status => params.append('status.values', status));
+      params.set('status.mode', 'Or'); // Multiple statuses are OR'd together
+    }
+    
+    // Handle date range
+    if (filters.dateRangeFrom) {
+      params.set('listDate.min', filters.dateRangeFrom);
+    }
+    if (filters.dateRangeTo) {
+      params.set('listDate.max', filters.dateRangeTo);
+    }
+    
+    // Handle street number range
+    if (filters.streetNumberMin) {
+      params.set('streetNumber.min', String(filters.streetNumberMin));
+    }
+    if (filters.streetNumberMax) {
+      params.set('streetNumber.max', String(filters.streetNumberMax));
+    }
+    
+    // Handle unit number
+    if (filters.unitNumber) {
+      params.set('unitNumber', filters.unitNumber);
+    }
+    
     // Map frontend filter names to backend search criteria names
     const fieldMapping: Record<string, string> = {
       minPrice: 'listPriceMin',
@@ -270,7 +304,19 @@ export default function BuyerSearch() {
       'acceptableFinancing'
     ];
     
+    // Fields handled manually above (skip in Object.entries loop)
+    const manuallyHandledFields = [
+      'statusActive', 'statusUnderContract', 'statusClosed',
+      'dateRangeFrom', 'dateRangeTo', 'streetNumberMin', 'streetNumberMax',
+      'unitNumber'
+    ];
+    
     Object.entries(filters).forEach(([key, value]) => {
+      // Skip manually handled fields
+      if (manuallyHandledFields.includes(key)) {
+        return;
+      }
+      
       if (value !== undefined && value !== '' && value !== null) {
         // Handle mode fields for non-array fields (city, postalCode, schools, etc.)
         if (key.endsWith('Mode')) {
@@ -419,44 +465,62 @@ export default function BuyerSearch() {
                 {/* Status */}
                 <div className="space-y-3">
                   <Label className="text-base font-semibold">Status</Label>
-                  <Select
-                    value={filters.status || ''}
-                    onValueChange={(value) => updateFilter('status', value || undefined)}
-                  >
-                    <SelectTrigger data-testid="select-status" className="h-10">
-                      <SelectValue placeholder="Select Status" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="Active">Active</SelectItem>
-                      <SelectItem value="Pending">Pending</SelectItem>
-                      <SelectItem value="Under Contract">Under Contract</SelectItem>
-                      <SelectItem value="Closed">Closed</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  {filters.status && (
-                    <div className="grid grid-cols-2 gap-2">
-                      <div>
-                        <Label className="text-xs text-muted-foreground">From</Label>
-                        <Input
-                          type="date"
-                          value={filters.statusDateFrom || ''}
-                          onChange={(e) => updateFilter('statusDateFrom', e.target.value || undefined)}
-                          data-testid="input-statusDateFrom"
-                          className="h-10"
-                        />
-                      </div>
-                      <div>
-                        <Label className="text-xs text-muted-foreground">To</Label>
-                        <Input
-                          type="date"
-                          value={filters.statusDateTo || ''}
-                          onChange={(e) => updateFilter('statusDateTo', e.target.value || undefined)}
-                          data-testid="input-statusDateTo"
-                          className="h-10"
-                        />
-                      </div>
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <Label htmlFor="status-active" className="text-base">Active</Label>
+                      <Switch
+                        id="status-active"
+                        checked={filters.statusActive || false}
+                        onCheckedChange={(checked) => updateFilter('statusActive', checked || undefined)}
+                        data-testid="switch-status-active"
+                      />
                     </div>
-                  )}
+                    <div className="flex items-center justify-between">
+                      <Label htmlFor="status-under-contract" className="text-base">Under Contract</Label>
+                      <Switch
+                        id="status-under-contract"
+                        checked={filters.statusUnderContract || false}
+                        onCheckedChange={(checked) => updateFilter('statusUnderContract', checked || undefined)}
+                        data-testid="switch-status-under-contract"
+                      />
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <Label htmlFor="status-closed" className="text-base">Closed</Label>
+                      <Switch
+                        id="status-closed"
+                        checked={filters.statusClosed || false}
+                        onCheckedChange={(checked) => updateFilter('statusClosed', checked || undefined)}
+                        data-testid="switch-status-closed"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                <Separator />
+
+                {/* Date Range */}
+                <div className="space-y-3">
+                  <Label className="text-base font-semibold">Date Range</Label>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <Input
+                        type="date"
+                        value={filters.dateRangeFrom || ''}
+                        onChange={(e) => updateFilter('dateRangeFrom', e.target.value || undefined)}
+                        data-testid="input-dateRangeFrom"
+                        className="h-10"
+                      />
+                    </div>
+                    <div>
+                      <Input
+                        type="date"
+                        value={filters.dateRangeTo || ''}
+                        onChange={(e) => updateFilter('dateRangeTo', e.target.value || undefined)}
+                        data-testid="input-dateRangeTo"
+                        className="h-10"
+                      />
+                    </div>
+                  </div>
                 </div>
 
                 <Separator />
@@ -693,6 +757,53 @@ export default function BuyerSearch() {
                       </div>
                     </div>
                   </RadioGroup>
+                </div>
+
+                {/* Street Number */}
+                <div className="space-y-3">
+                  <Label className="text-base font-semibold">Street Number</Label>
+                  <div className="grid grid-cols-2 gap-2">
+                    <Input
+                      placeholder="Min"
+                      type="number"
+                      value={filters.streetNumberMin || ''}
+                      onChange={(e) => updateFilter('streetNumberMin', e.target.value ? parseInt(e.target.value) : undefined)}
+                      data-testid="input-streetNumberMin"
+                      className="h-10"
+                    />
+                    <Input
+                      placeholder="Max"
+                      type="number"
+                      value={filters.streetNumberMax || ''}
+                      onChange={(e) => updateFilter('streetNumberMax', e.target.value ? parseInt(e.target.value) : undefined)}
+                      data-testid="input-streetNumberMax"
+                      className="h-10"
+                    />
+                  </div>
+                </div>
+
+                {/* Street Name */}
+                <div className="space-y-3">
+                  <Label className="text-base font-semibold">Street Name</Label>
+                  <Input
+                    placeholder="Street Name"
+                    value={filters.streetName || ''}
+                    onChange={(e) => updateFilter('streetName', e.target.value || undefined)}
+                    data-testid="input-streetName"
+                    className="h-10"
+                  />
+                </div>
+
+                {/* Unit Number */}
+                <div className="space-y-3">
+                  <Label className="text-base font-semibold">Unit Number</Label>
+                  <Input
+                    placeholder="Unit Number"
+                    value={filters.unitNumber || ''}
+                    onChange={(e) => updateFilter('unitNumber', e.target.value || undefined)}
+                    data-testid="input-unitNumber"
+                    className="h-10"
+                  />
                 </div>
 
                 <Separator />
