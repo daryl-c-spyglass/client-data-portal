@@ -150,12 +150,25 @@ export const sellerUpdates = pgTable("seller_updates", {
 export const insertSellerUpdateSchema = createInsertSchema(sellerUpdates).omit({ 
   id: true, 
   createdAt: true, 
-  updatedAt: true 
+  updatedAt: true,
+  lastSentAt: true,
 }).extend({
   emailFrequency: z.enum(['daily', 'weekly', 'bi-weekly', 'monthly']),
   email: z.string().email(),
 });
+
+export const updateSellerUpdateSchema = z.object({
+  name: z.string().optional(),
+  email: z.string().email().optional(),
+  postalCode: z.string().optional(),
+  elementarySchool: z.string().optional(),
+  propertySubType: z.string().optional(),
+  emailFrequency: z.enum(['daily', 'weekly', 'bi-weekly', 'monthly']).optional(),
+  isActive: z.boolean().optional(),
+});
+
 export type InsertSellerUpdate = z.infer<typeof insertSellerUpdateSchema>;
+export type UpdateSellerUpdate = z.infer<typeof updateSellerUpdateSchema>;
 export type SellerUpdate = typeof sellerUpdates.$inferSelect;
 
 // CMA Schema

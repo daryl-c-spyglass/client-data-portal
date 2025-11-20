@@ -2,7 +2,8 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { createMLSGridClient } from "./mlsgrid-client";
-import { searchCriteriaSchema, insertCmaSchema, insertUserSchema } from "@shared/schema";
+import { searchCriteriaSchema, insertCmaSchema, insertUserSchema, insertSellerUpdateSchema, updateSellerUpdateSchema } from "@shared/schema";
+import { findMatchingProperties, calculateMarketSummary } from "./seller-update-service";
 import { z } from "zod";
 import bcrypt from "bcryptjs";
 import passport from "passport";
@@ -284,6 +285,120 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(204).send();
     } catch (error) {
       res.status(500).json({ error: "Failed to delete CMA" });
+    }
+  });
+
+  // Seller Update routes - Quick Seller Update feature
+  app.get("/api/seller-updates", async (req, res) => {
+    try {
+      const updates = await storage.getAllSellerUpdates();
+      res.json(updates);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch seller updates" });
+    }
+  });
+
+  app.get("/api/seller-updates/:id", async (req, res) => {
+    try {
+      const update = await storage.getSellerUpdate(req.params.id);
+      if (!update) {
+        res.status(404).json({ error: "Seller update not found" });
+        return;
+      }
+      res.json(update);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch seller update" });
+    }
+  });
+
+  app.post("/api/seller-updates", async (req, res) => {
+    try {
+      const updateData = insertSellerUpdateSchema.parse(req.body);
+      const update = await storage.createSellerUpdate(updateData);
+      res.status(201).json(update);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        res.status(400).json({ error: "Invalid seller update data", details: error.errors });
+      } else {
+        res.status(500).json({ error: "Failed to create seller update" });
+      }
+    }
+  });
+
+  app.patch("/api/seller-updates/:id", async (req, res) => {
+    try {
+      const updateData = updateSellerUpdateSchema.parse(req.body);
+      const update = await storage.updateSellerUpdate(req.params.id, updateData);
+      if (!update) {
+        res.status(404).json({ error: "Seller update not found" });
+        return;
+      }
+      res.json(update);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        res.status(400).json({ error: "Invalid update data", details: error.errors });
+      } else {
+        res.status(500).json({ error: "Failed to update seller update" });
+      }
+    }
+  });
+
+  app.delete("/api/seller-updates/:id", async (req, res) => {
+    try {
+      const deleted = await storage.deleteSellerUpdate(req.params.id);
+      if (!deleted) {
+        res.status(404).json({ error: "Seller update not found" });
+        return;
+      }
+      res.status(204).send();
+    } catch (error) {
+      res.status(500).json({ error: "Failed to delete seller update" });
+    }
+  });
+
+  // Elementary schools autocomplete endpoint
+  app.get("/api/schools/elementary", async (req, res) => {
+    try {
+      const search = (req.query.search as string) || '';
+      const allProperties = await storage.getAllProperties();
+      
+      // Get unique elementary schools, filter by search, and sort
+      const schools = Array.from(new Set(
+        allProperties
+          .map(p => p.elementarySchool)
+          .filter((school): school is string => 
+            school !== null && 
+            school !== undefined && 
+            school.trim() !== '' &&
+            school.toLowerCase().includes(search.toLowerCase())
+          )
+      )).sort();
+      
+      res.json(schools.slice(0, 50)); // Limit to 50 results for autocomplete
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch elementary schools" });
+    }
+  });
+
+  // Preview matching properties for a seller update
+  app.get("/api/seller-updates/:id/preview", async (req, res) => {
+    try {
+      const sellerUpdate = await storage.getSellerUpdate(req.params.id);
+      if (!sellerUpdate) {
+        res.status(404).json({ error: "Seller update not found" });
+        return;
+      }
+      
+      const result = await findMatchingProperties(sellerUpdate);
+      const marketSummary = calculateMarketSummary(result.properties);
+      
+      res.json({
+        ...result,
+        marketSummary,
+        properties: result.properties.slice(0, 20), // Limit to 20 for preview
+      });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to preview matching properties" });
     }
   });
 

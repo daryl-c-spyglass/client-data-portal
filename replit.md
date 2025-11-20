@@ -31,6 +31,13 @@ Completed comprehensive improvements to property browsing and display:
 - **Total Properties**: 65,615 synced from MLS Grid
 - **Media Sync**: Known issue - Media endpoint returns 400 error (likely permissions), but property data sync is fully functional
 
+### Quick Seller Update Feature (In Progress)
+Started implementation of embeddable "Quick Seller Update" widget duplicating Follow Up Boss functionality:
+- **Database Schema**: Added `seller_updates` table with fields for postalCode, elementarySchool, propertySubType, emailFrequency, and tracking
+- **Storage Layer**: Implemented CRUD operations in both MemStorage and DbStorage
+- **Email Integration**: Configured for SendGrid via SENDGRID_API_KEY environment variable (optional - can be added when ready to send emails)
+- **Next Steps**: API routes, property matching logic, email templates, UI pages, and embeddable widget
+
 ## User Preferences
 
 Preferred communication style: Simple, everyday language.
