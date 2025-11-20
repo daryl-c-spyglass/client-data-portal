@@ -161,6 +161,8 @@ export function SearchCriteriaForm({ onSearch, initialCriteria = {} }: SearchCri
           <Input 
             id="neighborhood"
             placeholder="Select Neighborhood"
+            value={criteria.neighborhood?.join(', ') || ''}
+            onChange={(e) => updateCriteria('neighborhood', e.target.value ? e.target.value.split(',').map(s => s.trim()) : undefined)}
             data-testid="input-neighborhood"
           />
         </div>
@@ -170,6 +172,8 @@ export function SearchCriteriaForm({ onSearch, initialCriteria = {} }: SearchCri
           <Input 
             id="subdivisions"
             placeholder="Subdivisions"
+            value={criteria.subdivisions?.join(', ') || ''}
+            onChange={(e) => updateCriteria('subdivisions', e.target.value ? e.target.value.split(',').map(s => s.trim()) : undefined)}
             data-testid="input-subdivisions"
           />
         </div>
@@ -179,6 +183,8 @@ export function SearchCriteriaForm({ onSearch, initialCriteria = {} }: SearchCri
           <Input 
             id="cities"
             placeholder="Start Typing"
+            value={criteria.cities?.join(', ') || ''}
+            onChange={(e) => updateCriteria('cities', e.target.value ? e.target.value.split(',').map(s => s.trim()) : undefined)}
             data-testid="input-cities"
           />
         </div>
@@ -188,6 +194,8 @@ export function SearchCriteriaForm({ onSearch, initialCriteria = {} }: SearchCri
           <Input 
             id="zip-codes"
             placeholder="Start Typing"
+            value={criteria.zipCodes?.join(', ') || ''}
+            onChange={(e) => updateCriteria('zipCodes', e.target.value ? e.target.value.split(',').map(s => s.trim()) : undefined)}
             data-testid="input-zip-codes"
           />
         </div>
