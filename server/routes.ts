@@ -131,9 +131,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get("/api/properties", async (req, res) => {
     try {
-      const properties = await storage.getAllProperties();
-      res.json(properties);
+      // Limit to 1000 properties by default to prevent OOM
+      // Frontend uses search endpoint for filtered/criteria-based queries
+      const limit = parseInt(req.query.limit as string) || 1000;
+      const offset = parseInt(req.query.offset as string) || 0;
+      
+      const allProperties = await storage.getAllProperties();
+      const paginatedProperties = allProperties.slice(offset, offset + limit);
+      
+      res.json(paginatedProperties);
     } catch (error) {
+      console.error("Failed to fetch properties:", error);
       res.status(500).json({ error: "Failed to fetch properties" });
     }
   });

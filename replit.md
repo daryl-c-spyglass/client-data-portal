@@ -4,6 +4,33 @@
 
 This is a professional real estate IDX (Internet Data Exchange) platform powered by MLS Grid API integration. The platform enables real estate agents to search properties, create Comparative Market Analyses (CMAs), and share insights with clients. It combines property browsing capabilities inspired by leading real estate platforms (Zillow, Redfin, Realtor.com) with productivity-focused workflow tools.
 
+## Recent Changes (November 20, 2025)
+
+### Property Listing UI Enhancements
+Completed comprehensive improvements to property browsing and display:
+
+1. **Enhanced PropertyCard Component**: Improved visual design with better property details (type, price/sqft, year built), proper edge-case handling for studios (0 beds) and missing location data, and polished styling.
+
+2. **Multi-Sort Functionality**: Added global sorting across all view modes (grid, list, table) with options for price (low/high), date (newest/oldest), and status, with consistent sort order maintained when switching views.
+
+3. **Status Filtering Tabs**: Implemented status-based filtering with tabs for All, Active, Pending, Under Contract, and Closed properties, including accurate property counts per status.
+
+4. **List View**: Created PropertyListCard component providing horizontal property cards with image, details, and actions in a compact row format for efficient browsing.
+
+5. **Table View**: Implemented PropertyTable with sortable columns (address, price, beds, baths, sqft, status, days on market) and visual sort indicators, ideal for data comparison.
+
+6. **Pagination System**: Added "Load More" functionality showing 20 properties initially with ability to load additional properties incrementally, including accurate "Showing X of Y" counters that reset properly on filter/sort changes.
+
+### Backend Bug Fixes
+
+1. **MLS Grid Sync Upsert Logic**: Fixed duplicate key constraint violations by using `getPropertyByListingId` instead of `getProperty` when checking for existing properties during sync, ensuring proper updates instead of failed inserts.
+
+2. **API Pagination**: Added default limit of 1000 properties to GET /api/properties endpoint to prevent Node.js out-of-memory errors when serializing large datasets (65,615 properties). Supports optional limit and offset query parameters.
+
+### Current Database Status
+- **Total Properties**: 65,615 synced from MLS Grid
+- **Media Sync**: Known issue - Media endpoint returns 400 error (likely permissions), but property data sync is fully functional
+
 ## User Preferences
 
 Preferred communication style: Simple, everyday language.

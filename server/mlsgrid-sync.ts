@@ -120,15 +120,15 @@ export class MLSGridSyncService {
           // Upsert properties
           for (const property of properties) {
             try {
-              const existing = await storage.getProperty(property.id);
+              const existing = await storage.getPropertyByListingId(property.listingId);
               if (existing) {
-                await storage.updateProperty(property.id, property);
+                await storage.updateProperty(existing.id, property);
               } else {
                 await storage.createProperty(property);
               }
               totalSynced++;
             } catch (error) {
-              console.error(`Failed to upsert property ${property.id}:`, error);
+              console.error(`Failed to upsert property ${property.listingId}:`, error);
             }
           }
 
