@@ -24,6 +24,7 @@ export default function Properties() {
   // Only fetch when there's actual search criteria to prevent loading all 65K+ properties
   const { data: properties = [], isLoading, error } = useQuery<Property[]>({
     queryKey: ['/api/properties/search', searchCriteria],
+    queryFn: () => searchProperties(searchCriteria!),
     enabled: (activeTab === 'results' && searchCriteria !== null),
   });
 

@@ -578,6 +578,44 @@ export class DbStorage implements IStorage {
       conditions.push(inArray(properties.postalCode, criteria.zipCodes));
     }
 
+    if (criteria.subdivisions && criteria.subdivisions.length > 0) {
+      conditions.push(inArray(properties.subdivision, criteria.subdivisions));
+    }
+
+    if (criteria.neighborhood && criteria.neighborhood.length > 0) {
+      conditions.push(inArray(properties.neighborhood, criteria.neighborhood));
+    }
+
+    if (criteria.elementarySchools && criteria.elementarySchools.length > 0) {
+      conditions.push(inArray(properties.elementarySchool, criteria.elementarySchools));
+    }
+
+    if (criteria.middleSchools && criteria.middleSchools.length > 0) {
+      conditions.push(inArray(properties.middleOrJuniorSchool, criteria.middleSchools));
+    }
+
+    if (criteria.highSchools && criteria.highSchools.length > 0) {
+      conditions.push(inArray(properties.highSchool, criteria.highSchools));
+    }
+
+    if (criteria.schoolDistrict && criteria.schoolDistrict.length > 0) {
+      conditions.push(inArray(properties.schoolDistrict, criteria.schoolDistrict));
+    }
+
+    if (criteria.lotSizeAcres?.min !== undefined) {
+      conditions.push(gte(properties.lotSizeAcres, String(criteria.lotSizeAcres.min)));
+    }
+    if (criteria.lotSizeAcres?.max !== undefined) {
+      conditions.push(lte(properties.lotSizeAcres, String(criteria.lotSizeAcres.max)));
+    }
+
+    if (criteria.lotSizeSquareFeet?.min !== undefined) {
+      conditions.push(gte(properties.lotSizeSquareFeet, String(criteria.lotSizeSquareFeet.min)));
+    }
+    if (criteria.lotSizeSquareFeet?.max !== undefined) {
+      conditions.push(lte(properties.lotSizeSquareFeet, String(criteria.lotSizeSquareFeet.max)));
+    }
+
     return await this.db.select().from(properties).where(and(...conditions));
   }
 
