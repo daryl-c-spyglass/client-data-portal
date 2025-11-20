@@ -272,9 +272,11 @@ export class MLSGridSyncService {
       longitude: mlsData.Longitude?.toString(),
       subdivision: mlsData.SubdivisionName,
       neighborhood: mlsData.Neighborhood,
+      countyOrParish: mlsData.CountyOrParish,
       
       // Property Details
       bedroomsTotal: mlsData.BedroomsTotal,
+      mainLevelBedrooms: mlsData.MainLevelBedrooms,
       bathroomsTotalInteger: mlsData.BathroomsTotalInteger,
       bathroomsFull: mlsData.BathroomsFull,
       bathroomsHalf: mlsData.BathroomsHalf,
@@ -282,6 +284,13 @@ export class MLSGridSyncService {
       lotSizeSquareFeet: mlsData.LotSizeSquareFeet?.toString(),
       lotSizeAcres: mlsData.LotSizeAcres?.toString(),
       yearBuilt: mlsData.YearBuilt,
+      storiesTotal: mlsData.StoriesTotal,
+      propertyCondition: mlsData.PropertyCondition,
+      
+      // Parking & Garage
+      garageParkingSpaces: mlsData.GarageSpaces,
+      totalParkingSpaces: mlsData.TotalParkingSpaces,
+      parkingFeatures: mlsData.ParkingFeatures,
       
       // Listing Details
       daysOnMarket: mlsData.DaysOnMarket,
@@ -297,12 +306,69 @@ export class MLSGridSyncService {
       
       // Descriptions
       publicRemarks: mlsData.PublicRemarks,
+      privateRemarks: mlsData.PrivateRemarks,
       
       // MLS Info
       mlsId: mlsData.MlsId || mlsData.ListingId,
       mlsAreaMajor: mlsData.MLSAreaMajor,
       listAgentMlsId: mlsData.ListAgentMlsId,
       listOfficeMlsId: mlsData.ListOfficeMlsId,
+      
+      // Listing Conditions & Contingencies
+      flexListingYN: mlsData.FlexListingYN,
+      propertySaleContingency: mlsData.PropertySaleContingency,
+      specialListingConditions: mlsData.SpecialListingConditions,
+      showingRequirements: mlsData.ShowingRequirements,
+      occupantType: mlsData.OccupantType,
+      possession: mlsData.Possession,
+      buyerFinancing: mlsData.BuyerFinancing,
+      
+      // Property Features & Amenities
+      associationYN: mlsData.AssociationYN,
+      ownershipType: mlsData.OwnershipType,
+      poolPrivateYN: mlsData.PoolPrivateYN,
+      poolFeatures: mlsData.PoolFeatures,
+      spaFeatures: mlsData.SpaFeatures,
+      waterfrontYN: mlsData.WaterfrontYN,
+      waterfrontFeatures: mlsData.WaterfrontFeatures,
+      viewYN: mlsData.ViewYN,
+      view: mlsData.View,
+      horseYN: mlsData.HorseYN,
+      horseAmenities: mlsData.HorseAmenities,
+      
+      // Interior Features
+      interiorFeatures: mlsData.InteriorFeatures,
+      flooring: mlsData.Flooring,
+      fireplaceFeatures: mlsData.FireplaceFeatures,
+      windowFeatures: mlsData.WindowFeatures,
+      accessibilityFeatures: mlsData.AccessibilityFeatures,
+      securityFeatures: mlsData.SecurityFeatures,
+      
+      // Exterior Features
+      exteriorFeatures: mlsData.ExteriorFeatures,
+      foundationDetails: mlsData.FoundationDetails,
+      lotFeatures: mlsData.LotFeatures,
+      fencing: mlsData.Fencing,
+      patioAndPorchFeatures: mlsData.PatioAndPorchFeatures,
+      
+      // Community & Location Features
+      communityFeatures: mlsData.CommunityFeatures,
+      
+      // Utilities & Systems
+      heating: mlsData.Heating,
+      cooling: mlsData.Cooling,
+      waterSource: mlsData.WaterSource,
+      sewer: mlsData.Sewer,
+      utilities: mlsData.Utilities,
+      
+      // Green/Sustainability
+      greenEnergyEfficient: mlsData.GreenEnergyEfficient,
+      greenSustainability: mlsData.GreenSustainability,
+      greenBuildingVerificationType: mlsData.GreenBuildingVerificationType,
+      greenVerificationMetric: mlsData.GreenVerificationMetric,
+      greenVerificationStatus: mlsData.GreenVerificationStatus,
+      greenVerificationRating: mlsData.GreenVerificationRating,
+      greenVerificationYear: mlsData.GreenVerificationYear,
       
       // Store any additional fields
       additionalData: mlsData,

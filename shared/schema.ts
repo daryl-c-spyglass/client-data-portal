@@ -32,9 +32,11 @@ export const properties = pgTable("properties", {
   longitude: decimal("longitude", { precision: 10, scale: 7 }),
   subdivision: text("subdivision"),
   neighborhood: text("neighborhood"),
+  countyOrParish: text("county_or_parish"),
   
   // Property Details
   bedroomsTotal: integer("bedrooms_total"),
+  mainLevelBedrooms: integer("main_level_bedrooms"),
   bathroomsTotalInteger: integer("bathrooms_total_integer"),
   bathroomsFull: integer("bathrooms_full"),
   bathroomsHalf: integer("bathrooms_half"),
@@ -42,6 +44,13 @@ export const properties = pgTable("properties", {
   lotSizeSquareFeet: decimal("lot_size_square_feet", { precision: 14, scale: 2 }),
   lotSizeAcres: decimal("lot_size_acres", { precision: 10, scale: 4 }),
   yearBuilt: integer("year_built"),
+  storiesTotal: integer("stories_total"),
+  propertyCondition: text("property_condition").array(),
+  
+  // Parking & Garage
+  garageParkingSpaces: integer("garage_parking_spaces"),
+  totalParkingSpaces: integer("total_parking_spaces"),
+  parkingFeatures: text("parking_features").array(),
   
   // Listing Details
   daysOnMarket: integer("days_on_market"),
@@ -57,12 +66,69 @@ export const properties = pgTable("properties", {
   
   // Descriptions
   publicRemarks: text("public_remarks"),
+  privateRemarks: text("private_remarks"),
   
   // MLS Info
   mlsId: text("mls_id"),
   mlsAreaMajor: text("mls_area_major"),
   listAgentMlsId: text("list_agent_mls_id"),
   listOfficeMlsId: text("list_office_mls_id"),
+  
+  // Listing Conditions & Contingencies
+  flexListingYN: boolean("flex_listing_yn"),
+  propertySaleContingency: text("property_sale_contingency"),
+  specialListingConditions: text("special_listing_conditions").array(),
+  showingRequirements: text("showing_requirements").array(),
+  occupantType: text("occupant_type"),
+  possession: text("possession"),
+  buyerFinancing: text("buyer_financing").array(),
+  
+  // Property Features & Amenities
+  associationYN: boolean("association_yn"),
+  ownershipType: text("ownership_type"),
+  poolPrivateYN: boolean("pool_private_yn"),
+  poolFeatures: text("pool_features").array(),
+  spaFeatures: text("spa_features").array(),
+  waterfrontYN: boolean("waterfront_yn"),
+  waterfrontFeatures: text("waterfront_features").array(),
+  viewYN: boolean("view_yn"),
+  view: text("view").array(),
+  horseYN: boolean("horse_yn"),
+  horseAmenities: text("horse_amenities").array(),
+  
+  // Interior Features
+  interiorFeatures: text("interior_features").array(),
+  flooring: text("flooring").array(),
+  fireplaceFeatures: text("fireplace_features").array(),
+  windowFeatures: text("window_features").array(),
+  accessibilityFeatures: text("accessibility_features").array(),
+  securityFeatures: text("security_features").array(),
+  
+  // Exterior Features
+  exteriorFeatures: text("exterior_features").array(),
+  foundationDetails: text("foundation_details").array(),
+  lotFeatures: text("lot_features").array(),
+  fencing: text("fencing").array(),
+  patioAndPorchFeatures: text("patio_and_porch_features").array(),
+  
+  // Community & Location Features
+  communityFeatures: text("community_features").array(),
+  
+  // Utilities & Systems
+  heating: text("heating").array(),
+  cooling: text("cooling").array(),
+  waterSource: text("water_source").array(),
+  sewer: text("sewer").array(),
+  utilities: text("utilities").array(),
+  
+  // Green/Sustainability
+  greenEnergyEfficient: text("green_energy_efficient").array(),
+  greenSustainability: text("green_sustainability").array(),
+  greenBuildingVerificationType: text("green_building_verification_type").array(),
+  greenVerificationMetric: text("green_verification_metric"),
+  greenVerificationStatus: text("green_verification_status").array(),
+  greenVerificationRating: text("green_verification_rating"),
+  greenVerificationYear: integer("green_verification_year"),
   
   // Additional data as JSON for flexibility
   additionalData: json("additional_data"),
@@ -286,7 +352,108 @@ export const searchCriteriaSchema = z.object({
   halfBathsMax: z.coerce.number().optional(),
   totalBathsMin: z.coerce.number().optional(),
   totalBathsMax: z.coerce.number().optional(),
+  garageSpacesMin: z.coerce.number().optional(),
+  garageSpacesMax: z.coerce.number().optional(),
+  totalParkingSpacesMin: z.coerce.number().optional(),
+  totalParkingSpacesMax: z.coerce.number().optional(),
+  
+  // Location filters
+  countyOrParish: z.array(z.string()).optional(),
+  
+  // Property features with logical operators (And/Or/Not)
+  propertyCondition: z.array(z.string()).optional(),
+  propertyConditionLogic: z.enum(['And', 'Or', 'Not']).optional(),
+  levels: z.array(z.string()).optional(),
+  flexListingYN: z.coerce.boolean().optional(),
+  propertySaleContingency: z.string().optional(),
+  ownershipType: z.array(z.string()).optional(),
+  ownershipTypeLogic: z.enum(['And', 'Or', 'Not']).optional(),
+  
+  // Amenities
+  poolPrivateYN: z.coerce.boolean().optional(),
+  poolFeatures: z.array(z.string()).optional(),
+  poolFeaturesLogic: z.enum(['And', 'Or', 'Not']).optional(),
+  waterfrontYN: z.coerce.boolean().optional(),
+  waterfrontFeatures: z.array(z.string()).optional(),
+  waterfrontFeaturesLogic: z.enum(['And', 'Or', 'Not']).optional(),
+  viewYN: z.coerce.boolean().optional(),
+  view: z.array(z.string()).optional(),
+  viewLogic: z.enum(['And', 'Or', 'Not']).optional(),
+  horseYN: z.coerce.boolean().optional(),
+  horseAmenities: z.array(z.string()).optional(),
+  horseAmenitiesLogic: z.enum(['And', 'Or', 'Not']).optional(),
+  associationYN: z.coerce.boolean().optional(),
+  
+  // Interior features
+  interiorFeatures: z.array(z.string()).optional(),
+  interiorFeaturesLogic: z.enum(['And', 'Or', 'Not']).optional(),
+  flooring: z.array(z.string()).optional(),
+  flooringLogic: z.enum(['And', 'Or', 'Not']).optional(),
+  fireplaceFeatures: z.array(z.string()).optional(),
+  fireplaceLogic: z.enum(['And', 'Or', 'Not']).optional(),
+  windowFeatures: z.array(z.string()).optional(),
+  windowFeaturesLogic: z.enum(['And', 'Or', 'Not']).optional(),
+  accessibilityFeatures: z.array(z.string()).optional(),
+  accessibilityFeaturesLogic: z.enum(['And', 'Or', 'Not']).optional(),
+  securityFeatures: z.array(z.string()).optional(),
+  securityFeaturesLogic: z.enum(['And', 'Or', 'Not']).optional(),
+  
+  // Exterior features
+  exteriorFeatures: z.array(z.string()).optional(),
+  exteriorFeaturesLogic: z.enum(['And', 'Or', 'Not']).optional(),
+  foundationDetails: z.array(z.string()).optional(),
+  foundationLogic: z.enum(['And', 'Or', 'Not']).optional(),
+  lotFeatures: z.array(z.string()).optional(),
+  lotFeaturesLogic: z.enum(['And', 'Or', 'Not']).optional(),
+  fencing: z.array(z.string()).optional(),
+  fencingLogic: z.enum(['And', 'Or', 'Not']).optional(),
+  patioAndPorchFeatures: z.array(z.string()).optional(),
+  patioAndPorchFeaturesLogic: z.enum(['And', 'Or', 'Not']).optional(),
+  spaFeatures: z.array(z.string()).optional(),
+  spaFeaturesLogic: z.enum(['And', 'Or', 'Not']).optional(),
+  
+  // Community & location
+  communityFeatures: z.array(z.string()).optional(),
+  communityFeaturesLogic: z.enum(['And', 'Or', 'Not']).optional(),
+  
+  // Utilities
+  heating: z.array(z.string()).optional(),
+  heatingLogic: z.enum(['And', 'Or', 'Not']).optional(),
+  cooling: z.array(z.string()).optional(),
+  coolingLogic: z.enum(['And', 'Or', 'Not']).optional(),
+  waterSource: z.array(z.string()).optional(),
+  waterSourceLogic: z.enum(['And', 'Or', 'Not']).optional(),
+  sewer: z.array(z.string()).optional(),
+  sewerLogic: z.enum(['And', 'Or', 'Not']).optional(),
+  utilities: z.array(z.string()).optional(),
+  utilitiesLogic: z.enum(['And', 'Or', 'Not']).optional(),
+  
+  // Green/Sustainability
+  greenEnergyEfficient: z.array(z.string()).optional(),
+  greenEnergyEfficientLogic: z.enum(['And', 'Or', 'Not']).optional(),
+  greenSustainability: z.array(z.string()).optional(),
+  greenSustainabilityLogic: z.enum(['And', 'Or', 'Not']).optional(),
+  greenBuildingVerificationType: z.array(z.string()).optional(),
+  greenVerificationStatus: z.array(z.string()).optional(),
+  greenVerificationRating: z.string().optional(),
+  greenVerificationYear: z.coerce.number().optional(),
+  
+  // Listing conditions
+  specialListingConditions: z.array(z.string()).optional(),
+  showingRequirements: z.array(z.string()).optional(),
+  showingRequirementsLogic: z.enum(['And', 'Or', 'Not']).optional(),
+  occupantType: z.string().optional(),
+  possession: z.string().optional(),
+  buyerFinancing: z.array(z.string()).optional(),
+  buyerFinancingLogic: z.enum(['And', 'Or', 'Not']).optional(),
+  
+  // Parking
+  parkingFeatures: z.array(z.string()).optional(),
+  parkingFeaturesLogic: z.enum(['And', 'Or', 'Not']).optional(),
+  
+  // Remarks
   publicRemarks: z.string().optional(),
+  privateRemarks: z.string().optional(),
 }).partial();
 
 export type SearchCriteria = z.infer<typeof searchCriteriaSchema>;
