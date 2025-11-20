@@ -11,8 +11,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
@@ -47,7 +45,7 @@ interface SearchFilters {
   // MLS
   mlsNumber?: string;
   mlsAreas?: string;
-  mlsAreasMode?: string; // 'OR' or 'Not'
+  mlsAreasMode?: string;
   
   // Location
   postalCode?: string;
@@ -136,7 +134,6 @@ export default function BuyerSearch() {
   const [activeFiltersCount, setActiveFiltersCount] = useState(0);
   const [showFilters, setShowFilters] = useState(true);
 
-  // Build query string from filters
   const buildQueryString = () => {
     const params = new URLSearchParams();
     
@@ -228,10 +225,11 @@ export default function BuyerSearch() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-        {/* Filters Panel */}
+      {/* Filters and Results Layout */}
+      <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+        {/* Filters Panel - Wider Layout */}
         {showFilters && (
-          <Card className="lg:col-span-4 h-fit">
+          <Card className="xl:col-span-1">
             <CardHeader>
               <div className="flex items-center justify-between">
                 <div>
@@ -252,978 +250,621 @@ export default function BuyerSearch() {
                 )}
               </div>
             </CardHeader>
-            <CardContent>
-              <ScrollArea className="h-[calc(100vh-300px)]">
-                <div className="space-y-4 pr-4">
-                  {/* Status & Date Range */}
-                  <div className="space-y-2">
-                    <Label>Status</Label>
-                    <Select
-                      value={filters.status || ''}
-                      onValueChange={(value) => updateFilter('status', value || undefined)}
-                    >
-                      <SelectTrigger data-testid="select-status">
-                        <SelectValue placeholder="Any status" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="Active">Active</SelectItem>
-                        <SelectItem value="Pending">Pending</SelectItem>
-                        <SelectItem value="Under Contract">Under Contract</SelectItem>
-                        <SelectItem value="Closed">Closed</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    {filters.status && (
-                      <div className="grid grid-cols-2 gap-2 mt-2">
+            <CardContent className="max-h-[calc(100vh-280px)] overflow-y-auto">
+              <div className="space-y-6">
+                {/* Status */}
+                <div className="space-y-3">
+                  <Label className="text-base font-semibold">Status</Label>
+                  <Select
+                    value={filters.status || ''}
+                    onValueChange={(value) => updateFilter('status', value || undefined)}
+                  >
+                    <SelectTrigger data-testid="select-status" className="h-10">
+                      <SelectValue placeholder="Select Status" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Active">Active</SelectItem>
+                      <SelectItem value="Pending">Pending</SelectItem>
+                      <SelectItem value="Under Contract">Under Contract</SelectItem>
+                      <SelectItem value="Closed">Closed</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  {filters.status && (
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <Label className="text-xs text-muted-foreground">From</Label>
                         <Input
                           type="date"
-                          placeholder="From"
                           value={filters.statusDateFrom || ''}
                           onChange={(e) => updateFilter('statusDateFrom', e.target.value || undefined)}
                           data-testid="input-statusDateFrom"
+                          className="h-10"
                         />
+                      </div>
+                      <div>
+                        <Label className="text-xs text-muted-foreground">To</Label>
                         <Input
                           type="date"
-                          placeholder="To"
                           value={filters.statusDateTo || ''}
                           onChange={(e) => updateFilter('statusDateTo', e.target.value || undefined)}
                           data-testid="input-statusDateTo"
+                          className="h-10"
                         />
                       </div>
-                    )}
-                  </div>
+                    </div>
+                  )}
+                </div>
 
-                  <Separator />
+                <Separator />
 
-                  {/* Property Subtype */}
-                  <div className="space-y-2">
-                    <Label>Property Subtype</Label>
-                    <Select
-                      value={filters.propertySubType || ''}
-                      onValueChange={(value) => updateFilter('propertySubType', value || undefined)}
-                    >
-                      <SelectTrigger data-testid="select-propertySubType">
-                        <SelectValue placeholder="None Selected" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="Single Family">Single Family</SelectItem>
-                        <SelectItem value="Condo">Condo</SelectItem>
-                        <SelectItem value="Townhouse">Townhouse</SelectItem>
-                        <SelectItem value="Multi-Family">Multi-Family</SelectItem>
-                        <SelectItem value="Land">Land</SelectItem>
-                        <SelectItem value="Commercial">Commercial</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
+                {/* Property Subtype */}
+                <div className="space-y-3">
+                  <Label className="text-base font-semibold">Property Subtype</Label>
+                  <Select
+                    value={filters.propertySubType || ''}
+                    onValueChange={(value) => updateFilter('propertySubType', value || undefined)}
+                  >
+                    <SelectTrigger data-testid="select-propertySubType" className="h-10">
+                      <SelectValue placeholder="None Selected" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Single Family">Single Family</SelectItem>
+                      <SelectItem value="Condo">Condo</SelectItem>
+                      <SelectItem value="Townhouse">Townhouse</SelectItem>
+                      <SelectItem value="Multi-Family">Multi-Family</SelectItem>
+                      <SelectItem value="Land">Land</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
 
-                  {/* Contingency */}
-                  <div className="space-y-2">
-                    <Label>Contingency</Label>
-                    <RadioGroup
-                      value={filters.contingency || ''}
-                      onValueChange={(value) => updateFilter('contingency', value)}
-                    >
-                      <div className="flex gap-4">
-                        <div className="flex items-center space-x-2">
-                          <RadioGroupItem value="NA" id="contingency-na" />
-                          <Label htmlFor="contingency-na">NA</Label>
-                        </div>
-                        <div className="flex items-center space-x-2">
-                          <RadioGroupItem value="Yes" id="contingency-yes" />
-                          <Label htmlFor="contingency-yes">Yes</Label>
-                        </div>
-                        <div className="flex items-center space-x-2">
-                          <RadioGroupItem value="No" id="contingency-no" />
-                          <Label htmlFor="contingency-no">No</Label>
-                        </div>
+                {/* Contingency */}
+                <div className="space-y-3">
+                  <Label className="text-base font-semibold">Contingency</Label>
+                  <RadioGroup
+                    value={filters.contingency || ''}
+                    onValueChange={(value) => updateFilter('contingency', value)}
+                  >
+                    <div className="flex gap-6">
+                      <div className="flex items-center space-x-2">
+                        <RadioGroupItem value="NA" id="contingency-na" />
+                        <Label htmlFor="contingency-na" className="font-normal">NA</Label>
                       </div>
-                    </RadioGroup>
-                  </div>
-
-                  {/* Price Drop */}
-                  <div className="space-y-2">
-                    <Label>Price Drop</Label>
-                    <RadioGroup
-                      value={filters.priceDrop || ''}
-                      onValueChange={(value) => updateFilter('priceDrop', value)}
-                    >
-                      <div className="flex gap-4">
-                        <div className="flex items-center space-x-2">
-                          <RadioGroupItem value="NA" id="priceDrop-na" />
-                          <Label htmlFor="priceDrop-na">NA</Label>
-                        </div>
-                        <div className="flex items-center space-x-2">
-                          <RadioGroupItem value="Yes" id="priceDrop-yes" />
-                          <Label htmlFor="priceDrop-yes">Yes</Label>
-                        </div>
-                        <div className="flex items-center space-x-2">
-                          <RadioGroupItem value="No" id="priceDrop-no" />
-                          <Label htmlFor="priceDrop-no">No</Label>
-                        </div>
+                      <div className="flex items-center space-x-2">
+                        <RadioGroupItem value="Yes" id="contingency-yes" />
+                        <Label htmlFor="contingency-yes" className="font-normal">Yes</Label>
                       </div>
-                    </RadioGroup>
-                    {filters.priceDrop === 'Yes' && (
-                      <div className="grid grid-cols-2 gap-2 mt-2">
-                        <Input
-                          type="date"
-                          placeholder="From"
-                          value={filters.priceDropDateFrom || ''}
-                          onChange={(e) => updateFilter('priceDropDateFrom', e.target.value || undefined)}
-                          data-testid="input-priceDropDateFrom"
-                        />
-                        <Input
-                          type="date"
-                          placeholder="To"
-                          value={filters.priceDropDateTo || ''}
-                          onChange={(e) => updateFilter('priceDropDateTo', e.target.value || undefined)}
-                          data-testid="input-priceDropDateTo"
-                        />
+                      <div className="flex items-center space-x-2">
+                        <RadioGroupItem value="No" id="contingency-no" />
+                        <Label htmlFor="contingency-no" className="font-normal">No</Label>
                       </div>
-                    )}
-                  </div>
+                    </div>
+                  </RadioGroup>
+                </div>
 
-                  <Separator />
+                {/* Price Drop */}
+                <div className="space-y-3">
+                  <Label className="text-base font-semibold">Price Drop</Label>
+                  <RadioGroup
+                    value={filters.priceDrop || ''}
+                    onValueChange={(value) => updateFilter('priceDrop', value)}
+                  >
+                    <div className="flex gap-6">
+                      <div className="flex items-center space-x-2">
+                        <RadioGroupItem value="NA" id="priceDrop-na" />
+                        <Label htmlFor="priceDrop-na" className="font-normal">NA</Label>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <RadioGroupItem value="Yes" id="priceDrop-yes" />
+                        <Label htmlFor="priceDrop-yes" className="font-normal">Yes</Label>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <RadioGroupItem value="No" id="priceDrop-no" />
+                        <Label htmlFor="priceDrop-no" className="font-normal">No</Label>
+                      </div>
+                    </div>
+                  </RadioGroup>
+                </div>
 
-                  {/* List Price */}
-                  <div className="space-y-2">
-                    <Label>List Price</Label>
-                    <div className="grid grid-cols-2 gap-2">
+                <Separator />
+
+                {/* List Price */}
+                <div className="space-y-3">
+                  <Label className="text-base font-semibold">List Price</Label>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <Label className="text-xs text-muted-foreground">Min</Label>
                       <Input
                         type="number"
                         placeholder="Min"
                         value={filters.minPrice || ''}
                         onChange={(e) => updateFilter('minPrice', e.target.value ? Number(e.target.value) : undefined)}
                         data-testid="input-minPrice"
+                        className="h-10"
                       />
+                    </div>
+                    <div>
+                      <Label className="text-xs text-muted-foreground">Max</Label>
                       <Input
                         type="number"
                         placeholder="Max"
                         value={filters.maxPrice || ''}
                         onChange={(e) => updateFilter('maxPrice', e.target.value ? Number(e.target.value) : undefined)}
                         data-testid="input-maxPrice"
+                        className="h-10"
                       />
                     </div>
                   </div>
+                </div>
 
-                  {/* Street List */}
-                  <div className="space-y-2">
-                    <Label>Street list</Label>
-                    <Input
-                      placeholder="Street Name"
-                      value={filters.streetList || ''}
-                      onChange={(e) => updateFilter('streetList', e.target.value || undefined)}
-                      data-testid="input-streetList"
-                    />
-                  </div>
-
-                  <Separator />
-
-                  {/* MLS # */}
-                  <div className="space-y-2">
-                    <Label>MLS #</Label>
-                    <Input
-                      placeholder="MLS IDs"
-                      value={filters.mlsNumber || ''}
-                      onChange={(e) => updateFilter('mlsNumber', e.target.value || undefined)}
-                      data-testid="input-mlsNumber"
-                    />
-                  </div>
-
-                  {/* MLS Areas */}
-                  <div className="space-y-2">
-                    <Label>MLS Areas</Label>
-                    <Input
-                      placeholder="Start Typing"
-                      value={filters.mlsAreas || ''}
-                      onChange={(e) => updateFilter('mlsAreas', e.target.value || undefined)}
-                      data-testid="input-mlsAreas"
-                    />
-                    <RadioGroup
-                      value={filters.mlsAreasMode || 'OR'}
-                      onValueChange={(value) => updateFilter('mlsAreasMode', value)}
-                    >
-                      <div className="flex gap-4">
-                        <div className="flex items-center space-x-2">
-                          <RadioGroupItem value="OR" id="mlsAreas-or" />
-                          <Label htmlFor="mlsAreas-or">OR</Label>
-                        </div>
-                        <div className="flex items-center space-x-2">
-                          <RadioGroupItem value="Not" id="mlsAreas-not" />
-                          <Label htmlFor="mlsAreas-not">Not</Label>
-                        </div>
+                {/* MLS Areas */}
+                <div className="space-y-3">
+                  <Label className="text-base font-semibold">MLS Areas</Label>
+                  <Input
+                    placeholder="Start Typing"
+                    value={filters.mlsAreas || ''}
+                    onChange={(e) => updateFilter('mlsAreas', e.target.value || undefined)}
+                    data-testid="input-mlsAreas"
+                    className="h-10"
+                  />
+                  <RadioGroup
+                    value={filters.mlsAreasMode || 'OR'}
+                    onValueChange={(value) => updateFilter('mlsAreasMode', value)}
+                  >
+                    <div className="flex gap-6">
+                      <div className="flex items-center space-x-2">
+                        <RadioGroupItem value="OR" id="mlsAreas-or" />
+                        <Label htmlFor="mlsAreas-or" className="font-normal">OR</Label>
                       </div>
-                    </RadioGroup>
-                  </div>
-
-                  {/* Neighborhood */}
-                  <div className="space-y-2">
-                    <Label>Neighborhood</Label>
-                    <Input
-                      placeholder="Select Neighborhood"
-                      value={filters.neighborhood || ''}
-                      onChange={(e) => updateFilter('neighborhood', e.target.value || undefined)}
-                      data-testid="input-neighborhood"
-                    />
-                    <RadioGroup
-                      value={filters.neighborhoodMode || 'OR'}
-                      onValueChange={(value) => updateFilter('neighborhoodMode', value)}
-                    >
-                      <div className="flex gap-4">
-                        <div className="flex items-center space-x-2">
-                          <RadioGroupItem value="OR" id="neighborhood-or" />
-                          <Label htmlFor="neighborhood-or">OR</Label>
-                        </div>
-                        <div className="flex items-center space-x-2">
-                          <RadioGroupItem value="Not" id="neighborhood-not" />
-                          <Label htmlFor="neighborhood-not">Not</Label>
-                        </div>
+                      <div className="flex items-center space-x-2">
+                        <RadioGroupItem value="Not" id="mlsAreas-not" />
+                        <Label htmlFor="mlsAreas-not" className="font-normal">Not</Label>
                       </div>
-                    </RadioGroup>
-                  </div>
-
-                  {/* Subdivisions */}
-                  <div className="space-y-2">
-                    <Label>Subdivisions</Label>
-                    <Input
-                      placeholder="Subdivisions"
-                      value={filters.subdivision || ''}
-                      onChange={(e) => updateFilter('subdivision', e.target.value || undefined)}
-                      data-testid="input-subdivision"
-                    />
-                    <RadioGroup
-                      value={filters.subdivisionMode || 'OR'}
-                      onValueChange={(value) => updateFilter('subdivisionMode', value)}
-                    >
-                      <div className="flex gap-4">
-                        <div className="flex items-center space-x-2">
-                          <RadioGroupItem value="OR" id="subdivision-or" />
-                          <Label htmlFor="subdivision-or">OR</Label>
-                        </div>
-                        <div className="flex items-center space-x-2">
-                          <RadioGroupItem value="Not" id="subdivision-not" />
-                          <Label htmlFor="subdivision-not">Not</Label>
-                        </div>
-                      </div>
-                    </RadioGroup>
-                  </div>
-
-                  {/* Cities */}
-                  <div className="space-y-2">
-                    <Label>Cities</Label>
-                    <Input
-                      placeholder="Start Typing"
-                      value={filters.city || ''}
-                      onChange={(e) => updateFilter('city', e.target.value || undefined)}
-                      data-testid="input-city"
-                    />
-                    <RadioGroup
-                      value={filters.cityMode || 'OR'}
-                      onValueChange={(value) => updateFilter('cityMode', value)}
-                    >
-                      <div className="flex gap-4">
-                        <div className="flex items-center space-x-2">
-                          <RadioGroupItem value="OR" id="city-or" />
-                          <Label htmlFor="city-or">OR</Label>
-                        </div>
-                        <div className="flex items-center space-x-2">
-                          <RadioGroupItem value="Not" id="city-not" />
-                          <Label htmlFor="city-not">Not</Label>
-                        </div>
-                      </div>
-                    </RadioGroup>
-                  </div>
-
-                  {/* Street Number */}
-                  <div className="space-y-2">
-                    <Label>Street Number</Label>
-                    <div className="grid grid-cols-2 gap-2">
-                      <Input
-                        type="number"
-                        placeholder="Min"
-                        value={filters.streetNumberMin || ''}
-                        onChange={(e) => updateFilter('streetNumberMin', e.target.value ? Number(e.target.value) : undefined)}
-                        data-testid="input-streetNumberMin"
-                      />
-                      <Input
-                        type="number"
-                        placeholder="Max"
-                        value={filters.streetNumberMax || ''}
-                        onChange={(e) => updateFilter('streetNumberMax', e.target.value ? Number(e.target.value) : undefined)}
-                        data-testid="input-streetNumberMax"
-                      />
                     </div>
-                  </div>
+                  </RadioGroup>
+                </div>
 
-                  {/* Street Name */}
-                  <div className="space-y-2">
-                    <Label>Street Name</Label>
-                    <Input
-                      placeholder="Street Name"
-                      value={filters.streetName || ''}
-                      onChange={(e) => updateFilter('streetName', e.target.value || undefined)}
-                      data-testid="input-streetName"
-                    />
-                    <RadioGroup
-                      value={filters.streetNameMode || 'OR'}
-                      onValueChange={(value) => updateFilter('streetNameMode', value)}
-                    >
-                      <div className="flex gap-4">
-                        <div className="flex items-center space-x-2">
-                          <RadioGroupItem value="OR" id="streetName-or" />
-                          <Label htmlFor="streetName-or">OR</Label>
-                        </div>
-                        <div className="flex items-center space-x-2">
-                          <RadioGroupItem value="Not" id="streetName-not" />
-                          <Label htmlFor="streetName-not">Not</Label>
-                        </div>
+                {/* Neighborhood */}
+                <div className="space-y-3">
+                  <Label className="text-base font-semibold">Neighborhood</Label>
+                  <Input
+                    placeholder="Select Neighborhood"
+                    value={filters.neighborhood || ''}
+                    onChange={(e) => updateFilter('neighborhood', e.target.value || undefined)}
+                    data-testid="input-neighborhood"
+                    className="h-10"
+                  />
+                  <RadioGroup
+                    value={filters.neighborhoodMode || 'OR'}
+                    onValueChange={(value) => updateFilter('neighborhoodMode', value)}
+                  >
+                    <div className="flex gap-6">
+                      <div className="flex items-center space-x-2">
+                        <RadioGroupItem value="OR" id="neighborhood-or" />
+                        <Label htmlFor="neighborhood-or" className="font-normal">OR</Label>
                       </div>
-                    </RadioGroup>
-                  </div>
-
-                  {/* Unit Number */}
-                  <div className="space-y-2">
-                    <Label>Unit Number</Label>
-                    <Input
-                      placeholder="Unit Number"
-                      value={filters.unitNumber || ''}
-                      onChange={(e) => updateFilter('unitNumber', e.target.value || undefined)}
-                      data-testid="input-unitNumber"
-                    />
-                    <RadioGroup
-                      value={filters.unitNumberMode || 'OR'}
-                      onValueChange={(value) => updateFilter('unitNumberMode', value)}
-                    >
-                      <div className="flex gap-4">
-                        <div className="flex items-center space-x-2">
-                          <RadioGroupItem value="OR" id="unitNumber-or" />
-                          <Label htmlFor="unitNumber-or">OR</Label>
-                        </div>
-                        <div className="flex items-center space-x-2">
-                          <RadioGroupItem value="Not" id="unitNumber-not" />
-                          <Label htmlFor="unitNumber-not">Not</Label>
-                        </div>
+                      <div className="flex items-center space-x-2">
+                        <RadioGroupItem value="Not" id="neighborhood-not" />
+                        <Label htmlFor="neighborhood-not" className="font-normal">Not</Label>
                       </div>
-                    </RadioGroup>
-                  </div>
+                    </div>
+                  </RadioGroup>
+                </div>
 
-                  {/* Zip Codes */}
-                  <div className="space-y-2">
-                    <Label>Zip Codes</Label>
-                    <Input
-                      placeholder="Start Typing"
-                      value={filters.postalCode || ''}
-                      onChange={(e) => updateFilter('postalCode', e.target.value || undefined)}
-                      data-testid="input-postalCode"
-                    />
-                    <RadioGroup
-                      value={filters.postalCodeMode || 'OR'}
-                      onValueChange={(value) => updateFilter('postalCodeMode', value)}
-                    >
-                      <div className="flex gap-4">
-                        <div className="flex items-center space-x-2">
-                          <RadioGroupItem value="OR" id="postalCode-or" />
-                          <Label htmlFor="postalCode-or">OR</Label>
-                        </div>
-                        <div className="flex items-center space-x-2">
-                          <RadioGroupItem value="Not" id="postalCode-not" />
-                          <Label htmlFor="postalCode-not">Not</Label>
-                        </div>
+                {/* Subdivisions */}
+                <div className="space-y-3">
+                  <Label className="text-base font-semibold">Subdivisions</Label>
+                  <Input
+                    placeholder="Subdivisions"
+                    value={filters.subdivision || ''}
+                    onChange={(e) => updateFilter('subdivision', e.target.value || undefined)}
+                    data-testid="input-subdivision"
+                    className="h-10"
+                  />
+                  <RadioGroup
+                    value={filters.subdivisionMode || 'OR'}
+                    onValueChange={(value) => updateFilter('subdivisionMode', value)}
+                  >
+                    <div className="flex gap-6">
+                      <div className="flex items-center space-x-2">
+                        <RadioGroupItem value="OR" id="subdivision-or" />
+                        <Label htmlFor="subdivision-or" className="font-normal">OR</Label>
                       </div>
-                    </RadioGroup>
-                  </div>
-
-                  <Separator />
-
-                  {/* Elementary Schools */}
-                  <div className="space-y-2">
-                    <Label>Elementary Schools</Label>
-                    <Input
-                      placeholder="Start Typing"
-                      value={filters.elementarySchool || ''}
-                      onChange={(e) => updateFilter('elementarySchool', e.target.value || undefined)}
-                      data-testid="input-elementarySchool"
-                    />
-                    <RadioGroup
-                      value={filters.elementarySchoolMode || 'OR'}
-                      onValueChange={(value) => updateFilter('elementarySchoolMode', value)}
-                    >
-                      <div className="flex gap-4">
-                        <div className="flex items-center space-x-2">
-                          <RadioGroupItem value="OR" id="elementarySchool-or" />
-                          <Label htmlFor="elementarySchool-or">OR</Label>
-                        </div>
-                        <div className="flex items-center space-x-2">
-                          <RadioGroupItem value="Not" id="elementarySchool-not" />
-                          <Label htmlFor="elementarySchool-not">Not</Label>
-                        </div>
+                      <div className="flex items-center space-x-2">
+                        <RadioGroupItem value="Not" id="subdivision-not" />
+                        <Label htmlFor="subdivision-not" className="font-normal">Not</Label>
                       </div>
-                    </RadioGroup>
-                  </div>
+                    </div>
+                  </RadioGroup>
+                </div>
 
-                  {/* Middle/Junior Schools */}
-                  <div className="space-y-2">
-                    <Label>Middle/Junior Schools</Label>
-                    <Input
-                      placeholder="Start Typing"
-                      value={filters.middleSchool || ''}
-                      onChange={(e) => updateFilter('middleSchool', e.target.value || undefined)}
-                      data-testid="input-middleSchool"
-                    />
-                    <RadioGroup
-                      value={filters.middleSchoolMode || 'OR'}
-                      onValueChange={(value) => updateFilter('middleSchoolMode', value)}
-                    >
-                      <div className="flex gap-4">
-                        <div className="flex items-center space-x-2">
-                          <RadioGroupItem value="OR" id="middleSchool-or" />
-                          <Label htmlFor="middleSchool-or">OR</Label>
-                        </div>
-                        <div className="flex items-center space-x-2">
-                          <RadioGroupItem value="Not" id="middleSchool-not" />
-                          <Label htmlFor="middleSchool-not">Not</Label>
-                        </div>
+                {/* Cities */}
+                <div className="space-y-3">
+                  <Label className="text-base font-semibold">Cities</Label>
+                  <Input
+                    placeholder="Start Typing"
+                    value={filters.city || ''}
+                    onChange={(e) => updateFilter('city', e.target.value || undefined)}
+                    data-testid="input-city"
+                    className="h-10"
+                  />
+                  <RadioGroup
+                    value={filters.cityMode || 'OR'}
+                    onValueChange={(value) => updateFilter('cityMode', value)}
+                  >
+                    <div className="flex gap-6">
+                      <div className="flex items-center space-x-2">
+                        <RadioGroupItem value="OR" id="city-or" />
+                        <Label htmlFor="city-or" className="font-normal">OR</Label>
                       </div>
-                    </RadioGroup>
-                  </div>
-
-                  {/* High Schools */}
-                  <div className="space-y-2">
-                    <Label>High Schools</Label>
-                    <Input
-                      placeholder="Start Typing"
-                      value={filters.highSchool || ''}
-                      onChange={(e) => updateFilter('highSchool', e.target.value || undefined)}
-                      data-testid="input-highSchool"
-                    />
-                    <RadioGroup
-                      value={filters.highSchoolMode || 'OR'}
-                      onValueChange={(value) => updateFilter('highSchoolMode', value)}
-                    >
-                      <div className="flex gap-4">
-                        <div className="flex items-center space-x-2">
-                          <RadioGroupItem value="OR" id="highSchool-or" />
-                          <Label htmlFor="highSchool-or">OR</Label>
-                        </div>
-                        <div className="flex items-center space-x-2">
-                          <RadioGroupItem value="Not" id="highSchool-not" />
-                          <Label htmlFor="highSchool-not">Not</Label>
-                        </div>
+                      <div className="flex items-center space-x-2">
+                        <RadioGroupItem value="Not" id="city-not" />
+                        <Label htmlFor="city-not" className="font-normal">Not</Label>
                       </div>
-                    </RadioGroup>
-                  </div>
+                    </div>
+                  </RadioGroup>
+                </div>
 
-                  {/* School District */}
-                  <div className="space-y-2">
-                    <Label>School District</Label>
-                    <Input
-                      placeholder="Start Typing"
-                      value={filters.schoolDistrict || ''}
-                      onChange={(e) => updateFilter('schoolDistrict', e.target.value || undefined)}
-                      data-testid="input-schoolDistrict"
-                    />
-                    <RadioGroup
-                      value={filters.schoolDistrictMode || 'OR'}
-                      onValueChange={(value) => updateFilter('schoolDistrictMode', value)}
-                    >
-                      <div className="flex gap-4">
-                        <div className="flex items-center space-x-2">
-                          <RadioGroupItem value="OR" id="schoolDistrict-or" />
-                          <Label htmlFor="schoolDistrict-or">OR</Label>
-                        </div>
-                        <div className="flex items-center space-x-2">
-                          <RadioGroupItem value="Not" id="schoolDistrict-not" />
-                          <Label htmlFor="schoolDistrict-not">Not</Label>
-                        </div>
+                {/* Zip Codes */}
+                <div className="space-y-3">
+                  <Label className="text-base font-semibold">Zip Codes</Label>
+                  <Input
+                    placeholder="Start Typing"
+                    value={filters.postalCode || ''}
+                    onChange={(e) => updateFilter('postalCode', e.target.value || undefined)}
+                    data-testid="input-postalCode"
+                    className="h-10"
+                  />
+                  <RadioGroup
+                    value={filters.postalCodeMode || 'OR'}
+                    onValueChange={(value) => updateFilter('postalCodeMode', value)}
+                  >
+                    <div className="flex gap-6">
+                      <div className="flex items-center space-x-2">
+                        <RadioGroupItem value="OR" id="postalCode-or" />
+                        <Label htmlFor="postalCode-or" className="font-normal">OR</Label>
                       </div>
-                    </RadioGroup>
-                  </div>
+                      <div className="flex items-center space-x-2">
+                        <RadioGroupItem value="Not" id="postalCode-not" />
+                        <Label htmlFor="postalCode-not" className="font-normal">Not</Label>
+                      </div>
+                    </div>
+                  </RadioGroup>
+                </div>
 
-                  <Separator />
+                <Separator />
 
-                  {/* Year Built Range */}
-                  <div className="space-y-2">
-                    <Label>Year Built Range</Label>
-                    <div className="grid grid-cols-2 gap-2">
+                {/* Elementary Schools */}
+                <div className="space-y-3">
+                  <Label className="text-base font-semibold">Elementary Schools</Label>
+                  <Input
+                    placeholder="Start Typing"
+                    value={filters.elementarySchool || ''}
+                    onChange={(e) => updateFilter('elementarySchool', e.target.value || undefined)}
+                    data-testid="input-elementarySchool"
+                    className="h-10"
+                  />
+                  <RadioGroup
+                    value={filters.elementarySchoolMode || 'OR'}
+                    onValueChange={(value) => updateFilter('elementarySchoolMode', value)}
+                  >
+                    <div className="flex gap-6">
+                      <div className="flex items-center space-x-2">
+                        <RadioGroupItem value="OR" id="elementarySchool-or" />
+                        <Label htmlFor="elementarySchool-or" className="font-normal">OR</Label>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <RadioGroupItem value="Not" id="elementarySchool-not" />
+                        <Label htmlFor="elementarySchool-not" className="font-normal">Not</Label>
+                      </div>
+                    </div>
+                  </RadioGroup>
+                </div>
+
+                {/* Middle Schools */}
+                <div className="space-y-3">
+                  <Label className="text-base font-semibold">Middle/Junior Schools</Label>
+                  <Input
+                    placeholder="Start Typing"
+                    value={filters.middleSchool || ''}
+                    onChange={(e) => updateFilter('middleSchool', e.target.value || undefined)}
+                    data-testid="input-middleSchool"
+                    className="h-10"
+                  />
+                  <RadioGroup
+                    value={filters.middleSchoolMode || 'OR'}
+                    onValueChange={(value) => updateFilter('middleSchoolMode', value)}
+                  >
+                    <div className="flex gap-6">
+                      <div className="flex items-center space-x-2">
+                        <RadioGroupItem value="OR" id="middleSchool-or" />
+                        <Label htmlFor="middleSchool-or" className="font-normal">OR</Label>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <RadioGroupItem value="Not" id="middleSchool-not" />
+                        <Label htmlFor="middleSchool-not" className="font-normal">Not</Label>
+                      </div>
+                    </div>
+                  </RadioGroup>
+                </div>
+
+                {/* High Schools */}
+                <div className="space-y-3">
+                  <Label className="text-base font-semibold">High Schools</Label>
+                  <Input
+                    placeholder="Start Typing"
+                    value={filters.highSchool || ''}
+                    onChange={(e) => updateFilter('highSchool', e.target.value || undefined)}
+                    data-testid="input-highSchool"
+                    className="h-10"
+                  />
+                  <RadioGroup
+                    value={filters.highSchoolMode || 'OR'}
+                    onValueChange={(value) => updateFilter('highSchoolMode', value)}
+                  >
+                    <div className="flex gap-6">
+                      <div className="flex items-center space-x-2">
+                        <RadioGroupItem value="OR" id="highSchool-or" />
+                        <Label htmlFor="highSchool-or" className="font-normal">OR</Label>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <RadioGroupItem value="Not" id="highSchool-not" />
+                        <Label htmlFor="highSchool-not" className="font-normal">Not</Label>
+                      </div>
+                    </div>
+                  </RadioGroup>
+                </div>
+
+                {/* School District */}
+                <div className="space-y-3">
+                  <Label className="text-base font-semibold">School District</Label>
+                  <Input
+                    placeholder="Start Typing"
+                    value={filters.schoolDistrict || ''}
+                    onChange={(e) => updateFilter('schoolDistrict', e.target.value || undefined)}
+                    data-testid="input-schoolDistrict"
+                    className="h-10"
+                  />
+                  <RadioGroup
+                    value={filters.schoolDistrictMode || 'OR'}
+                    onValueChange={(value) => updateFilter('schoolDistrictMode', value)}
+                  >
+                    <div className="flex gap-6">
+                      <div className="flex items-center space-x-2">
+                        <RadioGroupItem value="OR" id="schoolDistrict-or" />
+                        <Label htmlFor="schoolDistrict-or" className="font-normal">OR</Label>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <RadioGroupItem value="Not" id="schoolDistrict-not" />
+                        <Label htmlFor="schoolDistrict-not" className="font-normal">Not</Label>
+                      </div>
+                    </div>
+                  </RadioGroup>
+                </div>
+
+                <Separator />
+
+                {/* Year Built */}
+                <div className="space-y-3">
+                  <Label className="text-base font-semibold">Year Built Range</Label>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <Label className="text-xs text-muted-foreground">Min</Label>
                       <Input
                         type="number"
                         placeholder="Min"
                         value={filters.minYearBuilt || ''}
                         onChange={(e) => updateFilter('minYearBuilt', e.target.value ? Number(e.target.value) : undefined)}
                         data-testid="input-minYearBuilt"
+                        className="h-10"
                       />
+                    </div>
+                    <div>
+                      <Label className="text-xs text-muted-foreground">Max</Label>
                       <Input
                         type="number"
                         placeholder="Max"
                         value={filters.maxYearBuilt || ''}
                         onChange={(e) => updateFilter('maxYearBuilt', e.target.value ? Number(e.target.value) : undefined)}
                         data-testid="input-maxYearBuilt"
+                        className="h-10"
                       />
                     </div>
                   </div>
+                </div>
 
-                  {/* Living Area (Sq Ft) */}
-                  <div className="space-y-2">
-                    <Label>Living Area (Sq Ft)</Label>
-                    <div className="grid grid-cols-2 gap-2">
+                {/* Living Area */}
+                <div className="space-y-3">
+                  <Label className="text-base font-semibold">Living Area (Sq Ft)</Label>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <Label className="text-xs text-muted-foreground">Min</Label>
                       <Input
                         type="number"
                         placeholder="Min"
                         value={filters.minLivingArea || ''}
                         onChange={(e) => updateFilter('minLivingArea', e.target.value ? Number(e.target.value) : undefined)}
                         data-testid="input-minLivingArea"
+                        className="h-10"
                       />
+                    </div>
+                    <div>
+                      <Label className="text-xs text-muted-foreground">Max</Label>
                       <Input
                         type="number"
                         placeholder="Max"
                         value={filters.maxLivingArea || ''}
                         onChange={(e) => updateFilter('maxLivingArea', e.target.value ? Number(e.target.value) : undefined)}
                         data-testid="input-maxLivingArea"
+                        className="h-10"
                       />
                     </div>
                   </div>
+                </div>
 
-                  {/* Lot Size (Square Feet) */}
-                  <div className="space-y-2">
-                    <Label>Lot Size (Square Feet)</Label>
-                    <div className="grid grid-cols-2 gap-2">
+                {/* Lot Size (Sq Ft) */}
+                <div className="space-y-3">
+                  <Label className="text-base font-semibold">Lot Size (Square Feet)</Label>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <Label className="text-xs text-muted-foreground">Min</Label>
                       <Input
                         type="number"
                         placeholder="Min"
                         value={filters.minLotSizeSqFt || ''}
                         onChange={(e) => updateFilter('minLotSizeSqFt', e.target.value ? Number(e.target.value) : undefined)}
                         data-testid="input-minLotSizeSqFt"
+                        className="h-10"
                       />
+                    </div>
+                    <div>
+                      <Label className="text-xs text-muted-foreground">Max</Label>
                       <Input
                         type="number"
                         placeholder="Max"
                         value={filters.maxLotSizeSqFt || ''}
                         onChange={(e) => updateFilter('maxLotSizeSqFt', e.target.value ? Number(e.target.value) : undefined)}
                         data-testid="input-maxLotSizeSqFt"
+                        className="h-10"
                       />
                     </div>
                   </div>
+                </div>
 
-                  {/* Lot Size (Acres) */}
-                  <div className="space-y-2">
-                    <Label>Lot Size (Acres)</Label>
-                    <div className="grid grid-cols-2 gap-2">
+                {/* Lot Size (Acres) */}
+                <div className="space-y-3">
+                  <Label className="text-base font-semibold">Lot Size (Acres)</Label>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <Label className="text-xs text-muted-foreground">Min</Label>
                       <Input
                         type="number"
                         placeholder="Min"
                         value={filters.minLotSizeAcres || ''}
                         onChange={(e) => updateFilter('minLotSizeAcres', e.target.value ? Number(e.target.value) : undefined)}
                         data-testid="input-minLotSizeAcres"
+                        className="h-10"
                       />
+                    </div>
+                    <div>
+                      <Label className="text-xs text-muted-foreground">Max</Label>
                       <Input
                         type="number"
                         placeholder="Max"
                         value={filters.maxLotSizeAcres || ''}
                         onChange={(e) => updateFilter('maxLotSizeAcres', e.target.value ? Number(e.target.value) : undefined)}
                         data-testid="input-maxLotSizeAcres"
+                        className="h-10"
                       />
                     </div>
                   </div>
+                </div>
 
-                  {/* # Bedrooms */}
-                  <div className="space-y-2">
-                    <Label># Bedrooms</Label>
-                    <div className="grid grid-cols-2 gap-2">
+                {/* Bedrooms */}
+                <div className="space-y-3">
+                  <Label className="text-base font-semibold"># Bedrooms</Label>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <Label className="text-xs text-muted-foreground">Min</Label>
                       <Input
                         type="number"
                         placeholder="Min"
                         value={filters.minBeds || ''}
                         onChange={(e) => updateFilter('minBeds', e.target.value ? Number(e.target.value) : undefined)}
                         data-testid="input-minBeds"
+                        className="h-10"
                       />
+                    </div>
+                    <div>
+                      <Label className="text-xs text-muted-foreground">Max</Label>
                       <Input
                         type="number"
                         placeholder="Max"
                         value={filters.maxBeds || ''}
                         onChange={(e) => updateFilter('maxBeds', e.target.value ? Number(e.target.value) : undefined)}
                         data-testid="input-maxBeds"
+                        className="h-10"
                       />
                     </div>
                   </div>
+                </div>
 
-                  {/* # Main Level Bedrooms */}
-                  <div className="space-y-2">
-                    <Label># Main Level Bedrooms</Label>
-                    <div className="grid grid-cols-2 gap-2">
-                      <Input
-                        type="number"
-                        placeholder="Min"
-                        value={filters.minMainLevelBeds || ''}
-                        onChange={(e) => updateFilter('minMainLevelBeds', e.target.value ? Number(e.target.value) : undefined)}
-                        data-testid="input-minMainLevelBeds"
-                      />
-                      <Input
-                        type="number"
-                        placeholder="Max"
-                        value={filters.maxMainLevelBeds || ''}
-                        onChange={(e) => updateFilter('maxMainLevelBeds', e.target.value ? Number(e.target.value) : undefined)}
-                        data-testid="input-maxMainLevelBeds"
-                      />
-                    </div>
-                  </div>
-
-                  {/* # Full Baths */}
-                  <div className="space-y-2">
-                    <Label># Full Baths</Label>
-                    <div className="grid grid-cols-2 gap-2">
+                {/* Full Baths */}
+                <div className="space-y-3">
+                  <Label className="text-base font-semibold"># Full Baths</Label>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <Label className="text-xs text-muted-foreground">Min</Label>
                       <Input
                         type="number"
                         placeholder="Min"
                         value={filters.minFullBaths || ''}
                         onChange={(e) => updateFilter('minFullBaths', e.target.value ? Number(e.target.value) : undefined)}
                         data-testid="input-minFullBaths"
+                        className="h-10"
                       />
+                    </div>
+                    <div>
+                      <Label className="text-xs text-muted-foreground">Max</Label>
                       <Input
                         type="number"
                         placeholder="Max"
                         value={filters.maxFullBaths || ''}
                         onChange={(e) => updateFilter('maxFullBaths', e.target.value ? Number(e.target.value) : undefined)}
                         data-testid="input-maxFullBaths"
+                        className="h-10"
                       />
                     </div>
                   </div>
+                </div>
 
-                  {/* # Half Baths */}
-                  <div className="space-y-2">
-                    <Label># Half Baths</Label>
-                    <div className="grid grid-cols-2 gap-2">
+                {/* Half Baths */}
+                <div className="space-y-3">
+                  <Label className="text-base font-semibold"># Half Baths</Label>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <Label className="text-xs text-muted-foreground">Min</Label>
                       <Input
                         type="number"
                         placeholder="Min"
                         value={filters.minHalfBaths || ''}
                         onChange={(e) => updateFilter('minHalfBaths', e.target.value ? Number(e.target.value) : undefined)}
                         data-testid="input-minHalfBaths"
+                        className="h-10"
                       />
+                    </div>
+                    <div>
+                      <Label className="text-xs text-muted-foreground">Max</Label>
                       <Input
                         type="number"
                         placeholder="Max"
                         value={filters.maxHalfBaths || ''}
                         onChange={(e) => updateFilter('maxHalfBaths', e.target.value ? Number(e.target.value) : undefined)}
                         data-testid="input-maxHalfBaths"
+                        className="h-10"
                       />
                     </div>
-                  </div>
-
-                  {/* Total Baths */}
-                  <div className="space-y-2">
-                    <Label>Total Baths</Label>
-                    <div className="grid grid-cols-2 gap-2">
-                      <Input
-                        type="number"
-                        placeholder="Min"
-                        value={filters.minTotalBaths || ''}
-                        onChange={(e) => updateFilter('minTotalBaths', e.target.value ? Number(e.target.value) : undefined)}
-                        data-testid="input-minTotalBaths"
-                      />
-                      <Input
-                        type="number"
-                        placeholder="Max"
-                        value={filters.maxTotalBaths || ''}
-                        onChange={(e) => updateFilter('maxTotalBaths', e.target.value ? Number(e.target.value) : undefined)}
-                        data-testid="input-maxTotalBaths"
-                      />
-                    </div>
-                  </div>
-
-                  {/* Public Remarks */}
-                  <div className="space-y-2">
-                    <Label>Public Remarks</Label>
-                    <Input
-                      placeholder="Search in property descriptions"
-                      value={filters.publicRemarks || ''}
-                      onChange={(e) => updateFilter('publicRemarks', e.target.value || undefined)}
-                      data-testid="input-publicRemarks"
-                    />
-                  </div>
-
-                  <Separator />
-
-                  {/* Select Levels */}
-                  <div className="space-y-2">
-                    <Label>Select Levels</Label>
-                    <Input
-                      placeholder="Select Levels"
-                      value={filters.selectLevels || ''}
-                      onChange={(e) => updateFilter('selectLevels', e.target.value || undefined)}
-                      data-testid="input-selectLevels"
-                    />
-                    <RadioGroup
-                      value={filters.selectLevelsMode || 'OR'}
-                      onValueChange={(value) => updateFilter('selectLevelsMode', value)}
-                    >
-                      <div className="flex gap-4">
-                        <div className="flex items-center space-x-2">
-                          <RadioGroupItem value="OR" id="selectLevels-or" />
-                          <Label htmlFor="selectLevels-or">OR</Label>
-                        </div>
-                        <div className="flex items-center space-x-2">
-                          <RadioGroupItem value="Not" id="selectLevels-not" />
-                          <Label htmlFor="selectLevels-not">Not</Label>
-                        </div>
-                      </div>
-                    </RadioGroup>
-                  </div>
-
-                  {/* New Construction */}
-                  <div className="space-y-2">
-                    <Label>New Construction</Label>
-                    <RadioGroup
-                      value={filters.newConstruction || ''}
-                      onValueChange={(value) => updateFilter('newConstruction', value)}
-                    >
-                      <div className="flex gap-4">
-                        <div className="flex items-center space-x-2">
-                          <RadioGroupItem value="NA" id="newConstruction-na" />
-                          <Label htmlFor="newConstruction-na">NA</Label>
-                        </div>
-                        <div className="flex items-center space-x-2">
-                          <RadioGroupItem value="Yes" id="newConstruction-yes" />
-                          <Label htmlFor="newConstruction-yes">Yes</Label>
-                        </div>
-                        <div className="flex items-center space-x-2">
-                          <RadioGroupItem value="No" id="newConstruction-no" />
-                          <Label htmlFor="newConstruction-no">No</Label>
-                        </div>
-                      </div>
-                    </RadioGroup>
-                  </div>
-
-                  {/* Builder Name */}
-                  <div className="space-y-2">
-                    <Label>Builder Name</Label>
-                    <Input
-                      placeholder="Builder Name"
-                      value={filters.builderName || ''}
-                      onChange={(e) => updateFilter('builderName', e.target.value || undefined)}
-                      data-testid="input-builderName"
-                    />
-                    <RadioGroup
-                      value={filters.builderNameMode || 'OR'}
-                      onValueChange={(value) => updateFilter('builderNameMode', value)}
-                    >
-                      <div className="flex gap-4">
-                        <div className="flex items-center space-x-2">
-                          <RadioGroupItem value="OR" id="builderName-or" />
-                          <Label htmlFor="builderName-or">OR</Label>
-                        </div>
-                        <div className="flex items-center space-x-2">
-                          <RadioGroupItem value="Not" id="builderName-not" />
-                          <Label htmlFor="builderName-not">Not</Label>
-                        </div>
-                      </div>
-                    </RadioGroup>
-                  </div>
-
-                  {/* Roof Type */}
-                  <div className="space-y-2">
-                    <Label>Roof Type</Label>
-                    <Input
-                      placeholder="Roof Type"
-                      value={filters.roofType || ''}
-                      onChange={(e) => updateFilter('roofType', e.target.value || undefined)}
-                      data-testid="input-roofType"
-                    />
-                    <RadioGroup
-                      value={filters.roofTypeMode || 'OR'}
-                      onValueChange={(value) => updateFilter('roofTypeMode', value)}
-                    >
-                      <div className="flex gap-4">
-                        <div className="flex items-center space-x-2">
-                          <RadioGroupItem value="OR" id="roofType-or" />
-                          <Label htmlFor="roofType-or">OR</Label>
-                        </div>
-                        <div className="flex items-center space-x-2">
-                          <RadioGroupItem value="Not" id="roofType-not" />
-                          <Label htmlFor="roofType-not">Not</Label>
-                        </div>
-                      </div>
-                    </RadioGroup>
-                  </div>
-
-                  {/* # Fireplaces */}
-                  <div className="space-y-2">
-                    <Label># Fireplaces</Label>
-                    <div className="grid grid-cols-2 gap-2">
-                      <Input
-                        type="number"
-                        placeholder="Min"
-                        value={filters.minFireplaces || ''}
-                        onChange={(e) => updateFilter('minFireplaces', e.target.value ? Number(e.target.value) : undefined)}
-                        data-testid="input-minFireplaces"
-                      />
-                      <Input
-                        type="number"
-                        placeholder="Max"
-                        value={filters.maxFireplaces || ''}
-                        onChange={(e) => updateFilter('maxFireplaces', e.target.value ? Number(e.target.value) : undefined)}
-                        data-testid="input-maxFireplaces"
-                      />
-                    </div>
-                  </div>
-
-                  {/* Property Condition */}
-                  <div className="space-y-2">
-                    <Label>Property Condition</Label>
-                    <Input
-                      placeholder="Property Condition"
-                      value={filters.propertyCondition || ''}
-                      onChange={(e) => updateFilter('propertyCondition', e.target.value || undefined)}
-                      data-testid="input-propertyCondition"
-                    />
-                  </div>
-
-                  {/* Utilities */}
-                  <div className="space-y-2">
-                    <Label>Utilities</Label>
-                    <Input
-                      placeholder="Utilities"
-                      value={filters.utilities || ''}
-                      onChange={(e) => updateFilter('utilities', e.target.value || undefined)}
-                      data-testid="input-utilities"
-                    />
-                    <RadioGroup
-                      value={filters.utilitiesMode || 'OR'}
-                      onValueChange={(value) => updateFilter('utilitiesMode', value)}
-                    >
-                      <div className="flex gap-4">
-                        <div className="flex items-center space-x-2">
-                          <RadioGroupItem value="OR" id="utilities-or" />
-                          <Label htmlFor="utilities-or">OR</Label>
-                        </div>
-                        <div className="flex items-center space-x-2">
-                          <RadioGroupItem value="Not" id="utilities-not" />
-                          <Label htmlFor="utilities-not">Not</Label>
-                        </div>
-                      </div>
-                    </RadioGroup>
-                  </div>
-
-                  {/* Interior Features */}
-                  <div className="space-y-2">
-                    <Label>Interior Features</Label>
-                    <Input
-                      placeholder="Interior Features"
-                      value={filters.interiorFeatures || ''}
-                      onChange={(e) => updateFilter('interiorFeatures', e.target.value || undefined)}
-                      data-testid="input-interiorFeatures"
-                    />
-                    <RadioGroup
-                      value={filters.interiorFeaturesMode || 'OR'}
-                      onValueChange={(value) => updateFilter('interiorFeaturesMode', value)}
-                    >
-                      <div className="flex gap-4">
-                        <div className="flex items-center space-x-2">
-                          <RadioGroupItem value="OR" id="interiorFeatures-or" />
-                          <Label htmlFor="interiorFeatures-or">OR</Label>
-                        </div>
-                        <div className="flex items-center space-x-2">
-                          <RadioGroupItem value="Not" id="interiorFeatures-not" />
-                          <Label htmlFor="interiorFeatures-not">Not</Label>
-                        </div>
-                      </div>
-                    </RadioGroup>
-                  </div>
-
-                  {/* Direction Faces */}
-                  <div className="space-y-2">
-                    <Label>Direction Faces</Label>
-                    <Input
-                      placeholder="Direction Faces"
-                      value={filters.directionFaces || ''}
-                      onChange={(e) => updateFilter('directionFaces', e.target.value || undefined)}
-                      data-testid="input-directionFaces"
-                    />
-                    <RadioGroup
-                      value={filters.directionFacesMode || 'OR'}
-                      onValueChange={(value) => updateFilter('directionFacesMode', value)}
-                    >
-                      <div className="flex gap-4">
-                        <div className="flex items-center space-x-2">
-                          <RadioGroupItem value="OR" id="directionFaces-or" />
-                          <Label htmlFor="directionFaces-or">OR</Label>
-                        </div>
-                        <div className="flex items-center space-x-2">
-                          <RadioGroupItem value="Not" id="directionFaces-not" />
-                          <Label htmlFor="directionFaces-not">Not</Label>
-                        </div>
-                      </div>
-                    </RadioGroup>
-                  </div>
-
-                  {/* Restrictions */}
-                  <div className="space-y-2">
-                    <Label>Restrictions</Label>
-                    <Input
-                      placeholder="Restrictions"
-                      value={filters.restrictions || ''}
-                      onChange={(e) => updateFilter('restrictions', e.target.value || undefined)}
-                      data-testid="input-restrictions"
-                    />
-                    <RadioGroup
-                      value={filters.restrictionsMode || 'OR'}
-                      onValueChange={(value) => updateFilter('restrictionsMode', value)}
-                    >
-                      <div className="flex gap-4">
-                        <div className="flex items-center space-x-2">
-                          <RadioGroupItem value="OR" id="restrictions-or" />
-                          <Label htmlFor="restrictions-or">OR</Label>
-                        </div>
-                        <div className="flex items-center space-x-2">
-                          <RadioGroupItem value="Not" id="restrictions-not" />
-                          <Label htmlFor="restrictions-not">Not</Label>
-                        </div>
-                      </div>
-                    </RadioGroup>
-                  </div>
-
-                  {/* Acceptable Financing */}
-                  <div className="space-y-2">
-                    <Label>Acceptable Financing</Label>
-                    <Input
-                      placeholder="Acceptable Financing"
-                      value={filters.acceptableFinancing || ''}
-                      onChange={(e) => updateFilter('acceptableFinancing', e.target.value || undefined)}
-                      data-testid="input-acceptableFinancing"
-                    />
-                    <RadioGroup
-                      value={filters.acceptableFinancingMode || 'OR'}
-                      onValueChange={(value) => updateFilter('acceptableFinancingMode', value)}
-                    >
-                      <div className="flex gap-4">
-                        <div className="flex items-center space-x-2">
-                          <RadioGroupItem value="OR" id="acceptableFinancing-or" />
-                          <Label htmlFor="acceptableFinancing-or">OR</Label>
-                        </div>
-                        <div className="flex items-center space-x-2">
-                          <RadioGroupItem value="Not" id="acceptableFinancing-not" />
-                          <Label htmlFor="acceptableFinancing-not">Not</Label>
-                        </div>
-                      </div>
-                    </RadioGroup>
                   </div>
                 </div>
 
-                <div className="mt-6 pt-4 border-t pr-4">
+                <div className="pt-4">
                   <Button
                     className="w-full"
                     onClick={handleSearch}
                     disabled={activeFiltersCount === 0}
                     data-testid="button-search"
+                    size="lg"
                   >
                     <Search className="w-4 h-4 mr-2" />
                     Search Properties
                   </Button>
                 </div>
-              </ScrollArea>
+              </div>
             </CardContent>
           </Card>
         )}
 
         {/* Results Panel */}
-        <Card className={showFilters ? "lg:col-span-8" : "lg:col-span-12"}>
+        <Card className={showFilters ? "xl:col-span-2" : "xl:col-span-3"}>
           <CardHeader>
             <div className="flex items-center justify-between">
               <div>
@@ -1236,7 +877,6 @@ export default function BuyerSearch() {
                 <div className="flex flex-wrap gap-2 max-w-2xl">
                   {Object.entries(filters).map(([key, value]) => {
                     if (!value) return null;
-                    // Skip "Mode" fields from badges
                     if (key.endsWith('Mode')) return null;
                     return (
                       <Badge
@@ -1262,7 +902,7 @@ export default function BuyerSearch() {
                 Searching properties...
               </div>
             ) : properties && properties.length > 0 ? (
-              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {properties.map((property) => (
                   <PropertyCard key={property.id} property={property} />
                 ))}
