@@ -3,7 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Map, Search } from "lucide-react";
+import { Map as MapIcon, Search } from "lucide-react";
 import { SearchCriteriaForm } from "@/components/SearchCriteria";
 import { PropertyResults } from "@/components/PropertyResults";
 import { searchProperties } from "@/lib/api";
@@ -91,7 +91,7 @@ export default function Properties() {
             Search Criteria
           </TabsTrigger>
           <TabsTrigger value="map" data-testid="tab-view-map">
-            <Map className="w-4 h-4 mr-2" />
+            <MapIcon className="w-4 h-4 mr-2" />
             View Map
           </TabsTrigger>
           <TabsTrigger value="results" data-testid="tab-view-results">
@@ -106,7 +106,7 @@ export default function Properties() {
         <TabsContent value="map">
           <div className="aspect-video bg-muted rounded-md flex items-center justify-center">
             <div className="text-center text-muted-foreground">
-              <Map className="w-12 h-12 mx-auto mb-4" />
+              <MapIcon className="w-12 h-12 mx-auto mb-4" />
               <p className="text-lg font-semibold mb-2">Interactive Map View</p>
               <p className="text-sm">Map integration coming soon with property markers and drawing tools</p>
             </div>

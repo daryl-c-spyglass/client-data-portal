@@ -9,9 +9,19 @@ import {
   type InsertCma,
   type SearchCriteria,
   type PropertyStatistics,
-  type TimelineDataPoint
+  type TimelineDataPoint,
+  properties,
+  media,
+  savedSearches,
+  cmas
 } from "@shared/schema";
 import { randomUUID } from "crypto";
+import { drizzle } from "drizzle-orm/neon-serverless";
+import { Pool, neonConfig } from "@neondatabase/serverless";
+import { eq, and, gte, lte, inArray, sql as drizzleSql } from "drizzle-orm";
+import ws from "ws";
+
+neonConfig.webSocketConstructor = ws;
 
 export interface IStorage {
   // Property operations
@@ -344,4 +354,231 @@ export class MemStorage implements IStorage {
   }
 }
 
-export const storage = new MemStorage();
+export class DbStorage implements IStorage {
+  private db;
+
+  constructor(connectionString: string) {
+    const pool = new Pool({ connectionString });
+    this.db = drizzle(pool, { schema: { properties, media, savedSearches, cmas } });
+  }
+
+  async getProperty(id: string): Promise<Property | undefined> {
+    const result = await this.db.select().from(properties).where(eq(properties.id, id)).limit(1);
+    return result[0];
+  }
+
+  async getPropertyByListingId(listingId: string): Promise<Property | undefined> {
+    const result = await this.db.select().from(properties).where(eq(properties.listingId, listingId)).limit(1);
+    return result[0];
+  }
+
+  async getProperties(criteria: SearchCriteria): Promise<Property[]> {
+    const conditions = [eq(properties.mlgCanView, true)];
+
+    if (criteria.status && criteria.status.length > 0) {
+      conditions.push(inArray(properties.standardStatus, criteria.status));
+    }
+
+    if (criteria.listPriceMin !== undefined) {
+      conditions.push(gte(properties.listPrice, String(criteria.listPriceMin)));
+    }
+    if (criteria.listPriceMax !== undefined) {
+      conditions.push(lte(properties.listPrice, String(criteria.listPriceMax)));
+    }
+
+    if (criteria.bedroomsMin !== undefined) {
+      conditions.push(gte(properties.bedroomsTotal, criteria.bedroomsMin));
+    }
+    if (criteria.bedroomsMax !== undefined) {
+      conditions.push(lte(properties.bedroomsTotal, criteria.bedroomsMax));
+    }
+
+    if (criteria.fullBathsMin !== undefined) {
+      conditions.push(gte(properties.bathroomsFull, criteria.fullBathsMin));
+    }
+
+    if (criteria.livingArea?.min !== undefined) {
+      conditions.push(gte(properties.livingArea, String(criteria.livingArea.min)));
+    }
+    if (criteria.livingArea?.max !== undefined) {
+      conditions.push(lte(properties.livingArea, String(criteria.livingArea.max)));
+    }
+
+    if (criteria.yearBuilt?.min !== undefined) {
+      conditions.push(gte(properties.yearBuilt, criteria.yearBuilt.min));
+    }
+    if (criteria.yearBuilt?.max !== undefined) {
+      conditions.push(lte(properties.yearBuilt, criteria.yearBuilt.max));
+    }
+
+    if (criteria.cities && criteria.cities.length > 0) {
+      conditions.push(inArray(properties.city, criteria.cities));
+    }
+
+    if (criteria.zipCodes && criteria.zipCodes.length > 0) {
+      conditions.push(inArray(properties.postalCode, criteria.zipCodes));
+    }
+
+    return await this.db.select().from(properties).where(and(...conditions));
+  }
+
+  async createProperty(insertProperty: InsertProperty): Promise<Property> {
+    const id = randomUUID();
+    const result = await this.db.insert(properties).values({ ...insertProperty, id } as any).returning();
+    return result[0];
+  }
+
+  async updateProperty(id: string, updates: Partial<Property>): Promise<Property | undefined> {
+    const result = await this.db.update(properties).set(updates).where(eq(properties.id, id)).returning();
+    return result[0];
+  }
+
+  async deleteProperty(id: string): Promise<boolean> {
+    const result = await this.db.delete(properties).where(eq(properties.id, id));
+    return result.rowCount! > 0;
+  }
+
+  async getAllProperties(): Promise<Property[]> {
+    return await this.db.select().from(properties).where(eq(properties.mlgCanView, true));
+  }
+
+  async getMedia(id: string): Promise<Media | undefined> {
+    const result = await this.db.select().from(media).where(eq(media.id, id)).limit(1);
+    return result[0];
+  }
+
+  async getMediaByResourceKey(resourceRecordKey: string): Promise<Media[]> {
+    return await this.db.select().from(media).where(eq(media.resourceRecordKey, resourceRecordKey));
+  }
+
+  async createMedia(insertMedia: InsertMedia): Promise<Media> {
+    const id = randomUUID();
+    const result = await this.db.insert(media).values({ ...insertMedia, id }).returning();
+    return result[0];
+  }
+
+  async deleteMedia(id: string): Promise<boolean> {
+    const result = await this.db.delete(media).where(eq(media.id, id));
+    return result.rowCount! > 0;
+  }
+
+  async getSavedSearch(id: string): Promise<SavedSearch | undefined> {
+    const result = await this.db.select().from(savedSearches).where(eq(savedSearches.id, id)).limit(1);
+    return result[0];
+  }
+
+  async getAllSavedSearches(): Promise<SavedSearch[]> {
+    return await this.db.select().from(savedSearches);
+  }
+
+  async createSavedSearch(search: InsertSavedSearch): Promise<SavedSearch> {
+    const result = await this.db.insert(savedSearches).values(search).returning();
+    return result[0];
+  }
+
+  async updateSavedSearch(id: string, updates: Partial<SavedSearch>): Promise<SavedSearch | undefined> {
+    const result = await this.db.update(savedSearches).set({ ...updates, updatedAt: new Date() }).where(eq(savedSearches.id, id)).returning();
+    return result[0];
+  }
+
+  async deleteSavedSearch(id: string): Promise<boolean> {
+    const result = await this.db.delete(savedSearches).where(eq(savedSearches.id, id));
+    return result.rowCount! > 0;
+  }
+
+  async getCma(id: string): Promise<Cma | undefined> {
+    const result = await this.db.select().from(cmas).where(eq(cmas.id, id)).limit(1);
+    return result[0];
+  }
+
+  async getAllCmas(): Promise<Cma[]> {
+    return await this.db.select().from(cmas);
+  }
+
+  async createCma(cma: InsertCma): Promise<Cma> {
+    const result = await this.db.insert(cmas).values(cma as any).returning();
+    return result[0];
+  }
+
+  async updateCma(id: string, updates: Partial<Cma>): Promise<Cma | undefined> {
+    const result = await this.db.update(cmas).set({ ...updates, updatedAt: new Date() }).where(eq(cmas.id, id)).returning();
+    return result[0];
+  }
+
+  async deleteCma(id: string): Promise<boolean> {
+    const result = await this.db.delete(cmas).where(eq(cmas.id, id));
+    return result.rowCount! > 0;
+  }
+
+  async calculateStatistics(propertyIds: string[]): Promise<PropertyStatistics> {
+    const props = await this.db.select().from(properties).where(
+      and(
+        inArray(properties.id, propertyIds),
+        eq(properties.mlgCanView, true)
+      )
+    );
+
+    if (props.length === 0) {
+      throw new Error("No properties found for statistics calculation");
+    }
+
+    const getNumericValues = (field: keyof Property) => 
+      props
+        .map(p => Number(p[field]))
+        .filter(v => !isNaN(v) && v > 0);
+
+    const calculateStats = (values: number[]) => {
+      if (values.length === 0) return { range: { min: 0, max: 0 }, average: 0, median: 0 };
+      
+      const sorted = [...values].sort((a, b) => a - b);
+      const min = sorted[0];
+      const max = sorted[sorted.length - 1];
+      const average = values.reduce((a, b) => a + b, 0) / values.length;
+      const median = sorted[Math.floor(sorted.length / 2)];
+      
+      return { range: { min, max }, average, median };
+    };
+
+    const prices = getNumericValues('listPrice');
+    const livingAreas = getNumericValues('livingArea');
+    const pricesPerSqFt = props
+      .map(p => Number(p.listPrice) / Number(p.livingArea))
+      .filter(v => !isNaN(v) && v > 0);
+
+    return {
+      price: calculateStats(prices),
+      pricePerSqFt: calculateStats(pricesPerSqFt),
+      daysOnMarket: calculateStats(getNumericValues('daysOnMarket')),
+      livingArea: calculateStats(livingAreas),
+      lotSize: calculateStats(getNumericValues('lotSizeSquareFeet')),
+      acres: calculateStats(getNumericValues('lotSizeAcres')),
+      bedrooms: calculateStats(getNumericValues('bedroomsTotal')),
+      bathrooms: calculateStats(getNumericValues('bathroomsTotalInteger')),
+      yearBuilt: calculateStats(getNumericValues('yearBuilt')),
+    };
+  }
+
+  async getTimelineData(propertyIds: string[]): Promise<TimelineDataPoint[]> {
+    const props = await this.db.select().from(properties).where(
+      and(
+        inArray(properties.id, propertyIds),
+        eq(properties.mlgCanView, true)
+      )
+    );
+
+    return props
+      .filter(p => p.listingContractDate && p.listPrice && p.unparsedAddress)
+      .map(p => ({
+        date: new Date(p.listingContractDate!),
+        price: Number(p.listPrice),
+        status: p.standardStatus as 'Active' | 'Under Contract' | 'Closed',
+        propertyId: p.id,
+        address: p.unparsedAddress!,
+      }))
+      .sort((a, b) => a.date.getTime() - b.date.getTime());
+  }
+}
+
+export const storage = process.env.DATABASE_URL 
+  ? new DbStorage(process.env.DATABASE_URL)
+  : new MemStorage();
