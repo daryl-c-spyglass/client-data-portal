@@ -552,8 +552,46 @@ export class DbStorage implements IStorage {
       conditions.push(lte(properties.bedroomsTotal, criteria.bedroomsMax));
     }
 
+    if (criteria.mainLevelBedroomsMin !== undefined) {
+      conditions.push(gte(properties.mainLevelBedrooms, criteria.mainLevelBedroomsMin));
+    }
+    if (criteria.mainLevelBedroomsMax !== undefined) {
+      conditions.push(lte(properties.mainLevelBedrooms, criteria.mainLevelBedroomsMax));
+    }
+
     if (criteria.fullBathsMin !== undefined) {
       conditions.push(gte(properties.bathroomsFull, criteria.fullBathsMin));
+    }
+    if (criteria.fullBathsMax !== undefined) {
+      conditions.push(lte(properties.bathroomsFull, criteria.fullBathsMax));
+    }
+
+    if (criteria.halfBathsMin !== undefined) {
+      conditions.push(gte(properties.bathroomsHalf, criteria.halfBathsMin));
+    }
+    if (criteria.halfBathsMax !== undefined) {
+      conditions.push(lte(properties.bathroomsHalf, criteria.halfBathsMax));
+    }
+
+    if (criteria.totalBathsMin !== undefined) {
+      conditions.push(gte(properties.bathroomsTotalInteger, criteria.totalBathsMin));
+    }
+    if (criteria.totalBathsMax !== undefined) {
+      conditions.push(lte(properties.bathroomsTotalInteger, criteria.totalBathsMax));
+    }
+
+    if (criteria.garageSpacesMin !== undefined) {
+      conditions.push(gte(properties.garageParkingSpaces, criteria.garageSpacesMin));
+    }
+    if (criteria.garageSpacesMax !== undefined) {
+      conditions.push(lte(properties.garageParkingSpaces, criteria.garageSpacesMax));
+    }
+
+    if (criteria.totalParkingSpacesMin !== undefined) {
+      conditions.push(gte(properties.totalParkingSpaces, criteria.totalParkingSpacesMin));
+    }
+    if (criteria.totalParkingSpacesMax !== undefined) {
+      conditions.push(lte(properties.totalParkingSpaces, criteria.totalParkingSpacesMax));
     }
 
     if (criteria.livingArea?.min !== undefined) {
@@ -616,6 +654,51 @@ export class DbStorage implements IStorage {
       conditions.push(lte(properties.lotSizeSquareFeet, String(criteria.lotSizeSquareFeet.max)));
     }
 
+    if (criteria.countyOrParish && criteria.countyOrParish.length > 0) {
+      conditions.push(inArray(properties.countyOrParish, criteria.countyOrParish));
+    }
+
+    // Boolean filters
+    if (criteria.flexListingYN !== undefined) {
+      conditions.push(eq(properties.flexListingYN, criteria.flexListingYN));
+    }
+
+    if (criteria.poolPrivateYN !== undefined) {
+      conditions.push(eq(properties.poolPrivateYN, criteria.poolPrivateYN));
+    }
+
+    if (criteria.waterfrontYN !== undefined) {
+      conditions.push(eq(properties.waterfrontYN, criteria.waterfrontYN));
+    }
+
+    if (criteria.viewYN !== undefined) {
+      conditions.push(eq(properties.viewYN, criteria.viewYN));
+    }
+
+    if (criteria.horseYN !== undefined) {
+      conditions.push(eq(properties.horseYN, criteria.horseYN));
+    }
+
+    if (criteria.associationYN !== undefined) {
+      conditions.push(eq(properties.associationYN, criteria.associationYN));
+    }
+
+    // Text/Enum filters
+    if (criteria.propertySaleContingency) {
+      conditions.push(eq(properties.propertySaleContingency, criteria.propertySaleContingency));
+    }
+
+    if (criteria.occupantType) {
+      conditions.push(eq(properties.occupantType, criteria.occupantType));
+    }
+
+    if (criteria.possession) {
+      conditions.push(eq(properties.possession, criteria.possession));
+    }
+
+    // Note: Array field filters are basic OR matching for now
+    // Future enhancement: Implement And/Not logic operators from searchCriteria
+    
     return await this.db.select().from(properties).where(and(...conditions));
   }
 
