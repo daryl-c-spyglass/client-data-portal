@@ -55,8 +55,6 @@ interface SearchFilters {
   postalCodeMode?: string;
   city?: string;
   cityMode?: string;
-  neighborhood?: string;
-  neighborhoodMode?: string;
   subdivision?: string;
   subdivisionMode?: string;
   
@@ -648,33 +646,6 @@ export default function BuyerSearch() {
                       <div className="flex items-center space-x-2">
                         <RadioGroupItem value="Not" id="mlsAreas-not" />
                         <Label htmlFor="mlsAreas-not" className="font-normal">Not</Label>
-                      </div>
-                    </div>
-                  </RadioGroup>
-                </div>
-
-                {/* Neighborhood */}
-                <div className="space-y-3">
-                  <Label className="text-base font-semibold">Neighborhood</Label>
-                  <Input
-                    placeholder="Select Neighborhood"
-                    value={filters.neighborhood || ''}
-                    onChange={(e) => updateFilter('neighborhood', e.target.value || undefined)}
-                    data-testid="input-neighborhood"
-                    className="h-10"
-                  />
-                  <RadioGroup
-                    value={filters.neighborhoodMode || 'OR'}
-                    onValueChange={(value) => updateFilter('neighborhoodMode', value)}
-                  >
-                    <div className="flex gap-6">
-                      <div className="flex items-center space-x-2">
-                        <RadioGroupItem value="OR" id="neighborhood-or" />
-                        <Label htmlFor="neighborhood-or" className="font-normal">OR</Label>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <RadioGroupItem value="Not" id="neighborhood-not" />
-                        <Label htmlFor="neighborhood-not" className="font-normal">Not</Label>
                       </div>
                     </div>
                   </RadioGroup>
