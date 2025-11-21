@@ -287,6 +287,14 @@ export default function BuyerSearch() {
       view: 'viewYN',
       horse: 'horseYN',
       flexListing: 'flexListingYN',
+      // Location field mappings (singular frontend → plural backend)
+      postalCode: 'zipCodes',
+      city: 'cities',
+      county: 'countyOrParish',
+      elementarySchool: 'elementarySchools',
+      middleSchool: 'middleSchools',
+      highSchool: 'highSchools',
+      schoolDistrict: 'schoolDistrict',
     };
 
     // Array-based fields that need special handling (comma-separated values → arrays)
@@ -299,7 +307,10 @@ export default function BuyerSearch() {
       'parkingFeatures', 'heating', 'cooling', 'waterSource', 'sewer',
       'utilities', 'greenEnergyEfficient', 'greenSustainability',
       'specialListingConditions', 'showingRequirements', 'possession',
-      'acceptableFinancing', 'subdivision'
+      'acceptableFinancing', 'subdivision',
+      // Location & school fields (need array handling)
+      'postalCode', 'city', 'county', 
+      'elementarySchool', 'middleSchool', 'highSchool', 'schoolDistrict'
     ];
     
     // Fields handled manually above (skip in Object.entries loop)
@@ -338,9 +349,12 @@ export default function BuyerSearch() {
             const modeKey = `${key}Mode` as keyof SearchFilters;
             const mode = filters[modeKey] || 'Or';
             
+            // Use mapped name for backend (e.g., postalCode → zipCodes)
+            const mappedKey = fieldMapping[key] || key;
+            
             // Add values array and mode
-            values.forEach(v => params.append(`${key}.values`, v));
-            params.set(`${key}.mode`, String(mode));
+            values.forEach(v => params.append(`${mappedKey}.values`, v));
+            params.set(`${mappedKey}.mode`, String(mode));
           }
           return;
         }

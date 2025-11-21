@@ -61,29 +61,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Pre-transform array.values/array.mode query params to arrays
       const transformedQuery: any = { ...req.query };
       
-      // Handle subdivision.values → subdivisions (array format from frontend)
-      if (transformedQuery['subdivision.values']) {
-        transformedQuery.subdivisions = Array.isArray(transformedQuery['subdivision.values']) 
-          ? transformedQuery['subdivision.values'] 
-          : [transformedQuery['subdivision.values']];
-        delete transformedQuery['subdivision.values'];
-        delete transformedQuery['subdivision.mode']; // Mode not used yet but remove anyway
-      }
+      // DEBUG: Log the raw query to see what's coming in
+      console.log('🔍 Raw query:', JSON.stringify(req.query, null, 2));
       
-      // Handle subdivision → subdivisions (singular format, just in case)
-      if (transformedQuery['subdivision'] && !transformedQuery.subdivisions) {
-        const subdivisionValue = transformedQuery['subdivision'];
-        transformedQuery.subdivisions = typeof subdivisionValue === 'string'
-          ? subdivisionValue.split(',').map(s => s.trim()).filter(Boolean)
-          : Array.isArray(subdivisionValue) 
-            ? subdivisionValue 
-            : [subdivisionValue];
-        delete transformedQuery['subdivision'];
-        delete transformedQuery['subdivisionMode'];
+      // Transform all .values array parameters to their canonical array names
+      const arrayFieldMappings: Record<string, string> = {
+        'subdivision.values': 'subdivisions',
+        'zipCodes.values': 'zipCodes',
+        'cities.values': 'cities',
+        'countyOrParish.values': 'countyOrParish',
+        'elementarySchools.values': 'elementarySchools',
+        'middleSchools.values': 'middleSchools',
+        'highSchools.values': 'highSchools',
+        'schoolDistrict.values': 'schoolDistrict',
+      };
+      
+      for (const [queryParam, canonicalName] of Object.entries(arrayFieldMappings)) {
+        if (transformedQuery[queryParam]) {
+          transformedQuery[canonicalName] = Array.isArray(transformedQuery[queryParam])
+            ? transformedQuery[queryParam]
+            : [transformedQuery[queryParam]];
+          delete transformedQuery[queryParam];
+          delete transformedQuery[queryParam.replace('.values', '.mode')];
+        }
       }
       
       // Parse and coerce query params to proper types
       const rawCriteria = searchCriteriaSchema.parse(transformedQuery);
+      
+      // DEBUG: Log the parsed criteria
+      console.log('✅ Parsed criteria.zipCodes:', rawCriteria.zipCodes);
       
       // Transform dot-notation fields into nested objects
       const criteria: any = { ...rawCriteria };
