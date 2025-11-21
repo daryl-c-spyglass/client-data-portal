@@ -10,6 +10,12 @@ Preferred communication style: Simple, everyday language.
 
 ## Recent Changes
 
+### Array Filter Validation Fix (Nov 21, 2025)
+- **Comprehensive Schema Update**: Fixed "Expected array, received string" validation errors across ALL array-based search filters by implementing the `stringOrArray` transformer in the Zod schema.
+- **Fields Fixed**: Updated 40+ array fields including subdivisions, cities, schools, property features, amenities, utilities, and all multi-select filters to accept both string and array inputs.
+- **Root Cause**: When users selected a single value for any multi-select filter, Express delivered it as a string instead of an array, causing Zod validation to fail. The `stringOrArray` transformer automatically handles both cases.
+- **Impact**: Eliminated "Error Loading properties" errors; all search filters now work reliably with single or multiple selections.
+
 ### Property Search Performance Optimization (Nov 21, 2025)
 - **Database-Level Pagination**: Implemented LIMIT/OFFSET at the database query level instead of in-memory slicing, dramatically improving performance when searching large datasets (65,649+ properties).
 - **Trigram Index**: Enabled `pg_trgm` extension and created a GIN trigram index on the `subdivision` column for fast partial text search using ILIKE queries.
