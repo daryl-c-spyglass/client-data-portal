@@ -24,7 +24,7 @@ import {
 import { randomUUID } from "crypto";
 import { drizzle } from "drizzle-orm/neon-serverless";
 import { Pool, neonConfig } from "@neondatabase/serverless";
-import { eq, and, gte, lte, inArray, sql as drizzleSql } from "drizzle-orm";
+import { eq, and, gte, lte, inArray, ilike, or, sql as drizzleSql } from "drizzle-orm";
 import ws from "ws";
 
 neonConfig.webSocketConstructor = ws;
@@ -617,7 +617,11 @@ export class DbStorage implements IStorage {
     }
 
     if (criteria.subdivisions && criteria.subdivisions.length > 0) {
-      conditions.push(inArray(properties.subdivision, criteria.subdivisions));
+      // Use partial matching (ILIKE) for subdivision searches
+      const subdivisionConditions = criteria.subdivisions.map(sub => 
+        ilike(properties.subdivision, `%${sub}%`)
+      );
+      conditions.push(or(...subdivisionConditions)!);
     }
 
     if (criteria.neighborhood && criteria.neighborhood.length > 0) {
