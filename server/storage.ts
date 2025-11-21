@@ -531,7 +531,7 @@ export class DbStorage implements IStorage {
     return result[0];
   }
 
-  async getProperties(criteria: SearchCriteria): Promise<Property[]> {
+  async getProperties(criteria: SearchCriteria, limit?: number, offset?: number): Promise<Property[]> {
     const conditions = [eq(properties.mlgCanView, true)];
 
     if (criteria.status && criteria.status.length > 0) {
@@ -703,7 +703,17 @@ export class DbStorage implements IStorage {
     // Note: Array field filters are basic OR matching for now
     // Future enhancement: Implement And/Not logic operators from searchCriteria
     
-    return await this.db.select().from(properties).where(and(...conditions));
+    let query = this.db.select().from(properties).where(and(...conditions));
+    
+    if (limit !== undefined) {
+      query = query.limit(limit);
+    }
+    
+    if (offset !== undefined) {
+      query = query.offset(offset);
+    }
+    
+    return await query;
   }
 
   async createProperty(insertProperty: InsertProperty): Promise<Property> {
