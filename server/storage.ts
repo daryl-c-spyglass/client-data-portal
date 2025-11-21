@@ -40,7 +40,7 @@ export interface IStorage {
   // Property operations
   getProperty(id: string): Promise<Property | undefined>;
   getPropertyByListingId(listingId: string): Promise<Property | undefined>;
-  getProperties(criteria: SearchCriteria): Promise<Property[]>;
+  getProperties(criteria: SearchCriteria, limit?: number, offset?: number): Promise<Property[]>;
   createProperty(property: InsertProperty): Promise<Property>;
   updateProperty(id: string, property: Partial<Property>): Promise<Property | undefined>;
   deleteProperty(id: string): Promise<boolean>;

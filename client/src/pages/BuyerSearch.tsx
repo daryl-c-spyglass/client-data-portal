@@ -301,7 +301,7 @@ export default function BuyerSearch() {
       'parkingFeatures', 'heating', 'cooling', 'waterSource', 'sewer',
       'utilities', 'greenEnergyEfficient', 'greenSustainability',
       'specialListingConditions', 'showingRequirements', 'possession',
-      'acceptableFinancing'
+      'acceptableFinancing', 'subdivision'
     ];
     
     // Fields handled manually above (skip in Object.entries loop)
