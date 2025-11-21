@@ -8,6 +8,14 @@ This project is a professional real estate IDX (Internet Data Exchange) platform
 
 Preferred communication style: Simple, everyday language.
 
+## Recent Changes
+
+### Property Search Performance Optimization (Nov 21, 2025)
+- **Database-Level Pagination**: Implemented LIMIT/OFFSET at the database query level instead of in-memory slicing, dramatically improving performance when searching large datasets (65,649+ properties).
+- **Trigram Index**: Enabled `pg_trgm` extension and created a GIN trigram index on the `subdivision` column for fast partial text search using ILIKE queries.
+- **Subdivision Search Fix**: Added query parameter transformation logic to handle both `subdivision.values` (array format) and `subdivision` (singular format) query parameters, converting them to the `subdivisions` array expected by the backend schema.
+- **Performance Impact**: Subdivision searches now respond in <1 second instead of timing out (previously >30 seconds).
+
 ## System Architecture
 
 ### Frontend Architecture
