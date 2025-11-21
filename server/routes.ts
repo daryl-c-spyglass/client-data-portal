@@ -58,8 +58,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Property routes
   app.get("/api/properties/search", async (req, res) => {
     try {
+      // Pre-transform array.values/array.mode query params to arrays
+      const transformedQuery: any = { ...req.query };
+      
+      // Handle subdivision.values → subdivisions (array format from frontend)
+      if (transformedQuery['subdivision.values']) {
+        transformedQuery.subdivisions = Array.isArray(transformedQuery['subdivision.values']) 
+          ? transformedQuery['subdivision.values'] 
+          : [transformedQuery['subdivision.values']];
+        delete transformedQuery['subdivision.values'];
+        delete transformedQuery['subdivision.mode']; // Mode not used yet but remove anyway
+      }
+      
+      // Handle subdivision → subdivisions (singular format, just in case)
+      if (transformedQuery['subdivision'] && !transformedQuery.subdivisions) {
+        const subdivisionValue = transformedQuery['subdivision'];
+        transformedQuery.subdivisions = typeof subdivisionValue === 'string'
+          ? subdivisionValue.split(',').map(s => s.trim()).filter(Boolean)
+          : Array.isArray(subdivisionValue) 
+            ? subdivisionValue 
+            : [subdivisionValue];
+        delete transformedQuery['subdivision'];
+        delete transformedQuery['subdivisionMode'];
+      }
+      
       // Parse and coerce query params to proper types
-      const rawCriteria = searchCriteriaSchema.parse(req.query);
+      const rawCriteria = searchCriteriaSchema.parse(transformedQuery);
       
       // Transform dot-notation fields into nested objects
       const criteria: any = { ...rawCriteria };
