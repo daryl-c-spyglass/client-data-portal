@@ -356,8 +356,10 @@ export default function BuyerSearch() {
     return params.toString();
   };
 
+  const queryString = buildQueryString();
+  const fullQueryString = queryString ? `${queryString}&limit=50&offset=0` : 'limit=50&offset=0';
   const { data: properties, isLoading, refetch } = useQuery<Property[]>({
-    queryKey: ['/api/properties/search', buildQueryString()],
+    queryKey: [`/api/properties/search?${fullQueryString}`],
     enabled: Object.keys(filters).length > 0,
   });
 

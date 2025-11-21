@@ -128,9 +128,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         delete criteria['lotSizeAcres.max'];
       }
       
-      // Limit to 1000 properties by default to prevent OOM errors
+      // Limit to 50 properties by default to prevent OOM errors
       // Supports optional limit and offset query parameters for pagination
-      const limit = parseInt(req.query.limit as string) || 1000;
+      const limit = parseInt(req.query.limit as string) || 50;
       const offset = parseInt(req.query.offset as string) || 0;
       
       // Pass limit and offset to storage layer for database-level pagination
