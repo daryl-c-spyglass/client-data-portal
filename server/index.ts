@@ -93,9 +93,10 @@ app.use((req, res, next) => {
   const mlsGridClient = createMLSGridClient();
   
   if (mlsGridClient && process.env.DATABASE_URL) {
-    // Start automatic background sync (every 60 minutes)
-    console.log('🚀 MLS Grid API configured - starting automatic sync...');
-    startMLSGridSync(mlsGridClient, 60);
+    // Automatic sync disabled to prevent OOM crashes
+    // Database already has 65,649 properties - manual sync can be triggered if needed
+    console.log('🚀 MLS Grid API configured (automatic sync disabled)');
+    // startMLSGridSync(mlsGridClient, 60);
   } else if (!process.env.MLSGRID_API_TOKEN) {
     // Seed sample data for development when MLS Grid is not configured
     await seedData();
