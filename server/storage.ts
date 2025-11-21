@@ -147,7 +147,7 @@ export class MemStorage implements IStorage {
     );
   }
 
-  async getProperties(criteria: SearchCriteria): Promise<Property[]> {
+  async getProperties(criteria: SearchCriteria, limit?: number, offset?: number): Promise<Property[]> {
     let properties = Array.from(this.properties.values()).filter(p => p.mlgCanView);
 
     // Apply status filter
@@ -232,7 +232,11 @@ export class MemStorage implements IStorage {
       );
     }
 
-    return properties;
+    // Apply pagination
+    const start = offset || 0;
+    const end = limit !== undefined ? start + limit : properties.length;
+    
+    return properties.slice(start, end);
   }
 
   async createProperty(insertProperty: InsertProperty): Promise<Property> {
