@@ -8,6 +8,7 @@ import { z } from "zod";
 import bcrypt from "bcryptjs";
 import passport from "passport";
 import { requireAuth, requireRole } from "./auth";
+import { fetchExternalUsers, fetchFromExternalApi } from "./external-api";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   const mlsGridClient = createMLSGridClient();
@@ -53,6 +54,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/auth/me", requireAuth, (req, res) => {
     // req.user is already sanitized by passport.deserializeUser
     res.json(req.user);
+  });
+
+  // External API integration routes
+  app.get("/api/external/users", async (req, res) => {
+    try {
+      const result = await fetchExternalUsers();
+      
+      if (!result.success) {
+        res.status(500).json({ error: result.error || 'Failed to fetch external users' });
+        return;
+      }
+      
+      res.json(result.data);
+    } catch (error) {
+      console.error('Error in /api/external/users:', error);
+      res.status(500).json({ error: 'Internal server error' });
+    }
   });
 
   // Property routes
