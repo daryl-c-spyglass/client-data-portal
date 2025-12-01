@@ -2,7 +2,7 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { createMLSGridClient } from "./mlsgrid-client";
-import { searchCriteriaSchema, insertCmaSchema, insertUserSchema, insertSellerUpdateSchema, updateSellerUpdateSchema } from "@shared/schema";
+import { searchCriteriaSchema, insertCmaSchema, insertUserSchema, insertSellerUpdateSchema, updateSellerUpdateSchema, updateLeadGateSettingsSchema } from "@shared/schema";
 import { findMatchingProperties, calculateMarketSummary } from "./seller-update-service";
 import { z } from "zod";
 import bcrypt from "bcryptjs";
@@ -70,6 +70,132 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error('Error in /api/external/users:', error);
       res.status(500).json({ error: 'Internal server error' });
+    }
+  });
+
+  // Lead Gate Settings routes (admin only)
+  app.get("/api/lead-gate/settings", async (req, res) => {
+    try {
+      let settings = await storage.getLeadGateSettings();
+      
+      // If no settings exist, return defaults
+      if (!settings) {
+        settings = {
+          id: '',
+          enabled: false,
+          freeViewsAllowed: 3,
+          countPropertyDetails: true,
+          countListViews: false,
+          updatedAt: new Date(),
+        };
+      }
+      
+      res.json(settings);
+    } catch (error) {
+      console.error('Error fetching lead gate settings:', error);
+      res.status(500).json({ error: 'Failed to fetch lead gate settings' });
+    }
+  });
+
+  app.put("/api/lead-gate/settings", requireAuth, async (req, res) => {
+    try {
+      const settings = updateLeadGateSettingsSchema.parse(req.body);
+      const updated = await storage.updateLeadGateSettings(settings);
+      res.json(updated);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        res.status(400).json({ error: "Invalid settings data", details: error.errors });
+      } else {
+        console.error('Error updating lead gate settings:', error);
+        res.status(500).json({ error: 'Failed to update lead gate settings' });
+      }
+    }
+  });
+
+  // Public endpoint to track property views (uses cookies to track anonymous users)
+  app.post("/api/lead-gate/track-view", async (req, res) => {
+    try {
+      const settings = await storage.getLeadGateSettings();
+      
+      // If lead gate is disabled, just acknowledge and return
+      if (!settings?.enabled) {
+        res.json({ allowed: true, viewsRemaining: null, gateEnabled: false });
+        return;
+      }
+
+      // Get current view count from cookie
+      const viewCookie = req.cookies?.propertyViews;
+      let currentViews = 0;
+      
+      if (viewCookie) {
+        try {
+          currentViews = parseInt(viewCookie, 10);
+        } catch {
+          currentViews = 0;
+        }
+      }
+
+      // Increment view count
+      const newViewCount = currentViews + 1;
+      
+      // Set cookie with new view count (expires in 30 days)
+      res.cookie('propertyViews', newViewCount.toString(), {
+        maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'lax',
+      });
+
+      const viewsRemaining = Math.max(0, settings.freeViewsAllowed - newViewCount);
+      const allowed = newViewCount <= settings.freeViewsAllowed;
+
+      res.json({
+        allowed,
+        viewsRemaining,
+        gateEnabled: true,
+        currentViews: newViewCount,
+        maxViews: settings.freeViewsAllowed,
+      });
+    } catch (error) {
+      console.error('Error tracking property view:', error);
+      res.status(500).json({ error: 'Failed to track property view' });
+    }
+  });
+
+  // Check current view status without incrementing
+  app.get("/api/lead-gate/status", async (req, res) => {
+    try {
+      const settings = await storage.getLeadGateSettings();
+      
+      if (!settings?.enabled) {
+        res.json({ gateEnabled: false, allowed: true });
+        return;
+      }
+
+      const viewCookie = req.cookies?.propertyViews;
+      let currentViews = 0;
+      
+      if (viewCookie) {
+        try {
+          currentViews = parseInt(viewCookie, 10);
+        } catch {
+          currentViews = 0;
+        }
+      }
+
+      const viewsRemaining = Math.max(0, settings.freeViewsAllowed - currentViews);
+      const allowed = currentViews < settings.freeViewsAllowed;
+
+      res.json({
+        gateEnabled: true,
+        allowed,
+        viewsRemaining,
+        currentViews,
+        maxViews: settings.freeViewsAllowed,
+      });
+    } catch (error) {
+      console.error('Error checking lead gate status:', error);
+      res.status(500).json({ error: 'Failed to check lead gate status' });
     }
   });
 

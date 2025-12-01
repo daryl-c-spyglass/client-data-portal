@@ -1,5 +1,6 @@
 import express, { type Request, Response, NextFunction } from "express";
 import session from "express-session";
+import cookieParser from "cookie-parser";
 import passport from "passport";
 import ConnectPgSimple from "connect-pg-simple";
 import { Pool } from "@neondatabase/serverless";
@@ -12,6 +13,9 @@ import { startMLSGridSync } from "./mlsgrid-sync";
 import { startEmailScheduler } from "./email-scheduler";
 
 const app = express();
+
+// Cookie parser for lead gate tracking
+app.use(cookieParser());
 
 declare module 'http' {
   interface IncomingMessage {
