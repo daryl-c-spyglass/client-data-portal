@@ -279,6 +279,30 @@ export const insertSyncMetadataSchema = createInsertSchema(syncMetadata).omit({
 export type InsertSyncMetadata = z.infer<typeof insertSyncMetadataSchema>;
 export type SyncMetadata = typeof syncMetadata.$inferSelect;
 
+// Lead Gate Settings Schema - Configure registration wall for property viewing
+export const leadGateSettings = pgTable("lead_gate_settings", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  enabled: boolean("enabled").notNull().default(false),
+  freeViewsAllowed: integer("free_views_allowed").notNull().default(3), // Number of listings before requiring registration
+  countPropertyDetails: boolean("count_property_details").notNull().default(true), // Count detail page views
+  countListViews: boolean("count_list_views").notNull().default(false), // Count search result impressions
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+export const insertLeadGateSettingsSchema = createInsertSchema(leadGateSettings).omit({ 
+  id: true, 
+  updatedAt: true 
+});
+export const updateLeadGateSettingsSchema = z.object({
+  enabled: z.boolean().optional(),
+  freeViewsAllowed: z.number().int().min(0).max(100).optional(),
+  countPropertyDetails: z.boolean().optional(),
+  countListViews: z.boolean().optional(),
+});
+export type InsertLeadGateSettings = z.infer<typeof insertLeadGateSettingsSchema>;
+export type UpdateLeadGateSettings = z.infer<typeof updateLeadGateSettingsSchema>;
+export type LeadGateSettings = typeof leadGateSettings.$inferSelect;
+
 // Search Criteria Types (for validation) - All fields optional for flexible querying
 // Handle both single string and array for multi-select filters from query params
 const stringOrArray = z.union([z.string(), z.array(z.string())]).transform((val) => 

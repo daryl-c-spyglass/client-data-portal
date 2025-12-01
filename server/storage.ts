@@ -9,6 +9,9 @@ import {
   type InsertCma,
   type SellerUpdate,
   type InsertSellerUpdate,
+  type LeadGateSettings,
+  type InsertLeadGateSettings,
+  type UpdateLeadGateSettings,
   type SearchCriteria,
   type PropertyStatistics,
   type TimelineDataPoint,
@@ -19,6 +22,7 @@ import {
   savedSearches,
   cmas,
   sellerUpdates,
+  leadGateSettings,
   users
 } from "@shared/schema";
 import { randomUUID } from "crypto";
@@ -83,6 +87,10 @@ export interface IStorage {
   // Statistics calculation
   calculateStatistics(propertyIds: string[]): Promise<PropertyStatistics>;
   getTimelineData(propertyIds: string[]): Promise<TimelineDataPoint[]>;
+  
+  // Lead Gate Settings operations
+  getLeadGateSettings(): Promise<LeadGateSettings | undefined>;
+  updateLeadGateSettings(settings: UpdateLeadGateSettings): Promise<LeadGateSettings>;
 }
 
 export class MemStorage implements IStorage {
@@ -488,6 +496,33 @@ export class MemStorage implements IStorage {
         address: p.unparsedAddress!,
       }))
       .sort((a, b) => a.date.getTime() - b.date.getTime());
+  }
+
+  // Lead Gate Settings operations (in-memory implementation)
+  private leadGateSettings: LeadGateSettings | undefined = undefined;
+
+  async getLeadGateSettings(): Promise<LeadGateSettings | undefined> {
+    return this.leadGateSettings;
+  }
+
+  async updateLeadGateSettings(settings: UpdateLeadGateSettings): Promise<LeadGateSettings> {
+    if (!this.leadGateSettings) {
+      this.leadGateSettings = {
+        id: randomUUID(),
+        enabled: settings.enabled ?? false,
+        freeViewsAllowed: settings.freeViewsAllowed ?? 3,
+        countPropertyDetails: settings.countPropertyDetails ?? true,
+        countListViews: settings.countListViews ?? false,
+        updatedAt: new Date(),
+      };
+    } else {
+      this.leadGateSettings = {
+        ...this.leadGateSettings,
+        ...settings,
+        updatedAt: new Date(),
+      };
+    }
+    return this.leadGateSettings;
   }
 }
 
@@ -933,6 +968,34 @@ export class DbStorage implements IStorage {
         address: p.unparsedAddress!,
       }))
       .sort((a, b) => a.date.getTime() - b.date.getTime());
+  }
+
+  // Lead Gate Settings operations
+  async getLeadGateSettings(): Promise<LeadGateSettings | undefined> {
+    const result = await this.db.select().from(leadGateSettings).limit(1);
+    return result[0];
+  }
+
+  async updateLeadGateSettings(settings: UpdateLeadGateSettings): Promise<LeadGateSettings> {
+    const existing = await this.getLeadGateSettings();
+    
+    if (!existing) {
+      // Create new settings
+      const result = await this.db.insert(leadGateSettings).values({
+        enabled: settings.enabled ?? false,
+        freeViewsAllowed: settings.freeViewsAllowed ?? 3,
+        countPropertyDetails: settings.countPropertyDetails ?? true,
+        countListViews: settings.countListViews ?? false,
+      }).returning();
+      return result[0];
+    } else {
+      // Update existing settings
+      const result = await this.db.update(leadGateSettings)
+        .set({ ...settings, updatedAt: new Date() })
+        .where(eq(leadGateSettings.id, existing.id))
+        .returning();
+      return result[0];
+    }
   }
 }
 
