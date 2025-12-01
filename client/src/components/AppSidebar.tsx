@@ -1,4 +1,4 @@
-import { Home, Search, FileText, Users, Settings, BarChart3, Mail, Code2, Filter } from "lucide-react";
+import { Home, Search, FileText, Users, Settings, BarChart3, Mail, Code2, Filter, Shield } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import {
   Sidebar,
@@ -69,6 +69,15 @@ const menuItems = [
   },
 ];
 
+const adminMenuItems = [
+  {
+    title: "Lead Gate",
+    url: "/settings/lead-gate",
+    icon: Shield,
+    testId: "link-lead-gate-settings",
+  },
+];
+
 export function AppSidebar() {
   const [location] = useLocation();
 
@@ -91,6 +100,26 @@ export function AppSidebar() {
           <SidebarGroupContent>
             <SidebarMenu>
               {menuItems.map((item) => (
+                <SidebarMenuItem key={item.title}>
+                  <SidebarMenuButton 
+                    asChild
+                    className={location === item.url ? "bg-sidebar-accent" : ""}
+                  >
+                    <Link href={item.url} data-testid={item.testId}>
+                      <item.icon className="w-4 h-4" />
+                      <span>{item.title}</span>
+                    </Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              ))}
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+        <SidebarGroup>
+          <SidebarGroupLabel>Admin</SidebarGroupLabel>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              {adminMenuItems.map((item) => (
                 <SidebarMenuItem key={item.title}>
                   <SidebarMenuButton 
                     asChild

@@ -5,6 +5,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/AppSidebar";
+import { LeadGateProvider } from "@/contexts/LeadGateContext";
 import NotFound from "@/pages/not-found";
 import Dashboard from "@/pages/Dashboard";
 import Properties from "@/pages/Properties";
@@ -17,6 +18,7 @@ import SellerUpdateNew from "@/pages/SellerUpdateNew";
 import SellerUpdateEmbed from "@/pages/SellerUpdateEmbed";
 import EmbedCodeGenerator from "@/pages/EmbedCodeGenerator";
 import BuyerSearch from "@/pages/BuyerSearch";
+import LeadGateSettings from "@/pages/LeadGateSettings";
 
 function Router() {
   return (
@@ -34,6 +36,7 @@ function Router() {
       <Route path="/clients" component={() => <div className="p-6">Clients page coming soon</div>} />
       <Route path="/analytics" component={() => <div className="p-6">Analytics page coming soon</div>} />
       <Route path="/settings" component={() => <div className="p-6">Settings page coming soon</div>} />
+      <Route path="/settings/lead-gate" component={LeadGateSettings} />
       <Route component={NotFound} />
     </Switch>
   );
@@ -49,32 +52,34 @@ export default function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
-        <Switch>
-          {/* Embed route without sidebar */}
-          <Route path="/embed/seller-update" component={SellerUpdateEmbed} />
-          
-          {/* All other routes with sidebar */}
-          <Route>
-            <SidebarProvider style={style as React.CSSProperties}>
-              <div className="flex h-screen w-full">
-                <AppSidebar />
-                <div className="flex flex-col flex-1 overflow-hidden">
-                  <header className="flex items-center justify-between p-4 border-b bg-background">
-                    <SidebarTrigger data-testid="button-sidebar-toggle" />
-                    <div className="text-sm text-muted-foreground">
-                      MLS Grid IDX Platform
-                    </div>
-                  </header>
-                  <main className="flex-1 overflow-auto p-6">
-                    <div className="max-w-7xl mx-auto">
-                      <Router />
-                    </div>
-                  </main>
+        <LeadGateProvider>
+          <Switch>
+            {/* Embed route without sidebar */}
+            <Route path="/embed/seller-update" component={SellerUpdateEmbed} />
+            
+            {/* All other routes with sidebar */}
+            <Route>
+              <SidebarProvider style={style as React.CSSProperties}>
+                <div className="flex h-screen w-full">
+                  <AppSidebar />
+                  <div className="flex flex-col flex-1 overflow-hidden">
+                    <header className="flex items-center justify-between p-4 border-b bg-background">
+                      <SidebarTrigger data-testid="button-sidebar-toggle" />
+                      <div className="text-sm text-muted-foreground">
+                        MLS Grid IDX Platform
+                      </div>
+                    </header>
+                    <main className="flex-1 overflow-auto p-6">
+                      <div className="max-w-7xl mx-auto">
+                        <Router />
+                      </div>
+                    </main>
+                  </div>
                 </div>
-              </div>
-            </SidebarProvider>
-          </Route>
-        </Switch>
+              </SidebarProvider>
+            </Route>
+          </Switch>
+        </LeadGateProvider>
         <Toaster />
       </TooltipProvider>
     </QueryClientProvider>

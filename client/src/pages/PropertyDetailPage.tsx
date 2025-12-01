@@ -1,12 +1,24 @@
 import { useRoute } from "wouter";
+import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft } from "lucide-react";
 import { Link } from "wouter";
 import { PropertyDetail } from "@/components/PropertyDetail";
+import { useLeadGateContext } from "@/contexts/LeadGateContext";
 import type { Property, Media } from "@shared/schema";
 
 export default function PropertyDetailPage() {
   const [, params] = useRoute("/properties/:id");
+  const { trackPropertyView, gateEnabled } = useLeadGateContext();
+  const [viewTracked, setViewTracked] = useState(false);
+
+  useEffect(() => {
+    if (!viewTracked && gateEnabled) {
+      trackPropertyView().then(() => {
+        setViewTracked(true);
+      });
+    }
+  }, [viewTracked, gateEnabled, trackPropertyView]);
   
   // Mock data - will be replaced with real data fetching in phase 3
   const mockProperty: Property = {
