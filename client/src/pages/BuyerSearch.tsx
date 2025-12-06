@@ -1,6 +1,7 @@
-import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useState, useEffect, useCallback } from "react";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { useLocation } from "wouter";
+import { apiRequest } from "@/lib/queryClient";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -424,7 +425,7 @@ export default function BuyerSearch() {
   });
   
   const isLoading = mlsGridLoading || homeReviewLoading;
-  const properties = useMLSGrid 
+  const rawProperties = useMLSGrid 
     ? (mlsGridResponse?.properties || []) 
     : (homeReviewResponse?.properties || []);
   const totalCount = useMLSGrid 
@@ -432,6 +433,68 @@ export default function BuyerSearch() {
     : (homeReviewResponse?.total || 0);
   const isApiUnavailable = healthStatus?.available === false || isError;
   const dataSource = 'HomeReview (Active & Sold Data)';
+
+  const [geocodedCoords, setGeocodedCoords] = useState<Map<string, { latitude: number; longitude: number }>>(new Map());
+  const [isGeocoding, setIsGeocoding] = useState(false);
+
+  const geocodeMutation = useMutation({
+    mutationFn: async (propertiesToGeocode: any[]) => {
+      const response = await apiRequest('POST', '/api/geocode/batch', {
+        properties: propertiesToGeocode.map(p => ({
+          id: p.id,
+          listingId: p.listingId,
+          unparsedAddress: p.unparsedAddress,
+          streetNumber: p.streetNumber,
+          streetName: p.streetName,
+          city: p.city,
+          stateOrProvince: p.stateOrProvince,
+          postalCode: p.postalCode,
+        })),
+      });
+      return response.json();
+    },
+    onSuccess: (data: { geocoded: Array<{ id: string; listingId: string; latitude: number; longitude: number }> }) => {
+      if (data.geocoded && data.geocoded.length > 0) {
+        setGeocodedCoords(prev => {
+          const updated = new Map(prev);
+          data.geocoded.forEach(item => {
+            updated.set(item.id, { latitude: item.latitude, longitude: item.longitude });
+          });
+          return updated;
+        });
+      }
+      setIsGeocoding(false);
+    },
+    onError: () => {
+      setIsGeocoding(false);
+    },
+  });
+
+  const geocodePropertiesWithoutCoords = useCallback((props: Property[]) => {
+    const needsGeocoding = props.filter(
+      p => (p.latitude == null || p.longitude == null) && !geocodedCoords.has(p.id)
+    );
+
+    if (needsGeocoding.length > 0 && !isGeocoding && !geocodeMutation.isPending) {
+      const batch = needsGeocoding.slice(0, 25);
+      setIsGeocoding(true);
+      geocodeMutation.mutate(batch);
+    }
+  }, [geocodedCoords, isGeocoding, geocodeMutation]);
+
+  useEffect(() => {
+    if (rawProperties.length > 0 && viewMode === 'map') {
+      geocodePropertiesWithoutCoords(rawProperties);
+    }
+  }, [rawProperties, viewMode, geocodePropertiesWithoutCoords]);
+
+  const properties = rawProperties.map(p => {
+    const coords = geocodedCoords.get(p.id);
+    if (coords && (p.latitude == null || p.longitude == null)) {
+      return { ...p, latitude: String(coords.latitude), longitude: String(coords.longitude) };
+    }
+    return p;
+  });
 
   const updateFilter = (key: keyof SearchFilters, value: any) => {
     setFilters(prev => {
@@ -2549,10 +2612,21 @@ export default function BuyerSearch() {
               </div>
             ) : properties && properties.length > 0 ? (
               viewMode === 'map' ? (
-                <PropertyMapView 
-                  properties={properties}
-                  isLoading={isLoading}
-                  onPropertyClick={(property) => {
+                <>
+                  {isGeocoding && (
+                    <div className="mb-4 p-3 bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800 rounded-md">
+                      <div className="flex items-center gap-2">
+                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-500"></div>
+                        <span className="text-sm text-blue-700 dark:text-blue-300">
+                          Finding property locations...
+                        </span>
+                      </div>
+                    </div>
+                  )}
+                  <PropertyMapView 
+                    properties={properties}
+                    isLoading={isLoading}
+                    onPropertyClick={(property) => {
                     const propertyId = property.listingId || property.id;
                     const propertyWithPhotos = property as Property & { photos?: string[] };
                     const media = propertyWithPhotos.photos?.length ? convertPhotosToMedia(propertyWithPhotos.photos, propertyId) : [];
@@ -2566,6 +2640,7 @@ export default function BuyerSearch() {
                     setLocation(`/properties/${propertyId}`);
                   }}
                 />
+                </>
               ) : (
                 <>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

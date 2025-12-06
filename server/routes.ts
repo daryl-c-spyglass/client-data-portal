@@ -3,6 +3,7 @@ import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { createMLSGridClient } from "./mlsgrid-client";
 import { getHomeReviewClient, mapHomeReviewPropertyToSchema, type PropertySearchParams } from "./homereview-client";
+import { geocodeAddress, geocodeProperties, isMapboxConfigured } from "./mapbox-geocoding";
 import { searchCriteriaSchema, insertCmaSchema, insertUserSchema, insertSellerUpdateSchema, updateSellerUpdateSchema, updateLeadGateSettingsSchema } from "@shared/schema";
 import { findMatchingProperties, calculateMarketSummary } from "./seller-update-service";
 import { z } from "zod";
@@ -1134,12 +1135,104 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Mapbox Geocoding endpoints - require authentication and rate limiting
+  const geocodeRateLimiter = new Map<string, { count: number; resetTime: number }>();
+  const GEOCODE_RATE_LIMIT = 100;
+  const GEOCODE_RATE_WINDOW = 60 * 1000;
+
+  const checkGeocodeRateLimit = (clientId: string): boolean => {
+    const now = Date.now();
+    const record = geocodeRateLimiter.get(clientId);
+    
+    if (!record || record.resetTime < now) {
+      geocodeRateLimiter.set(clientId, { count: 1, resetTime: now + GEOCODE_RATE_WINDOW });
+      return true;
+    }
+    
+    if (record.count >= GEOCODE_RATE_LIMIT) {
+      return false;
+    }
+    
+    record.count++;
+    return true;
+  };
+
+  app.get("/api/geocode", requireAuth, async (req, res) => {
+    try {
+      const userId = (req.user as any)?.id || 'anonymous';
+      
+      if (!checkGeocodeRateLimit(userId)) {
+        res.status(429).json({ error: "Rate limit exceeded. Try again in a minute." });
+        return;
+      }
+
+      const address = req.query.address as string;
+      
+      if (!address) {
+        res.status(400).json({ error: "Address is required" });
+        return;
+      }
+
+      if (!isMapboxConfigured()) {
+        res.status(503).json({ error: "Geocoding service not configured" });
+        return;
+      }
+
+      const result = await geocodeAddress(address);
+      
+      if (!result) {
+        res.status(404).json({ error: "Could not geocode address" });
+        return;
+      }
+
+      res.json(result);
+    } catch (error: any) {
+      console.error("Geocoding error:", error.message);
+      res.status(500).json({ error: "Geocoding failed" });
+    }
+  });
+
+  app.post("/api/geocode/batch", requireAuth, async (req, res) => {
+    try {
+      const userId = (req.user as any)?.id || 'anonymous';
+      
+      if (!checkGeocodeRateLimit(userId)) {
+        res.status(429).json({ error: "Rate limit exceeded. Try again in a minute." });
+        return;
+      }
+
+      const { properties } = req.body;
+      
+      if (!Array.isArray(properties) || properties.length === 0) {
+        res.status(400).json({ error: "Properties array is required" });
+        return;
+      }
+
+      if (!isMapboxConfigured()) {
+        res.status(503).json({ error: "Geocoding service not configured" });
+        return;
+      }
+
+      if (properties.length > 50) {
+        res.status(400).json({ error: "Maximum 50 properties per batch request" });
+        return;
+      }
+
+      const results = await geocodeProperties(properties);
+      res.json({ geocoded: results, total: results.length });
+    } catch (error: any) {
+      console.error("Batch geocoding error:", error.message);
+      res.status(500).json({ error: "Batch geocoding failed" });
+    }
+  });
+
   // Health check
   app.get("/api/health", (req, res) => {
     res.json({ 
       status: "ok", 
       mlsGridConfigured: mlsGridClient !== null,
       homeReviewConfigured: true,
+      mapboxConfigured: isMapboxConfigured(),
       timestamp: new Date().toISOString() 
     });
   });
