@@ -21,11 +21,13 @@ import {
   X, 
   SlidersHorizontal, 
   Map as MapIcon,
+  List,
   Save,
   Filter,
   AlertCircle,
 } from "lucide-react";
 import { PropertyCard } from "@/components/PropertyCard";
+import { PropertyMapView } from "@/components/PropertyMapView";
 import { useSelectedProperty } from "@/contexts/SelectedPropertyContext";
 import type { Property, Media } from "@shared/schema";
 
@@ -237,6 +239,7 @@ export default function BuyerSearch() {
     searchState?.searchTriggered ? Object.keys(searchState.filters || {}).filter(k => !k.endsWith('Mode') && searchState.filters[k]).length : 1
   );
   const [showFilters, setShowFilters] = useState(true);
+  const [viewMode, setViewMode] = useState<'list' | 'map'>('list');
   const [currentPage, setCurrentPage] = useState(0);
   const [searchTrigger, setSearchTrigger] = useState(() => 
     searchState?.searchTriggered ? 1 : 0
@@ -501,12 +504,20 @@ export default function BuyerSearch() {
             )}
           </Button>
           <Button
-            variant="outline"
-            disabled
+            variant={viewMode === 'list' ? 'default' : 'outline'}
+            onClick={() => setViewMode('list')}
+            data-testid="button-list-view"
+          >
+            <List className="w-4 h-4 mr-2" />
+            List
+          </Button>
+          <Button
+            variant={viewMode === 'map' ? 'default' : 'outline'}
+            onClick={() => setViewMode('map')}
             data-testid="button-map-view"
           >
             <MapIcon className="w-4 h-4 mr-2" />
-            Map View
+            Map
           </Button>
           <Button
             variant="outline"
@@ -2537,55 +2548,75 @@ export default function BuyerSearch() {
                 Searching properties...
               </div>
             ) : properties && properties.length > 0 ? (
-              <>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {properties.map((property: any) => {
+              viewMode === 'map' ? (
+                <PropertyMapView 
+                  properties={properties}
+                  isLoading={isLoading}
+                  onPropertyClick={(property) => {
                     const propertyId = property.listingId || property.id;
-                    const media = property.photos?.length ? convertPhotosToMedia(property.photos, propertyId) : [];
-                    return (
-                      <PropertyCard 
-                        key={property.id} 
-                        property={property}
-                        media={media}
-                        onClick={() => {
-                          setSearchState({
-                            properties,
-                            totalCount,
-                            filters,
-                            searchTriggered: true
-                          });
-                          setSelectedProperty({ property, media });
-                          setLocation(`/properties/${propertyId}`);
-                        }}
-                      />
-                    );
-                  })}
-                </div>
-                {/* Pagination */}
-                {totalCount > pageSize && (
-                  <div className="flex items-center justify-center gap-4 mt-6 pt-6 border-t">
-                    <Button
-                      variant="outline"
-                      onClick={() => setCurrentPage(p => Math.max(0, p - 1))}
-                      disabled={currentPage === 0}
-                      data-testid="button-prev-page"
-                    >
-                      Previous
-                    </Button>
-                    <span className="text-sm text-muted-foreground">
-                      Page {currentPage + 1} of {Math.ceil(totalCount / pageSize)}
-                    </span>
-                    <Button
-                      variant="outline"
-                      onClick={() => setCurrentPage(p => p + 1)}
-                      disabled={(currentPage + 1) * pageSize >= totalCount}
-                      data-testid="button-next-page"
-                    >
-                      Next
-                    </Button>
+                    const propertyWithPhotos = property as Property & { photos?: string[] };
+                    const media = propertyWithPhotos.photos?.length ? convertPhotosToMedia(propertyWithPhotos.photos, propertyId) : [];
+                    setSearchState({
+                      properties,
+                      totalCount,
+                      filters,
+                      searchTriggered: true
+                    });
+                    setSelectedProperty({ property, media });
+                    setLocation(`/properties/${propertyId}`);
+                  }}
+                />
+              ) : (
+                <>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {properties.map((property: any) => {
+                      const propertyId = property.listingId || property.id;
+                      const media = property.photos?.length ? convertPhotosToMedia(property.photos, propertyId) : [];
+                      return (
+                        <PropertyCard 
+                          key={property.id} 
+                          property={property}
+                          media={media}
+                          onClick={() => {
+                            setSearchState({
+                              properties,
+                              totalCount,
+                              filters,
+                              searchTriggered: true
+                            });
+                            setSelectedProperty({ property, media });
+                            setLocation(`/properties/${propertyId}`);
+                          }}
+                        />
+                      );
+                    })}
                   </div>
-                )}
-              </>
+                  {/* Pagination */}
+                  {totalCount > pageSize && (
+                    <div className="flex items-center justify-center gap-4 mt-6 pt-6 border-t">
+                      <Button
+                        variant="outline"
+                        onClick={() => setCurrentPage(p => Math.max(0, p - 1))}
+                        disabled={currentPage === 0}
+                        data-testid="button-prev-page"
+                      >
+                        Previous
+                      </Button>
+                      <span className="text-sm text-muted-foreground">
+                        Page {currentPage + 1} of {Math.ceil(totalCount / pageSize)}
+                      </span>
+                      <Button
+                        variant="outline"
+                        onClick={() => setCurrentPage(p => p + 1)}
+                        disabled={(currentPage + 1) * pageSize >= totalCount}
+                        data-testid="button-next-page"
+                      >
+                        Next
+                      </Button>
+                    </div>
+                  )}
+                </>
+              )
             ) : searchTrigger > 0 ? (
               <div className="text-center py-12 text-muted-foreground">
                 <Filter className="w-12 h-12 mx-auto mb-4 opacity-50" />
