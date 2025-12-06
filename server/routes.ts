@@ -700,13 +700,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Search properties via HomeReview API (with sold data from 1996-present)
   app.get("/api/homereview/properties", async (req, res) => {
     try {
+      const parseArray = (val: any): string[] | undefined => {
+        if (!val) return undefined;
+        return Array.isArray(val) ? val as string[] : [val as string];
+      };
+      
       const params: PropertySearchParams = {
         city: req.query.city as string,
-        cities: req.query.cities ? (Array.isArray(req.query.cities) ? req.query.cities as string[] : [req.query.cities as string]) : undefined,
+        cities: parseArray(req.query.cities),
         subdivision: req.query.subdivision as string,
-        subdivisions: req.query.subdivisions ? (Array.isArray(req.query.subdivisions) ? req.query.subdivisions as string[] : [req.query.subdivisions as string]) : undefined,
+        subdivisions: parseArray(req.query.subdivisions),
         status: req.query.status as string,
-        statuses: req.query.statuses ? (Array.isArray(req.query.statuses) ? req.query.statuses as string[] : [req.query.statuses as string]) : undefined,
+        statuses: parseArray(req.query.statuses),
         minPrice: req.query.minPrice ? parseInt(req.query.minPrice as string) : undefined,
         maxPrice: req.query.maxPrice ? parseInt(req.query.maxPrice as string) : undefined,
         minBeds: req.query.minBeds ? parseInt(req.query.minBeds as string) : undefined,
@@ -717,10 +722,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
         maxSqft: req.query.maxSqft ? parseInt(req.query.maxSqft as string) : undefined,
         minYearBuilt: req.query.minYearBuilt ? parseInt(req.query.minYearBuilt as string) : undefined,
         maxYearBuilt: req.query.maxYearBuilt ? parseInt(req.query.maxYearBuilt as string) : undefined,
-        propertyTypes: req.query.propertyTypes ? (Array.isArray(req.query.propertyTypes) ? req.query.propertyTypes as string[] : [req.query.propertyTypes as string]) : undefined,
+        minLotSize: req.query.minLotSize ? parseInt(req.query.minLotSize as string) : undefined,
+        maxLotSize: req.query.maxLotSize ? parseInt(req.query.maxLotSize as string) : undefined,
+        propertyTypes: parseArray(req.query.propertyTypes),
+        propertySubTypes: parseArray(req.query.propertySubTypes),
         hasPool: req.query.hasPool === 'true' ? true : req.query.hasPool === 'false' ? false : undefined,
         hasWaterfront: req.query.hasWaterfront === 'true' ? true : req.query.hasWaterfront === 'false' ? false : undefined,
         hasView: req.query.hasView === 'true' ? true : req.query.hasView === 'false' ? false : undefined,
+        minGarageSpaces: req.query.minGarageSpaces ? parseInt(req.query.minGarageSpaces as string) : undefined,
+        postalCodes: parseArray(req.query.postalCodes),
+        counties: parseArray(req.query.counties),
+        elementarySchools: parseArray(req.query.elementarySchools),
+        middleSchools: parseArray(req.query.middleSchools),
+        highSchools: parseArray(req.query.highSchools),
+        keywords: req.query.keywords as string,
+        listingAgentName: req.query.listingAgentName as string,
+        listingOfficeName: req.query.listingOfficeName as string,
+        minDaysOnMarket: req.query.minDaysOnMarket ? parseInt(req.query.minDaysOnMarket as string) : undefined,
+        maxDaysOnMarket: req.query.maxDaysOnMarket ? parseInt(req.query.maxDaysOnMarket as string) : undefined,
         limit: req.query.limit ? parseInt(req.query.limit as string) : 50,
         offset: req.query.offset ? parseInt(req.query.offset as string) : 0,
         sortBy: req.query.sortBy as string,

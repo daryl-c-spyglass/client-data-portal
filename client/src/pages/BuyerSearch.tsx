@@ -216,164 +216,118 @@ interface SearchFilters {
   maxListDate?: string;
 }
 
+interface HomeReviewResponse {
+  properties: Property[];
+  total: number;
+  hasMore: boolean;
+  source: string;
+}
+
 export default function BuyerSearch() {
   const [filters, setFilters] = useState<SearchFilters>({});
   const [activeFiltersCount, setActiveFiltersCount] = useState(0);
   const [showFilters, setShowFilters] = useState(true);
+  const [currentPage, setCurrentPage] = useState(0);
+  const pageSize = 50;
 
-  const buildQueryString = () => {
+  const buildHomeReviewQueryString = () => {
     const params = new URLSearchParams();
     
-    // Handle status toggles - build array of enabled statuses
+    // Handle status toggles - HomeReview uses 'status' or 'statuses' parameter
     const statuses: string[] = [];
     if (filters.statusActive) statuses.push('Active');
     if (filters.statusUnderContract) statuses.push('Under Contract');
     if (filters.statusClosed) statuses.push('Closed');
     if (statuses.length > 0) {
-      statuses.forEach(status => params.append('status.values', status));
-      params.set('status.mode', 'Or'); // Multiple statuses are OR'd together
+      statuses.forEach(s => params.append('statuses', s));
     }
     
-    // Handle date range
-    if (filters.dateRangeFrom) {
-      params.set('listDate.min', filters.dateRangeFrom);
-    }
-    if (filters.dateRangeTo) {
-      params.set('listDate.max', filters.dateRangeTo);
+    // Price filters
+    if (filters.minPrice) params.set('minPrice', String(filters.minPrice));
+    if (filters.maxPrice) params.set('maxPrice', String(filters.maxPrice));
+    
+    // Beds/Baths
+    if (filters.minBeds) params.set('minBeds', String(filters.minBeds));
+    if (filters.maxBeds) params.set('maxBeds', String(filters.maxBeds));
+    if (filters.minTotalBaths) params.set('minBaths', String(filters.minTotalBaths));
+    if (filters.maxTotalBaths) params.set('maxBaths', String(filters.maxTotalBaths));
+    
+    // Size
+    if (filters.minLivingArea) params.set('minSqft', String(filters.minLivingArea));
+    if (filters.maxLivingArea) params.set('maxSqft', String(filters.maxLivingArea));
+    if (filters.minLotSizeSqFt) params.set('minLotSize', String(filters.minLotSizeSqFt));
+    if (filters.maxLotSizeSqFt) params.set('maxLotSize', String(filters.maxLotSizeSqFt));
+    
+    // Year Built
+    if (filters.minYearBuilt) params.set('minYearBuilt', String(filters.minYearBuilt));
+    if (filters.maxYearBuilt) params.set('maxYearBuilt', String(filters.maxYearBuilt));
+    
+    // Garage
+    if (filters.minGarageSpaces) params.set('minGarageSpaces', String(filters.minGarageSpaces));
+    
+    // Location - Cities (comma-separated to array)
+    if (filters.city) {
+      filters.city.split(',').map(c => c.trim()).filter(c => c).forEach(c => params.append('cities', c));
     }
     
-    // Handle street number range
-    if (filters.streetNumberMin) {
-      params.set('streetNumber.min', String(filters.streetNumberMin));
-    }
-    if (filters.streetNumberMax) {
-      params.set('streetNumber.max', String(filters.streetNumberMax));
+    // Location - Subdivisions (comma-separated to array)
+    if (filters.subdivision) {
+      filters.subdivision.split(',').map(s => s.trim()).filter(s => s).forEach(s => params.append('subdivisions', s));
     }
     
-    // Handle unit number
-    if (filters.unitNumber) {
-      params.set('unitNumber', filters.unitNumber);
+    // Location - Postal Codes (comma-separated to array)
+    if (filters.postalCode) {
+      filters.postalCode.split(',').map(z => z.trim()).filter(z => z).forEach(z => params.append('postalCodes', z));
     }
     
-    // Map frontend filter names to backend search criteria names
-    const fieldMapping: Record<string, string> = {
-      minPrice: 'listPriceMin',
-      maxPrice: 'listPriceMax',
-      minBeds: 'bedroomsMin',
-      maxBeds: 'bedroomsMax',
-      minMainLevelBeds: 'mainLevelBedroomsMin',
-      maxMainLevelBeds: 'mainLevelBedroomsMax',
-      minFullBaths: 'fullBathsMin',
-      maxFullBaths: 'fullBathsMax',
-      minHalfBaths: 'halfBathsMin',
-      maxHalfBaths: 'halfBathsMax',
-      minTotalBaths: 'totalBathsMin',
-      maxTotalBaths: 'totalBathsMax',
-      minGarageSpaces: 'garageSpacesMin',
-      maxGarageSpaces: 'garageSpacesMax',
-      minTotalParkingSpaces: 'totalParkingSpacesMin',
-      maxTotalParkingSpaces: 'totalParkingSpacesMax',
-      minLivingArea: 'livingArea.min',
-      maxLivingArea: 'livingArea.max',
-      minYearBuilt: 'yearBuilt.min',
-      maxYearBuilt: 'yearBuilt.max',
-      minLotSizeSqFt: 'lotSizeSquareFeet.min',
-      maxLotSizeSqFt: 'lotSizeSquareFeet.max',
-      minLotSizeAcres: 'lotSizeAcres.min',
-      maxLotSizeAcres: 'lotSizeAcres.max',
-      hoa: 'associationYN',
-      privatePool: 'poolPrivateYN',
-      waterfront: 'waterfrontYN',
-      view: 'viewYN',
-      horse: 'horseYN',
-      flexListing: 'flexListingYN',
-      // Location field mappings (singular frontend → plural backend)
-      postalCode: 'zipCodes',
-      city: 'cities',
-      county: 'countyOrParish',
-      elementarySchool: 'elementarySchools',
-      middleSchool: 'middleSchools',
-      highSchool: 'highSchools',
-      schoolDistrict: 'schoolDistrict',
-    };
-
-    // Array-based fields that need special handling (comma-separated values → arrays)
-    const arrayFields = [
-      'propertyCondition', 'levels', 'poolFeatures', 'waterfrontFeatures', 
-      'viewFeatures', 'horseAmenities', 'interiorFeatures', 'flooring',
-      'fireplaceFeatures', 'windowFeatures', 'accessibilityFeatures',
-      'securityFeatures', 'exteriorFeatures', 'foundation', 'lotFeatures',
-      'fencing', 'patioAndPorchFeatures', 'spaFeatures', 'communityFeatures',
-      'parkingFeatures', 'heating', 'cooling', 'waterSource', 'sewer',
-      'utilities', 'greenEnergyEfficient', 'greenSustainability',
-      'specialListingConditions', 'showingRequirements', 'possession',
-      'acceptableFinancing', 'subdivision',
-      // Location & school fields (need array handling)
-      'postalCode', 'city', 'county', 
-      'elementarySchool', 'middleSchool', 'highSchool', 'schoolDistrict'
-    ];
+    // Location - Counties (comma-separated to array)
+    if (filters.county) {
+      filters.county.split(',').map(c => c.trim()).filter(c => c).forEach(c => params.append('counties', c));
+    }
     
-    // Fields handled manually above (skip in Object.entries loop)
-    const manuallyHandledFields = [
-      'statusActive', 'statusUnderContract', 'statusClosed',
-      'dateRangeFrom', 'dateRangeTo', 'streetNumberMin', 'streetNumberMax',
-      'unitNumber'
-    ];
+    // Schools
+    if (filters.elementarySchool) {
+      filters.elementarySchool.split(',').map(s => s.trim()).filter(s => s).forEach(s => params.append('elementarySchools', s));
+    }
+    if (filters.middleSchool) {
+      filters.middleSchool.split(',').map(s => s.trim()).filter(s => s).forEach(s => params.append('middleSchools', s));
+    }
+    if (filters.highSchool) {
+      filters.highSchool.split(',').map(s => s.trim()).filter(s => s).forEach(s => params.append('highSchools', s));
+    }
     
-    Object.entries(filters).forEach(([key, value]) => {
-      // Skip manually handled fields
-      if (manuallyHandledFields.includes(key)) {
-        return;
-      }
-      
-      if (value !== undefined && value !== '' && value !== null) {
-        // Handle mode fields for non-array fields (city, postalCode, schools, etc.)
-        if (key.endsWith('Mode')) {
-          // Get the base field name (e.g., "city" from "cityMode")
-          const baseField = key.replace(/Mode$/, '');
-          
-          // Only add mode if this is NOT an array field (array fields handle their own modes)
-          if (!arrayFields.includes(baseField)) {
-            // Apply field mapping to mode key (e.g., hoa → associationYN)
-            const mappedField = fieldMapping[baseField] || baseField;
-            params.set(`${mappedField}.mode`, String(value));
-          }
-          return;
-        }
-        
-        // Handle array-based fields with comma-separated values
-        if (arrayFields.includes(key) && typeof value === 'string') {
-          const values = value.split(',').map(v => v.trim()).filter(v => v);
-          if (values.length > 0) {
-            // Get the mode for this field (And/Or/Not) - use 'Or' as default
-            const modeKey = `${key}Mode` as keyof SearchFilters;
-            const mode = filters[modeKey] || 'Or';
-            
-            // Use mapped name for backend (e.g., postalCode → zipCodes)
-            const mappedKey = fieldMapping[key] || key;
-            
-            // Add values array and mode
-            values.forEach(v => params.append(`${mappedKey}.values`, v));
-            params.set(`${mappedKey}.mode`, String(mode));
-          }
-          return;
-        }
-        
-        // Use mapped name if available, otherwise use original key
-        const mappedKey = fieldMapping[key] || key;
-        params.set(mappedKey, String(value));
-      }
-    });
+    // Boolean features
+    if (filters.privatePool === 'Yes') params.set('hasPool', 'true');
+    if (filters.privatePool === 'No') params.set('hasPool', 'false');
+    if (filters.waterfront === 'Yes') params.set('hasWaterfront', 'true');
+    if (filters.waterfront === 'No') params.set('hasWaterfront', 'false');
+    if (filters.view === 'Yes') params.set('hasView', 'true');
+    if (filters.view === 'No') params.set('hasView', 'false');
+    
+    // Keywords search (public remarks)
+    if (filters.publicRemarks) params.set('keywords', filters.publicRemarks);
+    
+    // Property type
+    if (filters.propertySubType) params.append('propertySubTypes', filters.propertySubType);
     
     return params.toString();
   };
 
-  const queryString = buildQueryString();
-  const fullQueryString = queryString ? `${queryString}&limit=50&offset=0` : 'limit=50&offset=0';
-  const { data: properties, isLoading, refetch } = useQuery<Property[]>({
-    queryKey: [`/api/properties/search?${fullQueryString}`],
+  const queryString = buildHomeReviewQueryString();
+  const fullQueryString = `${queryString}${queryString ? '&' : ''}limit=${pageSize}&offset=${currentPage * pageSize}`;
+  
+  const { data: response, isLoading, refetch } = useQuery<HomeReviewResponse>({
+    queryKey: ['/api/homereview/properties', fullQueryString],
+    queryFn: async () => {
+      const res = await fetch(`/api/homereview/properties?${fullQueryString}`);
+      if (!res.ok) throw new Error('Failed to search properties');
+      return res.json();
+    },
     enabled: Object.keys(filters).length > 0,
   });
+  
+  const properties = response?.properties || [];
+  const totalCount = response?.total || 0;
 
   const updateFilter = (key: keyof SearchFilters, value: any) => {
     setFilters(prev => {
@@ -2423,7 +2377,12 @@ export default function BuyerSearch() {
               <div>
                 <CardTitle>Search Results</CardTitle>
                 <CardDescription>
-                  {properties ? `Found ${properties.length} properties` : 'Configure filters and click Search'}
+                  {totalCount > 0 
+                    ? `Found ${totalCount.toLocaleString()} properties (showing ${properties.length} on page ${currentPage + 1})`
+                    : activeFiltersCount > 0 
+                      ? 'Click Search to find properties' 
+                      : 'Configure filters and click Search'
+                  }
                 </CardDescription>
               </div>
               {activeFiltersCount > 0 && (
@@ -2455,11 +2414,37 @@ export default function BuyerSearch() {
                 Searching properties...
               </div>
             ) : properties && properties.length > 0 ? (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {properties.map((property) => (
-                  <PropertyCard key={property.id} property={property} />
-                ))}
-              </div>
+              <>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {properties.map((property) => (
+                    <PropertyCard key={property.id} property={property} />
+                  ))}
+                </div>
+                {/* Pagination */}
+                {totalCount > pageSize && (
+                  <div className="flex items-center justify-center gap-4 mt-6 pt-6 border-t">
+                    <Button
+                      variant="outline"
+                      onClick={() => setCurrentPage(p => Math.max(0, p - 1))}
+                      disabled={currentPage === 0}
+                      data-testid="button-prev-page"
+                    >
+                      Previous
+                    </Button>
+                    <span className="text-sm text-muted-foreground">
+                      Page {currentPage + 1} of {Math.ceil(totalCount / pageSize)}
+                    </span>
+                    <Button
+                      variant="outline"
+                      onClick={() => setCurrentPage(p => p + 1)}
+                      disabled={(currentPage + 1) * pageSize >= totalCount}
+                      data-testid="button-next-page"
+                    >
+                      Next
+                    </Button>
+                  </div>
+                )}
+              </>
             ) : activeFiltersCount > 0 ? (
               <div className="text-center py-12 text-muted-foreground">
                 <Filter className="w-12 h-12 mx-auto mb-4 opacity-50" />
