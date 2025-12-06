@@ -10,6 +10,14 @@ Preferred communication style: Simple, everyday language.
 
 ## Recent Changes
 
+### HomeReview API Integration (Dec 6, 2025)
+- **New Data Source**: Replaced direct MLS Grid API with HomeReview-AI Replit app as the primary data source.
+- **API Client**: Created `server/homereview-client.ts` to fetch properties, neighborhoods, and market stats from the HomeReview API.
+- **Proxy Endpoints**: Added `/api/homereview/properties`, `/api/homereview/neighborhoods`, and `/api/homereview/stats` endpoints in `server/routes.ts`.
+- **Data Volume**: 83,335 properties available including sold data from 1996-present.
+- **Field Mapping**: HomeReview API uses camelCase field names (listingId, closePrice, etc.) - mapper updated accordingly.
+- **Environment Variable**: `HOMEREVIEW_API_URL` controls the API endpoint (defaults to development URL).
+
 ### Array Filter Validation Fix (Nov 21, 2025)
 - **Comprehensive Schema Update**: Fixed "Expected array, received string" validation errors across ALL array-based search filters by implementing the `stringOrArray` transformer in the Zod schema.
 - **Fields Fixed**: Updated 40+ array fields including subdivisions, cities, schools, property features, amenities, utilities, and all multi-select filters to accept both string and array inputs.
