@@ -1,18 +1,41 @@
+import { useState } from "react";
 import { useRoute } from "wouter";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { ArrowLeft, Loader2 } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { ArrowLeft, Share2, Link as LinkIcon, Copy, Check, Trash2 } from "lucide-react";
 import { Link } from "wouter";
 import { CMAReport } from "@/components/CMAReport";
-import type { Cma, Property, Media, PropertyStatistics, TimelineDataPoint } from "@shared/schema";
+import { useToast } from "@/hooks/use-toast";
+import { 
+  Dialog, 
+  DialogContent, 
+  DialogDescription, 
+  DialogHeader, 
+  DialogTitle,
+  DialogTrigger 
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import type { Cma, Property, PropertyStatistics, TimelineDataPoint } from "@shared/schema";
+import { queryClient } from "@/lib/queryClient";
+
+interface ShareResponse {
+  shareToken: string;
+  shareUrl: string;
+  expiresAt: string;
+}
 
 export default function CMADetailPage() {
   const [, params] = useRoute("/cmas/:id");
   const id = params?.id;
+  const { toast } = useToast();
+  const [shareDialogOpen, setShareDialogOpen] = useState(false);
+  const [copied, setCopied] = useState(false);
 
-  const { data: cma, isLoading: cmaLoading } = useQuery<Cma>({
-    queryKey: [`/api/cmas/${id}`],
+  const { data: cma, isLoading: cmaLoading, refetch: refetchCma } = useQuery<Cma>({
+    queryKey: ['/api/cmas', id],
     enabled: !!id,
     queryFn: async () => {
       const response = await fetch(`/api/cmas/${id}`);
@@ -22,7 +45,7 @@ export default function CMADetailPage() {
   });
 
   const { data: statistics, isLoading: statsLoading } = useQuery<PropertyStatistics>({
-    queryKey: [`/api/cmas/${id}/statistics`],
+    queryKey: ['/api/cmas', id, 'statistics'],
     enabled: !!id && !!cma,
     queryFn: async () => {
       const response = await fetch(`/api/cmas/${id}/statistics`);
@@ -32,7 +55,7 @@ export default function CMADetailPage() {
   });
 
   const { data: timelineData = [], isLoading: timelineLoading } = useQuery<TimelineDataPoint[]>({
-    queryKey: [`/api/cmas/${id}/timeline`],
+    queryKey: ['/api/cmas', id, 'timeline'],
     enabled: !!id && !!cma,
     queryFn: async () => {
       const response = await fetch(`/api/cmas/${id}/timeline`);
@@ -50,16 +73,80 @@ export default function CMADetailPage() {
     },
   });
 
+  const shareMutation = useMutation<ShareResponse>({
+    mutationFn: async () => {
+      const response = await fetch(`/api/cmas/${id}/share`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+      });
+      if (!response.ok) throw new Error('Failed to generate share link');
+      return response.json();
+    },
+    onSuccess: () => {
+      refetchCma();
+      toast({
+        title: "Share link generated",
+        description: "Your CMA is now shareable via the link.",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to generate share link.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const unshareMutation = useMutation({
+    mutationFn: async () => {
+      const response = await fetch(`/api/cmas/${id}/share`, {
+        method: 'DELETE',
+      });
+      if (!response.ok) throw new Error('Failed to remove share link');
+      return response.json();
+    },
+    onSuccess: () => {
+      refetchCma();
+      setShareDialogOpen(false);
+      toast({
+        title: "Share link removed",
+        description: "This CMA is no longer publicly accessible.",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to remove share link.",
+        variant: "destructive",
+      });
+    },
+  });
+
   const properties = cma
     ? allProperties.filter((p) =>
         [cma.subjectPropertyId, ...(cma.comparablePropertyIds || [])].includes(p.id)
       )
     : [];
 
-  const mediaMap = new Map<string, Media[]>();
   const isLoading = cmaLoading || statsLoading || timelineLoading;
 
-  // Use mock statistics as fallback if data isn't loaded yet
+  const getShareUrl = () => {
+    if (!cma?.publicLink) return '';
+    const baseUrl = window.location.origin;
+    return `${baseUrl}/share/cma/${cma.publicLink}`;
+  };
+
+  const handleCopyLink = () => {
+    navigator.clipboard.writeText(getShareUrl());
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+    toast({
+      title: "Link copied",
+      description: "Share link copied to clipboard.",
+    });
+  };
+
   const mockStatistics: PropertyStatistics = {
     price: {
       range: { min: 371000, max: 710000 },
@@ -108,8 +195,6 @@ export default function CMADetailPage() {
     },
   };
 
-  const mockTimelineData: TimelineDataPoint[] = [];
-
   if (isLoading) {
     return (
       <div className="space-y-6">
@@ -132,7 +217,7 @@ export default function CMADetailPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between flex-wrap gap-4">
         <div>
           <Link href="/cmas">
             <Button variant="ghost" size="sm" className="mb-4" data-testid="button-back-to-cmas">
@@ -141,18 +226,97 @@ export default function CMADetailPage() {
             </Button>
           </Link>
           <h1 className="text-3xl font-bold" data-testid="text-cma-title">{cma.name}</h1>
+          {cma.publicLink && (
+            <Badge variant="secondary" className="mt-2">
+              <LinkIcon className="w-3 h-3 mr-1" />
+              Shared
+            </Badge>
+          )}
         </div>
+
+        <Dialog open={shareDialogOpen} onOpenChange={setShareDialogOpen}>
+          <DialogTrigger asChild>
+            <Button variant="outline" data-testid="button-share-cma">
+              <Share2 className="w-4 h-4 mr-2" />
+              Share
+            </Button>
+          </DialogTrigger>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Share CMA</DialogTitle>
+              <DialogDescription>
+                Generate a public link to share this CMA with clients.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4 pt-4">
+              {cma.publicLink ? (
+                <>
+                  <div className="space-y-2">
+                    <Label>Share Link</Label>
+                    <div className="flex gap-2">
+                      <Input 
+                        value={getShareUrl()} 
+                        readOnly 
+                        data-testid="input-share-link"
+                      />
+                      <Button 
+                        size="icon" 
+                        variant="outline"
+                        onClick={handleCopyLink}
+                        data-testid="button-copy-link"
+                      >
+                        {copied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+                      </Button>
+                    </div>
+                  </div>
+                  {cma.expiresAt && (
+                    <p className="text-sm text-muted-foreground">
+                      Link expires: {new Date(cma.expiresAt).toLocaleDateString()}
+                    </p>
+                  )}
+                  <div className="flex justify-between pt-4">
+                    <Button
+                      variant="destructive"
+                      onClick={() => unshareMutation.mutate()}
+                      disabled={unshareMutation.isPending}
+                      data-testid="button-remove-share"
+                    >
+                      <Trash2 className="w-4 h-4 mr-2" />
+                      Remove Link
+                    </Button>
+                    <Button onClick={() => setShareDialogOpen(false)}>
+                      Done
+                    </Button>
+                  </div>
+                </>
+              ) : (
+                <div className="text-center py-4">
+                  <p className="text-muted-foreground mb-4">
+                    Generate a shareable link for this CMA. The link will be valid for 30 days.
+                  </p>
+                  <Button 
+                    onClick={() => shareMutation.mutate()}
+                    disabled={shareMutation.isPending}
+                    data-testid="button-generate-link"
+                  >
+                    <LinkIcon className="w-4 h-4 mr-2" />
+                    {shareMutation.isPending ? 'Generating...' : 'Generate Share Link'}
+                  </Button>
+                </div>
+              )}
+            </div>
+          </DialogContent>
+        </Dialog>
       </div>
 
       <CMAReport
         properties={properties}
-        mediaMap={mediaMap}
         statistics={statistics || mockStatistics}
         timelineData={timelineData}
         isPreview={true}
-        expiresAt={new Date(Date.now() + 30 * 60 * 1000)}
+        expiresAt={cma.expiresAt ? new Date(cma.expiresAt) : new Date(Date.now() + 30 * 60 * 1000)}
         onSave={() => console.log("Save")}
-        onPublicLink={() => console.log("Public link")}
+        onPublicLink={() => setShareDialogOpen(true)}
         onModifySearch={() => console.log("Modify search")}
         onModifyStats={() => console.log("Modify stats")}
         onAddNotes={() => console.log("Add notes")}

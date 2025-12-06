@@ -154,6 +154,8 @@ export interface PropertySearchParams {
 
 export class HomeReviewClient {
   private client: AxiosInstance;
+  private lastHealthCheck: { available: boolean; timestamp: number } | null = null;
+  private healthCheckTTL = 60000;
 
   constructor() {
     this.client = axios.create({
@@ -163,6 +165,33 @@ export class HomeReviewClient {
       },
       timeout: 30000,
     });
+  }
+
+  async checkHealth(): Promise<{ available: boolean; latency?: number; message: string }> {
+    if (this.lastHealthCheck && Date.now() - this.lastHealthCheck.timestamp < this.healthCheckTTL) {
+      return {
+        available: this.lastHealthCheck.available,
+        message: this.lastHealthCheck.available ? 'HomeReview API is available (cached)' : 'HomeReview API is unavailable (cached)',
+      };
+    }
+
+    const start = Date.now();
+    try {
+      const response = await this.client.get('/api/health', { timeout: 5000 });
+      const latency = Date.now() - start;
+      this.lastHealthCheck = { available: true, timestamp: Date.now() };
+      return {
+        available: true,
+        latency,
+        message: `HomeReview API is available (${latency}ms latency)`,
+      };
+    } catch (error) {
+      this.lastHealthCheck = { available: false, timestamp: Date.now() };
+      return {
+        available: false,
+        message: 'HomeReview API is currently unavailable. The external data source may be offline.',
+      };
+    }
   }
 
   async searchProperties(params: PropertySearchParams): Promise<{

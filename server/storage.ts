@@ -69,6 +69,7 @@ export interface IStorage {
   
   // CMA operations
   getCma(id: string): Promise<Cma | undefined>;
+  getCmaByShareToken(token: string): Promise<Cma | undefined>;
   getCmasByUser(userId: string): Promise<Cma[]>;
   getAllCmas(): Promise<Cma[]>;
   createCma(cma: InsertCma): Promise<Cma>;
@@ -357,6 +358,10 @@ export class MemStorage implements IStorage {
   // CMA operations
   async getCma(id: string): Promise<Cma | undefined> {
     return this.cmas.get(id);
+  }
+
+  async getCmaByShareToken(token: string): Promise<Cma | undefined> {
+    return Array.from(this.cmas.values()).find(c => c.publicLink === token);
   }
 
   async getCmasByUser(userId: string): Promise<Cma[]> {
@@ -843,6 +848,11 @@ export class DbStorage implements IStorage {
 
   async getCma(id: string): Promise<Cma | undefined> {
     const result = await this.db.select().from(cmas).where(eq(cmas.id, id)).limit(1);
+    return result[0];
+  }
+
+  async getCmaByShareToken(token: string): Promise<Cma | undefined> {
+    const result = await this.db.select().from(cmas).where(eq(cmas.publicLink, token)).limit(1);
     return result[0];
   }
 

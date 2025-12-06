@@ -19,6 +19,7 @@ import SellerUpdateEmbed from "@/pages/SellerUpdateEmbed";
 import EmbedCodeGenerator from "@/pages/EmbedCodeGenerator";
 import BuyerSearch from "@/pages/BuyerSearch";
 import LeadGateSettings from "@/pages/LeadGateSettings";
+import SharedCMAView from "@/pages/SharedCMAView";
 
 function Router() {
   return (
@@ -56,6 +57,9 @@ export default function App() {
           <Switch>
             {/* Embed route without sidebar */}
             <Route path="/embed/seller-update" component={SellerUpdateEmbed} />
+            
+            {/* Public shared CMA view without sidebar */}
+            <Route path="/share/cma/:token" component={SharedCMAView} />
             
             {/* All other routes with sidebar */}
             <Route>

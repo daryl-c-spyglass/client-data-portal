@@ -471,6 +471,117 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // CMA Share Link routes (requires authentication and ownership)
+  app.post("/api/cmas/:id/share", requireAuth, async (req, res) => {
+    try {
+      const cma = await storage.getCma(req.params.id);
+      if (!cma) {
+        res.status(404).json({ error: "CMA not found" });
+        return;
+      }
+
+      // Ownership check - verify the user owns this CMA
+      const user = req.user as any;
+      if (cma.userId && cma.userId !== user?.id) {
+        res.status(403).json({ error: "Not authorized to share this CMA" });
+        return;
+      }
+
+      // Always generate a new token (regenerates if one already exists)
+      const shareToken = crypto.randomUUID();
+      const expiresAt = new Date();
+      expiresAt.setDate(expiresAt.getDate() + 30);
+
+      await storage.updateCma(req.params.id, {
+        publicLink: shareToken,
+        expiresAt,
+      });
+
+      res.json({
+        shareToken,
+        shareUrl: `/share/cma/${shareToken}`,
+        expiresAt,
+      });
+    } catch (error) {
+      console.error("Error generating share link:", error);
+      res.status(500).json({ error: "Failed to generate share link" });
+    }
+  });
+
+  app.delete("/api/cmas/:id/share", requireAuth, async (req, res) => {
+    try {
+      const cma = await storage.getCma(req.params.id);
+      if (!cma) {
+        res.status(404).json({ error: "CMA not found" });
+        return;
+      }
+
+      // Ownership check - verify the user owns this CMA
+      const user = req.user as any;
+      if (cma.userId && cma.userId !== user?.id) {
+        res.status(403).json({ error: "Not authorized to manage this CMA" });
+        return;
+      }
+
+      await storage.updateCma(req.params.id, {
+        publicLink: null,
+        expiresAt: null,
+      });
+
+      res.json({ message: "Share link removed" });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to remove share link" });
+    }
+  });
+
+  // Public CMA access via share token (no auth required, but sanitized response)
+  app.get("/api/share/cma/:token", async (req, res) => {
+    try {
+      const cma = await storage.getCmaByShareToken(req.params.token);
+      if (!cma) {
+        res.status(404).json({ error: "CMA not found or link expired" });
+        return;
+      }
+
+      if (cma.expiresAt && new Date(cma.expiresAt) < new Date()) {
+        res.status(410).json({ error: "This share link has expired" });
+        return;
+      }
+
+      const propertyIds = [
+        ...(cma.subjectPropertyId ? [cma.subjectPropertyId] : []),
+        ...(cma.comparablePropertyIds || [])
+      ];
+
+      const properties: any[] = [];
+      for (const id of propertyIds) {
+        const property = await storage.getProperty(id);
+        if (property) {
+          properties.push(property);
+        }
+      }
+
+      const statistics = await storage.calculateStatistics(propertyIds);
+      const timelineData = await storage.getTimelineData(propertyIds);
+
+      // SECURITY: Only return public-safe CMA data (exclude internal notes, userId, etc.)
+      res.json({
+        cma: {
+          id: cma.id,
+          name: cma.name,
+          createdAt: cma.createdAt,
+          expiresAt: cma.expiresAt,
+        },
+        properties,
+        statistics,
+        timelineData,
+      });
+    } catch (error) {
+      console.error("Error fetching shared CMA:", error);
+      res.status(500).json({ error: "Failed to fetch shared CMA" });
+    }
+  });
+
   // Seller Update routes - Quick Seller Update feature
   app.get("/api/seller-updates", async (req, res) => {
     try {
@@ -696,6 +807,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // all sold data from 1996-present and neighborhood boundaries
   
   const homeReviewClient = getHomeReviewClient();
+
+  // HomeReview API health check
+  app.get("/api/homereview/health", async (req, res) => {
+    try {
+      const health = await homeReviewClient.checkHealth();
+      res.json(health);
+    } catch (error: any) {
+      res.json({
+        available: false,
+        message: 'Failed to check HomeReview API status',
+      });
+    }
+  });
 
   // Search properties via HomeReview API (with sold data from 1996-present)
   app.get("/api/homereview/properties", async (req, res) => {

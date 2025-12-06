@@ -22,6 +22,7 @@ import {
   Map as MapIcon,
   Save,
   Filter,
+  AlertCircle,
 } from "lucide-react";
 import { PropertyCard } from "@/components/PropertyCard";
 import type { Property } from "@shared/schema";
@@ -316,7 +317,17 @@ export default function BuyerSearch() {
   const queryString = buildHomeReviewQueryString();
   const fullQueryString = `${queryString}${queryString ? '&' : ''}limit=${pageSize}&offset=${currentPage * pageSize}`;
   
-  const { data: response, isLoading, refetch } = useQuery<HomeReviewResponse>({
+  const { data: healthStatus } = useQuery<{ available: boolean; message: string }>({
+    queryKey: ['/api/homereview/health'],
+    queryFn: async () => {
+      const res = await fetch('/api/homereview/health');
+      return res.json();
+    },
+    refetchInterval: 60000,
+    staleTime: 30000,
+  });
+
+  const { data: response, isLoading, isError, refetch } = useQuery<HomeReviewResponse>({
     queryKey: ['/api/homereview/properties', fullQueryString],
     queryFn: async () => {
       const res = await fetch(`/api/homereview/properties?${fullQueryString}`);
@@ -324,10 +335,12 @@ export default function BuyerSearch() {
       return res.json();
     },
     enabled: Object.keys(filters).length > 0,
+    retry: 1,
   });
   
   const properties = response?.properties || [];
   const totalCount = response?.total || 0;
+  const isApiUnavailable = healthStatus?.available === false || isError;
 
   const updateFilter = (key: keyof SearchFilters, value: any) => {
     setFilters(prev => {
@@ -362,8 +375,21 @@ export default function BuyerSearch() {
 
   return (
     <div className="space-y-6">
+      {/* API Status Banner */}
+      {isApiUnavailable && (
+        <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700 rounded-md p-4">
+          <div className="flex items-center gap-2">
+            <AlertCircle className="w-5 h-5 text-amber-600 dark:text-amber-400" />
+            <p className="text-sm text-amber-800 dark:text-amber-200">
+              <strong>Data Source Unavailable:</strong> The HomeReview API is currently offline. 
+              Property search may not return results until the service is restored.
+            </p>
+          </div>
+        </div>
+      )}
+
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between flex-wrap gap-4">
         <div>
           <h1 className="text-3xl font-bold">Buyer Search</h1>
           <p className="text-muted-foreground mt-1">
