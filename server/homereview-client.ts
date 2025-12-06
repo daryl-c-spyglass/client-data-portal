@@ -1,88 +1,88 @@
 import axios, { AxiosInstance } from 'axios';
 
-const HOMEREVIEW_API_URL = 'https://home-review-ai-ryan1648.replit.app';
+const HOMEREVIEW_API_URL = process.env.HOMEREVIEW_API_URL || 'https://95f0a894-8940-4717-a771-851029450d05-00-3octfev6njpgb.spock.replit.dev';
 
 interface HomeReviewProperty {
-  ListingId: string;
-  ListingKey: string;
-  StandardStatus: string;
-  ListPrice: number;
-  ClosePrice?: number;
-  OriginalListPrice?: number;
-  PropertyType: string;
-  PropertySubType?: string;
-  City: string;
-  StateOrProvince: string;
-  PostalCode: string;
-  CountyOrParish?: string;
-  SubdivisionName?: string;
-  StreetNumber?: string;
-  StreetName?: string;
-  StreetSuffix?: string;
-  UnitNumber?: string;
-  UnparsedAddress?: string;
-  Latitude?: number;
-  Longitude?: number;
-  BedroomsTotal?: number;
-  BathroomsTotalInteger?: number;
-  BathroomsFull?: number;
-  BathroomsHalf?: number;
-  LivingArea?: number;
-  LotSizeSquareFeet?: number;
-  LotSizeAcres?: number;
-  YearBuilt?: number;
-  GarageSpaces?: number;
-  StoriesTotal?: number;
-  PoolPrivateYN?: boolean;
-  WaterfrontYN?: boolean;
-  ViewYN?: boolean;
-  AssociationFee?: number;
-  AssociationFeeFrequency?: string;
-  TaxAnnualAmount?: number;
-  PublicRemarks?: string;
-  PrivateRemarks?: string;
-  ListingContractDate?: string;
-  CloseDate?: string;
-  DaysOnMarket?: number;
-  CumulativeDaysOnMarket?: number;
-  ListAgentFullName?: string;
-  ListAgentEmail?: string;
-  ListAgentDirectPhone?: string;
-  ListOfficeName?: string;
-  BuyerAgentFullName?: string;
-  BuyerOfficeName?: string;
-  Photos?: string[];
-  PhotosCount?: number;
-  VirtualTourURLUnbranded?: string;
-  ArchitecturalStyle?: string[];
-  Appliances?: string[];
-  Cooling?: string[];
-  Heating?: string[];
-  InteriorFeatures?: string[];
-  ExteriorFeatures?: string[];
-  Flooring?: string[];
-  ParkingFeatures?: string[];
-  PatioAndPorchFeatures?: string[];
-  SecurityFeatures?: string[];
-  Utilities?: string[];
-  WaterSource?: string[];
-  Sewer?: string[];
-  ElementarySchool?: string;
-  MiddleOrJuniorSchool?: string;
-  HighSchool?: string;
-  ModificationTimestamp?: string;
+  listingId: string;
+  listingKey: string;
+  standardStatus: string;
+  listPrice: number;
+  closePrice?: number;
+  originalListPrice?: number;
+  propertyType: string;
+  propertySubType?: string;
+  city: string;
+  stateOrProvince: string;
+  postalCode: string;
+  countyOrParish?: string;
+  subdivisionName?: string;
+  streetNumber?: string;
+  streetName?: string;
+  streetSuffix?: string;
+  unitNumber?: string;
+  unparsedAddress?: string;
+  latitude?: number;
+  longitude?: number;
+  bedroomsTotal?: number;
+  bathroomsTotalInteger?: number;
+  bathroomsFull?: number;
+  bathroomsHalf?: number;
+  livingArea?: number;
+  lotSizeSquareFeet?: number;
+  lotSizeAcres?: number;
+  yearBuilt?: number;
+  garageSpaces?: number;
+  storiesTotal?: number;
+  poolPrivateYn?: boolean;
+  waterfrontYn?: boolean;
+  viewYn?: boolean;
+  associationFee?: number;
+  associationFeeFrequency?: string;
+  taxAnnualAmount?: number;
+  publicRemarks?: string;
+  privateRemarks?: string;
+  listingContractDate?: string;
+  closeDate?: string;
+  daysOnMarket?: number;
+  cumulativeDaysOnMarket?: number;
+  listAgentFullName?: string;
+  listAgentEmail?: string;
+  listAgentDirectPhone?: string;
+  listOfficeName?: string;
+  buyerAgentFullName?: string;
+  buyerOfficeName?: string;
+  photos?: string[];
+  photosCount?: number;
+  virtualTourURLUnbranded?: string;
+  architecturalStyle?: string[];
+  appliances?: string[];
+  cooling?: string[];
+  heating?: string[];
+  interiorFeatures?: string[];
+  exteriorFeatures?: string[];
+  flooring?: string[];
+  parkingFeatures?: string[];
+  patioAndPorchFeatures?: string[];
+  securityFeatures?: string[];
+  utilities?: string[];
+  waterSource?: string[];
+  sewer?: string[];
+  elementarySchool?: string;
+  middleOrJuniorSchool?: string;
+  highSchool?: string;
+  modificationTimestamp?: string;
+  mlgCanView?: boolean;
+  originatingSystemName?: string;
   [key: string]: any;
 }
 
 interface HomeReviewPropertiesResponse {
-  success: boolean;
-  data: HomeReviewProperty[];
-  pagination: {
-    total: number;
-    limit: number;
-    offset: number;
-    hasMore: boolean;
-  };
+  properties: HomeReviewProperty[];
+  count: number;
+  total: number;
+  limit: number;
+  offset: number;
+  timestamp: string;
 }
 
 interface MarketStats {
@@ -251,15 +251,15 @@ export class HomeReviewClient {
         `/api/mls/public/properties?${queryParams.toString()}`
       );
 
-      if (response.data.success) {
-        return {
-          properties: response.data.data,
-          total: response.data.pagination.total,
-          hasMore: response.data.pagination.hasMore,
-        };
-      }
+      const data = response.data;
+      const limit = params.limit || 50;
+      const hasMore = (data.offset + data.count) < data.total;
 
-      return { properties: [], total: 0, hasMore: false };
+      return {
+        properties: data.properties || [],
+        total: data.total || 0,
+        hasMore,
+      };
     } catch (error: any) {
       console.error('[HomeReview] Error searching properties:', error.message);
       throw new Error(`Failed to search properties from HomeReview: ${error.message}`);
@@ -272,8 +272,8 @@ export class HomeReviewClient {
         `/api/mls/public/properties?listingId=${listingId}&limit=1`
       );
 
-      if (response.data.success && response.data.data.length > 0) {
-        return response.data.data[0];
+      if (response.data.properties && response.data.properties.length > 0) {
+        return response.data.properties[0];
       }
 
       return null;
@@ -398,75 +398,75 @@ export function getHomeReviewClient(): HomeReviewClient {
 
 export function mapHomeReviewPropertyToSchema(prop: HomeReviewProperty): any {
   return {
-    id: prop.ListingKey || prop.ListingId,
-    listingId: prop.ListingId,
-    listingKey: prop.ListingKey,
-    standardStatus: prop.StandardStatus,
-    mlsStatus: prop.StandardStatus,
-    listPrice: prop.ListPrice,
-    closePrice: prop.ClosePrice,
-    originalListPrice: prop.OriginalListPrice,
-    propertyType: prop.PropertyType,
-    propertySubType: prop.PropertySubType,
-    city: prop.City,
-    stateOrProvince: prop.StateOrProvince,
-    postalCode: prop.PostalCode,
-    countyOrParish: prop.CountyOrParish,
-    subdivisionName: prop.SubdivisionName,
-    streetNumber: prop.StreetNumber,
-    streetName: prop.StreetName,
-    streetSuffix: prop.StreetSuffix,
-    unitNumber: prop.UnitNumber,
-    unparsedAddress: prop.UnparsedAddress,
-    latitude: prop.Latitude,
-    longitude: prop.Longitude,
-    bedroomsTotal: prop.BedroomsTotal,
-    bathroomsTotalInteger: prop.BathroomsTotalInteger,
-    bathroomsFull: prop.BathroomsFull,
-    bathroomsHalf: prop.BathroomsHalf,
-    livingArea: prop.LivingArea,
-    lotSizeSquareFeet: prop.LotSizeSquareFeet,
-    lotSizeAcres: prop.LotSizeAcres,
-    yearBuilt: prop.YearBuilt,
-    garageSpaces: prop.GarageSpaces,
-    storiesTotal: prop.StoriesTotal,
-    poolPrivateYN: prop.PoolPrivateYN,
-    waterfrontYN: prop.WaterfrontYN,
-    viewYN: prop.ViewYN,
-    associationFee: prop.AssociationFee,
-    associationFeeFrequency: prop.AssociationFeeFrequency,
-    taxAnnualAmount: prop.TaxAnnualAmount,
-    publicRemarks: prop.PublicRemarks,
-    privateRemarks: prop.PrivateRemarks,
-    listingContractDate: prop.ListingContractDate,
-    closeDate: prop.CloseDate,
-    daysOnMarket: prop.DaysOnMarket,
-    cumulativeDaysOnMarket: prop.CumulativeDaysOnMarket,
-    listAgentFullName: prop.ListAgentFullName,
-    listAgentEmail: prop.ListAgentEmail,
-    listAgentDirectPhone: prop.ListAgentDirectPhone,
-    listOfficeName: prop.ListOfficeName,
-    buyerAgentFullName: prop.BuyerAgentFullName,
-    buyerOfficeName: prop.BuyerOfficeName,
-    photos: prop.Photos || [],
-    photosCount: prop.PhotosCount || (prop.Photos?.length || 0),
-    virtualTourURLUnbranded: prop.VirtualTourURLUnbranded,
-    architecturalStyle: prop.ArchitecturalStyle,
-    appliances: prop.Appliances,
-    cooling: prop.Cooling,
-    heating: prop.Heating,
-    interiorFeatures: prop.InteriorFeatures,
-    exteriorFeatures: prop.ExteriorFeatures,
-    flooring: prop.Flooring,
-    parkingFeatures: prop.ParkingFeatures,
-    patioAndPorchFeatures: prop.PatioAndPorchFeatures,
-    securityFeatures: prop.SecurityFeatures,
-    utilities: prop.Utilities,
-    waterSource: prop.WaterSource,
-    sewer: prop.Sewer,
-    elementarySchool: prop.ElementarySchool,
-    middleOrJuniorSchool: prop.MiddleOrJuniorSchool,
-    highSchool: prop.HighSchool,
-    modificationTimestamp: prop.ModificationTimestamp,
+    id: prop.listingKey || prop.listingId,
+    listingId: prop.listingId,
+    listingKey: prop.listingKey,
+    standardStatus: prop.standardStatus,
+    mlsStatus: prop.standardStatus,
+    listPrice: prop.listPrice,
+    closePrice: prop.closePrice,
+    originalListPrice: prop.originalListPrice,
+    propertyType: prop.propertyType,
+    propertySubType: prop.propertySubType,
+    city: prop.city,
+    stateOrProvince: prop.stateOrProvince,
+    postalCode: prop.postalCode,
+    countyOrParish: prop.countyOrParish,
+    subdivisionName: prop.subdivisionName,
+    streetNumber: prop.streetNumber,
+    streetName: prop.streetName,
+    streetSuffix: prop.streetSuffix,
+    unitNumber: prop.unitNumber,
+    unparsedAddress: prop.unparsedAddress,
+    latitude: prop.latitude,
+    longitude: prop.longitude,
+    bedroomsTotal: prop.bedroomsTotal,
+    bathroomsTotalInteger: prop.bathroomsTotalInteger,
+    bathroomsFull: prop.bathroomsFull,
+    bathroomsHalf: prop.bathroomsHalf,
+    livingArea: prop.livingArea,
+    lotSizeSquareFeet: prop.lotSizeSquareFeet,
+    lotSizeAcres: prop.lotSizeAcres,
+    yearBuilt: prop.yearBuilt,
+    garageSpaces: prop.garageSpaces,
+    storiesTotal: prop.storiesTotal,
+    poolPrivateYN: prop.poolPrivateYn,
+    waterfrontYN: prop.waterfrontYn,
+    viewYN: prop.viewYn,
+    associationFee: prop.associationFee,
+    associationFeeFrequency: prop.associationFeeFrequency,
+    taxAnnualAmount: prop.taxAnnualAmount,
+    publicRemarks: prop.publicRemarks,
+    privateRemarks: prop.privateRemarks,
+    listingContractDate: prop.listingContractDate,
+    closeDate: prop.closeDate,
+    daysOnMarket: prop.daysOnMarket,
+    cumulativeDaysOnMarket: prop.cumulativeDaysOnMarket,
+    listAgentFullName: prop.listAgentFullName,
+    listAgentEmail: prop.listAgentEmail,
+    listAgentDirectPhone: prop.listAgentDirectPhone,
+    listOfficeName: prop.listOfficeName,
+    buyerAgentFullName: prop.buyerAgentFullName,
+    buyerOfficeName: prop.buyerOfficeName,
+    photos: prop.photos || [],
+    photosCount: prop.photosCount || (prop.photos?.length || 0),
+    virtualTourURLUnbranded: prop.virtualTourURLUnbranded,
+    architecturalStyle: prop.architecturalStyle,
+    appliances: prop.appliances,
+    cooling: prop.cooling,
+    heating: prop.heating,
+    interiorFeatures: prop.interiorFeatures,
+    exteriorFeatures: prop.exteriorFeatures,
+    flooring: prop.flooring,
+    parkingFeatures: prop.parkingFeatures,
+    patioAndPorchFeatures: prop.patioAndPorchFeatures,
+    securityFeatures: prop.securityFeatures,
+    utilities: prop.utilities,
+    waterSource: prop.waterSource,
+    sewer: prop.sewer,
+    elementarySchool: prop.elementarySchool,
+    middleOrJuniorSchool: prop.middleOrJuniorSchool,
+    highSchool: prop.highSchool,
+    modificationTimestamp: prop.modificationTimestamp,
   };
 }

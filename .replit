@@ -43,6 +43,10 @@ localPort = 41273
 externalPort = 3003
 
 [[ports]]
+localPort = 44545
+externalPort = 8008
+
+[[ports]]
 localPort = 44809
 externalPort = 4200
 
@@ -77,3 +81,8 @@ author = "agent"
 task = "shell.exec"
 args = "npm run dev"
 waitForPort = 5000
+
+[userenv]
+
+[userenv.shared]
+HOMEREVIEW_API_URL = "https://95f0a894-8940-4717-a771-851029450d05-00-3octfev6njpgb.spock.replit.dev"
