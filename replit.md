@@ -10,6 +10,12 @@ Preferred communication style: Simple, everyday language.
 
 ## Recent Changes
 
+### Clickable Property Cards & Real Data Detail Page (Dec 6, 2025)
+- **Navigation**: Property cards in Buyer Search are now clickable and navigate to the property detail page.
+- **Real Data**: PropertyDetailPage now fetches real property data from HomeReview API instead of using mock data.
+- **Route**: Clicking a property card navigates to `/properties/:listingId` which loads the full property details.
+- **Back Navigation**: Property detail page includes "Back to Search" button that returns to the buyer search with results preserved.
+
 ### Buyer Search Server-Side Filtering Fix (Dec 6, 2025)
 - **Issue**: HomeReview API wasn't filtering by postal code correctly, returning properties from wrong zip codes.
 - **Solution**: Applied server-side filtering for postal codes, cities, and subdivisions after fetching data from HomeReview.

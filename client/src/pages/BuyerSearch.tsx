@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { useLocation } from "wouter";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -25,7 +26,7 @@ import {
   AlertCircle,
 } from "lucide-react";
 import { PropertyCard } from "@/components/PropertyCard";
-import type { Property } from "@shared/schema";
+import type { Property, Media } from "@shared/schema";
 
 interface SearchFilters {
   // Status & Dates (independent toggles)
@@ -225,12 +226,28 @@ interface HomeReviewResponse {
 }
 
 export default function BuyerSearch() {
+  const [, setLocation] = useLocation();
   const [filters, setFilters] = useState<SearchFilters>({ statusActive: true });
   const [activeFiltersCount, setActiveFiltersCount] = useState(1);
   const [showFilters, setShowFilters] = useState(true);
   const [currentPage, setCurrentPage] = useState(0);
   const [searchTrigger, setSearchTrigger] = useState(0);
   const pageSize = 50;
+
+  const convertPhotosToMedia = (photos: string[], propertyId: string): Media[] => {
+    return photos.map((url, index) => ({
+      id: `photo-${propertyId}-${index}`,
+      mediaKey: `photo-${propertyId}-${index}`,
+      resourceRecordKey: propertyId,
+      mediaURL: url,
+      mediaCategory: 'Photo',
+      mediaType: 'image',
+      order: index,
+      caption: null,
+      modificationTimestamp: new Date(),
+      localPath: null,
+    }));
+  };
 
   // Use HomeReview as primary data source for all searches (better filtering support)
   // HomeReview has Active, Under Contract, and Closed listings
@@ -2513,8 +2530,13 @@ export default function BuyerSearch() {
             ) : properties && properties.length > 0 ? (
               <>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {properties.map((property) => (
-                    <PropertyCard key={property.id} property={property} />
+                  {properties.map((property: any) => (
+                    <PropertyCard 
+                      key={property.id} 
+                      property={property}
+                      media={property.photos?.length ? convertPhotosToMedia(property.photos, property.listingId || property.id) : undefined}
+                      onClick={() => setLocation(`/properties/${property.listingId || property.id}`)}
+                    />
                   ))}
                 </div>
                 {/* Pagination */}

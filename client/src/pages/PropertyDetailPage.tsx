@@ -1,72 +1,46 @@
-import { useRoute } from "wouter";
+import { useRoute, Link, useLocation } from "wouter";
 import { useEffect, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft } from "lucide-react";
-import { Link } from "wouter";
+import { ArrowLeft, Loader2 } from "lucide-react";
 import { PropertyDetail } from "@/components/PropertyDetail";
 import { useLeadGateContext } from "@/contexts/LeadGateContext";
 import type { Property, Media } from "@shared/schema";
 
 export default function PropertyDetailPage() {
   const [, params] = useRoute("/properties/:id");
+  const [, setLocation] = useLocation();
   const { trackPropertyView, gateEnabled } = useLeadGateContext();
   const [viewTracked, setViewTracked] = useState(false);
+  const listingId = params?.id;
+
+  const { data: property, isLoading, error } = useQuery<any>({
+    queryKey: ['/api/homereview/properties', listingId],
+    enabled: !!listingId,
+  });
 
   useEffect(() => {
-    if (!viewTracked && gateEnabled) {
+    if (!viewTracked && gateEnabled && property) {
       trackPropertyView().then(() => {
         setViewTracked(true);
       });
     }
-  }, [viewTracked, gateEnabled, trackPropertyView]);
-  
-  // Mock data - will be replaced with real data fetching in phase 3
-  const mockProperty: Property = {
-    id: params?.id || "1",
-    listingId: "12345",
-    mlgCanView: true,
-    modificationTimestamp: new Date(),
-    originatingSystemModificationTimestamp: new Date(),
-    listPrice: "450000",
-    standardStatus: "Active",
-    propertyType: "Residential",
-    propertySubType: "Single Family Residential",
-    unparsedAddress: "123 Main St, Austin, TX 78745",
-    streetNumber: "123",
-    streetName: "Main St",
-    city: "Austin",
-    stateOrProvince: "TX",
-    postalCode: "78745",
-    latitude: "30.2672",
-    longitude: "-97.7431",
-    bedroomsTotal: 3,
-    bathroomsTotalInteger: 2,
-    bathroomsFull: 2,
-    bathroomsHalf: 0,
-    livingArea: "1850",
-    lotSizeSquareFeet: "7500",
-    lotSizeAcres: "0.17",
-    yearBuilt: 1985,
-    daysOnMarket: 12,
-    listingContractDate: new Date(),
-    publicRemarks: "Beautiful home in a great neighborhood. Recently updated with modern finishes throughout. Spacious backyard perfect for entertaining. Close to schools, parks, and shopping.",
-    mlsId: "ACTRIS",
-    closeDate: null,
-    priceChangeTimestamp: null,
-    unitNumber: null,
-    subdivision: null,
-    neighborhood: "Hyde Park",
-    elementarySchool: "Pecan Springs Elementary",
-    middleOrJuniorSchool: "Martin Middle School",
-    highSchool: "Austin High School",
-    schoolDistrict: "Austin ISD",
-    mlsAreaMajor: null,
-    listAgentMlsId: null,
-    listOfficeMlsId: null,
-    additionalData: null,
-  };
+  }, [viewTracked, gateEnabled, trackPropertyView, property]);
 
-  const mockMedia: Media[] = [];
+  const convertPhotosToMedia = (photos: string[]): Media[] => {
+    return photos.map((url, index) => ({
+      id: `photo-${index}`,
+      mediaKey: `photo-${index}`,
+      resourceRecordKey: listingId || '',
+      mediaURL: url,
+      mediaCategory: 'Photo',
+      mediaType: 'image',
+      order: index,
+      caption: null,
+      modificationTimestamp: new Date(),
+      localPath: null,
+    }));
+  };
 
   const handleAddToCMA = () => {
     console.log("Add to CMA");
@@ -84,20 +58,57 @@ export default function PropertyDetailPage() {
     console.log("Schedule viewing");
   };
 
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+
+  if (error || !property) {
+    return (
+      <div className="space-y-6">
+        <div>
+          <Button 
+            variant="ghost" 
+            size="sm" 
+            className="mb-4" 
+            onClick={() => setLocation('/buyer-search')}
+            data-testid="button-back-to-search"
+          >
+            <ArrowLeft className="w-4 h-4 mr-2" />
+            Back to Search
+          </Button>
+        </div>
+        <div className="text-center py-12 text-muted-foreground">
+          <p>Property not found or failed to load.</p>
+          <p className="text-sm mt-2">Please try again or search for another property.</p>
+        </div>
+      </div>
+    );
+  }
+
+  const media = property.photos?.length ? convertPhotosToMedia(property.photos) : [];
+
   return (
     <div className="space-y-6">
       <div>
-        <Link href="/properties">
-          <Button variant="ghost" size="sm" className="mb-4" data-testid="button-back-to-properties">
-            <ArrowLeft className="w-4 h-4 mr-2" />
-            Back to Properties
-          </Button>
-        </Link>
+        <Button 
+          variant="ghost" 
+          size="sm" 
+          className="mb-4" 
+          onClick={() => setLocation('/buyer-search')}
+          data-testid="button-back-to-search"
+        >
+          <ArrowLeft className="w-4 h-4 mr-2" />
+          Back to Search
+        </Button>
       </div>
 
       <PropertyDetail
-        property={mockProperty}
-        media={mockMedia}
+        property={property as Property}
+        media={media}
         onAddToCMA={handleAddToCMA}
         onSave={handleSave}
         onShare={handleShare}
