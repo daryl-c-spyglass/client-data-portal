@@ -163,87 +163,23 @@ export class MLSGridClient {
   }): Promise<any> {
     await this.checkRateLimit();
 
-    const filters: string[] = [];
+    // MLS Grid API has limited filter field support
+    // Only use StandardStatus filter, then apply other filters server-side
+    const queryParams = new URLSearchParams();
     
     // Status filter (default to Active for IDX)
     if (params.standardStatus && params.standardStatus.length > 0) {
       const statusFilters = params.standardStatus.map(s => `StandardStatus eq '${s}'`);
-      filters.push(`(${statusFilters.join(' or ')})`);
+      queryParams.append('$filter', `(${statusFilters.join(' or ')})`);
     } else {
-      filters.push("StandardStatus eq 'Active'");
+      queryParams.append('$filter', "StandardStatus eq 'Active'");
     }
     
-    // Price filters
-    if (params.minListPrice) {
-      filters.push(`ListPrice ge ${params.minListPrice}`);
-    }
-    if (params.maxListPrice) {
-      filters.push(`ListPrice le ${params.maxListPrice}`);
-    }
+    // Fetch more results to allow for server-side filtering
+    // We'll fetch up to 200 and filter down to the requested limit
+    const fetchLimit = Math.min(200, (params.limit || 50) * 4);
+    queryParams.append('$top', fetchLimit.toString());
     
-    // Bedrooms
-    if (params.minBedroomsTotal) {
-      filters.push(`BedroomsTotal ge ${params.minBedroomsTotal}`);
-    }
-    if (params.maxBedroomsTotal) {
-      filters.push(`BedroomsTotal le ${params.maxBedroomsTotal}`);
-    }
-    
-    // Bathrooms
-    if (params.minBathroomsTotalInteger) {
-      filters.push(`BathroomsTotalInteger ge ${params.minBathroomsTotalInteger}`);
-    }
-    if (params.maxBathroomsTotalInteger) {
-      filters.push(`BathroomsTotalInteger le ${params.maxBathroomsTotalInteger}`);
-    }
-    
-    // Living area
-    if (params.minLivingArea) {
-      filters.push(`LivingArea ge ${params.minLivingArea}`);
-    }
-    if (params.maxLivingArea) {
-      filters.push(`LivingArea le ${params.maxLivingArea}`);
-    }
-    
-    // Year built
-    if (params.minYearBuilt) {
-      filters.push(`YearBuilt ge ${params.minYearBuilt}`);
-    }
-    if (params.maxYearBuilt) {
-      filters.push(`YearBuilt le ${params.maxYearBuilt}`);
-    }
-    
-    // Postal codes
-    if (params.postalCodes && params.postalCodes.length > 0) {
-      const postalFilters = params.postalCodes.map(z => `PostalCode eq '${z}'`);
-      filters.push(`(${postalFilters.join(' or ')})`);
-    }
-    
-    // Cities
-    if (params.cities && params.cities.length > 0) {
-      const cityFilters = params.cities.map(c => `City eq '${c}'`);
-      filters.push(`(${cityFilters.join(' or ')})`);
-    }
-    
-    // Subdivisions
-    if (params.subdivisions && params.subdivisions.length > 0) {
-      const subdivFilters = params.subdivisions.map(s => `SubdivisionName eq '${s}'`);
-      filters.push(`(${subdivFilters.join(' or ')})`);
-    }
-    
-    // Property sub type
-    if (params.propertySubType && params.propertySubType.length > 0) {
-      const typeFilters = params.propertySubType.map(t => `PropertySubType eq '${t}'`);
-      filters.push(`(${typeFilters.join(' or ')})`);
-    }
-
-    const queryParams = new URLSearchParams();
-    if (filters.length > 0) {
-      queryParams.append('$filter', filters.join(' and '));
-    }
-    if (params.limit) {
-      queryParams.append('$top', params.limit.toString());
-    }
     if (params.skip) {
       queryParams.append('$skip', params.skip.toString());
     }
@@ -255,7 +191,66 @@ export class MLSGridClient {
     
     try {
       const response = await this.client.get(`/Property?${queryParams.toString()}`);
-      return response.data;
+      let properties = response.data.value || [];
+      
+      // Apply filters server-side since MLS Grid API doesn't support them
+      properties = properties.filter((prop: any) => {
+        // Price filters
+        if (params.minListPrice && (prop.ListPrice || 0) < params.minListPrice) return false;
+        if (params.maxListPrice && (prop.ListPrice || Infinity) > params.maxListPrice) return false;
+        
+        // Bedrooms
+        if (params.minBedroomsTotal && (prop.BedroomsTotal || 0) < params.minBedroomsTotal) return false;
+        if (params.maxBedroomsTotal && (prop.BedroomsTotal || Infinity) > params.maxBedroomsTotal) return false;
+        
+        // Bathrooms
+        if (params.minBathroomsTotalInteger && (prop.BathroomsTotalInteger || 0) < params.minBathroomsTotalInteger) return false;
+        if (params.maxBathroomsTotalInteger && (prop.BathroomsTotalInteger || Infinity) > params.maxBathroomsTotalInteger) return false;
+        
+        // Living area
+        if (params.minLivingArea && (prop.LivingArea || 0) < params.minLivingArea) return false;
+        if (params.maxLivingArea && (prop.LivingArea || Infinity) > params.maxLivingArea) return false;
+        
+        // Year built
+        if (params.minYearBuilt && (prop.YearBuilt || 0) < params.minYearBuilt) return false;
+        if (params.maxYearBuilt && (prop.YearBuilt || Infinity) > params.maxYearBuilt) return false;
+        
+        // Postal codes
+        if (params.postalCodes && params.postalCodes.length > 0) {
+          if (!params.postalCodes.includes(prop.PostalCode)) return false;
+        }
+        
+        // Cities (case-insensitive)
+        if (params.cities && params.cities.length > 0) {
+          const propCity = (prop.City || '').toLowerCase();
+          if (!params.cities.some(c => c.toLowerCase() === propCity)) return false;
+        }
+        
+        // Subdivisions (case-insensitive partial match)
+        if (params.subdivisions && params.subdivisions.length > 0) {
+          const propSubdiv = (prop.SubdivisionName || '').toLowerCase();
+          if (!params.subdivisions.some(s => propSubdiv.includes(s.toLowerCase()))) return false;
+        }
+        
+        // Property sub type
+        if (params.propertySubType && params.propertySubType.length > 0) {
+          if (!params.propertySubType.includes(prop.PropertySubType)) return false;
+        }
+        
+        return true;
+      });
+      
+      // Apply limit after filtering
+      const limit = params.limit || 50;
+      const limitedProperties = properties.slice(0, limit);
+      
+      console.log(`[MLS Grid] Fetched ${response.data.value?.length || 0}, filtered to ${properties.length}, returning ${limitedProperties.length}`);
+      
+      return {
+        ...response.data,
+        value: limitedProperties,
+        '@odata.count': properties.length
+      };
     } catch (error: any) {
       console.error('[MLS Grid] API Error:', error.response?.status, error.response?.data);
       throw error;
