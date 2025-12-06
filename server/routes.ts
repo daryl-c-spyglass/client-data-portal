@@ -2,6 +2,7 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { createMLSGridClient } from "./mlsgrid-client";
+import { getHomeReviewClient, mapHomeReviewPropertyToSchema, type PropertySearchParams } from "./homereview-client";
 import { searchCriteriaSchema, insertCmaSchema, insertUserSchema, insertSellerUpdateSchema, updateSellerUpdateSchema, updateLeadGateSettingsSchema } from "@shared/schema";
 import { findMatchingProperties, calculateMarketSummary } from "./seller-update-service";
 import { z } from "zod";
@@ -690,11 +691,210 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ========== HomeReview API Integration Routes ==========
+  // These routes proxy requests to the HomeReview-AI app which contains
+  // all sold data from 1996-present and neighborhood boundaries
+  
+  const homeReviewClient = getHomeReviewClient();
+
+  // Search properties via HomeReview API (with sold data from 1996-present)
+  app.get("/api/homereview/properties", async (req, res) => {
+    try {
+      const params: PropertySearchParams = {
+        city: req.query.city as string,
+        cities: req.query.cities ? (Array.isArray(req.query.cities) ? req.query.cities as string[] : [req.query.cities as string]) : undefined,
+        subdivision: req.query.subdivision as string,
+        subdivisions: req.query.subdivisions ? (Array.isArray(req.query.subdivisions) ? req.query.subdivisions as string[] : [req.query.subdivisions as string]) : undefined,
+        status: req.query.status as string,
+        statuses: req.query.statuses ? (Array.isArray(req.query.statuses) ? req.query.statuses as string[] : [req.query.statuses as string]) : undefined,
+        minPrice: req.query.minPrice ? parseInt(req.query.minPrice as string) : undefined,
+        maxPrice: req.query.maxPrice ? parseInt(req.query.maxPrice as string) : undefined,
+        minBeds: req.query.minBeds ? parseInt(req.query.minBeds as string) : undefined,
+        maxBeds: req.query.maxBeds ? parseInt(req.query.maxBeds as string) : undefined,
+        minBaths: req.query.minBaths ? parseInt(req.query.minBaths as string) : undefined,
+        maxBaths: req.query.maxBaths ? parseInt(req.query.maxBaths as string) : undefined,
+        minSqft: req.query.minSqft ? parseInt(req.query.minSqft as string) : undefined,
+        maxSqft: req.query.maxSqft ? parseInt(req.query.maxSqft as string) : undefined,
+        minYearBuilt: req.query.minYearBuilt ? parseInt(req.query.minYearBuilt as string) : undefined,
+        maxYearBuilt: req.query.maxYearBuilt ? parseInt(req.query.maxYearBuilt as string) : undefined,
+        propertyTypes: req.query.propertyTypes ? (Array.isArray(req.query.propertyTypes) ? req.query.propertyTypes as string[] : [req.query.propertyTypes as string]) : undefined,
+        hasPool: req.query.hasPool === 'true' ? true : req.query.hasPool === 'false' ? false : undefined,
+        hasWaterfront: req.query.hasWaterfront === 'true' ? true : req.query.hasWaterfront === 'false' ? false : undefined,
+        hasView: req.query.hasView === 'true' ? true : req.query.hasView === 'false' ? false : undefined,
+        limit: req.query.limit ? parseInt(req.query.limit as string) : 50,
+        offset: req.query.offset ? parseInt(req.query.offset as string) : 0,
+        sortBy: req.query.sortBy as string,
+        sortOrder: req.query.sortOrder as 'asc' | 'desc',
+      };
+
+      const result = await homeReviewClient.searchProperties(params);
+      
+      // Map properties to our schema format
+      const mappedProperties = result.properties.map(mapHomeReviewPropertyToSchema);
+      
+      res.json({
+        properties: mappedProperties,
+        total: result.total,
+        hasMore: result.hasMore,
+        source: 'homereview',
+      });
+    } catch (error: any) {
+      console.error('HomeReview properties error:', error.message);
+      res.status(500).json({ error: 'Failed to fetch properties from HomeReview API' });
+    }
+  });
+
+  // Get single property from HomeReview API
+  app.get("/api/homereview/properties/:listingId", async (req, res) => {
+    try {
+      const property = await homeReviewClient.getProperty(req.params.listingId);
+      
+      if (!property) {
+        res.status(404).json({ error: 'Property not found' });
+        return;
+      }
+      
+      res.json(mapHomeReviewPropertyToSchema(property));
+    } catch (error: any) {
+      console.error('HomeReview property error:', error.message);
+      res.status(500).json({ error: 'Failed to fetch property from HomeReview API' });
+    }
+  });
+
+  // Get market statistics from HomeReview API
+  app.get("/api/homereview/stats", async (req, res) => {
+    try {
+      const subdivision = req.query.subdivision as string;
+      
+      if (!subdivision) {
+        res.status(400).json({ error: 'Subdivision is required' });
+        return;
+      }
+      
+      const stats = await homeReviewClient.getMarketStats(subdivision);
+      
+      if (!stats) {
+        res.status(404).json({ error: 'No statistics found for subdivision' });
+        return;
+      }
+      
+      res.json(stats);
+    } catch (error: any) {
+      console.error('HomeReview stats error:', error.message);
+      res.status(500).json({ error: 'Failed to fetch market statistics' });
+    }
+  });
+
+  // Neighborhood lookup by coordinates
+  app.get("/api/homereview/neighborhoods/lookup", async (req, res) => {
+    try {
+      const lat = parseFloat(req.query.lat as string);
+      const lon = parseFloat(req.query.lon as string);
+      
+      if (isNaN(lat) || isNaN(lon)) {
+        res.status(400).json({ error: 'Valid latitude and longitude are required' });
+        return;
+      }
+      
+      const neighborhood = await homeReviewClient.lookupNeighborhood(lat, lon);
+      
+      if (!neighborhood) {
+        res.status(404).json({ error: 'No neighborhood found at coordinates' });
+        return;
+      }
+      
+      res.json(neighborhood);
+    } catch (error: any) {
+      console.error('HomeReview neighborhood lookup error:', error.message);
+      res.status(500).json({ error: 'Failed to lookup neighborhood' });
+    }
+  });
+
+  // Search neighborhoods by name
+  app.get("/api/homereview/neighborhoods/search", async (req, res) => {
+    try {
+      const name = req.query.name as string;
+      const city = req.query.city as string;
+      
+      if (!name) {
+        res.status(400).json({ error: 'Name is required' });
+        return;
+      }
+      
+      const neighborhoods = await homeReviewClient.searchNeighborhoods(name, city);
+      res.json(neighborhoods);
+    } catch (error: any) {
+      console.error('HomeReview neighborhood search error:', error.message);
+      res.status(500).json({ error: 'Failed to search neighborhoods' });
+    }
+  });
+
+  // Get all neighborhoods in a city
+  app.get("/api/homereview/neighborhoods/city/:city", async (req, res) => {
+    try {
+      const neighborhoods = await homeReviewClient.getNeighborhoodsByCity(req.params.city);
+      res.json(neighborhoods);
+    } catch (error: any) {
+      console.error('HomeReview city neighborhoods error:', error.message);
+      res.status(500).json({ error: 'Failed to fetch city neighborhoods' });
+    }
+  });
+
+  // Get neighborhood GeoJSON for a city
+  app.get("/api/homereview/neighborhoods/geojson", async (req, res) => {
+    try {
+      const city = req.query.city as string;
+      
+      if (!city) {
+        res.status(400).json({ error: 'City is required' });
+        return;
+      }
+      
+      const geojson = await homeReviewClient.getNeighborhoodGeoJSON(city);
+      
+      if (!geojson) {
+        res.status(404).json({ error: 'No GeoJSON found for city' });
+        return;
+      }
+      
+      res.json(geojson);
+    } catch (error: any) {
+      console.error('HomeReview GeoJSON error:', error.message);
+      res.status(500).json({ error: 'Failed to fetch neighborhood GeoJSON' });
+    }
+  });
+
+  // Match MLS subdivision to neighborhood
+  app.get("/api/homereview/neighborhoods/match-mls", async (req, res) => {
+    try {
+      const subdivision = req.query.subdivision as string;
+      const city = req.query.city as string;
+      
+      if (!subdivision || !city) {
+        res.status(400).json({ error: 'Subdivision and city are required' });
+        return;
+      }
+      
+      const neighborhood = await homeReviewClient.matchMLSSubdivision(subdivision, city);
+      
+      if (!neighborhood) {
+        res.status(404).json({ error: 'No matching neighborhood found' });
+        return;
+      }
+      
+      res.json(neighborhood);
+    } catch (error: any) {
+      console.error('HomeReview MLS match error:', error.message);
+      res.status(500).json({ error: 'Failed to match MLS subdivision' });
+    }
+  });
+
   // Health check
   app.get("/api/health", (req, res) => {
     res.json({ 
       status: "ok", 
       mlsGridConfigured: mlsGridClient !== null,
+      homeReviewConfigured: true,
       timestamp: new Date().toISOString() 
     });
   });
