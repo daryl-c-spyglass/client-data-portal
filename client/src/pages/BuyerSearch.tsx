@@ -232,8 +232,11 @@ export default function BuyerSearch() {
   const [searchTrigger, setSearchTrigger] = useState(0);
   const pageSize = 50;
 
-  const useMLSGrid = filters.statusActive && !filters.statusClosed;
-  const useHomeReview = filters.statusClosed && !filters.statusActive;
+  // Use HomeReview as primary data source for all searches (better filtering support)
+  // HomeReview has Active, Under Contract, and Closed listings
+  // MLS Grid is only used as fallback when HomeReview is unavailable
+  const useHomeReview = true;
+  const useMLSGrid = false; // MLS Grid has limited filtering - only use as backup
 
   const buildMLSGridQueryString = () => {
     const params = new URLSearchParams();
@@ -398,9 +401,8 @@ export default function BuyerSearch() {
   const totalCount = useMLSGrid 
     ? (mlsGridResponse?.total || 0) 
     : (homeReviewResponse?.total || 0);
-  const isApiUnavailable = (useHomeReview && (healthStatus?.available === false || isError)) || 
-                           (useMLSGrid && mlsGridError);
-  const dataSource = useMLSGrid ? 'MLS Grid (IDX)' : 'HomeReview (Sold Data)';
+  const isApiUnavailable = healthStatus?.available === false || isError;
+  const dataSource = 'HomeReview (Active & Sold Data)';
 
   const updateFilter = (key: keyof SearchFilters, value: any) => {
     setFilters(prev => {

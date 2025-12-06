@@ -245,9 +245,11 @@ export class HomeReviewClient {
       if (params.minStories !== undefined) queryParams.append('minStories', params.minStories.toString());
       if (params.maxStories !== undefined) queryParams.append('maxStories', params.maxStories.toString());
 
-      if (params.postalCodes?.length) {
-        params.postalCodes.forEach(z => queryParams.append('postalCode', z));
-      }
+      // Note: Don't send postalCode to HomeReview API as it doesn't filter correctly
+      // We'll apply postal code filtering server-side after fetching results
+      // if (params.postalCodes?.length) {
+      //   params.postalCodes.forEach(z => queryParams.append('postalCode', z));
+      // }
       if (params.counties?.length) {
         params.counties.forEach(c => queryParams.append('county', c));
       }
@@ -274,6 +276,15 @@ export class HomeReviewClient {
       if (params.sortBy) queryParams.append('sortBy', params.sortBy);
       if (params.sortOrder) queryParams.append('sortOrder', params.sortOrder);
 
+      // Fetch more than requested to allow for server-side filtering
+      // since HomeReview API may not filter all location fields correctly
+      // If postal codes are specified, we need to fetch more to find matches
+      const hasLocationFilter = params.postalCodes?.length || params.cities?.length || params.subdivisions?.length;
+      const fetchLimit = hasLocationFilter 
+        ? Math.min(500, (params.limit || 50) * 10)  // Fetch more for location filtering
+        : Math.min(200, (params.limit || 50) * 4);
+      queryParams.set('limit', fetchLimit.toString());
+      
       console.log(`[HomeReview] Fetching properties: /api/mls/public/properties?${queryParams.toString()}`);
 
       const response = await this.client.get<HomeReviewPropertiesResponse>(
@@ -281,12 +292,39 @@ export class HomeReviewClient {
       );
 
       const data = response.data;
+      let properties = data.properties || [];
+      
+      // Apply server-side filtering for fields HomeReview API may not filter correctly
+      if (params.postalCodes?.length) {
+        properties = properties.filter(p => 
+          params.postalCodes!.includes(p.postalCode || '')
+        );
+      }
+      
+      if (params.cities?.length) {
+        const lowerCities = params.cities.map(c => c.toLowerCase());
+        properties = properties.filter(p => 
+          lowerCities.includes((p.city || '').toLowerCase())
+        );
+      }
+      
+      if (params.subdivisions?.length) {
+        const lowerSubdivs = params.subdivisions.map(s => s.toLowerCase());
+        properties = properties.filter(p => 
+          lowerSubdivs.some(s => (p.subdivisionName || '').toLowerCase().includes(s))
+        );
+      }
+      
+      // Apply requested limit after filtering
       const limit = params.limit || 50;
-      const hasMore = (data.offset + data.count) < data.total;
+      const limitedProperties = properties.slice(0, limit);
+      const hasMore = properties.length > limit || (data.offset + data.count) < data.total;
+      
+      console.log(`[HomeReview] Fetched ${data.properties?.length || 0}, filtered to ${properties.length}, returning ${limitedProperties.length}`);
 
       return {
-        properties: data.properties || [],
-        total: data.total || 0,
+        properties: limitedProperties,
+        total: properties.length,
         hasMore,
       };
     } catch (error: any) {

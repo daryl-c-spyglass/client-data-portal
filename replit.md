@@ -10,6 +10,13 @@ Preferred communication style: Simple, everyday language.
 
 ## Recent Changes
 
+### Buyer Search Server-Side Filtering Fix (Dec 6, 2025)
+- **Issue**: HomeReview API wasn't filtering by postal code correctly, returning properties from wrong zip codes.
+- **Solution**: Applied server-side filtering for postal codes, cities, and subdivisions after fetching data from HomeReview.
+- **Data Source**: Switched to HomeReview as primary data source for all searches (Active, Under Contract, Closed) since it has better filtering support than MLS Grid's limited OData API.
+- **MLS Grid Limitation**: MLS Grid OData API doesn't support filtering on many fields (ListPrice, BedroomsTotal, etc.), so it's only used as a fallback.
+- **Fetch Strategy**: When location filters are specified, fetch up to 500 properties and filter server-side to ensure accurate results.
+
 ### Shareable CMA Links with Security Hardening (Dec 6, 2025)
 - **Share Tokens**: Added ability to generate shareable links for CMAs that expire after 30 days.
 - **Public Route**: Created `/share/cma/:token` route for public viewing of shared CMAs without authentication.

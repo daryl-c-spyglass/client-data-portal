@@ -956,7 +956,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         hasWaterfront: req.query.hasWaterfront === 'true' ? true : req.query.hasWaterfront === 'false' ? false : undefined,
         hasView: req.query.hasView === 'true' ? true : req.query.hasView === 'false' ? false : undefined,
         minGarageSpaces: req.query.minGarageSpaces ? parseInt(req.query.minGarageSpaces as string) : undefined,
-        postalCodes: parseArray(req.query.postalCodes),
+        postalCodes: parseArray(req.query.postalCodes) || parseArray(req.query.postalCode),
         counties: parseArray(req.query.counties),
         elementarySchools: parseArray(req.query.elementarySchools),
         middleSchools: parseArray(req.query.middleSchools),
