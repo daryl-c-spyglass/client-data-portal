@@ -6,6 +6,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/AppSidebar";
 import { LeadGateProvider } from "@/contexts/LeadGateContext";
+import { SelectedPropertyProvider } from "@/contexts/SelectedPropertyContext";
 import NotFound from "@/pages/not-found";
 import Dashboard from "@/pages/Dashboard";
 import Properties from "@/pages/Properties";
@@ -54,7 +55,8 @@ export default function App() {
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
         <LeadGateProvider>
-          <Switch>
+          <SelectedPropertyProvider>
+            <Switch>
             {/* Embed route without sidebar */}
             <Route path="/embed/seller-update" component={SellerUpdateEmbed} />
             
@@ -83,6 +85,7 @@ export default function App() {
               </SidebarProvider>
             </Route>
           </Switch>
+          </SelectedPropertyProvider>
         </LeadGateProvider>
         <Toaster />
       </TooltipProvider>

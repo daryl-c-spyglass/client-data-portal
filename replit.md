@@ -12,9 +12,10 @@ Preferred communication style: Simple, everyday language.
 
 ### Clickable Property Cards & Real Data Detail Page (Dec 6, 2025)
 - **Navigation**: Property cards in Buyer Search are now clickable and navigate to the property detail page.
-- **Real Data**: PropertyDetailPage now fetches real property data from HomeReview API instead of using mock data.
-- **Route**: Clicking a property card navigates to `/properties/:listingId` which loads the full property details.
-- **Back Navigation**: Property detail page includes "Back to Search" button that returns to the buyer search with results preserved.
+- **Data Passing**: Property data is passed via React context (SelectedPropertyContext) instead of re-fetching from API, since HomeReview API doesn't support single-property lookups.
+- **Route**: Clicking a property card navigates to `/properties/:listingId` which displays the full property details.
+- **State Preservation**: Search state (results, filters, trigger) is saved to context before navigation, ensuring "Back to Search" restores results.
+- **Back Navigation**: Property detail page includes "Back to Search" button that returns to the buyer search with results fully preserved.
 
 ### Buyer Search Server-Side Filtering Fix (Dec 6, 2025)
 - **Issue**: HomeReview API wasn't filtering by postal code correctly, returning properties from wrong zip codes.

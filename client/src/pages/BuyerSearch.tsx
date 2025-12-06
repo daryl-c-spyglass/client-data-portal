@@ -26,6 +26,7 @@ import {
   AlertCircle,
 } from "lucide-react";
 import { PropertyCard } from "@/components/PropertyCard";
+import { useSelectedProperty } from "@/contexts/SelectedPropertyContext";
 import type { Property, Media } from "@shared/schema";
 
 interface SearchFilters {
@@ -227,11 +228,19 @@ interface HomeReviewResponse {
 
 export default function BuyerSearch() {
   const [, setLocation] = useLocation();
-  const [filters, setFilters] = useState<SearchFilters>({ statusActive: true });
-  const [activeFiltersCount, setActiveFiltersCount] = useState(1);
+  const { setSelectedProperty, searchState, setSearchState } = useSelectedProperty();
+  
+  const [filters, setFilters] = useState<SearchFilters>(() => 
+    searchState?.filters || { statusActive: true }
+  );
+  const [activeFiltersCount, setActiveFiltersCount] = useState(() => 
+    searchState?.searchTriggered ? Object.keys(searchState.filters || {}).filter(k => !k.endsWith('Mode') && searchState.filters[k]).length : 1
+  );
   const [showFilters, setShowFilters] = useState(true);
   const [currentPage, setCurrentPage] = useState(0);
-  const [searchTrigger, setSearchTrigger] = useState(0);
+  const [searchTrigger, setSearchTrigger] = useState(() => 
+    searchState?.searchTriggered ? 1 : 0
+  );
   const pageSize = 50;
 
   const convertPhotosToMedia = (photos: string[], propertyId: string): Media[] => {
@@ -2530,14 +2539,27 @@ export default function BuyerSearch() {
             ) : properties && properties.length > 0 ? (
               <>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {properties.map((property: any) => (
-                    <PropertyCard 
-                      key={property.id} 
-                      property={property}
-                      media={property.photos?.length ? convertPhotosToMedia(property.photos, property.listingId || property.id) : undefined}
-                      onClick={() => setLocation(`/properties/${property.listingId || property.id}`)}
-                    />
-                  ))}
+                  {properties.map((property: any) => {
+                    const propertyId = property.listingId || property.id;
+                    const media = property.photos?.length ? convertPhotosToMedia(property.photos, propertyId) : [];
+                    return (
+                      <PropertyCard 
+                        key={property.id} 
+                        property={property}
+                        media={media}
+                        onClick={() => {
+                          setSearchState({
+                            properties,
+                            totalCount,
+                            filters,
+                            searchTriggered: true
+                          });
+                          setSelectedProperty({ property, media });
+                          setLocation(`/properties/${propertyId}`);
+                        }}
+                      />
+                    );
+                  })}
                 </div>
                 {/* Pagination */}
                 {totalCount > pageSize && (

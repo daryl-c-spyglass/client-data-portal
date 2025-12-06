@@ -1,46 +1,27 @@
-import { useRoute, Link, useLocation } from "wouter";
+import { useRoute, useLocation } from "wouter";
 import { useEffect, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft, Loader2 } from "lucide-react";
 import { PropertyDetail } from "@/components/PropertyDetail";
 import { useLeadGateContext } from "@/contexts/LeadGateContext";
+import { useSelectedProperty } from "@/contexts/SelectedPropertyContext";
 import type { Property, Media } from "@shared/schema";
 
 export default function PropertyDetailPage() {
   const [, params] = useRoute("/properties/:id");
   const [, setLocation] = useLocation();
   const { trackPropertyView, gateEnabled } = useLeadGateContext();
+  const { selectedProperty } = useSelectedProperty();
   const [viewTracked, setViewTracked] = useState(false);
   const listingId = params?.id;
 
-  const { data: property, isLoading, error } = useQuery<any>({
-    queryKey: ['/api/homereview/properties', listingId],
-    enabled: !!listingId,
-  });
-
   useEffect(() => {
-    if (!viewTracked && gateEnabled && property) {
+    if (!viewTracked && gateEnabled && selectedProperty) {
       trackPropertyView().then(() => {
         setViewTracked(true);
       });
     }
-  }, [viewTracked, gateEnabled, trackPropertyView, property]);
-
-  const convertPhotosToMedia = (photos: string[]): Media[] => {
-    return photos.map((url, index) => ({
-      id: `photo-${index}`,
-      mediaKey: `photo-${index}`,
-      resourceRecordKey: listingId || '',
-      mediaURL: url,
-      mediaCategory: 'Photo',
-      mediaType: 'image',
-      order: index,
-      caption: null,
-      modificationTimestamp: new Date(),
-      localPath: null,
-    }));
-  };
+  }, [viewTracked, gateEnabled, trackPropertyView, selectedProperty]);
 
   const handleAddToCMA = () => {
     console.log("Add to CMA");
@@ -58,15 +39,7 @@ export default function PropertyDetailPage() {
     console.log("Schedule viewing");
   };
 
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center min-h-[400px]">
-        <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
-      </div>
-    );
-  }
-
-  if (error || !property) {
+  if (!selectedProperty) {
     return (
       <div className="space-y-6">
         <div>
@@ -82,14 +55,14 @@ export default function PropertyDetailPage() {
           </Button>
         </div>
         <div className="text-center py-12 text-muted-foreground">
-          <p>Property not found or failed to load.</p>
-          <p className="text-sm mt-2">Please try again or search for another property.</p>
+          <p>Property data not available.</p>
+          <p className="text-sm mt-2">Please search for properties and click on a property card to view details.</p>
         </div>
       </div>
     );
   }
 
-  const media = property.photos?.length ? convertPhotosToMedia(property.photos) : [];
+  const { property, media } = selectedProperty;
 
   return (
     <div className="space-y-6">
