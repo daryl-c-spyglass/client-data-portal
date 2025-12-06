@@ -10,6 +10,13 @@ Preferred communication style: Simple, everyday language.
 
 ## Recent Changes
 
+### Shareable CMA Links with Security Hardening (Dec 6, 2025)
+- **Share Tokens**: Added ability to generate shareable links for CMAs that expire after 30 days.
+- **Public Route**: Created `/share/cma/:token` route for public viewing of shared CMAs without authentication.
+- **Security**: Share endpoints require authentication and ownership verification. Only CMA owners can generate/revoke share links.
+- **Sanitized Response**: Public CMA view excludes internal notes and user IDs to protect sensitive agent information.
+- **UI**: CMADetailPage now includes a Share dialog with copy-to-clipboard functionality and link management.
+
 ### HomeReview API Integration (Dec 6, 2025)
 - **New Data Source**: Replaced direct MLS Grid API with HomeReview-AI Replit app as the primary data source.
 - **API Client**: Created `server/homereview-client.ts` to fetch properties, neighborhoods, and market stats from the HomeReview API.
