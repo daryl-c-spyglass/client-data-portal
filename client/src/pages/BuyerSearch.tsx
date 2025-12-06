@@ -225,11 +225,50 @@ interface HomeReviewResponse {
 }
 
 export default function BuyerSearch() {
-  const [filters, setFilters] = useState<SearchFilters>({});
-  const [activeFiltersCount, setActiveFiltersCount] = useState(0);
+  const [filters, setFilters] = useState<SearchFilters>({ statusActive: true });
+  const [activeFiltersCount, setActiveFiltersCount] = useState(1);
   const [showFilters, setShowFilters] = useState(true);
   const [currentPage, setCurrentPage] = useState(0);
+  const [searchTrigger, setSearchTrigger] = useState(0);
   const pageSize = 50;
+
+  const useMLSGrid = filters.statusActive && !filters.statusClosed;
+  const useHomeReview = filters.statusClosed && !filters.statusActive;
+
+  const buildMLSGridQueryString = () => {
+    const params = new URLSearchParams();
+    
+    if (filters.statusActive) params.append('standardStatus', 'Active');
+    if (filters.statusUnderContract) params.append('standardStatus', 'Under Contract');
+    if (filters.statusClosed) params.append('standardStatus', 'Closed');
+    
+    if (filters.minPrice) params.set('minListPrice', String(filters.minPrice));
+    if (filters.maxPrice) params.set('maxListPrice', String(filters.maxPrice));
+    
+    if (filters.minBeds) params.set('minBedroomsTotal', String(filters.minBeds));
+    if (filters.maxBeds) params.set('maxBedroomsTotal', String(filters.maxBeds));
+    if (filters.minTotalBaths) params.set('minBathroomsTotalInteger', String(filters.minTotalBaths));
+    if (filters.maxTotalBaths) params.set('maxBathroomsTotalInteger', String(filters.maxTotalBaths));
+    
+    if (filters.minLivingArea) params.set('livingArea.min', String(filters.minLivingArea));
+    if (filters.maxLivingArea) params.set('livingArea.max', String(filters.maxLivingArea));
+    
+    if (filters.minYearBuilt) params.set('yearBuilt.min', String(filters.minYearBuilt));
+    if (filters.maxYearBuilt) params.set('yearBuilt.max', String(filters.maxYearBuilt));
+    
+    if (filters.city) {
+      filters.city.split(',').map(c => c.trim()).filter(c => c).forEach(c => params.append('cities', c));
+    }
+    if (filters.subdivision) {
+      filters.subdivision.split(',').map(s => s.trim()).filter(s => s).forEach(s => params.append('subdivisions', s));
+    }
+    if (filters.postalCode) {
+      filters.postalCode.split(',').map(z => z.trim()).filter(z => z).forEach(z => params.append('zipCodes', z));
+    }
+    if (filters.propertySubType) params.append('propertySubType', filters.propertySubType);
+    
+    return params.toString();
+  };
 
   const buildHomeReviewQueryString = () => {
     const params = new URLSearchParams();
@@ -314,8 +353,11 @@ export default function BuyerSearch() {
     return params.toString();
   };
 
-  const queryString = buildHomeReviewQueryString();
-  const fullQueryString = `${queryString}${queryString ? '&' : ''}limit=${pageSize}&offset=${currentPage * pageSize}`;
+  const mlsGridQueryString = buildMLSGridQueryString();
+  const homeReviewQueryString = buildHomeReviewQueryString();
+  
+  const mlsGridFullQuery = `${mlsGridQueryString}${mlsGridQueryString ? '&' : ''}limit=${pageSize}&offset=${currentPage * pageSize}`;
+  const homeReviewFullQuery = `${homeReviewQueryString}${homeReviewQueryString ? '&' : ''}limit=${pageSize}&offset=${currentPage * pageSize}`;
   
   const { data: healthStatus } = useQuery<{ available: boolean; message: string }>({
     queryKey: ['/api/homereview/health'],
@@ -325,22 +367,40 @@ export default function BuyerSearch() {
     },
     refetchInterval: 60000,
     staleTime: 30000,
+    enabled: useHomeReview,
   });
 
-  const { data: response, isLoading, isError, refetch } = useQuery<HomeReviewResponse>({
-    queryKey: ['/api/homereview/properties', fullQueryString],
+  const { data: mlsGridResponse, isLoading: mlsGridLoading, refetch: refetchMLSGrid } = useQuery<Property[]>({
+    queryKey: ['/api/properties/search', mlsGridFullQuery, searchTrigger],
     queryFn: async () => {
-      const res = await fetch(`/api/homereview/properties?${fullQueryString}`);
+      const res = await fetch(`/api/properties/search?${mlsGridFullQuery}`);
       if (!res.ok) throw new Error('Failed to search properties');
       return res.json();
     },
-    enabled: Object.keys(filters).length > 0,
+    enabled: useMLSGrid && searchTrigger > 0,
+    retry: 1,
+  });
+
+  const { data: homeReviewResponse, isLoading: homeReviewLoading, isError, refetch: refetchHomeReview } = useQuery<HomeReviewResponse>({
+    queryKey: ['/api/homereview/properties', homeReviewFullQuery, searchTrigger],
+    queryFn: async () => {
+      const res = await fetch(`/api/homereview/properties?${homeReviewFullQuery}`);
+      if (!res.ok) throw new Error('Failed to search properties');
+      return res.json();
+    },
+    enabled: useHomeReview && searchTrigger > 0,
     retry: 1,
   });
   
-  const properties = response?.properties || [];
-  const totalCount = response?.total || 0;
-  const isApiUnavailable = healthStatus?.available === false || isError;
+  const isLoading = mlsGridLoading || homeReviewLoading;
+  const properties = useMLSGrid 
+    ? (mlsGridResponse || []) 
+    : (homeReviewResponse?.properties || []);
+  const totalCount = useMLSGrid 
+    ? (mlsGridResponse?.length || 0) 
+    : (homeReviewResponse?.total || 0);
+  const isApiUnavailable = useHomeReview && (healthStatus?.available === false || isError);
+  const dataSource = useMLSGrid ? 'MLS Grid (IDX)' : 'HomeReview (Sold Data)';
 
   const updateFilter = (key: keyof SearchFilters, value: any) => {
     setFilters(prev => {
@@ -365,12 +425,14 @@ export default function BuyerSearch() {
   };
 
   const clearAllFilters = () => {
-    setFilters({});
-    setActiveFiltersCount(0);
+    setFilters({ statusActive: true });
+    setActiveFiltersCount(1);
+    setSearchTrigger(0);
   };
 
   const handleSearch = () => {
-    refetch();
+    setCurrentPage(0);
+    setSearchTrigger(prev => prev + 1);
   };
 
   return (
@@ -2399,15 +2461,22 @@ export default function BuyerSearch() {
         {/* Results Panel */}
         <Card className={showFilters ? "xl:col-span-2" : "xl:col-span-3"}>
           <CardHeader>
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between flex-wrap gap-2">
               <div>
-                <CardTitle>Search Results</CardTitle>
+                <CardTitle className="flex items-center gap-2">
+                  Search Results
+                  {searchTrigger > 0 && (
+                    <Badge variant="outline" className="text-xs font-normal">
+                      {dataSource}
+                    </Badge>
+                  )}
+                </CardTitle>
                 <CardDescription>
                   {totalCount > 0 
                     ? `Found ${totalCount.toLocaleString()} properties (showing ${properties.length} on page ${currentPage + 1})`
-                    : activeFiltersCount > 0 
-                      ? 'Click Search to find properties' 
-                      : 'Configure filters and click Search'
+                    : searchTrigger === 0
+                      ? 'Click "Search Properties" to search'
+                      : 'No properties found - try adjusting filters'
                   }
                 </CardDescription>
               </div>
@@ -2471,11 +2540,11 @@ export default function BuyerSearch() {
                   </div>
                 )}
               </>
-            ) : activeFiltersCount > 0 ? (
+            ) : searchTrigger > 0 ? (
               <div className="text-center py-12 text-muted-foreground">
                 <Filter className="w-12 h-12 mx-auto mb-4 opacity-50" />
                 <p>No properties found matching your criteria.</p>
-                <p className="text-sm mt-2">Try adjusting your filters.</p>
+                <p className="text-sm mt-2">Try adjusting your filters or changing the status filter.</p>
               </div>
             ) : (
               <div className="text-center py-12 text-muted-foreground">
