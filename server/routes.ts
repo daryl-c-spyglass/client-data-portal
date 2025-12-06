@@ -802,6 +802,108 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // MLS Grid direct search endpoint (real-time Active listings from IDX)
+  app.get("/api/mlsgrid/search", async (req, res) => {
+    try {
+      if (!mlsGridClient) {
+        res.status(503).json({ 
+          error: "MLS Grid API not configured",
+          properties: [],
+          total: 0 
+        });
+        return;
+      }
+
+      const parseArray = (val: any): string[] | undefined => {
+        if (!val) return undefined;
+        return Array.isArray(val) ? val as string[] : [val as string];
+      };
+
+      const params = {
+        standardStatus: parseArray(req.query.standardStatus) || ['Active'],
+        minListPrice: req.query.minListPrice ? parseInt(req.query.minListPrice as string) : undefined,
+        maxListPrice: req.query.maxListPrice ? parseInt(req.query.maxListPrice as string) : undefined,
+        minBedroomsTotal: req.query.minBedroomsTotal ? parseInt(req.query.minBedroomsTotal as string) : undefined,
+        maxBedroomsTotal: req.query.maxBedroomsTotal ? parseInt(req.query.maxBedroomsTotal as string) : undefined,
+        minBathroomsTotalInteger: req.query.minBathroomsTotalInteger ? parseInt(req.query.minBathroomsTotalInteger as string) : undefined,
+        maxBathroomsTotalInteger: req.query.maxBathroomsTotalInteger ? parseInt(req.query.maxBathroomsTotalInteger as string) : undefined,
+        minLivingArea: req.query.minLivingArea ? parseInt(req.query.minLivingArea as string) : undefined,
+        maxLivingArea: req.query.maxLivingArea ? parseInt(req.query.maxLivingArea as string) : undefined,
+        minYearBuilt: req.query.minYearBuilt ? parseInt(req.query.minYearBuilt as string) : undefined,
+        maxYearBuilt: req.query.maxYearBuilt ? parseInt(req.query.maxYearBuilt as string) : undefined,
+        postalCodes: parseArray(req.query.postalCodes) || parseArray(req.query.zipCodes),
+        cities: parseArray(req.query.cities),
+        subdivisions: parseArray(req.query.subdivisions),
+        propertySubType: parseArray(req.query.propertySubType),
+        limit: req.query.limit ? parseInt(req.query.limit as string) : 50,
+        skip: req.query.offset ? parseInt(req.query.offset as string) : 0,
+      };
+
+      console.log('[MLS Grid Search] Params:', JSON.stringify(params, null, 2));
+
+      const result = await mlsGridClient.searchProperties(params);
+      
+      // Map MLS Grid response to our property format
+      const properties = (result.value || []).map((prop: any) => ({
+        id: prop.ListingId || prop.ListingKey,
+        listingId: prop.ListingId,
+        listingKey: prop.ListingKey,
+        standardStatus: prop.StandardStatus,
+        listPrice: prop.ListPrice,
+        closePrice: prop.ClosePrice,
+        originalListPrice: prop.OriginalListPrice,
+        streetNumber: prop.StreetNumber,
+        streetName: prop.StreetName,
+        streetSuffix: prop.StreetSuffix,
+        unitNumber: prop.UnitNumber,
+        city: prop.City,
+        stateOrProvince: prop.StateOrProvince,
+        postalCode: prop.PostalCode,
+        county: prop.CountyOrParish,
+        subdivision: prop.SubdivisionName,
+        propertyType: prop.PropertyType,
+        propertySubType: prop.PropertySubType,
+        bedroomsTotal: prop.BedroomsTotal,
+        bathroomsTotalInteger: prop.BathroomsTotalInteger,
+        bathroomsFull: prop.BathroomsFull,
+        bathroomsHalf: prop.BathroomsHalf,
+        livingArea: prop.LivingArea,
+        lotSizeSquareFeet: prop.LotSizeSquareFeet,
+        lotSizeAcres: prop.LotSizeAcres,
+        yearBuilt: prop.YearBuilt,
+        garageSpaces: prop.GarageSpaces,
+        stories: prop.Stories,
+        poolPrivateYN: prop.PoolPrivateYN,
+        waterfrontYN: prop.WaterfrontYN,
+        view: prop.View,
+        publicRemarks: prop.PublicRemarks,
+        listAgentFullName: prop.ListAgentFullName,
+        listOfficeName: prop.ListOfficeName,
+        daysOnMarket: prop.DaysOnMarket,
+        listingContractDate: prop.ListingContractDate,
+        closeDate: prop.CloseDate,
+        media: prop.Media || [],
+        latitude: prop.Latitude,
+        longitude: prop.Longitude,
+      }));
+
+      res.json({
+        properties,
+        total: result['@odata.count'] || properties.length,
+        hasMore: properties.length === params.limit,
+        source: 'MLS Grid IDX',
+      });
+    } catch (error: any) {
+      console.error('[MLS Grid Search] Error:', error.message);
+      res.status(500).json({ 
+        error: "Failed to search MLS Grid",
+        message: error.message,
+        properties: [],
+        total: 0 
+      });
+    }
+  });
+
   // ========== HomeReview API Integration Routes ==========
   // These routes proxy requests to the HomeReview-AI app which contains
   // all sold data from 1996-present and neighborhood boundaries

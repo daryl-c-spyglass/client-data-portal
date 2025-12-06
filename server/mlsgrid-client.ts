@@ -141,6 +141,126 @@ export class MLSGridClient {
       }
     }
   }
+
+  async searchProperties(params: {
+    standardStatus?: string[];
+    minListPrice?: number;
+    maxListPrice?: number;
+    minBedroomsTotal?: number;
+    maxBedroomsTotal?: number;
+    minBathroomsTotalInteger?: number;
+    maxBathroomsTotalInteger?: number;
+    minLivingArea?: number;
+    maxLivingArea?: number;
+    minYearBuilt?: number;
+    maxYearBuilt?: number;
+    postalCodes?: string[];
+    cities?: string[];
+    subdivisions?: string[];
+    propertySubType?: string[];
+    limit?: number;
+    skip?: number;
+  }): Promise<any> {
+    await this.checkRateLimit();
+
+    const filters: string[] = [];
+    
+    // Status filter (default to Active for IDX)
+    if (params.standardStatus && params.standardStatus.length > 0) {
+      const statusFilters = params.standardStatus.map(s => `StandardStatus eq '${s}'`);
+      filters.push(`(${statusFilters.join(' or ')})`);
+    } else {
+      filters.push("StandardStatus eq 'Active'");
+    }
+    
+    // Price filters
+    if (params.minListPrice) {
+      filters.push(`ListPrice ge ${params.minListPrice}`);
+    }
+    if (params.maxListPrice) {
+      filters.push(`ListPrice le ${params.maxListPrice}`);
+    }
+    
+    // Bedrooms
+    if (params.minBedroomsTotal) {
+      filters.push(`BedroomsTotal ge ${params.minBedroomsTotal}`);
+    }
+    if (params.maxBedroomsTotal) {
+      filters.push(`BedroomsTotal le ${params.maxBedroomsTotal}`);
+    }
+    
+    // Bathrooms
+    if (params.minBathroomsTotalInteger) {
+      filters.push(`BathroomsTotalInteger ge ${params.minBathroomsTotalInteger}`);
+    }
+    if (params.maxBathroomsTotalInteger) {
+      filters.push(`BathroomsTotalInteger le ${params.maxBathroomsTotalInteger}`);
+    }
+    
+    // Living area
+    if (params.minLivingArea) {
+      filters.push(`LivingArea ge ${params.minLivingArea}`);
+    }
+    if (params.maxLivingArea) {
+      filters.push(`LivingArea le ${params.maxLivingArea}`);
+    }
+    
+    // Year built
+    if (params.minYearBuilt) {
+      filters.push(`YearBuilt ge ${params.minYearBuilt}`);
+    }
+    if (params.maxYearBuilt) {
+      filters.push(`YearBuilt le ${params.maxYearBuilt}`);
+    }
+    
+    // Postal codes
+    if (params.postalCodes && params.postalCodes.length > 0) {
+      const postalFilters = params.postalCodes.map(z => `PostalCode eq '${z}'`);
+      filters.push(`(${postalFilters.join(' or ')})`);
+    }
+    
+    // Cities
+    if (params.cities && params.cities.length > 0) {
+      const cityFilters = params.cities.map(c => `City eq '${c}'`);
+      filters.push(`(${cityFilters.join(' or ')})`);
+    }
+    
+    // Subdivisions
+    if (params.subdivisions && params.subdivisions.length > 0) {
+      const subdivFilters = params.subdivisions.map(s => `SubdivisionName eq '${s}'`);
+      filters.push(`(${subdivFilters.join(' or ')})`);
+    }
+    
+    // Property sub type
+    if (params.propertySubType && params.propertySubType.length > 0) {
+      const typeFilters = params.propertySubType.map(t => `PropertySubType eq '${t}'`);
+      filters.push(`(${typeFilters.join(' or ')})`);
+    }
+
+    const queryParams = new URLSearchParams();
+    if (filters.length > 0) {
+      queryParams.append('$filter', filters.join(' and '));
+    }
+    if (params.limit) {
+      queryParams.append('$top', params.limit.toString());
+    }
+    if (params.skip) {
+      queryParams.append('$skip', params.skip.toString());
+    }
+    
+    // Order by modification timestamp (most recently modified first)
+    queryParams.append('$orderby', 'ModificationTimestamp desc');
+
+    console.log('[MLS Grid] Search query:', queryParams.toString());
+    
+    try {
+      const response = await this.client.get(`/Property?${queryParams.toString()}`);
+      return response.data;
+    } catch (error: any) {
+      console.error('[MLS Grid] API Error:', error.response?.status, error.response?.data);
+      throw error;
+    }
+  }
 }
 
 export function createMLSGridClient(): MLSGridClient | null {

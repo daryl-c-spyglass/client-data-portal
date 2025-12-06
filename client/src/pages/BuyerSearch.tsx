@@ -240,7 +240,6 @@ export default function BuyerSearch() {
     
     if (filters.statusActive) params.append('standardStatus', 'Active');
     if (filters.statusUnderContract) params.append('standardStatus', 'Under Contract');
-    if (filters.statusClosed) params.append('standardStatus', 'Closed');
     
     if (filters.minPrice) params.set('minListPrice', String(filters.minPrice));
     if (filters.maxPrice) params.set('maxListPrice', String(filters.maxPrice));
@@ -250,11 +249,11 @@ export default function BuyerSearch() {
     if (filters.minTotalBaths) params.set('minBathroomsTotalInteger', String(filters.minTotalBaths));
     if (filters.maxTotalBaths) params.set('maxBathroomsTotalInteger', String(filters.maxTotalBaths));
     
-    if (filters.minLivingArea) params.set('livingArea.min', String(filters.minLivingArea));
-    if (filters.maxLivingArea) params.set('livingArea.max', String(filters.maxLivingArea));
+    if (filters.minLivingArea) params.set('minLivingArea', String(filters.minLivingArea));
+    if (filters.maxLivingArea) params.set('maxLivingArea', String(filters.maxLivingArea));
     
-    if (filters.minYearBuilt) params.set('yearBuilt.min', String(filters.minYearBuilt));
-    if (filters.maxYearBuilt) params.set('yearBuilt.max', String(filters.maxYearBuilt));
+    if (filters.minYearBuilt) params.set('minYearBuilt', String(filters.minYearBuilt));
+    if (filters.maxYearBuilt) params.set('maxYearBuilt', String(filters.maxYearBuilt));
     
     if (filters.city) {
       filters.city.split(',').map(c => c.trim()).filter(c => c).forEach(c => params.append('cities', c));
@@ -263,7 +262,7 @@ export default function BuyerSearch() {
       filters.subdivision.split(',').map(s => s.trim()).filter(s => s).forEach(s => params.append('subdivisions', s));
     }
     if (filters.postalCode) {
-      filters.postalCode.split(',').map(z => z.trim()).filter(z => z).forEach(z => params.append('zipCodes', z));
+      filters.postalCode.split(',').map(z => z.trim()).filter(z => z).forEach(z => params.append('postalCodes', z));
     }
     if (filters.propertySubType) params.append('propertySubType', filters.propertySubType);
     
@@ -370,11 +369,11 @@ export default function BuyerSearch() {
     enabled: useHomeReview,
   });
 
-  const { data: mlsGridResponse, isLoading: mlsGridLoading, refetch: refetchMLSGrid } = useQuery<Property[]>({
-    queryKey: ['/api/properties/search', mlsGridFullQuery, searchTrigger],
+  const { data: mlsGridResponse, isLoading: mlsGridLoading, isError: mlsGridError, refetch: refetchMLSGrid } = useQuery<HomeReviewResponse>({
+    queryKey: ['/api/mlsgrid/search', mlsGridFullQuery, searchTrigger],
     queryFn: async () => {
-      const res = await fetch(`/api/properties/search?${mlsGridFullQuery}`);
-      if (!res.ok) throw new Error('Failed to search properties');
+      const res = await fetch(`/api/mlsgrid/search?${mlsGridFullQuery}`);
+      if (!res.ok) throw new Error('Failed to search MLS Grid');
       return res.json();
     },
     enabled: useMLSGrid && searchTrigger > 0,
@@ -394,12 +393,13 @@ export default function BuyerSearch() {
   
   const isLoading = mlsGridLoading || homeReviewLoading;
   const properties = useMLSGrid 
-    ? (mlsGridResponse || []) 
+    ? (mlsGridResponse?.properties || []) 
     : (homeReviewResponse?.properties || []);
   const totalCount = useMLSGrid 
-    ? (mlsGridResponse?.length || 0) 
+    ? (mlsGridResponse?.total || 0) 
     : (homeReviewResponse?.total || 0);
-  const isApiUnavailable = useHomeReview && (healthStatus?.available === false || isError);
+  const isApiUnavailable = (useHomeReview && (healthStatus?.available === false || isError)) || 
+                           (useMLSGrid && mlsGridError);
   const dataSource = useMLSGrid ? 'MLS Grid (IDX)' : 'HomeReview (Sold Data)';
 
   const updateFilter = (key: keyof SearchFilters, value: any) => {
