@@ -1,14 +1,21 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
-import { X, Plus, TrendingUp } from "lucide-react";
-import { PropertyCard } from "./PropertyCard";
-import type { Property, Media } from "@shared/schema";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { X, Plus, TrendingUp, Search, Loader2, AlertCircle, Home } from "lucide-react";
+import type { Property } from "@shared/schema";
+
+interface HomeReviewResponse {
+  properties: Property[];
+  total: number;
+  hasMore: boolean;
+  source: string;
+}
 
 interface CMABuilderProps {
   onCreateCMA: (data: {
@@ -23,15 +30,42 @@ export function CMABuilder({ onCreateCMA }: CMABuilderProps) {
   const [subjectProperty, setSubjectProperty] = useState<Property | null>(null);
   const [comparables, setComparables] = useState<Property[]>([]);
   
-  // Fetch available properties from backend
-  const { data: searchResults = [] } = useQuery<Property[]>({
-    queryKey: ['/api/properties'],
+  const [searchCity, setSearchCity] = useState("");
+  const [searchSubdivision, setSearchSubdivision] = useState("");
+  const [searchMinBeds, setSearchMinBeds] = useState("");
+  const [searchMaxPrice, setSearchMaxPrice] = useState("");
+  const [searchStatus, setSearchStatus] = useState("Closed");
+  const [searchEnabled, setSearchEnabled] = useState(false);
+
+  const buildSearchQuery = () => {
+    const params = new URLSearchParams();
+    if (searchStatus) params.append('statuses', searchStatus);
+    if (searchCity) params.append('cities', searchCity.trim());
+    if (searchSubdivision) params.append('subdivisions', searchSubdivision.trim());
+    if (searchMinBeds) params.set('minBeds', searchMinBeds);
+    if (searchMaxPrice) params.set('maxPrice', searchMaxPrice);
+    params.set('limit', '20');
+    return params.toString();
+  };
+
+  const { data: searchResponse, isLoading, isError, error, refetch } = useQuery<HomeReviewResponse>({
+    queryKey: ['/api/homereview/properties', buildSearchQuery()],
     queryFn: async () => {
-      const response = await fetch('/api/properties');
-      if (!response.ok) throw new Error('Failed to fetch properties');
-      return response.json();
+      const res = await fetch(`/api/homereview/properties?${buildSearchQuery()}`);
+      if (!res.ok) throw new Error('Failed to search properties');
+      return res.json();
     },
+    enabled: searchEnabled,
+    retry: 1,
   });
+
+  const searchResults = searchResponse?.properties || [];
+  const totalResults = searchResponse?.total || 0;
+
+  const handleSearch = () => {
+    setSearchEnabled(true);
+    refetch();
+  };
 
   const handleAddComparable = (property: Property) => {
     if (comparables.length < 6 && !comparables.find(p => p.id === property.id)) {
@@ -57,12 +91,31 @@ export function CMABuilder({ onCreateCMA }: CMABuilderProps) {
     }
   };
 
+  const formatPrice = (price: string | number | null | undefined) => {
+    if (!price) return 'N/A';
+    return `$${Number(price).toLocaleString()}`;
+  };
+
+  const getPriceDisplay = (property: Property) => {
+    if (property.standardStatus === 'Closed' && property.closePrice) {
+      return formatPrice(property.closePrice);
+    }
+    return formatPrice(property.listPrice);
+  };
+
+  const getPriceLabel = (property: Property) => {
+    if (property.standardStatus === 'Closed' && property.closePrice) {
+      return 'Sold';
+    }
+    return 'List';
+  };
+
   return (
     <div className="space-y-6">
-      {/* CMA Name */}
       <Card>
         <CardHeader>
           <CardTitle>CMA Information</CardTitle>
+          <CardDescription>Name your Comparative Market Analysis</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="space-y-2">
@@ -78,9 +131,93 @@ export function CMABuilder({ onCreateCMA }: CMABuilderProps) {
         </CardContent>
       </Card>
 
-      {/* Three-panel layout */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Search className="w-5 h-5" />
+            Search Properties
+          </CardTitle>
+          <CardDescription>
+            Find comparable properties from the HomeReview database (83,335+ properties)
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+            <div className="space-y-2">
+              <Label>City</Label>
+              <Input
+                placeholder="e.g., Austin"
+                value={searchCity}
+                onChange={(e) => setSearchCity(e.target.value)}
+                data-testid="input-search-city"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Subdivision</Label>
+              <Input
+                placeholder="e.g., Barton Hills"
+                value={searchSubdivision}
+                onChange={(e) => setSearchSubdivision(e.target.value)}
+                data-testid="input-search-subdivision"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Min Beds</Label>
+              <Select value={searchMinBeds} onValueChange={setSearchMinBeds}>
+                <SelectTrigger data-testid="select-min-beds">
+                  <SelectValue placeholder="Any" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="any">Any</SelectItem>
+                  <SelectItem value="2">2+</SelectItem>
+                  <SelectItem value="3">3+</SelectItem>
+                  <SelectItem value="4">4+</SelectItem>
+                  <SelectItem value="5">5+</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>Max Price</Label>
+              <Select value={searchMaxPrice} onValueChange={setSearchMaxPrice}>
+                <SelectTrigger data-testid="select-max-price">
+                  <SelectValue placeholder="Any" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="any">Any</SelectItem>
+                  <SelectItem value="300000">$300K</SelectItem>
+                  <SelectItem value="500000">$500K</SelectItem>
+                  <SelectItem value="750000">$750K</SelectItem>
+                  <SelectItem value="1000000">$1M</SelectItem>
+                  <SelectItem value="2000000">$2M</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>Status</Label>
+              <Select value={searchStatus} onValueChange={setSearchStatus}>
+                <SelectTrigger data-testid="select-status">
+                  <SelectValue placeholder="Select status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Closed">Sold</SelectItem>
+                  <SelectItem value="Active">Active</SelectItem>
+                  <SelectItem value="Under Contract">Under Contract</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <Button onClick={handleSearch} disabled={isLoading} data-testid="button-search-properties">
+            {isLoading ? (
+              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+            ) : (
+              <Search className="w-4 h-4 mr-2" />
+            )}
+            Search Properties
+          </Button>
+        </CardContent>
+      </Card>
+
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Subject Property */}
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center justify-between">
@@ -95,9 +232,10 @@ export function CMABuilder({ onCreateCMA }: CMABuilderProps) {
                   <div className="flex items-start justify-between mb-2">
                     <div className="flex-1">
                       <p className="font-semibold text-sm">{subjectProperty.unparsedAddress}</p>
-                      <p className="text-xs text-muted-foreground">
-                        {subjectProperty.listPrice && `$${Number(subjectProperty.listPrice).toLocaleString()}`}
-                      </p>
+                      <div className="flex items-center gap-2 text-xs text-muted-foreground mt-1">
+                        <Badge variant="secondary">{getPriceLabel(subjectProperty)}</Badge>
+                        <span className="font-medium">{getPriceDisplay(subjectProperty)}</span>
+                      </div>
                     </div>
                     <Button
                       size="icon"
@@ -122,14 +260,14 @@ export function CMABuilder({ onCreateCMA }: CMABuilderProps) {
               </div>
             ) : (
               <div className="text-center py-8 text-muted-foreground">
+                <Home className="w-8 h-8 mx-auto mb-2 opacity-50" />
                 <p className="text-sm mb-2">No subject property selected</p>
-                <p className="text-xs">Click "+ Set as Subject" on a property from search results</p>
+                <p className="text-xs">Click "Set as Subject" on a property from search results</p>
               </div>
             )}
           </CardContent>
         </Card>
 
-        {/* Comparable Properties */}
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center justify-between">
@@ -146,11 +284,12 @@ export function CMABuilder({ onCreateCMA }: CMABuilderProps) {
                       <div className="flex-1">
                         <div className="flex items-center gap-2 mb-1">
                           <span className="text-xs font-semibold text-muted-foreground">#{index + 1}</span>
-                          <p className="font-semibold text-sm">{property.unparsedAddress}</p>
+                          <p className="font-semibold text-sm line-clamp-1">{property.unparsedAddress}</p>
                         </div>
-                        <p className="text-xs text-muted-foreground">
-                          {property.listPrice && `$${Number(property.listPrice).toLocaleString()}`}
-                        </p>
+                        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                          <Badge variant="secondary">{getPriceLabel(property)}</Badge>
+                          <span className="font-medium">{getPriceDisplay(property)}</span>
+                        </div>
                       </div>
                       <Button
                         size="icon"
@@ -176,6 +315,7 @@ export function CMABuilder({ onCreateCMA }: CMABuilderProps) {
               </div>
             ) : (
               <div className="text-center py-8 text-muted-foreground">
+                <Plus className="w-8 h-8 mx-auto mb-2 opacity-50" />
                 <p className="text-sm mb-2">No comparables selected</p>
                 <p className="text-xs">Search and select properties to compare</p>
               </div>
@@ -183,7 +323,6 @@ export function CMABuilder({ onCreateCMA }: CMABuilderProps) {
           </CardContent>
         </Card>
 
-        {/* Analysis Tools */}
         <Card>
           <CardHeader>
             <CardTitle>Analysis</CardTitle>
@@ -195,9 +334,14 @@ export function CMABuilder({ onCreateCMA }: CMABuilderProps) {
                   <div className="flex justify-between text-sm">
                     <span className="text-muted-foreground">Avg Price</span>
                     <span className="font-semibold">
-                      ${Math.round(
-                        comparables.reduce((sum, p) => sum + Number(p.listPrice || 0), 0) / comparables.length
-                      ).toLocaleString()}
+                      {formatPrice(
+                        comparables.reduce((sum, p) => {
+                          const price = p.standardStatus === 'Closed' && p.closePrice 
+                            ? Number(p.closePrice) 
+                            : Number(p.listPrice || 0);
+                          return sum + price;
+                        }, 0) / comparables.length
+                      )}
                     </span>
                   </div>
                   <div className="flex justify-between text-sm">
@@ -213,7 +357,9 @@ export function CMABuilder({ onCreateCMA }: CMABuilderProps) {
                     <span className="font-semibold">
                       ${(
                         comparables.reduce((sum, p) => {
-                          const price = Number(p.listPrice || 0);
+                          const price = p.standardStatus === 'Closed' && p.closePrice 
+                            ? Number(p.closePrice) 
+                            : Number(p.listPrice || 0);
                           const sqft = Number(p.livingArea || 1);
                           return sum + (price / sqft);
                         }, 0) / comparables.length
@@ -221,11 +367,17 @@ export function CMABuilder({ onCreateCMA }: CMABuilderProps) {
                     </span>
                   </div>
                   <div className="flex justify-between text-sm">
-                    <span className="text-muted-foreground">Avg DOM</span>
-                    <span className="font-semibold">
-                      {Math.round(
-                        comparables.reduce((sum, p) => sum + Number(p.daysOnMarket || 0), 0) / comparables.length
-                      )} days
+                    <span className="text-muted-foreground">Price Range</span>
+                    <span className="font-semibold text-xs">
+                      {formatPrice(Math.min(...comparables.map(p => {
+                        return p.standardStatus === 'Closed' && p.closePrice 
+                          ? Number(p.closePrice) 
+                          : Number(p.listPrice || 0);
+                      })))} - {formatPrice(Math.max(...comparables.map(p => {
+                        return p.standardStatus === 'Closed' && p.closePrice 
+                          ? Number(p.closePrice) 
+                          : Number(p.listPrice || 0);
+                      })))}
                     </span>
                   </div>
                 </div>
@@ -252,20 +404,42 @@ export function CMABuilder({ onCreateCMA }: CMABuilderProps) {
         </Card>
       </div>
 
-      {/* Available Properties */}
       <Card>
         <CardHeader>
-          <CardTitle>Available Properties ({searchResults.length})</CardTitle>
+          <CardTitle>
+            Search Results {totalResults > 0 && `(${totalResults.toLocaleString()} found)`}
+          </CardTitle>
         </CardHeader>
         <CardContent>
-          {searchResults.length > 0 ? (
+          {isLoading ? (
+            <div className="text-center py-12">
+              <Loader2 className="w-8 h-8 mx-auto animate-spin text-muted-foreground mb-2" />
+              <p className="text-sm text-muted-foreground">Searching properties...</p>
+            </div>
+          ) : isError ? (
+            <div className="text-center py-12">
+              <AlertCircle className="w-8 h-8 mx-auto text-destructive mb-2" />
+              <p className="text-sm text-destructive mb-2">Unable to search properties</p>
+              <p className="text-xs text-muted-foreground">
+                The HomeReview API may be temporarily unavailable. Please try again later.
+              </p>
+            </div>
+          ) : searchResults.length > 0 ? (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {searchResults.slice(0, 6).map((property) => (
+              {searchResults.map((property) => (
                 <div key={property.id} className="p-4 border rounded-md space-y-2">
-                  <p className="font-semibold text-sm line-clamp-2">{property.unparsedAddress}</p>
-                  <p className="text-xs text-muted-foreground">
-                    {property.listPrice && `$${Number(property.listPrice).toLocaleString()}`}
-                  </p>
+                  <div className="flex items-start justify-between gap-2">
+                    <p className="font-semibold text-sm line-clamp-2">{property.unparsedAddress}</p>
+                    <Badge variant={property.standardStatus === 'Closed' ? 'secondary' : 'default'}>
+                      {property.standardStatus === 'Closed' ? 'Sold' : property.standardStatus}
+                    </Badge>
+                  </div>
+                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                    <span className="font-medium text-foreground">{getPriceDisplay(property)}</span>
+                    {property.closeDate && (
+                      <span>• Sold {new Date(property.closeDate).toLocaleDateString()}</span>
+                    )}
+                  </div>
                   <div className="flex gap-2 text-xs text-muted-foreground">
                     <span>{property.bedroomsTotal} beds</span>
                     <span>•</span>
@@ -273,7 +447,16 @@ export function CMABuilder({ onCreateCMA }: CMABuilderProps) {
                     <span>•</span>
                     <span>{property.livingArea && `${Number(property.livingArea).toLocaleString()} sqft`}</span>
                   </div>
-                  <div className="flex gap-2">
+                  {property.livingArea && (
+                    <div className="text-xs text-muted-foreground">
+                      ${(
+                        (property.standardStatus === 'Closed' && property.closePrice 
+                          ? Number(property.closePrice) 
+                          : Number(property.listPrice || 0)) / Number(property.livingArea)
+                      ).toFixed(0)}/sqft
+                    </div>
+                  )}
+                  <div className="flex gap-2 pt-2">
                     <Button
                       size="sm"
                       variant="outline"
@@ -298,11 +481,17 @@ export function CMABuilder({ onCreateCMA }: CMABuilderProps) {
                 </div>
               ))}
             </div>
+          ) : searchEnabled ? (
+            <div className="text-center py-12 text-muted-foreground">
+              <Search className="w-12 h-12 mx-auto mb-4 opacity-50" />
+              <p className="text-sm mb-2">No properties found matching your criteria</p>
+              <p className="text-xs">Try adjusting your search filters</p>
+            </div>
           ) : (
-            <div className="text-center py-8 text-muted-foreground">
-              <Plus className="w-12 h-12 mx-auto mb-4 opacity-50" />
-              <p className="text-sm mb-2">No properties available</p>
-              <p className="text-xs">Properties from MLS Grid will appear here once synced</p>
+            <div className="text-center py-12 text-muted-foreground">
+              <Search className="w-12 h-12 mx-auto mb-4 opacity-50" />
+              <p className="text-sm mb-2">Search for properties to add to your CMA</p>
+              <p className="text-xs">Use the filters above and click "Search Properties"</p>
             </div>
           )}
         </CardContent>
