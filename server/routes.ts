@@ -483,8 +483,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // CMA Share Link routes (requires authentication and ownership)
-  app.post("/api/cmas/:id/share", requireAuth, async (req, res) => {
+  // CMA Share Link routes
+  app.post("/api/cmas/:id/share", async (req, res) => {
     try {
       const cma = await storage.getCma(req.params.id);
       if (!cma) {
@@ -492,7 +492,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return;
       }
 
-      // Ownership check - verify the user owns this CMA
+      // Ownership check - if CMA has an owner, verify the user owns it
       const user = req.user as any;
       if (cma.userId && cma.userId !== user?.id) {
         res.status(403).json({ error: "Not authorized to share this CMA" });
@@ -520,7 +520,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.delete("/api/cmas/:id/share", requireAuth, async (req, res) => {
+  app.delete("/api/cmas/:id/share", async (req, res) => {
     try {
       const cma = await storage.getCma(req.params.id);
       if (!cma) {
@@ -528,7 +528,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return;
       }
 
-      // Ownership check - verify the user owns this CMA
+      // Ownership check - if CMA has an owner, verify the user owns it
       const user = req.user as any;
       if (cma.userId && cma.userId !== user?.id) {
         res.status(403).json({ error: "Not authorized to manage this CMA" });
