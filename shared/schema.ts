@@ -244,6 +244,7 @@ export const cmas = pgTable("cmas", {
   name: text("name").notNull(),
   subjectPropertyId: text("subject_property_id"),
   comparablePropertyIds: json("comparable_property_ids").$type<string[]>().notNull(),
+  propertiesData: json("properties_data").$type<any[]>(), // Store actual property data from HomeReview
   searchCriteria: json("search_criteria"),
   notes: text("notes"),
   publicLink: text("public_link").unique(),

@@ -301,7 +301,7 @@ export function CMAReport({
                       name="Properties" 
                       data={timelineData.map(d => ({ 
                         ...d, 
-                        date: d.date.getTime(),
+                        date: new Date(d.date).getTime(),
                         fill: d.status === 'Active' ? '#22c55e' : d.status === 'Under Contract' ? '#eab308' : '#ef4444'
                       }))} 
                       fill="hsl(var(--primary))"

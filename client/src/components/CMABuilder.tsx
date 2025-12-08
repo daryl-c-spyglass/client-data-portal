@@ -22,6 +22,7 @@ interface CMABuilderProps {
     name: string;
     subjectPropertyId?: string;
     comparablePropertyIds: string[];
+    propertiesData: any[];
   }) => void;
 }
 
@@ -84,10 +85,14 @@ export function CMABuilder({ onCreateCMA }: CMABuilderProps) {
 
   const handleCreate = () => {
     if (comparables.length > 0) {
+      const allProperties = subjectProperty 
+        ? [subjectProperty, ...comparables] 
+        : comparables;
       onCreateCMA({
         name: cmaName || "Untitled CMA",
         subjectPropertyId: subjectProperty?.id,
         comparablePropertyIds: comparables.map(p => p.id),
+        propertiesData: allProperties,
       });
     }
   };

@@ -18,6 +18,7 @@ export default function CMANew() {
       name: string;
       subjectPropertyId?: string;
       comparablePropertyIds: string[];
+      propertiesData: any[];
     }) => {
       const response = await apiRequest('/api/cmas', 'POST', data);
       return response.json();
@@ -43,6 +44,7 @@ export default function CMANew() {
     name: string;
     subjectPropertyId?: string;
     comparablePropertyIds: string[];
+    propertiesData: any[];
   }) => {
     createCmaMutation.mutate(data);
   };

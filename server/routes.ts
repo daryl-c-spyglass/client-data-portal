@@ -754,7 +754,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // CMA Statistics
+  // CMA Statistics - calculate from stored propertiesData
   app.get("/api/cmas/:id/statistics", async (req, res) => {
     try {
       const cma = await storage.getCma(req.params.id);
@@ -763,18 +763,71 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return;
       }
 
-      const propertyIds = [
-        ...(cma.subjectPropertyId ? [cma.subjectPropertyId] : []),
-        ...(cma.comparablePropertyIds || [])
-      ];
+      const properties = (cma as any).propertiesData || [];
+      
+      if (properties.length === 0) {
+        const emptyStats = { range: { min: 0, max: 0 }, average: 0, median: 0 };
+        res.json({
+          price: emptyStats,
+          livingArea: emptyStats,
+          pricePerSqFt: emptyStats,
+          daysOnMarket: emptyStats,
+          lotSize: emptyStats,
+          acres: emptyStats,
+          yearBuilt: emptyStats,
+          bedrooms: emptyStats,
+          bathrooms: emptyStats,
+          activeListings: 0,
+        });
+        return;
+      }
 
-      const statistics = await storage.calculateStatistics(propertyIds);
-      res.json(statistics);
+      const getNumericValues = (values: number[]) => values.filter(v => !isNaN(v) && v > 0);
+      
+      const calculateStats = (values: number[]) => {
+        if (values.length === 0) return { range: { min: 0, max: 0 }, average: 0, median: 0 };
+        const sorted = [...values].sort((a, b) => a - b);
+        return {
+          range: { min: sorted[0], max: sorted[sorted.length - 1] },
+          average: values.reduce((a, b) => a + b, 0) / values.length,
+          median: sorted[Math.floor(sorted.length / 2)],
+        };
+      };
+
+      const prices = getNumericValues(properties.map((p: any) => Number(p.closePrice || p.listPrice)));
+      const livingAreas = getNumericValues(properties.map((p: any) => Number(p.livingArea)));
+      const pricesPerSqFt = getNumericValues(properties.map((p: any) => {
+        const price = Number(p.closePrice || p.listPrice);
+        const area = Number(p.livingArea);
+        return area > 0 ? price / area : 0;
+      }));
+      const daysOnMarket = getNumericValues(properties.map((p: any) => Number(p.daysOnMarket || p.cumulativeDaysOnMarket)));
+      const lotSizes = getNumericValues(properties.map((p: any) => Number(p.lotSizeSquareFeet)));
+      const acres = getNumericValues(properties.map((p: any) => Number(p.lotSizeAcres || (p.lotSizeSquareFeet ? p.lotSizeSquareFeet / 43560 : 0))));
+      const yearsBuilt = getNumericValues(properties.map((p: any) => Number(p.yearBuilt)));
+      const bedrooms = getNumericValues(properties.map((p: any) => Number(p.bedroomsTotal)));
+      const bathrooms = getNumericValues(properties.map((p: any) => Number(p.bathroomsTotalInteger || p.bathroomsFull)));
+      const activeCount = properties.filter((p: any) => p.standardStatus === 'Active').length;
+
+      res.json({
+        price: calculateStats(prices),
+        livingArea: calculateStats(livingAreas),
+        pricePerSqFt: calculateStats(pricesPerSqFt),
+        daysOnMarket: calculateStats(daysOnMarket),
+        lotSize: calculateStats(lotSizes),
+        acres: calculateStats(acres),
+        yearBuilt: calculateStats(yearsBuilt),
+        bedrooms: calculateStats(bedrooms),
+        bathrooms: calculateStats(bathrooms),
+        activeListings: activeCount,
+      });
     } catch (error) {
+      console.error("Error calculating statistics:", error);
       res.status(500).json({ error: "Failed to calculate statistics" });
     }
   });
 
+  // CMA Timeline - calculate from stored propertiesData
   app.get("/api/cmas/:id/timeline", async (req, res) => {
     try {
       const cma = await storage.getCma(req.params.id);
@@ -783,12 +836,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return;
       }
 
-      const propertyIds = [
-        ...(cma.subjectPropertyId ? [cma.subjectPropertyId] : []),
-        ...(cma.comparablePropertyIds || [])
-      ];
+      const properties = (cma as any).propertiesData || [];
+      
+      const timelineData = properties
+        .filter((p: any) => p.closeDate || p.listingContractDate)
+        .map((p: any) => ({
+          date: p.closeDate || p.listingContractDate,
+          price: Number(p.closePrice || p.listPrice),
+          status: p.standardStatus || 'Unknown',
+          propertyId: p.id || p.listingId,
+        }))
+        .sort((a: any, b: any) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
-      const timelineData = await storage.getTimelineData(propertyIds);
       res.json(timelineData);
     } catch (error) {
       res.status(500).json({ error: "Failed to get timeline data" });

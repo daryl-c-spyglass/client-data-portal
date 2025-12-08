@@ -64,14 +64,6 @@ export default function CMADetailPage() {
     },
   });
 
-  const { data: allProperties = [] } = useQuery<Property[]>({
-    queryKey: ['/api/properties'],
-    queryFn: async () => {
-      const response = await fetch('/api/properties');
-      if (!response.ok) throw new Error('Failed to fetch properties');
-      return response.json();
-    },
-  });
 
   const shareMutation = useMutation<ShareResponse>({
     mutationFn: async () => {
@@ -123,11 +115,7 @@ export default function CMADetailPage() {
     },
   });
 
-  const properties = cma
-    ? allProperties.filter((p) =>
-        [cma.subjectPropertyId, ...(cma.comparablePropertyIds || [])].includes(p.id)
-      )
-    : [];
+  const properties = cma ? ((cma as any).propertiesData || []) : [];
 
   const isLoading = cmaLoading || statsLoading || timelineLoading;
 
