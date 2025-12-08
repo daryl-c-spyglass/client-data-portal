@@ -422,8 +422,17 @@ export default function BuyerSearch() {
       if (neighborhoods.length > 0) params.set('neighborhood', neighborhoods[0]);
     }
     
-    // Property type
-    if (filters.propertySubType) params.set('propertyType', filters.propertySubType);
+    // Property type - map to Repliers class values (residential, condo, commercial)
+    if (filters.propertySubType) {
+      const subType = filters.propertySubType.toLowerCase();
+      if (subType === 'single family' || subType === 'townhouse') {
+        params.set('propertyType', 'residential');
+      } else if (subType === 'condo') {
+        params.set('propertyType', 'condo');
+      } else if (subType === 'multi-family' || subType === 'land') {
+        params.set('propertyType', 'commercial');
+      }
+    }
     
     // Sort - Repliers requires specific format like listPriceAsc or listPriceDesc
     params.set('sortBy', 'listPriceDesc');
