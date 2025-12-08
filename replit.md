@@ -10,6 +10,16 @@ Preferred communication style: Simple, everyday language.
 
 ## Recent Changes
 
+### Repliers API Integration (Dec 8, 2025)
+- **New Primary Data Source**: Integrated Repliers API as the primary data source for property search, replacing HomeReview.
+- **Benefits**: Repliers includes latitude/longitude coordinates with every property - no geocoding required for map view.
+- **API Client**: Created `server/repliers-client.ts` with support for listings search, single listing lookup, locations, and AI-powered NLP search.
+- **Endpoints Added**: `/api/repliers/listings`, `/api/repliers/listings/:mlsNumber`, `/api/repliers/locations`, `/api/repliers/nlp`
+- **Parameter Mapping**: Repliers uses specific parameter names: `zip` (not postalCode), `class` (for Residential/Commercial/Condo), `status` (A/U/S for Active/Under Contract/Sold)
+- **Data Volume**: 30,000+ active listings available with real-time updates.
+- **Sort Options**: Uses Repliers-specific sort values like `listPriceDesc`, `listPriceAsc`, `createdOnDesc`, etc.
+- **Environment Variable**: `REPLIERS_API_KEY` required for API access.
+
 ### Clickable Property Cards & Real Data Detail Page (Dec 6, 2025)
 - **Navigation**: Property cards in Buyer Search are now clickable and navigate to the property detail page.
 - **Data Passing**: Property data is passed via React context (SelectedPropertyContext) instead of re-fetching from API, since HomeReview API doesn't support single-property lookups.

@@ -130,9 +130,9 @@ class RepliersClient {
       if (params.maxBaths) queryParams.append('maxBaths', params.maxBaths.toString());
       if (params.minSqft) queryParams.append('minSqft', params.minSqft.toString());
       if (params.maxSqft) queryParams.append('maxSqft', params.maxSqft.toString());
-      if (params.propertyType) queryParams.append('propertyType', params.propertyType);
+      if (params.propertyType) queryParams.append('class', params.propertyType.toLowerCase());
       if (params.city) queryParams.append('city', params.city);
-      if (params.postalCode) queryParams.append('postalCode', params.postalCode);
+      if (params.postalCode) queryParams.append('zip', params.postalCode);
       if (params.neighborhood) queryParams.append('neighborhood', params.neighborhood);
       if (params.minLat) queryParams.append('minLat', params.minLat.toString());
       if (params.maxLat) queryParams.append('maxLat', params.maxLat.toString());
