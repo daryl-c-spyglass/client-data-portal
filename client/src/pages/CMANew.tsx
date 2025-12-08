@@ -19,7 +19,7 @@ export default function CMANew() {
       subjectPropertyId?: string;
       comparablePropertyIds: string[];
     }) => {
-      const response = await apiRequest('POST', '/api/cmas', data);
+      const response = await apiRequest('/api/cmas', 'POST', data);
       return response.json();
     },
     onSuccess: (cma: { id: string }) => {
