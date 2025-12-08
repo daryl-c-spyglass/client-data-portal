@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -7,7 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { X, Plus, TrendingUp, Search, Loader2, AlertCircle, Home } from "lucide-react";
+import { X, Plus, TrendingUp, Search, Loader2, AlertCircle, Home, MousePointerClick } from "lucide-react";
 import type { Property } from "@shared/schema";
 
 interface HomeReviewResponse {
@@ -29,6 +29,7 @@ export function CMABuilder({ onCreateCMA }: CMABuilderProps) {
   const [cmaName, setCmaName] = useState("");
   const [subjectProperty, setSubjectProperty] = useState<Property | null>(null);
   const [comparables, setComparables] = useState<Property[]>([]);
+  const searchSectionRef = useRef<HTMLDivElement>(null);
   
   const [searchCity, setSearchCity] = useState("");
   const [searchSubdivision, setSearchSubdivision] = useState("");
@@ -131,7 +132,7 @@ export function CMABuilder({ onCreateCMA }: CMABuilderProps) {
         </CardContent>
       </Card>
 
-      <Card>
+      <Card ref={searchSectionRef}>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Search className="w-5 h-5" />
@@ -259,10 +260,17 @@ export function CMABuilder({ onCreateCMA }: CMABuilderProps) {
                 </p>
               </div>
             ) : (
-              <div className="text-center py-8 text-muted-foreground">
+              <div 
+                className="text-center py-8 text-muted-foreground cursor-pointer hover-elevate rounded-lg border border-dashed border-muted-foreground/30 transition-colors hover:border-primary/50"
+                onClick={() => searchSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
+                data-testid="button-select-subject"
+              >
                 <Home className="w-8 h-8 mx-auto mb-2 opacity-50" />
                 <p className="text-sm mb-2">No subject property selected</p>
-                <p className="text-xs">Click "Set as Subject" on a property from search results</p>
+                <p className="text-xs flex items-center justify-center gap-1">
+                  <MousePointerClick className="w-3 h-3" />
+                  Click here to search for a property
+                </p>
               </div>
             )}
           </CardContent>

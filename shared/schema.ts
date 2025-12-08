@@ -240,7 +240,7 @@ export type SellerUpdate = typeof sellerUpdates.$inferSelect;
 // CMA Schema
 export const cmas = pgTable("cmas", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  userId: varchar("user_id").notNull().references(() => users.id),
+  userId: varchar("user_id").references(() => users.id), // Nullable for unauthenticated users
   name: text("name").notNull(),
   subjectPropertyId: text("subject_property_id"),
   comparablePropertyIds: json("comparable_property_ids").$type<string[]>().notNull(),

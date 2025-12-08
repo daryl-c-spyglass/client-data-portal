@@ -436,13 +436,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/cmas", async (req, res) => {
     try {
-      const cmaData = insertCmaSchema.parse(req.body);
+      // Get user ID if authenticated, otherwise leave null
+      const user = req.user as any;
+      const userId = user?.id || null;
+      
+      const cmaData = insertCmaSchema.parse({
+        ...req.body,
+        userId,
+      });
       const cma = await storage.createCma(cmaData);
       res.status(201).json(cma);
     } catch (error) {
       if (error instanceof z.ZodError) {
+        console.error("CMA validation error:", error.errors);
         res.status(400).json({ error: "Invalid CMA data", details: error.errors });
       } else {
+        console.error("CMA creation error:", error);
         res.status(500).json({ error: "Failed to create CMA" });
       }
     }
