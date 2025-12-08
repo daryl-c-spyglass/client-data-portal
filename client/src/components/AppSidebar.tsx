@@ -11,6 +11,7 @@ import {
   SidebarMenuItem,
   SidebarHeader,
 } from "@/components/ui/sidebar";
+import spyglassLogo from "@assets/Large_Logo_1765233192587.jpeg";
 
 const menuItems = [
   {
@@ -84,15 +85,14 @@ export function AppSidebar() {
   return (
     <Sidebar>
       <SidebarHeader className="p-4">
-        <div className="flex items-center gap-2">
-          <div className="w-8 h-8 bg-primary rounded-md flex items-center justify-center">
-            <Home className="w-5 h-5 text-primary-foreground" />
-          </div>
-          <div>
-            <h2 className="font-semibold text-lg">MLS Grid IDX</h2>
-            <p className="text-xs text-muted-foreground">Professional CMA</p>
-          </div>
-        </div>
+        <Link href="/" className="block">
+          <img 
+            src={spyglassLogo} 
+            alt="Spyglass Realty" 
+            className="h-12 w-auto object-contain"
+            data-testid="img-logo"
+          />
+        </Link>
       </SidebarHeader>
       <SidebarContent>
         <SidebarGroup>

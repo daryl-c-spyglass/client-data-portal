@@ -10,6 +10,13 @@ Preferred communication style: Simple, everyday language.
 
 ## Recent Changes
 
+### Spyglass Realty Branding (Dec 8, 2025)
+- **Brand Colors**: Updated to Spyglass Realty color scheme with orange primary (HSL 25, 90%, 52%) and clean black/white design
+- **Logo**: Added Spyglass Realty logo to sidebar header (attached_assets/Large_Logo_1765233192587.jpeg)
+- **Dashboard**: Updated welcome text to reference "Spyglass Realty agent platform"
+- **Design Guidelines**: Updated design_guidelines.md with Spyglass brand identity and color specifications
+- **Dark Mode**: Maintained orange accent colors for dark mode compatibility
+
 ### Repliers API Integration (Dec 8, 2025)
 - **New Primary Data Source**: Integrated Repliers API as the primary data source for property search, replacing HomeReview.
 - **Benefits**: Repliers includes latitude/longitude coordinates with every property - no geocoding required for map view.

@@ -25,7 +25,7 @@ export default function Dashboard() {
     <div className="space-y-6">
       <div>
         <h1 className="text-3xl font-bold mb-2" data-testid="text-dashboard-title">Dashboard</h1>
-        <p className="text-muted-foreground">Welcome to your MLS Grid IDX platform</p>
+        <p className="text-muted-foreground">Welcome to your Spyglass Realty agent platform</p>
       </div>
 
       {/* MLS Grid Status Alert */}

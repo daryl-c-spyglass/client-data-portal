@@ -1,10 +1,22 @@
-# MLS Grid IDX/CMA Platform Design Guidelines
+# Spyglass Realty Platform Design Guidelines
+
+## Brand Identity
+
+**Company:** Spyglass Realty - Austin's premier real estate brokerage
+**Website Reference:** https://www.spyglassrealty.com/
+**Logo:** Spyglass Realty logo with distinctive orange arc accents
 
 ## Design Approach
 
-**Hybrid Reference Strategy:** Drawing from industry-leading real estate platforms (Zillow, Redfin, Realtor.com) for property browsing patterns, combined with modern productivity tools (Linear, Notion) for the agent dashboard interface. This creates a professional, data-rich experience that serves both real estate professionals and their clients.
+**Brand Colors:**
+- **Primary (Orange):** HSL 25, 90%, 52% - Used for CTAs, accents, and brand highlights
+- **Foreground (Dark):** HSL 0, 0%, 12% - Clean black/charcoal for text
+- **Background:** Pure white for clean, professional appearance
+- **Secondary:** Warm gray tones for subtle backgrounds
 
-**Core Principle:** Balance visual appeal for client engagement with functional efficiency for agent workflow. Property imagery takes center stage while maintaining clean data presentation and powerful comparison tools.
+**Hybrid Reference Strategy:** Drawing from industry-leading real estate platforms (Zillow, Redfin, Realtor.com) for property browsing patterns, combined with modern productivity tools (Linear, Notion) for the agent dashboard interface. Aligned with Spyglass Realty's professional, boutique brokerage identity.
+
+**Core Principle:** Balance visual appeal for client engagement with functional efficiency for agent workflow. Property imagery takes center stage while maintaining clean data presentation, powerful comparison tools, and consistent Spyglass Realty branding.
 
 ---
 
