@@ -19,9 +19,10 @@ export default function CMANew() {
       subjectPropertyId?: string;
       comparablePropertyIds: string[];
     }) => {
-      return apiRequest('POST', '/api/cmas', data);
+      const response = await apiRequest('POST', '/api/cmas', data);
+      return response.json();
     },
-    onSuccess: (cma) => {
+    onSuccess: (cma: { id: string }) => {
       queryClient.invalidateQueries({ queryKey: ['/api/cmas'] });
       toast({
         title: "CMA created",
