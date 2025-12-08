@@ -3,6 +3,7 @@ import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { createMLSGridClient } from "./mlsgrid-client";
 import { getHomeReviewClient, mapHomeReviewPropertyToSchema, type PropertySearchParams } from "./homereview-client";
+import { initRepliersClient, getRepliersClient, isRepliersConfigured } from "./repliers-client";
 import { geocodeAddress, geocodeProperties, isMapboxConfigured } from "./mapbox-geocoding";
 import { searchCriteriaSchema, insertCmaSchema, insertUserSchema, insertSellerUpdateSchema, updateSellerUpdateSchema, updateLeadGateSettingsSchema } from "@shared/schema";
 import { findMatchingProperties, calculateMarketSummary } from "./seller-update-service";
@@ -14,6 +15,7 @@ import { fetchExternalUsers, fetchFromExternalApi } from "./external-api";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   const mlsGridClient = createMLSGridClient();
+  const repliersClient = initRepliersClient();
 
   // Auth routes
   app.post("/api/auth/register", async (req, res) => {
@@ -1226,12 +1228,126 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Repliers API endpoints
+  app.get("/api/repliers/listings", async (req, res) => {
+    try {
+      const client = getRepliersClient();
+      if (!client) {
+        res.status(503).json({ error: "Repliers API not configured" });
+        return;
+      }
+
+      const params: any = {};
+      
+      if (req.query.status) params.status = req.query.status as string;
+      if (req.query.minPrice) params.minPrice = parseInt(req.query.minPrice as string);
+      if (req.query.maxPrice) params.maxPrice = parseInt(req.query.maxPrice as string);
+      if (req.query.minBeds) params.minBeds = parseInt(req.query.minBeds as string);
+      if (req.query.maxBeds) params.maxBeds = parseInt(req.query.maxBeds as string);
+      if (req.query.minBaths) params.minBaths = parseInt(req.query.minBaths as string);
+      if (req.query.maxBaths) params.maxBaths = parseInt(req.query.maxBaths as string);
+      if (req.query.minSqft) params.minSqft = parseInt(req.query.minSqft as string);
+      if (req.query.maxSqft) params.maxSqft = parseInt(req.query.maxSqft as string);
+      if (req.query.propertyType) params.propertyType = req.query.propertyType as string;
+      if (req.query.city) params.city = req.query.city as string;
+      if (req.query.postalCode) params.postalCode = req.query.postalCode as string;
+      if (req.query.neighborhood) params.neighborhood = req.query.neighborhood as string;
+      if (req.query.pageNum) params.pageNum = parseInt(req.query.pageNum as string);
+      if (req.query.resultsPerPage) params.resultsPerPage = parseInt(req.query.resultsPerPage as string);
+      if (req.query.sortBy) params.sortBy = req.query.sortBy as string;
+      if (req.query.class) params.class = req.query.class as string;
+
+      const response = await client.searchListings(params);
+      
+      const standardizedProperties = response.listings.map(listing => 
+        client.mapToStandardProperty(listing)
+      );
+
+      res.json({
+        properties: standardizedProperties,
+        total: response.count,
+        page: response.currentPage,
+        totalPages: response.numPages,
+        resultsPerPage: response.resultsPerPage,
+      });
+    } catch (error: any) {
+      console.error("Repliers listings error:", error.message);
+      res.status(500).json({ error: "Failed to fetch listings from Repliers" });
+    }
+  });
+
+  app.get("/api/repliers/listings/:mlsNumber", async (req, res) => {
+    try {
+      const client = getRepliersClient();
+      if (!client) {
+        res.status(503).json({ error: "Repliers API not configured" });
+        return;
+      }
+
+      const listing = await client.getListing(req.params.mlsNumber);
+      
+      if (!listing) {
+        res.status(404).json({ error: "Listing not found" });
+        return;
+      }
+
+      res.json(client.mapToStandardProperty(listing));
+    } catch (error: any) {
+      console.error("Repliers listing detail error:", error.message);
+      res.status(500).json({ error: "Failed to fetch listing from Repliers" });
+    }
+  });
+
+  app.get("/api/repliers/locations", async (req, res) => {
+    try {
+      const client = getRepliersClient();
+      if (!client) {
+        res.status(503).json({ error: "Repliers API not configured" });
+        return;
+      }
+
+      const params: any = {};
+      if (req.query.area) params.area = req.query.area as string;
+      if (req.query.city) params.city = req.query.city as string;
+
+      const locations = await client.getLocations(params);
+      res.json(locations);
+    } catch (error: any) {
+      console.error("Repliers locations error:", error.message);
+      res.status(500).json({ error: "Failed to fetch locations from Repliers" });
+    }
+  });
+
+  app.post("/api/repliers/nlp", async (req, res) => {
+    try {
+      const client = getRepliersClient();
+      if (!client) {
+        res.status(503).json({ error: "Repliers API not configured" });
+        return;
+      }
+
+      const { prompt, nlpId } = req.body;
+      
+      if (!prompt) {
+        res.status(400).json({ error: "Prompt is required" });
+        return;
+      }
+
+      const result = await client.nlpSearch(prompt, nlpId);
+      res.json(result);
+    } catch (error: any) {
+      console.error("Repliers NLP error:", error.message);
+      res.status(500).json({ error: "Failed to perform NLP search" });
+    }
+  });
+
   // Health check
   app.get("/api/health", (req, res) => {
     res.json({ 
       status: "ok", 
       mlsGridConfigured: mlsGridClient !== null,
       homeReviewConfigured: true,
+      repliersConfigured: isRepliersConfigured(),
       mapboxConfigured: isMapboxConfigured(),
       timestamp: new Date().toISOString() 
     });

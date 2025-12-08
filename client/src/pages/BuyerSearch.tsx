@@ -262,11 +262,12 @@ export default function BuyerSearch() {
     }));
   };
 
-  // Use HomeReview as primary data source for all searches (better filtering support)
-  // HomeReview has Active, Under Contract, and Closed listings
-  // MLS Grid is only used as fallback when HomeReview is unavailable
-  const useHomeReview = true;
-  const useMLSGrid = false; // MLS Grid has limited filtering - only use as backup
+  // Use Repliers as primary data source (includes coordinates, no geocoding needed)
+  // Repliers has Active, Under Contract, Closed, and more - with built-in lat/lng
+  // HomeReview and MLS Grid are available as fallback options
+  const useRepliers = true;
+  const useHomeReview = false;
+  const useMLSGrid = false;
 
   const buildMLSGridQueryString = () => {
     const params = new URLSearchParams();
@@ -385,12 +386,70 @@ export default function BuyerSearch() {
     return params.toString();
   };
 
+  const buildRepliersQueryString = () => {
+    const params = new URLSearchParams();
+    
+    // Status mapping for Repliers API
+    if (filters.statusActive) params.set('status', 'A');
+    if (filters.statusUnderContract) params.set('status', 'U');
+    if (filters.statusClosed) params.set('status', 'S');
+    
+    // Price filters
+    if (filters.minPrice) params.set('minPrice', String(filters.minPrice));
+    if (filters.maxPrice) params.set('maxPrice', String(filters.maxPrice));
+    
+    // Beds/Baths
+    if (filters.minBeds) params.set('minBeds', String(filters.minBeds));
+    if (filters.maxBeds) params.set('maxBeds', String(filters.maxBeds));
+    if (filters.minTotalBaths) params.set('minBaths', String(filters.minTotalBaths));
+    if (filters.maxTotalBaths) params.set('maxBaths', String(filters.maxTotalBaths));
+    
+    // Size
+    if (filters.minLivingArea) params.set('minSqft', String(filters.minLivingArea));
+    if (filters.maxLivingArea) params.set('maxSqft', String(filters.maxLivingArea));
+    
+    // Location
+    if (filters.city) {
+      const cities = filters.city.split(',').map(c => c.trim()).filter(c => c);
+      if (cities.length > 0) params.set('city', cities[0]);
+    }
+    if (filters.postalCode) {
+      const zips = filters.postalCode.split(',').map(z => z.trim()).filter(z => z);
+      if (zips.length > 0) params.set('postalCode', zips[0]);
+    }
+    if (filters.subdivision) {
+      const neighborhoods = filters.subdivision.split(',').map(s => s.trim()).filter(s => s);
+      if (neighborhoods.length > 0) params.set('neighborhood', neighborhoods[0]);
+    }
+    
+    // Property type
+    if (filters.propertySubType) params.set('propertyType', filters.propertySubType);
+    
+    // Sort - Repliers requires specific format like listPriceAsc or listPriceDesc
+    params.set('sortBy', 'listPriceDesc');
+    
+    return params.toString();
+  };
+
   const mlsGridQueryString = buildMLSGridQueryString();
   const homeReviewQueryString = buildHomeReviewQueryString();
+  const repliersQueryString = buildRepliersQueryString();
   
   const mlsGridFullQuery = `${mlsGridQueryString}${mlsGridQueryString ? '&' : ''}limit=${pageSize}&offset=${currentPage * pageSize}`;
   const homeReviewFullQuery = `${homeReviewQueryString}${homeReviewQueryString ? '&' : ''}limit=${pageSize}&offset=${currentPage * pageSize}`;
+  const repliersFullQuery = `${repliersQueryString}${repliersQueryString ? '&' : ''}resultsPerPage=${pageSize}&pageNum=${currentPage + 1}`;
   
+  const { data: repliersHealthStatus } = useQuery<{ status: string; repliersConfigured: boolean }>({
+    queryKey: ['/api/health'],
+    queryFn: async () => {
+      const res = await fetch('/api/health');
+      return res.json();
+    },
+    refetchInterval: 60000,
+    staleTime: 30000,
+    enabled: useRepliers,
+  });
+
   const { data: healthStatus } = useQuery<{ available: boolean; message: string }>({
     queryKey: ['/api/homereview/health'],
     queryFn: async () => {
@@ -400,6 +459,25 @@ export default function BuyerSearch() {
     refetchInterval: 60000,
     staleTime: 30000,
     enabled: useHomeReview,
+  });
+
+  interface RepliersResponse {
+    properties: Property[];
+    total: number;
+    page: number;
+    totalPages: number;
+    resultsPerPage: number;
+  }
+
+  const { data: repliersResponse, isLoading: repliersLoading, isError: repliersError, refetch: refetchRepliers } = useQuery<RepliersResponse>({
+    queryKey: ['/api/repliers/listings', repliersFullQuery, searchTrigger],
+    queryFn: async () => {
+      const res = await fetch(`/api/repliers/listings?${repliersFullQuery}`);
+      if (!res.ok) throw new Error('Failed to search Repliers');
+      return res.json();
+    },
+    enabled: useRepliers && searchTrigger > 0,
+    retry: 1,
   });
 
   const { data: mlsGridResponse, isLoading: mlsGridLoading, isError: mlsGridError, refetch: refetchMLSGrid } = useQuery<HomeReviewResponse>({
@@ -424,15 +502,21 @@ export default function BuyerSearch() {
     retry: 1,
   });
   
-  const isLoading = mlsGridLoading || homeReviewLoading;
-  const rawProperties = useMLSGrid 
-    ? (mlsGridResponse?.properties || []) 
-    : (homeReviewResponse?.properties || []);
-  const totalCount = useMLSGrid 
-    ? (mlsGridResponse?.total || 0) 
-    : (homeReviewResponse?.total || 0);
-  const isApiUnavailable = healthStatus?.available === false || isError;
-  const dataSource = 'HomeReview (Active & Sold Data)';
+  const isLoading = repliersLoading || mlsGridLoading || homeReviewLoading;
+  const rawProperties = useRepliers 
+    ? (repliersResponse?.properties || [])
+    : useMLSGrid 
+      ? (mlsGridResponse?.properties || []) 
+      : (homeReviewResponse?.properties || []);
+  const totalCount = useRepliers 
+    ? (repliersResponse?.total || 0)
+    : useMLSGrid 
+      ? (mlsGridResponse?.total || 0) 
+      : (homeReviewResponse?.total || 0);
+  const isApiUnavailable = useRepliers 
+    ? (repliersHealthStatus?.repliersConfigured === false || repliersError)
+    : (healthStatus?.available === false || isError);
+  const dataSource = useRepliers ? 'Repliers (MLS Data with Coordinates)' : 'HomeReview (Active & Sold Data)';
 
   const [geocodedCoords, setGeocodedCoords] = useState<Map<string, { latitude: number; longitude: number }>>(new Map());
   const [isGeocoding, setIsGeocoding] = useState(false);
@@ -483,10 +567,10 @@ export default function BuyerSearch() {
   }, [geocodedCoords, isGeocoding, geocodeMutation]);
 
   useEffect(() => {
-    if (rawProperties.length > 0 && viewMode === 'map') {
+    if (rawProperties.length > 0 && viewMode === 'map' && !useRepliers) {
       geocodePropertiesWithoutCoords(rawProperties);
     }
-  }, [rawProperties, viewMode, geocodePropertiesWithoutCoords]);
+  }, [rawProperties, viewMode, geocodePropertiesWithoutCoords, useRepliers]);
 
   const properties = rawProperties.map(p => {
     const coords = geocodedCoords.get(p.id);
@@ -537,7 +621,7 @@ export default function BuyerSearch() {
           <div className="flex items-center gap-2">
             <AlertCircle className="w-5 h-5 text-amber-600 dark:text-amber-400" />
             <p className="text-sm text-amber-800 dark:text-amber-200">
-              <strong>Data Source Unavailable:</strong> The HomeReview API is currently offline. 
+              <strong>Data Source Unavailable:</strong> {useRepliers ? 'The Repliers API' : 'The HomeReview API'} is currently offline. 
               Property search may not return results until the service is restored.
             </p>
           </div>
