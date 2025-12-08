@@ -258,7 +258,9 @@ class RepliersClient {
       subdivisionName: neighborhood,
       latitude: latitude,
       longitude: longitude,
-      photos: listing.photos || [],
+      photos: (listing.images || listing.photos || []).map((img: string) => 
+        img.startsWith('http') ? img : `https://cdn.repliers.io/${img}`
+      ),
       publicRemarks: description,
       listingContractDate: listing.listDate || listing.listingContractDate,
       closeDate: listing.soldDate || listing.closeDate,
