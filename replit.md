@@ -10,6 +10,18 @@ Preferred communication style: Simple, everyday language.
 
 ## Recent Changes
 
+### Unified Search API with Proper Numeric Types (Dec 9, 2025)
+- **Unified Search Endpoint**: Created GET /api/search that intelligently routes based on status:
+  - `status=active` or `status=under_contract` → queries Repliers API
+  - `status=closed` or `status=sold` → queries local PostgreSQL database
+- **Numeric Type Preservation**: All numeric fields (listPrice, closePrice, livingArea, yearBuilt, latitude, longitude, daysOnMarket) are now properly typed as numbers, not strings
+- **Status Normalization**: Consistent MLS-standard status values across all data sources:
+  - Repliers 'A' → 'Active'
+  - Repliers 'U' → 'Active Under Contract'
+  - Database 'Closed' → 'Closed'
+- **Data Mapper**: Added `mapNormalizedToProperty()` in client/src/lib/api.ts for converting normalized API response to Property type
+- **CMA Compatibility**: Fixed data normalization to ensure CMA statistics calculations work correctly with both active (Repliers) and closed (database) listings
+
 ### MLS Grid Scheduled Sync (Dec 9, 2025)
 - **Automatic Daily Sync**: Enabled scheduled MLS Grid sync to run automatically at 12:00 AM CST daily
 - **Fresh Data**: Ensures property database is updated with the latest listings before business hours

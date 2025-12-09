@@ -1,0 +1,68 @@
+We are continuing development on the IDXGridData app.
+
+Please note:
+- The IDX Buyer Search is functioning but requires refinement.
+- There are bugs with the CMA workflow and related components.
+- We now have a working data source from Repliers.com, which is performing better in testing than our previous MLS Grid dataset. For now, please prioritize using Repliers for active listings where appropriate, while keeping MLS Grid and HomeReview data available for closed/sold data.
+
+IMPORTANT: Do NOT modify the UI layout, styling, or component structure. The visual UI should remain exactly as it is. Only adjust backend logic, data mapping, and functionality.
+
+Please focus on the following tasks:
+
+1) Create a unified property search backend:
+   - Add a new endpoint: GET /api/search
+   - Supported query parameters:
+       status (active | closed)
+       postalCode
+       subdivision
+       minPrice
+       maxPrice
+       bedsMin
+       bathsMin
+       limit
+   - If status=active: call the Repliers API using the correct parameters.
+   - If status=closed: call the HomeReview-AI API using the correct parameters.
+   - Normalize results into a consistent object format:
+       id
+       address
+       city
+       state
+       postalCode
+       listPrice
+       closePrice
+       status
+       beds
+       baths
+       livingArea
+       yearBuilt
+       latitude
+       longitude
+       photos[]
+
+2) Update the Buyer Search page functionality (without changing UI layout):
+   - Wire the following fields to the new /api/search endpoint:
+       status toggles (Active / Closed)
+       postalCode
+       subdivision
+       minPrice
+       maxPrice
+       bedsMin
+       bathsMin
+   - Make “Search Properties” call the new backend and display results using the existing card UI.
+   - Property cards should show address, price, beds, baths, sqft, and first photo (if available).
+   - No changes to map logic at this stage.
+
+3) Create a stable property detail endpoint and page:
+   - Add endpoint: GET /api/properties/:id
+       Fetch property data from the appropriate source and return normalized data.
+   - Make property cards clickable using the existing UI.
+   - Ensure property detail pages show complete data + photo gallery using the current layout.
+
+4) Begin improving CMA functionality:
+   - Fix issues where CMA results do not match selected properties.
+   - Ensure CMA statistics (min, max, avg, median, price per sq ft) are calculated from the correct listing set.
+   - Preserve the current CMA UI and only update backend logic and data loading.
+
+Please complete these items in small, safe steps, and confirm correct results using queries such as:
+   status=active&postalCode=78704
+   status=closed&postalCode=78704

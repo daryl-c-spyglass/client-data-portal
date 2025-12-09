@@ -6,7 +6,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Map as MapIcon, Search } from "lucide-react";
 import { SearchCriteriaForm } from "@/components/SearchCriteria";
 import { PropertyResults } from "@/components/PropertyResults";
-import { searchProperties } from "@/lib/api";
+import { unifiedSearch } from "@/lib/api";
 import type { Property, Media, SearchCriteria } from "@shared/schema";
 
 export default function Properties() {
@@ -21,10 +21,10 @@ export default function Properties() {
   const totalCount = countData?.count ?? 0;
 
   // Fetch properties with search criteria if available
-  // Only fetch when there's actual search criteria to prevent loading all 65K+ properties
+  // Uses unified search API: Repliers for active, HomeReview/DB for closed
   const { data: properties = [], isLoading, error } = useQuery<Property[]>({
-    queryKey: ['/api/properties/search', searchCriteria],
-    queryFn: () => searchProperties(searchCriteria!),
+    queryKey: ['/api/search', searchCriteria],
+    queryFn: () => unifiedSearch(searchCriteria!),
     enabled: (activeTab === 'results' && searchCriteria !== null),
   });
 

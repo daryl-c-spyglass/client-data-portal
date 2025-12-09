@@ -204,6 +204,244 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Unified Property Search API
+  // Routes to Repliers for active listings, HomeReview for closed/sold
+  app.get("/api/search", async (req, res) => {
+    try {
+      const {
+        status = 'active',
+        postalCode,
+        subdivision,
+        city,
+        minPrice,
+        maxPrice,
+        bedsMin,
+        bathsMin,
+        limit = '50',
+      } = req.query as Record<string, string | undefined>;
+
+      const parsedLimit = Math.min(parseInt(limit || '50', 10), 200);
+
+      // Normalize results to consistent format
+      interface NormalizedProperty {
+        id: string;
+        address: string;
+        city: string;
+        state: string;
+        postalCode: string;
+        listPrice: number;
+        closePrice: number | null;
+        status: string;
+        beds: number | null;
+        baths: number | null;
+        livingArea: number | null;
+        yearBuilt: number | null;
+        latitude: number | null;
+        longitude: number | null;
+        photos: string[];
+        subdivision: string | null;
+        daysOnMarket: number | null;
+      }
+
+      let results: NormalizedProperty[] = [];
+
+      if (status === 'active' || status === 'under_contract') {
+        // Use Repliers API for active listings
+        if (!isRepliersConfigured()) {
+          res.status(503).json({ error: 'Repliers API not configured' });
+          return;
+        }
+
+        const repliersClient = getRepliersClient();
+        if (!repliersClient) {
+          res.status(503).json({ error: 'Repliers client not available' });
+          return;
+        }
+
+        const repliersStatus = status === 'active' ? 'A' : 'U';
+        const response = await repliersClient.searchListings({
+          status: repliersStatus,
+          postalCode: postalCode,
+          city: city,
+          minPrice: minPrice ? parseInt(minPrice, 10) : undefined,
+          maxPrice: maxPrice ? parseInt(maxPrice, 10) : undefined,
+          minBeds: bedsMin ? parseInt(bedsMin, 10) : undefined,
+          minBaths: bathsMin ? parseInt(bathsMin, 10) : undefined,
+          resultsPerPage: parsedLimit,
+        });
+
+        results = (response.listings || []).map((listing: any) => {
+          const addr = listing.address || {};
+          const details = listing.details || {};
+          const map = listing.map || {};
+
+          const fullAddress = [
+            addr.streetNumber,
+            addr.streetName,
+            addr.streetSuffix,
+            addr.unitNumber ? `#${addr.unitNumber}` : null,
+          ].filter(Boolean).join(' ');
+
+          // Map Repliers status codes to MLS-standard values
+          const statusMap: Record<string, string> = {
+            'A': 'Active',
+            'U': 'Active Under Contract',
+            'S': 'Closed',
+            'P': 'Pending',
+          };
+          const mappedStatus = statusMap[listing.status] || listing.status || 'Active';
+
+          // Helper to get numeric value
+          const toNumber = (val: any): number | null => {
+            if (val == null) return null;
+            const num = Number(val);
+            return isNaN(num) ? null : num;
+          };
+
+          // Get the first bath value if it's an array
+          const bathsRaw = details.bathrooms ?? listing.bathroomsTotalInteger;
+          const baths = Array.isArray(bathsRaw) ? toNumber(bathsRaw[0]) : toNumber(bathsRaw);
+
+          return {
+            id: listing.mlsNumber || listing.listingId,
+            address: fullAddress || listing.unparsedAddress || 'Unknown Address',
+            city: addr.city || listing.city || '',
+            state: addr.state || listing.stateOrProvince || 'TX',
+            postalCode: addr.zip || listing.postalCode || '',
+            listPrice: toNumber(listing.listPrice) || 0,
+            closePrice: toNumber(listing.soldPrice) || null,
+            status: mappedStatus,
+            beds: toNumber(details.bedrooms ?? listing.bedroomsTotal),
+            baths: baths,
+            livingArea: toNumber(details.sqft || listing.livingArea),
+            yearBuilt: toNumber(details.yearBuilt || listing.yearBuilt),
+            latitude: toNumber(map.latitude ?? listing.latitude),
+            longitude: toNumber(map.longitude ?? listing.longitude),
+            photos: listing.photos || [],
+            subdivision: addr.neighborhood || listing.subdivisionName || null,
+            daysOnMarket: toNumber(listing.daysOnMarket),
+          };
+        });
+
+        // Server-side subdivision filter (Repliers doesn't support subdivision param directly)
+        if (subdivision) {
+          const subdivisionLower = subdivision.toLowerCase();
+          results = results.filter(p => 
+            p.subdivision?.toLowerCase().includes(subdivisionLower)
+          );
+        }
+
+      } else if (status === 'closed' || status === 'sold') {
+        // Use HomeReview API for closed/sold listings
+        const homeReviewClient = getHomeReviewClient();
+        const health = await homeReviewClient.checkHealth();
+        
+        if (!health.available) {
+          // Fallback to local database for closed listings
+          const dbResults = await storage.getProperties({
+            status: ['Closed'],
+            zipCodes: postalCode ? [postalCode] : undefined,
+            subdivisions: subdivision ? [subdivision] : undefined,
+            cities: city ? [city] : undefined,
+            listPriceMin: minPrice ? parseInt(minPrice, 10) : undefined,
+            listPriceMax: maxPrice ? parseInt(maxPrice, 10) : undefined,
+            bedroomsMin: bedsMin ? parseInt(bedsMin, 10) : undefined,
+            fullBathsMin: bathsMin ? parseInt(bathsMin, 10) : undefined,
+          }, parsedLimit, 0);
+
+          // Helper to get numeric value
+          const toNum = (val: any): number | null => {
+            if (val == null) return null;
+            const num = Number(val);
+            return isNaN(num) ? null : num;
+          };
+
+          results = dbResults.map((p: any) => ({
+            id: p.listingId || p.id,
+            address: p.unparsedAddress || [p.streetNumber, p.streetName, p.streetSuffix].filter(Boolean).join(' '),
+            city: p.city || '',
+            state: p.stateOrProvince || 'TX',
+            postalCode: p.postalCode || '',
+            listPrice: toNum(p.listPrice) || 0,
+            closePrice: toNum(p.closePrice) || null,
+            status: 'Closed',
+            beds: toNum(p.bedroomsTotal),
+            baths: toNum(p.bathroomsTotalInteger),
+            livingArea: toNum(p.livingArea),
+            yearBuilt: toNum(p.yearBuilt),
+            latitude: toNum(p.latitude),
+            longitude: toNum(p.longitude),
+            photos: p.photos || [],
+            subdivision: p.subdivisionName || null,
+            daysOnMarket: toNum(p.daysOnMarket),
+            cumulativeDaysOnMarket: toNum(p.cumulativeDaysOnMarket) || toNum(p.daysOnMarket),
+            lotSizeSquareFeet: toNum(p.lotSizeSquareFeet),
+            lotSizeAcres: toNum(p.lotSizeAcres),
+            garageSpaces: toNum(p.garageSpaces),
+            closeDate: p.closeDate || null,
+          }));
+        } else {
+          // Use HomeReview API
+          const response = await homeReviewClient.searchProperties({
+            status: 'Closed',
+            postalCodes: postalCode ? [postalCode] : undefined,
+            subdivision: subdivision,
+            city: city,
+            minPrice: minPrice ? parseInt(minPrice, 10) : undefined,
+            maxPrice: maxPrice ? parseInt(maxPrice, 10) : undefined,
+            minBeds: bedsMin ? parseInt(bedsMin, 10) : undefined,
+            minBaths: bathsMin ? parseInt(bathsMin, 10) : undefined,
+            limit: parsedLimit,
+          });
+
+          // Helper to get numeric value for HomeReview results
+          const toNumHR = (val: any): number | null => {
+            if (val == null) return null;
+            const num = Number(val);
+            return isNaN(num) ? null : num;
+          };
+
+          results = (response.properties || []).map((p: any) => ({
+            id: p.listingId || p.listingKey,
+            address: p.unparsedAddress || [p.streetNumber, p.streetName, p.streetSuffix].filter(Boolean).join(' '),
+            city: p.city || '',
+            state: p.stateOrProvince || 'TX',
+            postalCode: p.postalCode || '',
+            listPrice: toNumHR(p.listPrice) || 0,
+            closePrice: toNumHR(p.closePrice) || null,
+            status: 'Closed',
+            beds: toNumHR(p.bedroomsTotal),
+            baths: toNumHR(p.bathroomsTotalInteger),
+            livingArea: toNumHR(p.livingArea),
+            yearBuilt: toNumHR(p.yearBuilt),
+            latitude: toNumHR(p.latitude),
+            longitude: toNumHR(p.longitude),
+            photos: p.photos || [],
+            subdivision: p.subdivisionName || null,
+            daysOnMarket: toNumHR(p.daysOnMarket),
+            cumulativeDaysOnMarket: toNumHR(p.cumulativeDaysOnMarket) || toNumHR(p.daysOnMarket),
+            lotSizeSquareFeet: toNumHR(p.lotSizeSquareFeet),
+            lotSizeAcres: toNumHR(p.lotSizeAcres),
+            garageSpaces: toNumHR(p.garageSpaces),
+            closeDate: p.closeDate || null,
+          }));
+        }
+      } else {
+        res.status(400).json({ error: 'Invalid status. Use: active, under_contract, closed, or sold' });
+        return;
+      }
+
+      res.json({
+        properties: results,
+        count: results.length,
+        status: status,
+      });
+    } catch (error) {
+      console.error('Unified search error:', error);
+      res.status(500).json({ error: 'Search failed' });
+    }
+  });
+
   // Property routes
   app.get("/api/properties/search", async (req, res) => {
     try {
@@ -316,13 +554,86 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get("/api/properties/:id", async (req, res) => {
     try {
-      const property = await storage.getProperty(req.params.id);
-      if (!property) {
-        res.status(404).json({ error: "Property not found" });
+      const { id } = req.params;
+      const { source } = req.query;
+      
+      // If source=repliers, try Repliers API first (for active listings)
+      if (source === 'repliers' && isRepliersConfigured()) {
+        const repliersClient = getRepliersClient();
+        if (repliersClient) {
+          const listing = await repliersClient.getListing(id);
+          if (listing) {
+            // Normalize Repliers listing to standard format
+            const addr = listing.address || {};
+            const details = listing.details || {};
+            const map = listing.map || {};
+            
+            const fullAddress = [
+              addr.streetNumber,
+              addr.streetName,
+              addr.streetSuffix,
+              addr.unitNumber ? `#${addr.unitNumber}` : null,
+            ].filter(Boolean).join(' ');
+
+            const normalizedProperty = {
+              id: listing.mlsNumber,
+              listingId: listing.mlsNumber,
+              listingKey: listing.mlsNumber,
+              standardStatus: listing.status === 'A' ? 'Active' : listing.status === 'U' ? 'Under Contract' : listing.status,
+              listPrice: String(listing.listPrice || 0),
+              closePrice: listing.soldPrice ? String(listing.soldPrice) : null,
+              originalListPrice: listing.originalPrice ? String(listing.originalPrice) : null,
+              propertyType: details.propertyType || 'Residential',
+              city: addr.city || '',
+              stateOrProvince: addr.state || 'TX',
+              postalCode: addr.zip || '',
+              subdivisionName: addr.neighborhood || null,
+              unparsedAddress: fullAddress || 'Unknown Address',
+              latitude: map.latitude ? String(map.latitude) : null,
+              longitude: map.longitude ? String(map.longitude) : null,
+              bedroomsTotal: details.bedrooms ?? null,
+              bathroomsTotalInteger: details.bathrooms ?? null,
+              livingArea: details.sqft ? String(details.sqft) : null,
+              lotSizeSquareFeet: details.lotSize ? String(details.lotSize) : null,
+              yearBuilt: details.yearBuilt ?? null,
+              garageSpaces: details.garage ?? null,
+              photos: listing.photos || [],
+              photosCount: listing.photos?.length || 0,
+              publicRemarks: details.description || null,
+              daysOnMarket: listing.daysOnMarket ?? null,
+              listAgentFullName: listing.agent?.name || null,
+              listAgentEmail: listing.agent?.email || null,
+              listAgentDirectPhone: listing.agent?.phone || null,
+              listOfficeName: listing.office?.name || null,
+              listDate: listing.listDate || null,
+              soldDate: listing.soldDate || null,
+              modificationTimestamp: new Date().toISOString(),
+              originatingSystemName: 'Repliers',
+            };
+            
+            res.json(normalizedProperty);
+            return;
+          }
+        }
+      }
+      
+      // Default: try local database
+      const property = await storage.getProperty(id);
+      if (property) {
+        res.json(property);
         return;
       }
-      res.json(property);
+      
+      // Also try by listing ID if direct ID lookup fails
+      const propertyByListingId = await storage.getPropertyByListingId(id);
+      if (propertyByListingId) {
+        res.json(propertyByListingId);
+        return;
+      }
+      
+      res.status(404).json({ error: "Property not found" });
     } catch (error) {
+      console.error('Error fetching property:', error);
       res.status(500).json({ error: "Failed to fetch property" });
     }
   });
