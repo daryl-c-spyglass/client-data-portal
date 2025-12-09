@@ -10,6 +10,15 @@ Preferred communication style: Simple, everyday language.
 
 ## Recent Changes
 
+### Property SubType & Address Server-Side Filtering (Dec 9, 2025)
+- **Issue**: Repliers API doesn't support `propertySubType` or `streetName`/`streetNumber` filters directly - both Single Family homes and Land properties fall under "residential" class
+- **Solution**: Added server-side filtering in `/api/repliers/listings` endpoint:
+  - **propertySubType filter**: When "Single Family" is selected, excludes properties containing "land", "lot", "unimproved", "vacant" in their subtype
+  - **streetName filter**: Geocodes address via Mapbox, creates lat/lng bounding box (~1km), then post-filters for exact street match
+  - **streetNumber filter**: Supports min/max street number range filtering
+- **Performance**: Fetches 4x results when filtering is needed to ensure enough matches after filtering
+- **Tested**: Filtering for "Single Family" now correctly returns only "Single Family Residence" (no Land properties)
+
 ### Unified Search API with Repliers Primary (Dec 9, 2025)
 - **Repliers as Primary Data Source**: Repliers API is the preferred data source for property search
 - **Unified Search Endpoint**: Created GET /api/search that intelligently routes based on status:

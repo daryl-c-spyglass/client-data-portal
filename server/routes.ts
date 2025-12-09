@@ -1660,8 +1660,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const params: any = {};
       
-      // Server-side filter for propertySubType (Repliers doesn't support this directly)
+      // Server-side filters (Repliers doesn't support these directly)
       const propertySubTypeFilter = req.query.propertySubType as string | undefined;
+      const streetNameFilter = req.query.streetName as string | undefined;
+      const streetNumberMin = req.query.streetNumberMin ? parseInt(req.query.streetNumberMin as string) : undefined;
+      const streetNumberMax = req.query.streetNumberMax ? parseInt(req.query.streetNumberMax as string) : undefined;
+      const needsServerSideFiltering = !!(propertySubTypeFilter || streetNameFilter || streetNumberMin || streetNumberMax);
+      
       const requestedResultsPerPage = req.query.resultsPerPage 
         ? parseInt(req.query.resultsPerPage as string) 
         : 50;
@@ -1683,9 +1688,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (req.query.sortBy) params.sortBy = req.query.sortBy as string;
       if (req.query.class) params.class = req.query.class as string;
       
-      // If filtering by propertySubType, fetch more results to ensure enough after filtering
-      params.resultsPerPage = propertySubTypeFilter 
-        ? Math.min(requestedResultsPerPage * 3, 200) 
+      // If filtering by street address, try to geocode and use bounding box
+      if (streetNameFilter && isMapboxConfigured()) {
+        try {
+          // Build address string for geocoding
+          const addressParts = [streetNameFilter];
+          if (req.query.city) addressParts.push(req.query.city as string);
+          if (req.query.postalCode) addressParts.push(req.query.postalCode as string);
+          addressParts.push('TX'); // Default to Texas
+          
+          const geocodeResult = await geocodeAddress(addressParts.join(', '));
+          if (geocodeResult.latitude && geocodeResult.longitude) {
+            // Create a tight bounding box (~0.01 degrees = ~1km radius)
+            const delta = 0.01;
+            params.minLat = geocodeResult.latitude - delta;
+            params.maxLat = geocodeResult.latitude + delta;
+            params.minLng = geocodeResult.longitude - delta;
+            params.maxLng = geocodeResult.longitude + delta;
+            console.log(`Geocoded "${addressParts.join(', ')}" to lat/lng bounding box: ${params.minLat},${params.maxLat},${params.minLng},${params.maxLng}`);
+          }
+        } catch (geocodeError) {
+          console.log('Geocoding failed for street address search, will filter server-side:', geocodeError);
+        }
+      }
+      
+      // If filtering by server-side params, fetch more results to ensure enough after filtering
+      params.resultsPerPage = needsServerSideFiltering 
+        ? Math.min(requestedResultsPerPage * 4, 200) 
         : requestedResultsPerPage;
 
       const response = await client.searchListings(params);
@@ -1710,16 +1739,40 @@ export async function registerRoutes(app: Express): Promise<Server> {
           }
           return propSubType.includes(filterLower) || propSubType === filterLower;
         });
-        // Limit to requested count after filtering
+      }
+      
+      // Apply server-side street name filter
+      if (streetNameFilter) {
+        const streetLower = streetNameFilter.toLowerCase().trim();
+        standardizedProperties = standardizedProperties.filter(prop => {
+          const propStreetName = (prop.streetName || '').toLowerCase().trim();
+          const propAddress = (prop.unparsedAddress || prop.address || '').toLowerCase();
+          return propStreetName.includes(streetLower) || propAddress.includes(streetLower);
+        });
+      }
+      
+      // Apply server-side street number filter
+      if (streetNumberMin !== undefined || streetNumberMax !== undefined) {
+        standardizedProperties = standardizedProperties.filter(prop => {
+          const streetNum = parseInt(prop.streetNumber || '0', 10);
+          if (isNaN(streetNum)) return false;
+          if (streetNumberMin !== undefined && streetNum < streetNumberMin) return false;
+          if (streetNumberMax !== undefined && streetNum > streetNumberMax) return false;
+          return true;
+        });
+      }
+      
+      // Limit to requested count after all filtering
+      if (needsServerSideFiltering) {
         standardizedProperties = standardizedProperties.slice(0, requestedResultsPerPage);
       }
 
       res.json({
         properties: standardizedProperties,
-        total: propertySubTypeFilter ? standardizedProperties.length : response.count,
+        total: needsServerSideFiltering ? standardizedProperties.length : response.count,
         page: response.currentPage,
         totalPages: response.numPages,
-        resultsPerPage: propertySubTypeFilter ? standardizedProperties.length : response.resultsPerPage,
+        resultsPerPage: needsServerSideFiltering ? standardizedProperties.length : response.resultsPerPage,
       });
     } catch (error: any) {
       console.error("Repliers listings error:", error.message);
