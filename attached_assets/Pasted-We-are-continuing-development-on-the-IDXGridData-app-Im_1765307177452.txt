@@ -1,0 +1,57 @@
+We are continuing development on the IDXGridData app.
+
+Important data source preference from the client:
+- For this project, we want to use Repliers as the primary data source.
+- BO and IDX are for MLS Grid in general, but for this app Repliers has more functionality, so we want to keep testing it while we have free access.
+- MLS Grid and the local PostgreSQL database can still be used as a fallback or for long-term historical data, but Repliers should be preferred wherever possible.
+
+IMPORTANT: Do NOT modify the UI layout, styling, or component structure. The visual UI should remain exactly as it is. Only adjust backend logic, data mapping, and functionality.
+
+Please update the unified search and related logic as follows:
+
+1) Adjust unified search behavior inside GET /api/search:
+   - Continue using Repliers as the primary source for listing data:
+       • status=active or status=under_contract → use Repliers API.
+       • status=closed or status=sold → first try Repliers for sold/closed results.
+   - Only when Repliers cannot return results for closed/sold should the system fall back to our local PostgreSQL database (historical MLS Grid data).
+   - Preserve the normalized data shape and numeric types, including:
+       id
+       address
+       city
+       state
+       postalCode
+       listPrice
+       closePrice
+       status
+       beds
+       baths
+       livingArea
+       yearBuilt
+       latitude
+       longitude
+       photos[]
+       daysOnMarket
+       cumulativeDaysOnMarket
+       lotSizeSquareFeet
+       lotSizeAcres
+       garageSpaces
+       closeDate
+
+2) Ensure the Buyer Search page is fully wired to this updated unified search:
+   - The existing fields and “Search Properties” button should call /api/search with the correct parameters.
+   - Active searches should clearly be using Repliers as the source.
+   - Closed/sold searches should use Repliers first, and fall back to the database only as needed.
+   - Keep the existing card UI; do not modify layout or styling.
+
+3) Ensure CMA calculations use the normalized listing data:
+   - CMA statistics (min, max, average, median, price per square foot, days on market) must be computed only from the listings selected by the user.
+   - CMA should work consistently whether listings came from Repliers or from the fallback database.
+   - No CMA UI changes; only backend data loading, mapping, and calculations should be updated.
+
+4) Provide a test address:
+   - Please provide a real, verifiable property address that returns correct and complete results from Repliers.
+   - Then verify that the same property can be retrieved through:
+       • The unified /api/search endpoint
+       • The Buyer Search UI
+       • The Property Detail view
+   - This will allow us to confirm that the integration is functioning consistently across the backend and frontend.

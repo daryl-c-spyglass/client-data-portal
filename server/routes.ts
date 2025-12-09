@@ -320,6 +320,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
             photos: listing.photos || [],
             subdivision: addr.neighborhood || listing.subdivisionName || null,
             daysOnMarket: toNumber(listing.daysOnMarket),
+            cumulativeDaysOnMarket: toNumber(listing.cumulativeDaysOnMarket) || toNumber(listing.daysOnMarket),
+            lotSizeSquareFeet: toNumber(details.lotSize || listing.lotSizeSquareFeet),
+            lotSizeAcres: toNumber(listing.lotSizeAcres),
+            garageSpaces: toNumber(details.garage || listing.garageSpaces),
+            closeDate: listing.soldDate || listing.closeDate || null,
           };
         });
 
@@ -332,100 +337,57 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
 
       } else if (status === 'closed' || status === 'sold') {
-        // Use HomeReview API for closed/sold listings
-        const homeReviewClient = getHomeReviewClient();
-        const health = await homeReviewClient.checkHealth();
+        // Note: Repliers API only supports status 'A' (Active) and 'U' (Under Contract)
+        // Repliers does NOT support status 'S' (Sold) - it returns a 400 error
+        // Therefore, closed/sold listings must come from the local PostgreSQL database
+        // which contains historical MLS Grid data
+        console.log('📦 Using local database for closed/sold listings (Repliers does not support sold status)...');
         
-        if (!health.available) {
-          // Fallback to local database for closed listings
-          const dbResults = await storage.getProperties({
-            status: ['Closed'],
-            zipCodes: postalCode ? [postalCode] : undefined,
-            subdivisions: subdivision ? [subdivision] : undefined,
-            cities: city ? [city] : undefined,
-            listPriceMin: minPrice ? parseInt(minPrice, 10) : undefined,
-            listPriceMax: maxPrice ? parseInt(maxPrice, 10) : undefined,
-            bedroomsMin: bedsMin ? parseInt(bedsMin, 10) : undefined,
-            fullBathsMin: bathsMin ? parseInt(bathsMin, 10) : undefined,
-          }, parsedLimit, 0);
+        const dbResults = await storage.getProperties({
+          status: ['Closed'],
+          zipCodes: postalCode ? [postalCode] : undefined,
+          subdivisions: subdivision ? [subdivision] : undefined,
+          cities: city ? [city] : undefined,
+          listPriceMin: minPrice ? parseInt(minPrice, 10) : undefined,
+          listPriceMax: maxPrice ? parseInt(maxPrice, 10) : undefined,
+          bedroomsMin: bedsMin ? parseInt(bedsMin, 10) : undefined,
+          fullBathsMin: bathsMin ? parseInt(bathsMin, 10) : undefined,
+        }, parsedLimit, 0);
 
-          // Helper to get numeric value
-          const toNum = (val: any): number | null => {
-            if (val == null) return null;
-            const num = Number(val);
-            return isNaN(num) ? null : num;
-          };
+        // Helper to get numeric value
+        const toNum = (val: any): number | null => {
+          if (val == null) return null;
+          const num = Number(val);
+          return isNaN(num) ? null : num;
+        };
 
-          results = dbResults.map((p: any) => ({
-            id: p.listingId || p.id,
-            address: p.unparsedAddress || [p.streetNumber, p.streetName, p.streetSuffix].filter(Boolean).join(' '),
-            city: p.city || '',
-            state: p.stateOrProvince || 'TX',
-            postalCode: p.postalCode || '',
-            listPrice: toNum(p.listPrice) || 0,
-            closePrice: toNum(p.closePrice) || null,
-            status: 'Closed',
-            beds: toNum(p.bedroomsTotal),
-            baths: toNum(p.bathroomsTotalInteger),
-            livingArea: toNum(p.livingArea),
-            yearBuilt: toNum(p.yearBuilt),
-            latitude: toNum(p.latitude),
-            longitude: toNum(p.longitude),
-            photos: p.photos || [],
-            subdivision: p.subdivisionName || null,
-            daysOnMarket: toNum(p.daysOnMarket),
-            cumulativeDaysOnMarket: toNum(p.cumulativeDaysOnMarket) || toNum(p.daysOnMarket),
-            lotSizeSquareFeet: toNum(p.lotSizeSquareFeet),
-            lotSizeAcres: toNum(p.lotSizeAcres),
-            garageSpaces: toNum(p.garageSpaces),
-            closeDate: p.closeDate || null,
-          }));
-        } else {
-          // Use HomeReview API
-          const response = await homeReviewClient.searchProperties({
-            status: 'Closed',
-            postalCodes: postalCode ? [postalCode] : undefined,
-            subdivision: subdivision,
-            city: city,
-            minPrice: minPrice ? parseInt(minPrice, 10) : undefined,
-            maxPrice: maxPrice ? parseInt(maxPrice, 10) : undefined,
-            minBeds: bedsMin ? parseInt(bedsMin, 10) : undefined,
-            minBaths: bathsMin ? parseInt(bathsMin, 10) : undefined,
-            limit: parsedLimit,
-          });
+        results = dbResults.map((p: any) => ({
+          id: p.listingId || p.id,
+          address: p.unparsedAddress || [p.streetNumber, p.streetName, p.streetSuffix].filter(Boolean).join(' '),
+          city: p.city || '',
+          state: p.stateOrProvince || 'TX',
+          postalCode: p.postalCode || '',
+          listPrice: toNum(p.listPrice) || 0,
+          closePrice: toNum(p.closePrice) || null,
+          status: 'Closed',
+          beds: toNum(p.bedroomsTotal),
+          baths: toNum(p.bathroomsTotalInteger),
+          livingArea: toNum(p.livingArea),
+          yearBuilt: toNum(p.yearBuilt),
+          latitude: toNum(p.latitude),
+          longitude: toNum(p.longitude),
+          photos: p.photos || [],
+          subdivision: p.subdivisionName || null,
+          daysOnMarket: toNum(p.daysOnMarket),
+          cumulativeDaysOnMarket: toNum(p.cumulativeDaysOnMarket) || toNum(p.daysOnMarket),
+          lotSizeSquareFeet: toNum(p.lotSizeSquareFeet),
+          lotSizeAcres: toNum(p.lotSizeAcres),
+          garageSpaces: toNum(p.garageSpaces),
+          closeDate: p.closeDate || null,
+        }));
+        
+        console.log(`📦 Database returned ${results.length} closed/sold listings`);
 
-          // Helper to get numeric value for HomeReview results
-          const toNumHR = (val: any): number | null => {
-            if (val == null) return null;
-            const num = Number(val);
-            return isNaN(num) ? null : num;
-          };
-
-          results = (response.properties || []).map((p: any) => ({
-            id: p.listingId || p.listingKey,
-            address: p.unparsedAddress || [p.streetNumber, p.streetName, p.streetSuffix].filter(Boolean).join(' '),
-            city: p.city || '',
-            state: p.stateOrProvince || 'TX',
-            postalCode: p.postalCode || '',
-            listPrice: toNumHR(p.listPrice) || 0,
-            closePrice: toNumHR(p.closePrice) || null,
-            status: 'Closed',
-            beds: toNumHR(p.bedroomsTotal),
-            baths: toNumHR(p.bathroomsTotalInteger),
-            livingArea: toNumHR(p.livingArea),
-            yearBuilt: toNumHR(p.yearBuilt),
-            latitude: toNumHR(p.latitude),
-            longitude: toNumHR(p.longitude),
-            photos: p.photos || [],
-            subdivision: p.subdivisionName || null,
-            daysOnMarket: toNumHR(p.daysOnMarket),
-            cumulativeDaysOnMarket: toNumHR(p.cumulativeDaysOnMarket) || toNumHR(p.daysOnMarket),
-            lotSizeSquareFeet: toNumHR(p.lotSizeSquareFeet),
-            lotSizeAcres: toNumHR(p.lotSizeAcres),
-            garageSpaces: toNumHR(p.garageSpaces),
-            closeDate: p.closeDate || null,
-          }));
-        }
       } else {
         res.status(400).json({ error: 'Invalid status. Use: active, under_contract, closed, or sold' });
         return;
