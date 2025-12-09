@@ -10,6 +10,18 @@ Preferred communication style: Simple, everyday language.
 
 ## Recent Changes
 
+### Autocomplete & Dashboard Enhancements (Dec 9, 2025)
+- **Autocomplete for Schools**: Added autocomplete dropdowns for Elementary Schools, Middle Schools, High Schools, and School Districts in Buyer Search
+- **Dashboard Stats API**: Created GET /api/stats/dashboard endpoint returning totalActiveProperties, totalClosedProperties, activeCmas, sellerUpdates, systemStatus
+- **Dashboard Wiring**: Dashboard cards now display real counts from the API instead of fetching all records
+- **Sync MLS Button**: "Sync MLS Data" button now triggers the /api/sync endpoint with loading state
+- **CMA Builder Unified Search**: CMA Builder now uses unified /api/search endpoint for property search:
+  - Supports Active, Under Contract, and Closed/Sold status options
+  - Closed/Sold queries the PostgreSQL database for historical sold data
+  - Enables agents to add sold comparables to CMAs for accurate pricing analysis
+- **Seller Updates Fix**: Fixed Select.Item runtime error by replacing empty value prop with "all" value
+- **Autocomplete Deduplication**: Removed duplicate autocomplete routes that were returning raw arrays
+
 ### Property SubType & Address Server-Side Filtering (Dec 9, 2025)
 - **Issue**: Repliers API doesn't support `propertySubType` or `streetName`/`streetNumber` filters directly - both Single Family homes and Land properties fall under "residential" class
 - **Solution**: Added server-side filtering in `/api/repliers/listings` endpoint:

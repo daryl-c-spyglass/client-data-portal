@@ -67,7 +67,12 @@ export default function SellerUpdateNew() {
 
   const createMutation = useMutation({
     mutationFn: async (values: z.infer<typeof formSchema>) => {
-      return await apiRequest('POST', '/api/seller-updates', values);
+      // Convert "all" back to empty string for database storage
+      const cleanedValues = {
+        ...values,
+        propertySubType: values.propertySubType === 'all' ? '' : values.propertySubType,
+      };
+      return await apiRequest('/api/seller-updates', 'POST', cleanedValues);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/seller-updates'] });
@@ -259,7 +264,7 @@ export default function SellerUpdateNew() {
                             </SelectTrigger>
                           </FormControl>
                           <SelectContent>
-                            <SelectItem value="">All Types</SelectItem>
+                            <SelectItem value="all">All Types</SelectItem>
                             {propertyTypes && propertyTypes.map((type) => (
                               <SelectItem key={type} value={type}>
                                 {type}

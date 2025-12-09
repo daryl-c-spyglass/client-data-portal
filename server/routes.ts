@@ -1912,6 +1912,40 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Dashboard statistics
+  app.get("/api/stats/dashboard", async (req, res) => {
+    try {
+      const [allCmas, allSellerUpdates, healthStatus] = await Promise.all([
+        storage.getAllCmas(),
+        storage.getAllSellerUpdates(),
+        Promise.resolve({ mlsGridConfigured: mlsGridClient !== null, repliersConfigured: isRepliersConfigured() })
+      ]);
+      
+      // Get property counts from database
+      const allProperties = await storage.getAllProperties();
+      const activeProperties = allProperties.filter(p => 
+        p.standardStatus === 'Active' || p.standardStatus === 'Active Under Contract'
+      );
+      const closedProperties = allProperties.filter(p => 
+        p.standardStatus === 'Closed' || p.standardStatus === 'Sold'
+      );
+      
+      res.json({
+        totalActiveProperties: activeProperties.length,
+        totalClosedProperties: closedProperties.length,
+        totalProperties: allProperties.length,
+        activeCmas: allCmas.length,
+        sellerUpdates: allSellerUpdates.length,
+        systemStatus: healthStatus.repliersConfigured || healthStatus.mlsGridConfigured ? 'Ready' : 'Setup',
+        repliersConfigured: healthStatus.repliersConfigured,
+        mlsGridConfigured: healthStatus.mlsGridConfigured
+      });
+    } catch (error: any) {
+      console.error("Dashboard stats error:", error.message);
+      res.status(500).json({ error: "Failed to load dashboard stats" });
+    }
+  });
+
   // Health check
   app.get("/api/health", (req, res) => {
     res.json({ 

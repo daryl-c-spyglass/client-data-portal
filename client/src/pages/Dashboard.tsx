@@ -1,25 +1,56 @@
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Home, FileText, TrendingUp, Clock, AlertCircle } from "lucide-react";
+import { Home, FileText, TrendingUp, Clock, AlertCircle, RefreshCw } from "lucide-react";
 import { Link } from "wouter";
-import type { Property, Cma } from "@shared/schema";
+import { useToast } from "@/hooks/use-toast";
+import { apiRequest, queryClient } from "@/lib/queryClient";
+import type { Cma } from "@shared/schema";
+
+interface DashboardStats {
+  totalActiveProperties: number;
+  totalClosedProperties: number;
+  totalProperties: number;
+  activeCmas: number;
+  sellerUpdates: number;
+  systemStatus: string;
+  repliersConfigured: boolean;
+  mlsGridConfigured: boolean;
+}
 
 export default function Dashboard() {
-  const { data: properties = [], isLoading: propertiesLoading } = useQuery<Property[]>({
-    queryKey: ['/api/properties'],
+  const { toast } = useToast();
+  
+  const { data: stats, isLoading: statsLoading } = useQuery<DashboardStats>({
+    queryKey: ['/api/stats/dashboard'],
   });
 
   const { data: cmas = [], isLoading: cmasLoading } = useQuery<Cma[]>({
     queryKey: ['/api/cmas'],
   });
 
-  const { data: healthCheck } = useQuery<{ mlsGridConfigured: boolean }>({
-    queryKey: ['/api/health'],
+  const syncMutation = useMutation({
+    mutationFn: async () => {
+      return apiRequest('/api/sync', 'POST');
+    },
+    onSuccess: () => {
+      toast({
+        title: "Sync Started",
+        description: "MLS data sync has been triggered. This may take a few minutes.",
+      });
+      queryClient.invalidateQueries({ queryKey: ['/api/stats/dashboard'] });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Sync Failed",
+        description: error.message || "Failed to start MLS data sync",
+        variant: "destructive",
+      });
+    },
   });
 
-  const isLoading = propertiesLoading || cmasLoading;
+  const isLoading = statsLoading || cmasLoading;
 
   return (
     <div className="space-y-6">
@@ -28,18 +59,17 @@ export default function Dashboard() {
         <p className="text-muted-foreground">Welcome to your Spyglass Realty agent platform</p>
       </div>
 
-      {/* MLS Grid Status Alert */}
-      {healthCheck && !healthCheck.mlsGridConfigured && (
+      {stats && !stats.mlsGridConfigured && !stats.repliersConfigured && (
         <Card className="border-yellow-500 bg-yellow-50 dark:bg-yellow-900/20">
           <CardContent className="pt-6">
             <div className="flex items-start gap-4">
               <AlertCircle className="w-5 h-5 text-yellow-600 dark:text-yellow-500 flex-shrink-0 mt-0.5" />
               <div className="flex-1">
                 <h3 className="font-semibold text-yellow-900 dark:text-yellow-100 mb-1">
-                  MLS Grid API Not Configured
+                  API Not Configured
                 </h3>
                 <p className="text-sm text-yellow-800 dark:text-yellow-200">
-                  To start importing property data from MLS Grid, please configure your API credentials in the environment variables.
+                  To start importing property data, please configure your API credentials in the environment variables.
                 </p>
               </div>
             </div>
@@ -47,7 +77,6 @@ export default function Dashboard() {
         </Card>
       )}
 
-      {/* Stats Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -60,9 +89,11 @@ export default function Dashboard() {
             ) : (
               <>
                 <div className="text-2xl font-bold" data-testid="text-total-properties">
-                  {properties.length}
+                  {stats?.totalProperties?.toLocaleString() || 0}
                 </div>
-                <p className="text-xs text-muted-foreground">Available in system</p>
+                <p className="text-xs text-muted-foreground">
+                  {stats?.totalActiveProperties?.toLocaleString() || 0} active, {stats?.totalClosedProperties?.toLocaleString() || 0} closed
+                </p>
               </>
             )}
           </CardContent>
@@ -79,7 +110,7 @@ export default function Dashboard() {
             ) : (
               <>
                 <div className="text-2xl font-bold" data-testid="text-active-cmas">
-                  {cmas.length}
+                  {stats?.activeCmas || 0}
                 </div>
                 <p className="text-xs text-muted-foreground">Total created</p>
               </>
@@ -89,12 +120,20 @@ export default function Dashboard() {
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Saved Searches</CardTitle>
+            <CardTitle className="text-sm font-medium">Seller Updates</CardTitle>
             <TrendingUp className="w-4 h-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold" data-testid="text-saved-searches">0</div>
-            <p className="text-xs text-muted-foreground">Monitoring market</p>
+            {isLoading ? (
+              <Skeleton className="h-8 w-20" />
+            ) : (
+              <>
+                <div className="text-2xl font-bold" data-testid="text-saved-searches">
+                  {stats?.sellerUpdates || 0}
+                </div>
+                <p className="text-xs text-muted-foreground">Monitoring market</p>
+              </>
+            )}
           </CardContent>
         </Card>
 
@@ -104,15 +143,14 @@ export default function Dashboard() {
             <Clock className="w-4 h-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">
-              {healthCheck?.mlsGridConfigured ? 'Ready' : 'Setup'}
+            <div className="text-2xl font-bold" data-testid="text-system-status">
+              {stats?.systemStatus || 'Loading...'}
             </div>
             <p className="text-xs text-muted-foreground">Platform status</p>
           </CardContent>
         </Card>
       </div>
 
-      {/* Quick Actions */}
       <Card>
         <CardHeader>
           <CardTitle>Quick Actions</CardTitle>
@@ -130,20 +168,25 @@ export default function Dashboard() {
               Create CMA
             </Button>
           </Link>
-          <Button className="w-full" variant="outline" data-testid="button-sync-data">
-            <TrendingUp className="w-4 h-4 mr-2" />
-            Sync MLS Data
+          <Button 
+            className="w-full" 
+            variant="outline" 
+            data-testid="button-sync-data"
+            onClick={() => syncMutation.mutate()}
+            disabled={syncMutation.isPending}
+          >
+            <RefreshCw className={`w-4 h-4 mr-2 ${syncMutation.isPending ? 'animate-spin' : ''}`} />
+            {syncMutation.isPending ? 'Syncing...' : 'Sync MLS Data'}
           </Button>
         </CardContent>
       </Card>
 
-      {/* Recent CMAs */}
       <Card>
         <CardHeader>
           <CardTitle>Recent CMAs</CardTitle>
         </CardHeader>
         <CardContent>
-          {isLoading ? (
+          {cmasLoading ? (
             <div className="space-y-4">
               {[1, 2, 3].map((i) => (
                 <div key={i} className="flex items-center gap-4">

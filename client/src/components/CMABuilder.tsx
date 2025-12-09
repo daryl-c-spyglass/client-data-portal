@@ -10,12 +10,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { X, Plus, TrendingUp, Search, Loader2, AlertCircle, Home, MousePointerClick } from "lucide-react";
 import type { Property } from "@shared/schema";
 
-interface RepliersResponse {
+interface UnifiedSearchResponse {
   properties: Property[];
-  total: number;
-  page: number;
-  totalPages: number;
-  resultsPerPage: number;
+  count: number;
+  status: string;
 }
 
 interface CMABuilderProps {
@@ -42,29 +40,28 @@ export function CMABuilder({ onCreateCMA }: CMABuilderProps) {
 
   const buildSearchQuery = () => {
     const params = new URLSearchParams();
-    // Repliers uses status codes: A=Active, U=Under Contract, S=Sold
+    // Use unified search status values: active, under_contract, closed
     if (searchStatus) {
       const statusMap: Record<string, string> = {
-        'Active': 'A',
-        'Under Contract': 'U',
-        'Closed': 'S',
-        'Sold': 'S'
+        'Active': 'active',
+        'Under Contract': 'under_contract',
+        'Closed': 'closed',
+        'Sold': 'closed'
       };
-      params.set('status', statusMap[searchStatus] || searchStatus);
+      params.set('status', statusMap[searchStatus] || 'active');
     }
     if (searchCity) params.set('city', searchCity.trim());
-    if (searchSubdivision) params.set('neighborhood', searchSubdivision.trim());
-    if (searchMinBeds) params.set('minBeds', searchMinBeds);
+    if (searchSubdivision) params.set('subdivision', searchSubdivision.trim());
+    if (searchMinBeds) params.set('bedsMin', searchMinBeds);
     if (searchMaxPrice) params.set('maxPrice', searchMaxPrice);
-    params.set('resultsPerPage', '20');
-    params.set('class', 'residential');
+    params.set('limit', '20');
     return params.toString();
   };
 
-  const { data: searchResponse, isLoading, isError, error, refetch } = useQuery<RepliersResponse>({
-    queryKey: ['/api/repliers/listings', buildSearchQuery()],
+  const { data: searchResponse, isLoading, isError, error, refetch } = useQuery<UnifiedSearchResponse>({
+    queryKey: ['/api/search', buildSearchQuery()],
     queryFn: async () => {
-      const res = await fetch(`/api/repliers/listings?${buildSearchQuery()}`);
+      const res = await fetch(`/api/search?${buildSearchQuery()}`);
       if (!res.ok) throw new Error('Failed to search properties');
       return res.json();
     },
@@ -73,7 +70,7 @@ export function CMABuilder({ onCreateCMA }: CMABuilderProps) {
   });
 
   const searchResults = searchResponse?.properties || [];
-  const totalResults = searchResponse?.total || 0;
+  const totalResults = searchResponse?.count || 0;
 
   const handleSearch = () => {
     setSearchEnabled(true);
@@ -224,6 +221,7 @@ export function CMABuilder({ onCreateCMA }: CMABuilderProps) {
                 <SelectContent>
                   <SelectItem value="Active">Active</SelectItem>
                   <SelectItem value="Under Contract">Under Contract</SelectItem>
+                  <SelectItem value="Closed">Closed/Sold</SelectItem>
                 </SelectContent>
               </Select>
             </div>
