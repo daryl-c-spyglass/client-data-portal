@@ -1,16 +1,148 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Switch } from "@/components/ui/switch";
-import { CalendarIcon, Search } from "lucide-react";
+import { CalendarIcon, Search, X } from "lucide-react";
 import { format } from "date-fns";
-import { cn } from "@/lib/utils";
 import type { SearchCriteria } from "@shared/schema";
+
+interface AutocompleteOption {
+  value: string;
+  count: number;
+}
+
+interface AutocompleteInputProps {
+  id: string;
+  placeholder: string;
+  values: string[];
+  onChange: (values: string[]) => void;
+  apiEndpoint: string;
+  testId: string;
+}
+
+function AutocompleteInput({ id, placeholder, values, onChange, apiEndpoint, testId }: AutocompleteInputProps) {
+  const [inputValue, setInputValue] = useState('');
+  const [suggestions, setSuggestions] = useState<AutocompleteOption[]>([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+        setShowSuggestions(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  useEffect(() => {
+    const fetchSuggestions = async () => {
+      if (inputValue.length < 1) {
+        setSuggestions([]);
+        return;
+      }
+      
+      setIsLoading(true);
+      try {
+        const response = await fetch(`${apiEndpoint}?search=${encodeURIComponent(inputValue)}`);
+        if (response.ok) {
+          const data = await response.json();
+          setSuggestions(data.filter((item: AutocompleteOption) => 
+            !values.includes(item.value)
+          ));
+        }
+      } catch (error) {
+        console.error('Failed to fetch suggestions:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    const debounce = setTimeout(fetchSuggestions, 200);
+    return () => clearTimeout(debounce);
+  }, [inputValue, apiEndpoint, values]);
+
+  const addValue = (value: string) => {
+    if (!values.includes(value)) {
+      onChange([...values, value]);
+    }
+    setInputValue('');
+    setSuggestions([]);
+    inputRef.current?.focus();
+  };
+
+  const removeValue = (valueToRemove: string) => {
+    onChange(values.filter(v => v !== valueToRemove));
+  };
+
+  return (
+    <div ref={containerRef} className="relative">
+      <div className="flex flex-wrap gap-1 min-h-9 p-1 border rounded-md bg-background focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2">
+        {values.map((value, index) => (
+          <span 
+            key={index} 
+            className="inline-flex items-center gap-1 px-2 py-0.5 text-xs bg-primary/10 text-primary rounded"
+            data-testid={`tag-${testId}-${index}`}
+          >
+            {value}
+            <button 
+              type="button" 
+              onClick={() => removeValue(value)}
+              className="hover:bg-primary/20 rounded-full p-0.5"
+              data-testid={`button-remove-${testId}-${index}`}
+            >
+              <X className="w-3 h-3" />
+            </button>
+          </span>
+        ))}
+        <input
+          ref={inputRef}
+          id={id}
+          type="text"
+          className="flex-1 min-w-[100px] bg-transparent outline-none text-sm px-1"
+          placeholder={values.length === 0 ? placeholder : "Add more..."}
+          value={inputValue}
+          onChange={(e) => {
+            setInputValue(e.target.value);
+            setShowSuggestions(true);
+          }}
+          onFocus={() => {
+            if (inputValue.length > 0) setShowSuggestions(true);
+          }}
+          data-testid={testId}
+        />
+      </div>
+      
+      {showSuggestions && suggestions.length > 0 && (
+        <div className="absolute z-50 w-full mt-1 bg-popover border rounded-md shadow-lg max-h-60 overflow-auto">
+          {isLoading ? (
+            <div className="p-2 text-sm text-muted-foreground">Loading...</div>
+          ) : (
+            suggestions.map((suggestion, index) => (
+              <button
+                key={index}
+                type="button"
+                className="w-full px-3 py-2 text-left text-sm hover:bg-accent hover:text-accent-foreground flex justify-between items-center"
+                onClick={() => addValue(suggestion.value)}
+                data-testid={`suggestion-${testId}-${index}`}
+              >
+                <span>{suggestion.value}</span>
+                <span className="text-xs text-muted-foreground">({suggestion.count.toLocaleString()})</span>
+              </button>
+            ))
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
 
 interface SearchCriteriaProps {
   onSearch: (criteria: SearchCriteria) => void;
@@ -154,71 +286,59 @@ export function SearchCriteriaForm({ onSearch, initialCriteria = {} }: SearchCri
         </div>
       </div>
 
-      {/* Location */}
+      {/* Location with Autocomplete */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <div className="space-y-2">
           <Label htmlFor="neighborhood">Neighborhood</Label>
-          <Input 
+          <AutocompleteInput
             id="neighborhood"
-            placeholder="Select Neighborhood"
-            value={criteria.neighborhood?.join(', ') || ''}
-            onChange={(e) => updateCriteria('neighborhood', e.target.value ? e.target.value.split(',').map(s => s.trim()) : undefined)}
-            data-testid="input-neighborhood"
+            placeholder="Type to search..."
+            values={criteria.neighborhood || []}
+            onChange={(values) => updateCriteria('neighborhood', values.length > 0 ? values : undefined)}
+            apiEndpoint="/api/autocomplete/neighborhoods"
+            testId="input-neighborhood"
           />
         </div>
 
         <div className="space-y-2">
           <Label htmlFor="subdivisions">Subdivisions</Label>
-          <Input 
+          <AutocompleteInput
             id="subdivisions"
-            placeholder="Subdivisions"
-            value={criteria.subdivisions?.join(', ') || ''}
-            onChange={(e) => updateCriteria('subdivisions', e.target.value ? e.target.value.split(',').map(s => s.trim()) : undefined)}
-            data-testid="input-subdivisions"
+            placeholder="Type to search..."
+            values={criteria.subdivisions || []}
+            onChange={(values) => updateCriteria('subdivisions', values.length > 0 ? values : undefined)}
+            apiEndpoint="/api/autocomplete/subdivisions"
+            testId="input-subdivisions"
           />
         </div>
 
         <div className="space-y-2">
           <Label htmlFor="cities">Cities</Label>
-          <Input 
+          <AutocompleteInput
             id="cities"
-            placeholder="Start Typing"
-            value={criteria.cities?.join(', ') || ''}
-            onChange={(e) => updateCriteria('cities', e.target.value ? e.target.value.split(',').map(s => s.trim()) : undefined)}
-            data-testid="input-cities"
+            placeholder="Type to search..."
+            values={criteria.cities || []}
+            onChange={(values) => updateCriteria('cities', values.length > 0 ? values : undefined)}
+            apiEndpoint="/api/autocomplete/cities"
+            testId="input-cities"
           />
         </div>
 
         <div className="space-y-2">
           <Label htmlFor="zip-codes">Zip Codes</Label>
-          <Input 
+          <AutocompleteInput
             id="zip-codes"
-            placeholder="Start Typing"
-            value={criteria.zipCodes?.join(', ') || ''}
-            onChange={(e) => updateCriteria('zipCodes', e.target.value ? e.target.value.split(',').map(s => s.trim()) : undefined)}
-            data-testid="input-zip-codes"
+            placeholder="Type to search..."
+            values={criteria.zipCodes || []}
+            onChange={(values) => updateCriteria('zipCodes', values.length > 0 ? values : undefined)}
+            apiEndpoint="/api/autocomplete/zipcodes"
+            testId="input-zip-codes"
           />
         </div>
       </div>
 
       {/* Street */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div className="space-y-2">
-          <Label>Street Number</Label>
-          <div className="flex gap-2">
-            <Input 
-              type="number" 
-              placeholder="Min"
-              data-testid="input-street-number-min"
-            />
-            <Input 
-              type="number" 
-              placeholder="Max"
-              data-testid="input-street-number-max"
-            />
-          </div>
-        </div>
-
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div className="space-y-2">
           <Label htmlFor="street-name">Street Name</Label>
           <Input 

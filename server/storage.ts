@@ -92,6 +92,11 @@ export interface IStorage {
   // Lead Gate Settings operations
   getLeadGateSettings(): Promise<LeadGateSettings | undefined>;
   updateLeadGateSettings(settings: UpdateLeadGateSettings): Promise<LeadGateSettings>;
+  
+  // Autocomplete operations (optimized)
+  getAutocompleteCities(search: string, limit?: number): Promise<{ value: string; count: number }[]>;
+  getAutocompleteZipCodes(search: string, limit?: number): Promise<{ value: string; count: number }[]>;
+  getAutocompleteSubdivisions(search: string, limit?: number): Promise<{ value: string; count: number }[]>;
 }
 
 export class MemStorage implements IStorage {
@@ -529,6 +534,66 @@ export class MemStorage implements IStorage {
     }
     return this.leadGateSettings;
   }
+  
+  // Autocomplete operations (in-memory implementation)
+  async getAutocompleteCities(search: string, limit: number = 50): Promise<{ value: string; count: number }[]> {
+    const cityMap = new Map<string, number>();
+    const allProps = Array.from(this.properties.values());
+    
+    allProps.forEach(p => {
+      if (p.city && p.city.trim() !== '') {
+        const city = p.city.trim();
+        if (search === '' || city.toLowerCase().includes(search.toLowerCase())) {
+          cityMap.set(city, (cityMap.get(city) || 0) + 1);
+        }
+      }
+    });
+    
+    return Array.from(cityMap.entries())
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, limit)
+      .map(([value, count]) => ({ value, count }));
+  }
+  
+  async getAutocompleteZipCodes(search: string, limit: number = 50): Promise<{ value: string; count: number }[]> {
+    const zipMap = new Map<string, number>();
+    const allProps = Array.from(this.properties.values());
+    
+    allProps.forEach(p => {
+      if (p.postalCode && p.postalCode.trim() !== '') {
+        const zip = p.postalCode.trim();
+        if (search === '' || zip.includes(search)) {
+          zipMap.set(zip, (zipMap.get(zip) || 0) + 1);
+        }
+      }
+    });
+    
+    return Array.from(zipMap.entries())
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, limit)
+      .map(([value, count]) => ({ value, count }));
+  }
+  
+  async getAutocompleteSubdivisions(search: string, limit: number = 50): Promise<{ value: string; count: number }[]> {
+    const invalidNames = new Set(['none', 'n/a', 'na', '0', 'no', 'see legal', 'tbd', 'unknown', '-', '.']);
+    const subMap = new Map<string, number>();
+    const allProps = Array.from(this.properties.values());
+    
+    allProps.forEach(p => {
+      if (p.subdivision && p.subdivision.trim() !== '') {
+        const subdivision = p.subdivision.trim();
+        if (invalidNames.has(subdivision.toLowerCase())) return;
+        if (search === '' || subdivision.toLowerCase().includes(search.toLowerCase())) {
+          subMap.set(subdivision, (subMap.get(subdivision) || 0) + 1);
+        }
+      }
+    });
+    
+    return Array.from(subMap.entries())
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, limit)
+      .map(([value, count]) => ({ value, count }));
+  }
 }
 
 export class DbStorage implements IStorage {
@@ -747,17 +812,15 @@ export class DbStorage implements IStorage {
     // Note: Array field filters are basic OR matching for now
     // Future enhancement: Implement And/Not logic operators from searchCriteria
     
-    let query = this.db.select().from(properties).where(and(...conditions));
+    const effectiveLimit = limit ?? 500;
+    const effectiveOffset = offset ?? 0;
     
-    if (limit !== undefined) {
-      query = query.limit(limit);
-    }
-    
-    if (offset !== undefined) {
-      query = query.offset(offset);
-    }
-    
-    return await query;
+    return await this.db
+      .select()
+      .from(properties)
+      .where(and(...conditions))
+      .limit(effectiveLimit)
+      .offset(effectiveOffset);
   }
 
   async createProperty(insertProperty: InsertProperty): Promise<Property> {
@@ -1006,6 +1069,48 @@ export class DbStorage implements IStorage {
         .returning();
       return result[0];
     }
+  }
+  
+  // Autocomplete operations (optimized database queries)
+  async getAutocompleteCities(search: string, limit: number = 50): Promise<{ value: string; count: number }[]> {
+    const result = await this.db.execute(drizzleSql`
+      SELECT city as value, COUNT(*)::int as count 
+      FROM properties 
+      WHERE city IS NOT NULL AND city != ''
+      ${search ? drizzleSql`AND LOWER(city) LIKE ${`%${search.toLowerCase()}%`}` : drizzleSql``}
+      GROUP BY city 
+      ORDER BY count DESC 
+      LIMIT ${limit}
+    `);
+    return result.rows as { value: string; count: number }[];
+  }
+  
+  async getAutocompleteZipCodes(search: string, limit: number = 50): Promise<{ value: string; count: number }[]> {
+    const result = await this.db.execute(drizzleSql`
+      SELECT postal_code as value, COUNT(*)::int as count 
+      FROM properties 
+      WHERE postal_code IS NOT NULL AND postal_code != ''
+      ${search ? drizzleSql`AND postal_code LIKE ${`%${search}%`}` : drizzleSql``}
+      GROUP BY postal_code 
+      ORDER BY count DESC 
+      LIMIT ${limit}
+    `);
+    return result.rows as { value: string; count: number }[];
+  }
+  
+  async getAutocompleteSubdivisions(search: string, limit: number = 50): Promise<{ value: string; count: number }[]> {
+    const invalidNames = ['none', 'n/a', 'na', '0', 'no', 'see legal', 'tbd', 'unknown', '-', '.'];
+    const result = await this.db.execute(drizzleSql`
+      SELECT subdivision as value, COUNT(*)::int as count 
+      FROM properties 
+      WHERE subdivision IS NOT NULL AND subdivision != ''
+      AND LOWER(subdivision) NOT IN (${drizzleSql.join(invalidNames.map(n => drizzleSql`${n}`), drizzleSql`, `)})
+      ${search ? drizzleSql`AND LOWER(subdivision) LIKE ${`%${search.toLowerCase()}%`}` : drizzleSql``}
+      GROUP BY subdivision 
+      ORDER BY count DESC 
+      LIMIT ${limit}
+    `);
+    return result.rows as { value: string; count: number }[];
   }
 }
 
