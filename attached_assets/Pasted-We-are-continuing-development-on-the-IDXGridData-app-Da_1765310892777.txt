@@ -1,0 +1,180 @@
+We are continuing development on the IDXGridData app.
+
+Data source preference:
+- Repliers is the primary data source for active listings (and closed where available).
+- MLS Grid / PostgreSQL is secondary, mainly for historical sold data.
+- The unified /api/search endpoint and normalized listing format should continue to be used.
+
+IMPORTANT: Do NOT change any layout, styling, or visual design for Dashboard, Properties, CMAs, or Seller Updates. The UI structure (as shown in the current screenshots) must remain as-is. Only fix and enhance the underlying functionality, routing, and data wiring.
+
+Please focus on these sections:
+
+==================================================
+1) Dashboard behavior
+==================================================
+
+Current UI: 
+- Top metrics cards: Total Properties, Active CMAs, Saved Searches, System Status.
+- Quick Actions buttons: “Search Properties”, “Create CMA”, “Sync MLS Data”.
+- “Recent CMAs” list/cards underneath.
+
+Tasks:
+- Implement or update GET /api/stats/dashboard to return:
+  • totalActiveProperties – count of active listings from Repliers (or unified search).
+  • totalClosedProperties – count of closed/sold properties (from Repliers or PostgreSQL).
+  • activeCmas – count of CMA records in the database.
+  • savedSearches / sellerUpdates – count of saved seller updates or searches.
+  • systemStatus – simple status string like "Ready".
+
+- Wire the Dashboard cards so they display real numbers from /api/stats/dashboard instead of placeholders.
+
+- Ensure the Quick Actions buttons navigate correctly:
+  • "Search Properties" → Properties search page.
+  • "Create CMA" → CMA list page with Create New CMA flow (see CMAs section).
+  • "Sync MLS Data" → call the existing MLS sync endpoint or show current status (no UI redesign, just functional hookup).
+
+- Populate "Recent CMAs" with the most recently created CMAs, using the existing card UI.
+
+==================================================
+2) Properties section behavior
+==================================================
+
+Current UI:
+- Tabbed header with "Search Criteria" and "View Map".
+- Big filter form (Status toggles, Date Range, Property Subtype, List Price, MLS Areas, Neighborhood, Subdivisions, Cities, Zip Codes, etc.).
+- "Search Properties" button at the bottom.
+
+Tasks:
+- Ensure the Properties page uses the unified /api/search backend, just like Buyer Search:
+  • Map the Status toggles to status=active/under_contract/closed.
+  • Map key fields (price range, beds, baths, zip codes, subdivision, city, etc.) to the /api/search query parameters.
+  • For now, it is OK if not every single field is wired, but the core filters (status, price, beds, baths, ZIP, subdivision, city) must work reliably.
+
+- Make the "Search Properties" button execute a search against /api/search and show results in the existing “View Results” area using the current card/table design.
+
+- Each property result should be clickable and navigate to the existing Property Detail page (e.g., /properties/:id) using the normalized property ID.
+
+- Make sure errors (e.g., failing API calls) show a friendly error message in the results area rather than crashing the app.
+
+==================================================
+3) CMAs list + Create New CMA flow
+==================================================
+
+Current UI:
+- CMAs list: grid of CMA cards, plus a "Create New CMA" button.
+- Create New CMA page:
+  • Top: CMA name field.
+  • Search Properties section (City, Subdivision, Min Beds, Max Price, Status, Search button).
+  • Subject Property card (optional).
+  • Comparable Properties card (0/6).
+  • Analysis card.
+
+Expected behavior:
+- Clicking the "CMAs" menu item shows the list of saved CMAs.
+- Clicking "Create New CMA" should navigate to the Create New CMA page.
+- Creating a new CMA should save it and show it as a card in the CMAs list.
+
+Tasks:
+- Ensure routing is correct:
+  • "Create New CMA" button on the CMAs page → Create New CMA route.
+  • "Back to CMAs" link on the Create New CMA page → CMAs list.
+
+- On the Create New CMA page:
+  • Make the Search Properties form call the unified /api/search endpoint (or a dedicated Repliers-based CMA search endpoint) for active listings.
+  • Allow selecting a Subject Property via a search dialog or property picker (even if simple for now).
+  • Allow selecting multiple Comparable Properties (up to 6) from the search results and add them to the "Comparable Properties" card.
+
+- When the user clicks "Generate Report" (or whatever the CTA is):
+  • Create a CMA record in the database with:
+    – cmaName
+    – subjectPropertyId (optional)
+    – comparablePropertyIds[]
+    – createdAt, updatedAt
+  • Compute CMA statistics (min, max, average, median, price per sq ft, DOM) based only on the selected comparable properties using the normalized listing data.
+  • Save those statistics so they can be displayed on the CMA detail/view page and in any CMA emails/links.
+
+- Ensure the CMA list page reads from the CMA records table and displays:
+  • CMA name
+  • Created date
+  • Number of comparable properties (e.g., “3 comparable properties”).
+  • Clicking a CMA card should open its detail view.
+
+- Fix any existing issues where CMA stats do not match the selected properties.
+
+==================================================
+4) Seller Updates section + Create Update error
+==================================================
+
+Current UI:
+- Seller Updates page shows cards like:
+  • Name, email.
+  • Zip Code.
+  • School.
+  • Type (Single Family / Condo, etc.).
+  • Frequency (Weekly, etc.).
+  • Buttons: Preview, Pause, Delete.
+- "Create Update" button in the top-right.
+- Currently, clicking Create Update leads to an error overlay:
+  [plugin:runtime-error-plugin] A <Select.Item /> must have a value prop that is not an empty string. This is because the Select value can be set to an empty string to clear the selection and show the placeholder.
+
+Expected behavior:
+- Clicking "Create Update" opens a form page to define a new Seller Update.
+- On submit, it should create the update and redirect back to the Seller Updates list, showing the new card.
+- No runtime error should appear.
+
+Tasks:
+- Fix the Select.Item runtime error:
+  • In the Seller Update create/edit form, make sure every <Select.Item /> has a non-empty value prop.
+  • Ensure the Select components are controlled properly:
+    – Default value should be null or undefined, not an empty string.
+    – When the user selects an option, the value stored in state must be a valid non-empty string that matches a Select.Item value.
+  • This applies to selects such as:
+    – Property subtype (Single Family, Condo, etc.).
+    – Frequency (Daily, Weekly, Bi-weekly, Monthly).
+    – Any other dropdowns in the Seller Update form.
+
+- Implement/finalize backend for Seller Updates:
+  • Seller Update model should store:
+    – id
+    – name (e.g., client name or property address label)
+    – email
+    – zipCode
+    – elementarySchool
+    – propertySubtype
+    – frequency ('daily' | 'weekly' | 'bi-weekly' | 'monthly')
+    – status (active/paused)
+    – timestamps.
+  • REST endpoints:
+    – GET /api/seller-updates
+    – POST /api/seller-updates
+    – PUT /api/seller-updates/:id
+    – DELETE /api/seller-updates/:id
+
+- Wire the Seller Updates UI:
+  • "Create Update" button → Seller Update form page.
+  • Submitting the form → POST /api/seller-updates, then redirect back to the Seller Updates list and show the new card.
+  • Preview: show a modal or page that displays example market update content using data from /api/search with the saved filters.
+  • Pause: toggle the status field (active/paused).
+  • Delete: calls DELETE and removes the card from the list.
+
+- Email sending:
+  • If email provider (SendGrid, etc.) is configured, keep or implement a basic email send for Seller Updates, using the stored criteria to fetch matching properties.
+  • If no provider is configured, at least store or log the prepared email so we can test the logic without breaking.
+
+==================================================
+5) Provide test flows and addresses
+==================================================
+
+Finally, please provide:
+
+- One or more testing addresses that:
+  • Are returned from Repliers.
+  • Can be found via /api/search and the Properties/Buyer Search UI.
+  • Can be used in a CMA as comparables.
+  • Match what you see when querying Repliers directly.
+
+- A brief description of how to:
+  • Create a CMA using those addresses and verify the statistics.
+  • Create a Seller Update that targets a ZIP/school where those addresses fall, and successfully preview the update without errors.
+
+The goal is to have Dashboard, Properties, CMAs, and Seller Updates fully functional with the existing UI, using Repliers as the primary data source and MLS Grid/DB as secondary where needed.

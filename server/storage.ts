@@ -97,6 +97,10 @@ export interface IStorage {
   getAutocompleteCities(search: string, limit?: number): Promise<{ value: string; count: number }[]>;
   getAutocompleteZipCodes(search: string, limit?: number): Promise<{ value: string; count: number }[]>;
   getAutocompleteSubdivisions(search: string, limit?: number): Promise<{ value: string; count: number }[]>;
+  getAutocompleteElementarySchools(search: string, limit?: number): Promise<{ value: string; count: number }[]>;
+  getAutocompleteMiddleSchools(search: string, limit?: number): Promise<{ value: string; count: number }[]>;
+  getAutocompleteHighSchools(search: string, limit?: number): Promise<{ value: string; count: number }[]>;
+  getAutocompleteSchoolDistricts(search: string, limit?: number): Promise<{ value: string; count: number }[]>;
 }
 
 export class MemStorage implements IStorage {
@@ -590,6 +594,44 @@ export class MemStorage implements IStorage {
     });
     
     return Array.from(subMap.entries())
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, limit)
+      .map(([value, count]) => ({ value, count }));
+  }
+  
+  async getAutocompleteElementarySchools(search: string, limit: number = 50): Promise<{ value: string; count: number }[]> {
+    return this.getSchoolAutocomplete('elementarySchool', search, limit);
+  }
+  
+  async getAutocompleteMiddleSchools(search: string, limit: number = 50): Promise<{ value: string; count: number }[]> {
+    return this.getSchoolAutocomplete('middleOrJuniorSchool', search, limit);
+  }
+  
+  async getAutocompleteHighSchools(search: string, limit: number = 50): Promise<{ value: string; count: number }[]> {
+    return this.getSchoolAutocomplete('highSchool', search, limit);
+  }
+  
+  async getAutocompleteSchoolDistricts(search: string, limit: number = 50): Promise<{ value: string; count: number }[]> {
+    return this.getSchoolAutocomplete('schoolDistrict', search, limit);
+  }
+  
+  private getSchoolAutocomplete(field: keyof Property, search: string, limit: number): { value: string; count: number }[] {
+    const invalidNames = new Set(['none', 'n/a', 'na', '0', 'no', 'tbd', 'unknown', '-', '.', '']);
+    const schoolMap = new Map<string, number>();
+    const allProps = Array.from(this.properties.values());
+    
+    allProps.forEach(p => {
+      const value = p[field] as string | null | undefined;
+      if (value && value.trim() !== '') {
+        const school = value.trim();
+        if (invalidNames.has(school.toLowerCase())) return;
+        if (search === '' || school.toLowerCase().includes(search.toLowerCase())) {
+          schoolMap.set(school, (schoolMap.get(school) || 0) + 1);
+        }
+      }
+    });
+    
+    return Array.from(schoolMap.entries())
       .sort((a, b) => b[1] - a[1])
       .slice(0, limit)
       .map(([value, count]) => ({ value, count }));
@@ -1107,6 +1149,37 @@ export class DbStorage implements IStorage {
       AND LOWER(subdivision) NOT IN (${drizzleSql.join(invalidNames.map(n => drizzleSql`${n}`), drizzleSql`, `)})
       ${search ? drizzleSql`AND LOWER(subdivision) LIKE ${`%${search.toLowerCase()}%`}` : drizzleSql``}
       GROUP BY subdivision 
+      ORDER BY count DESC 
+      LIMIT ${limit}
+    `);
+    return result.rows as { value: string; count: number }[];
+  }
+  
+  async getAutocompleteElementarySchools(search: string, limit: number = 50): Promise<{ value: string; count: number }[]> {
+    return this.getSchoolAutocomplete('elementary_school', search, limit);
+  }
+  
+  async getAutocompleteMiddleSchools(search: string, limit: number = 50): Promise<{ value: string; count: number }[]> {
+    return this.getSchoolAutocomplete('middle_or_junior_school', search, limit);
+  }
+  
+  async getAutocompleteHighSchools(search: string, limit: number = 50): Promise<{ value: string; count: number }[]> {
+    return this.getSchoolAutocomplete('high_school', search, limit);
+  }
+  
+  async getAutocompleteSchoolDistricts(search: string, limit: number = 50): Promise<{ value: string; count: number }[]> {
+    return this.getSchoolAutocomplete('school_district', search, limit);
+  }
+  
+  private async getSchoolAutocomplete(column: string, search: string, limit: number): Promise<{ value: string; count: number }[]> {
+    const invalidNames = ['none', 'n/a', 'na', '0', 'no', 'tbd', 'unknown', '-', '.'];
+    const result = await this.db.execute(drizzleSql`
+      SELECT ${drizzleSql.raw(column)} as value, COUNT(*)::int as count 
+      FROM properties 
+      WHERE ${drizzleSql.raw(column)} IS NOT NULL AND ${drizzleSql.raw(column)} != ''
+      AND LOWER(${drizzleSql.raw(column)}) NOT IN (${drizzleSql.join(invalidNames.map(n => drizzleSql`${n}`), drizzleSql`, `)})
+      ${search ? drizzleSql`AND LOWER(${drizzleSql.raw(column)}) LIKE ${`%${search.toLowerCase()}%`}` : drizzleSql``}
+      GROUP BY ${drizzleSql.raw(column)} 
       ORDER BY count DESC 
       LIMIT ${limit}
     `);

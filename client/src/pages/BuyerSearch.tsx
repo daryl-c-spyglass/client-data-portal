@@ -1140,12 +1140,12 @@ export default function BuyerSearch() {
                 {/* Elementary Schools */}
                 <div className="space-y-3">
                   <Label className="text-base font-semibold">Elementary Schools</Label>
-                  <Input
-                    placeholder="Start Typing"
+                  <AutocompleteInput
+                    placeholder="Start typing school..."
                     value={filters.elementarySchool || ''}
-                    onChange={(e) => updateFilter('elementarySchool', e.target.value || undefined)}
-                    data-testid="input-elementarySchool"
-                    className="h-10"
+                    onChange={(value) => updateFilter('elementarySchool', value || undefined)}
+                    endpoint="/api/autocomplete/elementarySchools"
+                    testId="input-elementarySchool"
                   />
                   <RadioGroup
                     value={filters.elementarySchoolMode || 'OR'}
@@ -1167,12 +1167,12 @@ export default function BuyerSearch() {
                 {/* Middle Schools */}
                 <div className="space-y-3">
                   <Label className="text-base font-semibold">Middle/Junior Schools</Label>
-                  <Input
-                    placeholder="Start Typing"
+                  <AutocompleteInput
+                    placeholder="Start typing school..."
                     value={filters.middleSchool || ''}
-                    onChange={(e) => updateFilter('middleSchool', e.target.value || undefined)}
-                    data-testid="input-middleSchool"
-                    className="h-10"
+                    onChange={(value) => updateFilter('middleSchool', value || undefined)}
+                    endpoint="/api/autocomplete/middleSchools"
+                    testId="input-middleSchool"
                   />
                   <RadioGroup
                     value={filters.middleSchoolMode || 'OR'}
@@ -1194,12 +1194,12 @@ export default function BuyerSearch() {
                 {/* High Schools */}
                 <div className="space-y-3">
                   <Label className="text-base font-semibold">High Schools</Label>
-                  <Input
-                    placeholder="Start Typing"
+                  <AutocompleteInput
+                    placeholder="Start typing school..."
                     value={filters.highSchool || ''}
-                    onChange={(e) => updateFilter('highSchool', e.target.value || undefined)}
-                    data-testid="input-highSchool"
-                    className="h-10"
+                    onChange={(value) => updateFilter('highSchool', value || undefined)}
+                    endpoint="/api/autocomplete/highSchools"
+                    testId="input-highSchool"
                   />
                   <RadioGroup
                     value={filters.highSchoolMode || 'OR'}
@@ -1221,12 +1221,12 @@ export default function BuyerSearch() {
                 {/* School District */}
                 <div className="space-y-3">
                   <Label className="text-base font-semibold">School District</Label>
-                  <Input
-                    placeholder="Start Typing"
+                  <AutocompleteInput
+                    placeholder="Start typing district..."
                     value={filters.schoolDistrict || ''}
-                    onChange={(e) => updateFilter('schoolDistrict', e.target.value || undefined)}
-                    data-testid="input-schoolDistrict"
-                    className="h-10"
+                    onChange={(value) => updateFilter('schoolDistrict', value || undefined)}
+                    endpoint="/api/autocomplete/schoolDistricts"
+                    testId="input-schoolDistrict"
                   />
                   <RadioGroup
                     value={filters.schoolDistrictMode || 'OR'}

@@ -1843,6 +1843,74 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json({ suggestions: [] });
     }
   });
+  
+  app.get("/api/autocomplete/elementarySchools", async (req, res) => {
+    try {
+      const query = (req.query.q as string || '').trim();
+      if (query.length < 2) {
+        res.json({ suggestions: [] });
+        return;
+      }
+      
+      const results = await storage.getAutocompleteElementarySchools(query, 20);
+      const suggestions = results.map(r => r.value);
+      res.json({ suggestions });
+    } catch (error: any) {
+      console.error("Elementary school autocomplete error:", error.message);
+      res.json({ suggestions: [] });
+    }
+  });
+  
+  app.get("/api/autocomplete/middleSchools", async (req, res) => {
+    try {
+      const query = (req.query.q as string || '').trim();
+      if (query.length < 2) {
+        res.json({ suggestions: [] });
+        return;
+      }
+      
+      const results = await storage.getAutocompleteMiddleSchools(query, 20);
+      const suggestions = results.map(r => r.value);
+      res.json({ suggestions });
+    } catch (error: any) {
+      console.error("Middle school autocomplete error:", error.message);
+      res.json({ suggestions: [] });
+    }
+  });
+  
+  app.get("/api/autocomplete/highSchools", async (req, res) => {
+    try {
+      const query = (req.query.q as string || '').trim();
+      if (query.length < 2) {
+        res.json({ suggestions: [] });
+        return;
+      }
+      
+      const results = await storage.getAutocompleteHighSchools(query, 20);
+      const suggestions = results.map(r => r.value);
+      res.json({ suggestions });
+    } catch (error: any) {
+      console.error("High school autocomplete error:", error.message);
+      res.json({ suggestions: [] });
+    }
+  });
+  
+  app.get("/api/autocomplete/schoolDistricts", async (req, res) => {
+    try {
+      const query = (req.query.q as string || '').trim();
+      if (query.length < 2) {
+        res.json({ suggestions: [] });
+        return;
+      }
+      
+      const results = await storage.getAutocompleteSchoolDistricts(query, 20);
+      const suggestions = results.map(r => r.value);
+      res.json({ suggestions });
+    } catch (error: any) {
+      console.error("School district autocomplete error:", error.message);
+      res.json({ suggestions: [] });
+    }
+  });
 
   // Health check
   app.get("/api/health", (req, res) => {
