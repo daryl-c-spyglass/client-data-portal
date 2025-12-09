@@ -438,6 +438,14 @@ export default function BuyerSearch() {
       }
     }
     
+    // Street address filters (server-side filtering with geocoding)
+    if (filters.streetName) {
+      params.set('streetName', filters.streetName.trim());
+    }
+    if (filters.streetNumber) {
+      params.set('streetNumber', filters.streetNumber.trim());
+    }
+    
     // Sort - Repliers requires specific format like listPriceAsc or listPriceDesc
     params.set('sortBy', 'listPriceDesc');
     
@@ -990,24 +998,14 @@ export default function BuyerSearch() {
                 {/* Street Number */}
                 <div className="space-y-3">
                   <Label className="text-base font-semibold">Street Number</Label>
-                  <div className="grid grid-cols-2 gap-2">
-                    <Input
-                      placeholder="Min"
-                      type="number"
-                      value={filters.streetNumberMin || ''}
-                      onChange={(e) => updateFilter('streetNumberMin', e.target.value ? parseInt(e.target.value) : undefined)}
-                      data-testid="input-streetNumberMin"
-                      className="h-10"
-                    />
-                    <Input
-                      placeholder="Max"
-                      type="number"
-                      value={filters.streetNumberMax || ''}
-                      onChange={(e) => updateFilter('streetNumberMax', e.target.value ? parseInt(e.target.value) : undefined)}
-                      data-testid="input-streetNumberMax"
-                      className="h-10"
-                    />
-                  </div>
+                  <Input
+                    placeholder="e.g. 13212"
+                    type="text"
+                    value={filters.streetNumber || ''}
+                    onChange={(e) => updateFilter('streetNumber', e.target.value || undefined)}
+                    data-testid="input-streetNumber"
+                    className="h-10"
+                  />
                 </div>
 
                 {/* Street Name */}

@@ -1663,9 +1663,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Server-side filters (Repliers doesn't support these directly)
       const propertySubTypeFilter = req.query.propertySubType as string | undefined;
       const streetNameFilter = req.query.streetName as string | undefined;
-      const streetNumberMin = req.query.streetNumberMin ? parseInt(req.query.streetNumberMin as string) : undefined;
-      const streetNumberMax = req.query.streetNumberMax ? parseInt(req.query.streetNumberMax as string) : undefined;
-      const needsServerSideFiltering = !!(propertySubTypeFilter || streetNameFilter || streetNumberMin || streetNumberMax);
+      const streetNumberFilter = req.query.streetNumber as string | undefined;
+      const needsServerSideFiltering = !!(propertySubTypeFilter || streetNameFilter || streetNumberFilter);
       
       const requestedResultsPerPage = req.query.resultsPerPage 
         ? parseInt(req.query.resultsPerPage as string) 
@@ -1698,7 +1697,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           addressParts.push('TX'); // Default to Texas
           
           const geocodeResult = await geocodeAddress(addressParts.join(', '));
-          if (geocodeResult.latitude && geocodeResult.longitude) {
+          if (geocodeResult && geocodeResult.latitude && geocodeResult.longitude) {
             // Create a tight bounding box (~0.01 degrees = ~1km radius)
             const delta = 0.01;
             params.minLat = geocodeResult.latitude - delta;
@@ -1751,14 +1750,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
       
-      // Apply server-side street number filter
-      if (streetNumberMin !== undefined || streetNumberMax !== undefined) {
+      // Apply server-side street number filter (exact match)
+      if (streetNumberFilter) {
+        const targetNumber = streetNumberFilter.trim();
         standardizedProperties = standardizedProperties.filter(prop => {
-          const streetNum = parseInt(prop.streetNumber || '0', 10);
-          if (isNaN(streetNum)) return false;
-          if (streetNumberMin !== undefined && streetNum < streetNumberMin) return false;
-          if (streetNumberMax !== undefined && streetNum > streetNumberMax) return false;
-          return true;
+          const propStreetNumber = (prop.streetNumber || '').trim();
+          return propStreetNumber === targetNumber;
         });
       }
       
