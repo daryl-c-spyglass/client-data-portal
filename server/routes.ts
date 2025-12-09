@@ -1660,6 +1660,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const params: any = {};
       
+      // Server-side filter for propertySubType (Repliers doesn't support this directly)
+      const propertySubTypeFilter = req.query.propertySubType as string | undefined;
+      const requestedResultsPerPage = req.query.resultsPerPage 
+        ? parseInt(req.query.resultsPerPage as string) 
+        : 50;
+      
       if (req.query.status) params.status = req.query.status as string;
       if (req.query.minPrice) params.minPrice = parseInt(req.query.minPrice as string);
       if (req.query.maxPrice) params.maxPrice = parseInt(req.query.maxPrice as string);
@@ -1674,22 +1680,46 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (req.query.postalCode) params.postalCode = req.query.postalCode as string;
       if (req.query.neighborhood) params.neighborhood = req.query.neighborhood as string;
       if (req.query.pageNum) params.pageNum = parseInt(req.query.pageNum as string);
-      if (req.query.resultsPerPage) params.resultsPerPage = parseInt(req.query.resultsPerPage as string);
       if (req.query.sortBy) params.sortBy = req.query.sortBy as string;
       if (req.query.class) params.class = req.query.class as string;
+      
+      // If filtering by propertySubType, fetch more results to ensure enough after filtering
+      params.resultsPerPage = propertySubTypeFilter 
+        ? Math.min(requestedResultsPerPage * 3, 200) 
+        : requestedResultsPerPage;
 
       const response = await client.searchListings(params);
       
-      const standardizedProperties = response.listings.map(listing => 
+      let standardizedProperties = response.listings.map(listing => 
         client.mapToStandardProperty(listing)
       );
+      
+      // Apply server-side propertySubType filter
+      if (propertySubTypeFilter) {
+        const filterLower = propertySubTypeFilter.toLowerCase().trim();
+        standardizedProperties = standardizedProperties.filter(prop => {
+          const propSubType = (prop.propertySubType || prop.style || '').toLowerCase().trim();
+          // Exact match or contains the filter term
+          if (filterLower === 'single family') {
+            // Exclude land, lots, and unimproved properties when filtering for Single Family
+            const excludeTerms = ['land', 'lot', 'unimproved', 'vacant'];
+            const hasExcludeTerm = excludeTerms.some(term => propSubType.includes(term));
+            return propSubType.includes('single') || 
+                   propSubType.includes('detached') || 
+                   (propSubType.includes('family') && !hasExcludeTerm);
+          }
+          return propSubType.includes(filterLower) || propSubType === filterLower;
+        });
+        // Limit to requested count after filtering
+        standardizedProperties = standardizedProperties.slice(0, requestedResultsPerPage);
+      }
 
       res.json({
         properties: standardizedProperties,
-        total: response.count,
+        total: propertySubTypeFilter ? standardizedProperties.length : response.count,
         page: response.currentPage,
         totalPages: response.numPages,
-        resultsPerPage: response.resultsPerPage,
+        resultsPerPage: propertySubTypeFilter ? standardizedProperties.length : response.resultsPerPage,
       });
     } catch (error: any) {
       console.error("Repliers listings error:", error.message);

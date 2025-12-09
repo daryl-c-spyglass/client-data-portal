@@ -423,8 +423,12 @@ export default function BuyerSearch() {
     }
     
     // Property type - map to Repliers class values (residential, condo, commercial)
+    // Also pass propertySubType for server-side filtering since Repliers' class filter is too broad
     if (filters.propertySubType) {
       const subType = filters.propertySubType.toLowerCase();
+      // Pass original value for server-side filtering
+      params.set('propertySubType', filters.propertySubType);
+      // Also set class filter to reduce initial results
       if (subType === 'single family' || subType === 'townhouse') {
         params.set('propertyType', 'residential');
       } else if (subType === 'condo') {
