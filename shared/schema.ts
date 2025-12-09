@@ -331,10 +331,7 @@ export const searchCriteriaSchema = z.object({
   neighborhood: stringOrArray.optional(),
   subdivisions: stringOrArray.optional(),
   cities: stringOrArray.optional(),
-  streetNumber: z.object({
-    min: z.coerce.number().optional(),
-    max: z.coerce.number().optional(),
-  }).optional(),
+  streetNumber: z.coerce.number().optional(),
   streetName: z.string().optional(),
   unitNumber: z.string().optional(),
   zipCodes: stringOrArray.optional(),

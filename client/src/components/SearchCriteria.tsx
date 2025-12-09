@@ -338,12 +338,26 @@ export function SearchCriteriaForm({ onSearch, initialCriteria = {} }: SearchCri
       </div>
 
       {/* Street */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="space-y-2">
+          <Label htmlFor="street-number">Street Number</Label>
+          <Input 
+            id="street-number"
+            type="number"
+            placeholder="e.g. 3616"
+            value={criteria.streetNumber || ''}
+            onChange={(e) => updateCriteria('streetNumber', e.target.value ? Number(e.target.value) : undefined)}
+            data-testid="input-street-number"
+          />
+        </div>
+
         <div className="space-y-2">
           <Label htmlFor="street-name">Street Name</Label>
           <Input 
             id="street-name"
             placeholder="Street Name"
+            value={criteria.streetName || ''}
+            onChange={(e) => updateCriteria('streetName', e.target.value || undefined)}
             data-testid="input-street-name"
           />
         </div>
@@ -353,6 +367,8 @@ export function SearchCriteriaForm({ onSearch, initialCriteria = {} }: SearchCri
           <Input 
             id="unit-number"
             placeholder="Unit Number"
+            value={criteria.unitNumber || ''}
+            onChange={(e) => updateCriteria('unitNumber', e.target.value || undefined)}
             data-testid="input-unit-number"
           />
         </div>
