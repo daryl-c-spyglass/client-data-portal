@@ -2,11 +2,39 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Home, FileText, TrendingUp, Clock, AlertCircle, RefreshCw } from "lucide-react";
+import { Home, FileText, TrendingUp, Clock, AlertCircle, RefreshCw, BarChart3 } from "lucide-react";
 import { Link } from "wouter";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import type { Cma } from "@shared/schema";
+import {
+  LineChart,
+  Line,
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Legend,
+  ResponsiveContainer,
+} from "recharts";
+
+interface ListingsByMonth {
+  month: string;
+  active: number;
+  closed: number;
+}
+
+interface PriceDistribution {
+  range: string;
+  count: number;
+}
+
+interface CmasByMonth {
+  month: string;
+  count: number;
+}
 
 interface DashboardStats {
   totalActiveProperties: number;
@@ -28,6 +56,18 @@ export default function Dashboard() {
 
   const { data: cmas = [], isLoading: cmasLoading } = useQuery<Cma[]>({
     queryKey: ['/api/cmas'],
+  });
+
+  const { data: listingsByMonth = [], isLoading: listingsLoading } = useQuery<ListingsByMonth[]>({
+    queryKey: ['/api/stats/listings-by-month'],
+  });
+
+  const { data: priceDistribution = [], isLoading: priceLoading } = useQuery<PriceDistribution[]>({
+    queryKey: ['/api/stats/price-distribution'],
+  });
+
+  const { data: cmasByMonth = [], isLoading: cmasChartLoading } = useQuery<CmasByMonth[]>({
+    queryKey: ['/api/stats/cmas-by-month'],
   });
 
   const syncMutation = useMutation({
@@ -229,6 +269,158 @@ export default function Dashboard() {
           )}
         </CardContent>
       </Card>
+
+      {/* Market Insights Section */}
+      <div className="space-y-6">
+        <div className="flex items-center gap-2">
+          <BarChart3 className="w-6 h-6 text-primary" />
+          <h2 className="text-2xl font-bold">Market Insights</h2>
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* Market Activity Chart */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-lg">Market Activity (Last 12 Months)</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {listingsLoading ? (
+                <Skeleton className="h-64 w-full" />
+              ) : listingsByMonth.length > 0 ? (
+                <ResponsiveContainer width="100%" height={280}>
+                  <LineChart data={listingsByMonth.map(item => ({
+                    ...item,
+                    monthLabel: new Date(item.month + '-01').toLocaleDateString('en-US', { month: 'short', year: '2-digit' })
+                  }))}>
+                    <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                    <XAxis 
+                      dataKey="monthLabel" 
+                      tick={{ fontSize: 12 }}
+                      className="text-muted-foreground"
+                    />
+                    <YAxis tick={{ fontSize: 12 }} className="text-muted-foreground" />
+                    <Tooltip 
+                      contentStyle={{ 
+                        backgroundColor: 'hsl(var(--card))', 
+                        border: '1px solid hsl(var(--border))',
+                        borderRadius: '8px'
+                      }} 
+                    />
+                    <Legend />
+                    <Line 
+                      type="monotone" 
+                      dataKey="active" 
+                      stroke="hsl(var(--primary))" 
+                      strokeWidth={2}
+                      name="New Listings"
+                      dot={{ fill: 'hsl(var(--primary))' }}
+                    />
+                    <Line 
+                      type="monotone" 
+                      dataKey="closed" 
+                      stroke="hsl(142, 76%, 36%)" 
+                      strokeWidth={2}
+                      name="Closed Sales"
+                      dot={{ fill: 'hsl(142, 76%, 36%)' }}
+                    />
+                  </LineChart>
+                </ResponsiveContainer>
+              ) : (
+                <div className="h-64 flex items-center justify-center text-muted-foreground">
+                  No data available
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Price Distribution Chart */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-lg">Price Distribution (Active Listings)</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {priceLoading ? (
+                <Skeleton className="h-64 w-full" />
+              ) : priceDistribution.length > 0 ? (
+                <ResponsiveContainer width="100%" height={280}>
+                  <BarChart data={priceDistribution}>
+                    <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                    <XAxis 
+                      dataKey="range" 
+                      tick={{ fontSize: 11 }}
+                      className="text-muted-foreground"
+                    />
+                    <YAxis tick={{ fontSize: 12 }} className="text-muted-foreground" />
+                    <Tooltip 
+                      contentStyle={{ 
+                        backgroundColor: 'hsl(var(--card))', 
+                        border: '1px solid hsl(var(--border))',
+                        borderRadius: '8px'
+                      }}
+                      formatter={(value: number) => [value.toLocaleString(), 'Properties']}
+                    />
+                    <Bar 
+                      dataKey="count" 
+                      fill="hsl(var(--primary))" 
+                      radius={[4, 4, 0, 0]}
+                      name="Properties"
+                    />
+                  </BarChart>
+                </ResponsiveContainer>
+              ) : (
+                <div className="h-64 flex items-center justify-center text-muted-foreground">
+                  No data available
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* CMA Activity Chart */}
+          <Card className="lg:col-span-2">
+            <CardHeader>
+              <CardTitle className="text-lg">CMA Activity (Last 12 Months)</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {cmasChartLoading ? (
+                <Skeleton className="h-64 w-full" />
+              ) : cmasByMonth.length > 0 ? (
+                <ResponsiveContainer width="100%" height={280}>
+                  <BarChart data={cmasByMonth.map(item => ({
+                    ...item,
+                    monthLabel: new Date(item.month + '-01').toLocaleDateString('en-US', { month: 'short', year: '2-digit' })
+                  }))}>
+                    <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                    <XAxis 
+                      dataKey="monthLabel" 
+                      tick={{ fontSize: 12 }}
+                      className="text-muted-foreground"
+                    />
+                    <YAxis tick={{ fontSize: 12 }} className="text-muted-foreground" allowDecimals={false} />
+                    <Tooltip 
+                      contentStyle={{ 
+                        backgroundColor: 'hsl(var(--card))', 
+                        border: '1px solid hsl(var(--border))',
+                        borderRadius: '8px'
+                      }}
+                      formatter={(value: number) => [value, 'CMAs Created']}
+                    />
+                    <Bar 
+                      dataKey="count" 
+                      fill="hsl(var(--primary))" 
+                      radius={[4, 4, 0, 0]}
+                      name="CMAs Created"
+                    />
+                  </BarChart>
+                </ResponsiveContainer>
+              ) : (
+                <div className="h-64 flex items-center justify-center text-muted-foreground">
+                  No CMA data available
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+      </div>
     </div>
   );
 }

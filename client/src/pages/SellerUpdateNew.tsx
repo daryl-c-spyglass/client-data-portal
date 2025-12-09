@@ -59,11 +59,16 @@ export default function SellerUpdateNew() {
     queryKey: ['/api/properties/types'],
   });
 
-  // School autocomplete
-  const { data: schools } = useQuery<string[]>({
-    queryKey: ['/api/schools/elementary', schoolSearch],
+  // School autocomplete - using the autocomplete endpoint
+  const { data: schoolsResponse } = useQuery<{ suggestions: string[] }>({
+    queryKey: ['/api/autocomplete/elementarySchools', schoolSearch],
+    queryFn: async () => {
+      const res = await fetch(`/api/autocomplete/elementarySchools?q=${encodeURIComponent(schoolSearch)}`);
+      return res.json();
+    },
     enabled: schoolSearch.length >= 2,
   });
+  const schools = schoolsResponse?.suggestions || [];
 
   const createMutation = useMutation({
     mutationFn: async (values: z.infer<typeof formSchema>) => {

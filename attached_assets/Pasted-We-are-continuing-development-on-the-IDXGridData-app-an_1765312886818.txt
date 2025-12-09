@@ -1,0 +1,168 @@
+We are continuing development on the IDXGridData app and need to complete multiple functional enhancements across Dashboard, Properties, CMA Builder, Seller Updates, and add new professional dashboard graphs.
+
+Data source preference:
+- Repliers is the primary data source for active (and, where available, closed/sold) listings.
+- MLS Grid / PostgreSQL is a secondary source mainly for historical closed data.
+- Continue using the unified /api/search endpoint and normalized listing format.
+
+IMPORTANT UI REQUIREMENT:
+Do NOT change the visual layout, spacing, component structure, card positions, or styling of the Dashboard, Properties, CMA pages, or Seller Updates. All UI must remain visually identical to current screenshots. Only add missing functionality, fix logic, and insert additional sections *below* existing UI where noted.
+
+==================================================
+1) DASHBOARD FIXES + NEW “MARKET INSIGHTS” GRAPH SECTION
+==================================================
+
+Issues to fix:
+- Metric cards (Total Properties, Active CMAs, Saved Searches, System Status) currently show blank values.
+- “Sync MLS Data” button throws an error, likely because this app relies primarily on Repliers.
+
+Required:
+- Implement/confirm endpoint: GET /api/stats/dashboard returning:
+  • totalProperties (active listings count from Repliers)
+  • activeCmas (count of saved CMAs)
+  • savedSellerUpdates or savedSearches count
+  • systemStatus: "Ready"
+- Wire Dashboard.tsx to show real numbers.
+- Fix the “Sync MLS Data” button:
+  • If MLS sync is still available, handle gracefully without crashing.
+  • If MLS sync is not required, make the button show a harmless status response.
+
+NEW ENHANCEMENT — Add a “Market Insights” section UNDER current dashboard content:
+(Charts must not alter existing layout; they must appear as additional sections.)
+
+1) Market Activity (Last 12 Months)
+   - Chart: line or bar
+   - Data endpoint: GET /api/stats/listings-by-month
+     Returns:
+     [
+       { month: '2025-01', active: 120, closed: 85 },
+       { month: '2025-02', active: 135, closed: 92 },
+       ...
+     ]
+
+2) Price Distribution of Active Listings
+   - Chart: bar / histogram
+   - Data endpoint: GET /api/stats/price-distribution
+     Returns:
+     [
+       { range: '<400k', count: 25 },
+       { range: '400k-700k', count: 60 },
+       ...
+     ]
+
+3) CMA Activity (optional but preferred)
+   - Chart: line
+   - Data endpoint: GET /api/stats/cmas-by-month
+     Returns:
+     [
+       { month: '2025-01', count: 3 },
+       { month: '2025-02', count: 7 },
+       ...
+     ]
+
+Charts must:
+- Match Spyglass branding colors/typography
+- Be responsive
+- Handle loading/error states
+- Not modify any existing Dashboard sections
+
+==================================================
+2) PROPERTIES SECTION – AUTOCOMPLETE, SEARCH FIXES, IMAGES, MAP
+==================================================
+
+Issues:
+- Missing autocomplete suggestions for Neighborhood, Subdivision, City, Zip Code.
+- Search results page missing property images.
+- Returned results sometimes do not match the search criteria.
+- The interactive “View Map” tab is not working.
+
+Required:
+- Implement autocomplete endpoints & UI wiring (similar to school autocomplete) for:
+  • neighborhood
+  • subdivision
+  • city
+  • postalCode
+
+- Ensure the Properties page uses unified /api/search and correctly passes:
+  • status
+  • price range
+  • beds/baths
+  • city/subdivision/neighborhood/postalCode
+
+- Fix property images:
+  • Map normalized.photoUrls[0] (or equivalent from Repliers) to the card thumbnail.
+  • If no photos, use a placeholder.
+
+- Fix View Map:
+  • Make markers render using latitude/longitude from normalized properties.
+  • If a listing lacks coordinates, geocode ONLY when necessary.
+  • Switching between tabs (Search Criteria → View Map → View Results) must not break.
+
+==================================================
+3) CMA BUILDER – SEARCH RESULTS & CLOSED/SOLD COMPS
+==================================================
+
+Issues:
+- CMA search results do not show addresses.
+- Need ability to add Closed/Sold comparables.
+
+Required:
+- Update CMA Builder search results to show:
+  • Full address
+  • Price / close price
+  • Beds/baths/sqft
+  • Status
+
+- Ensure CMA Builder uses unified /api/search for:
+  • Active
+  • Under Contract
+  • Closed/Sold (now added)
+
+- Ensure CMA generation saves:
+  • subjectPropertyId
+  • comparablePropertyIds
+  • calculated stats (min/avg/median/max price, $/sqft, DOM)
+
+- Ensure CMA detail pages load correct stats.
+
+==================================================
+4) SELLER UPDATES – FORM FIXES & AUTOCOMPLETE
+==================================================
+
+Issues:
+- Elementary School does not autocomplete.
+- Property Type dropdown only shows “All Types”.
+- Prior Select.Item error must not return.
+
+Required:
+- Elementary School:
+  • Use same AutocompleteInput from Buyer Search.
+  • Suggest schools based on input.
+
+- Property Type dropdown:
+  • Show full list of subtypes supported by Repliers (Single Family, Condo, Townhouse, Multi-Family, etc.)
+  • Include a special “All Types” option that backend interprets correctly.
+
+- Form behavior:
+  • POST /api/seller-updates must work with correct payload.
+  • Redirect back to Seller Updates list after creation.
+  • No runtime errors.
+
+==================================================
+5) PROVIDE VERIFIED TEST ADDRESSES
+==================================================
+
+Please provide:
+- At least ONE ACTIVE listing address verified from Repliers that returns correctly through:
+  • /api/search
+  • Properties page results
+  • CMA Builder search
+- At least ONE CLOSED/SOLD listing address verified through:
+  • /api/search?status=closed
+  • CMA Builder comparable selection
+
+Include the exact filters used to retrieve them so we can test end-to-end.
+
+==================================================
+END OF INSTRUCTIONS
+==================================================
