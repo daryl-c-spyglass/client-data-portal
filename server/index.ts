@@ -9,7 +9,7 @@ import { setupVite, serveStatic, log } from "./vite";
 import { seedData } from "./seed-data";
 import { setupAuth } from "./auth";
 import { createMLSGridClient } from "./mlsgrid-client";
-import { startMLSGridSync } from "./mlsgrid-sync";
+import { startMLSGridScheduledSync, triggerManualSync } from "./mlsgrid-sync";
 import { startEmailScheduler } from "./email-scheduler";
 
 const app = express();
@@ -97,10 +97,9 @@ app.use((req, res, next) => {
   const mlsGridClient = createMLSGridClient();
   
   if (mlsGridClient && process.env.DATABASE_URL) {
-    // Automatic sync disabled to prevent OOM crashes
-    // Database already has 65,649 properties - manual sync can be triggered if needed
-    console.log('🚀 MLS Grid API configured (automatic sync disabled)');
-    // startMLSGridSync(mlsGridClient, 60);
+    // Enable scheduled sync at 12:00 AM CST daily
+    console.log('🚀 MLS Grid API configured - enabling scheduled sync');
+    startMLSGridScheduledSync(mlsGridClient);
   } else if (!process.env.MLSGRID_API_TOKEN) {
     // Seed sample data for development when MLS Grid is not configured
     await seedData();

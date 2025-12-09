@@ -2,6 +2,7 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { createMLSGridClient } from "./mlsgrid-client";
+import { triggerManualSync } from "./mlsgrid-sync";
 import { getHomeReviewClient, mapHomeReviewPropertyToSchema, type PropertySearchParams } from "./homereview-client";
 import { initRepliersClient, getRepliersClient, isRepliersConfigured } from "./repliers-client";
 import { geocodeAddress, geocodeProperties, isMapboxConfigured } from "./mapbox-geocoding";
@@ -854,22 +855,51 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // MLS Grid sync endpoint
-  app.post("/api/sync", async (req, res) => {
+  // MLS Grid sync endpoint - triggers manual sync
+  app.post("/api/sync", requireAuth, async (req, res) => {
     try {
       if (!mlsGridClient) {
         res.status(503).json({ error: "MLS Grid API not configured" });
         return;
       }
 
-      const { lastSyncTime } = req.body;
-      const timestamp = lastSyncTime ? new Date(lastSyncTime) : undefined;
+      console.log('🔄 Manual MLS Grid sync triggered by user');
       
-      // This would trigger a background sync process
-      // For now, we'll just return success
-      res.json({ message: "Sync initiated", timestamp: new Date().toISOString() });
+      // Start sync in background and respond immediately
+      triggerManualSync()
+        .then(() => console.log('✅ Manual MLS Grid sync completed'))
+        .catch(err => console.error('❌ Manual MLS Grid sync failed:', err));
+      
+      res.json({ 
+        message: "Sync initiated - this may take several minutes", 
+        timestamp: new Date().toISOString(),
+        note: "Check server logs for progress"
+      });
     } catch (error) {
       res.status(500).json({ error: "Failed to initiate sync" });
+    }
+  });
+  
+  // Get sync status
+  app.get("/api/sync/status", async (req, res) => {
+    try {
+      // Get current time in CST for next scheduled sync info
+      const now = new Date();
+      const cstFormatter = new Intl.DateTimeFormat('en-US', {
+        timeZone: 'America/Chicago',
+        hour: 'numeric',
+        minute: 'numeric',
+        hour12: true,
+      });
+      
+      res.json({
+        mlsGridConfigured: !!mlsGridClient,
+        scheduledSyncTime: "12:00 AM CST (daily)",
+        currentTimeCst: cstFormatter.format(now),
+        message: "MLS Grid sync runs automatically at 12:00 AM CST daily"
+      });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to get sync status" });
     }
   });
 

@@ -15,7 +15,12 @@ const db = pool ? drizzle(pool) : null;
 
 export class MLSGridSyncService {
   private syncInterval: NodeJS.Timeout | null = null;
+  private scheduledTimeout: NodeJS.Timeout | null = null;
   private isSyncing = false;
+  private useScheduledSync: boolean = false;
+  private scheduledHour: number = 0; // 12 AM
+  private scheduledMinute: number = 0;
+  private timezone: string = 'America/Chicago'; // CST/CDT
 
   constructor(
     private mlsGridClient: MLSGridClient,
@@ -23,7 +28,82 @@ export class MLSGridSyncService {
   ) {}
 
   /**
-   * Start automatic background sync
+   * Calculate milliseconds until next scheduled sync time (12 AM CST)
+   */
+  private getMillisecondsUntilNextSync(): number {
+    const now = new Date();
+    
+    // Get current time in CST
+    const cstFormatter = new Intl.DateTimeFormat('en-US', {
+      timeZone: this.timezone,
+      hour: 'numeric',
+      minute: 'numeric',
+      hour12: false,
+    });
+    
+    const cstParts = cstFormatter.formatToParts(now);
+    const currentHour = parseInt(cstParts.find(p => p.type === 'hour')?.value || '0');
+    const currentMinute = parseInt(cstParts.find(p => p.type === 'minute')?.value || '0');
+    
+    // Convert current time to total minutes since midnight
+    const currentTotalMinutes = currentHour * 60 + currentMinute;
+    const targetTotalMinutes = this.scheduledHour * 60 + this.scheduledMinute;
+    
+    // Calculate minutes until target time
+    let minutesUntilSync = targetTotalMinutes - currentTotalMinutes;
+    
+    if (minutesUntilSync <= 0) {
+      // Target time already passed today, schedule for tomorrow
+      minutesUntilSync += 24 * 60; // Add 24 hours in minutes
+    }
+    
+    const hoursUntil = Math.floor(minutesUntilSync / 60);
+    const minsUntil = minutesUntilSync % 60;
+    const milliseconds = minutesUntilSync * 60 * 1000;
+    
+    console.log(`⏰ Next MLS Grid sync scheduled in ${hoursUntil}h ${minsUntil}m (12:00 AM CST)`);
+    
+    return milliseconds;
+  }
+
+  /**
+   * Start scheduled sync at 12 AM CST daily
+   */
+  startScheduled() {
+    if (this.scheduledTimeout) {
+      console.log('⚠️ MLS Grid scheduled sync already running');
+      return;
+    }
+
+    this.useScheduledSync = true;
+    console.log('🕛 Starting MLS Grid scheduled sync (daily at 12:00 AM CST)');
+    
+    this.scheduleNextSync();
+  }
+
+  /**
+   * Schedule the next sync
+   */
+  private scheduleNextSync() {
+    const msUntilSync = this.getMillisecondsUntilNextSync();
+    
+    this.scheduledTimeout = setTimeout(async () => {
+      try {
+        console.log('🔄 Running scheduled MLS Grid sync (12:00 AM CST)...');
+        await this.syncAll();
+      } catch (error) {
+        console.error('❌ Scheduled MLS Grid sync failed:', error);
+      }
+      
+      // Schedule next day's sync
+      if (this.useScheduledSync) {
+        this.scheduleNextSync();
+      }
+    }, msUntilSync);
+  }
+
+  /**
+   * Start automatic background sync (interval-based)
    */
   start() {
     if (this.syncInterval) {
@@ -53,7 +133,13 @@ export class MLSGridSyncService {
     if (this.syncInterval) {
       clearInterval(this.syncInterval);
       this.syncInterval = null;
-      console.log('🛑 MLS Grid auto-sync stopped');
+      console.log('🛑 MLS Grid interval sync stopped');
+    }
+    if (this.scheduledTimeout) {
+      clearTimeout(this.scheduledTimeout);
+      this.scheduledTimeout = null;
+      this.useScheduledSync = false;
+      console.log('🛑 MLS Grid scheduled sync stopped');
     }
   }
 
@@ -456,6 +542,23 @@ export function startMLSGridSync(mlsGridClient: MLSGridClient, intervalMinutes: 
 
   syncService = new MLSGridSyncService(mlsGridClient, intervalMinutes);
   syncService.start();
+}
+
+export function startMLSGridScheduledSync(mlsGridClient: MLSGridClient): void {
+  if (syncService) {
+    console.log('MLS Grid sync service already running');
+    return;
+  }
+
+  syncService = new MLSGridSyncService(mlsGridClient);
+  syncService.startScheduled();
+}
+
+export function triggerManualSync(): Promise<void> {
+  if (!syncService) {
+    return Promise.reject(new Error('MLS Grid sync service not initialized'));
+  }
+  return syncService.syncAll();
 }
 
 export function stopMLSGridSync(): void {

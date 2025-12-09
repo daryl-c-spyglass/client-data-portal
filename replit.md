@@ -10,6 +10,15 @@ Preferred communication style: Simple, everyday language.
 
 ## Recent Changes
 
+### MLS Grid Scheduled Sync (Dec 9, 2025)
+- **Automatic Daily Sync**: Enabled scheduled MLS Grid sync to run automatically at 12:00 AM CST daily
+- **Fresh Data**: Ensures property database is updated with the latest listings before business hours
+- **Manual Trigger**: Added `/api/sync` POST endpoint (requires auth) to trigger manual sync when needed
+- **Sync Status**: Added `/api/sync/status` GET endpoint to check scheduled sync information
+- **Rate Limit Compliance**: Sync respects MLS Grid rate limits (2 req/sec, 7200 req/hour)
+- **Background Processing**: Sync runs in background without blocking API requests
+- **Implementation**: Uses `America/Chicago` timezone for accurate CST scheduling
+
 ### Spyglass Realty Branding (Dec 8, 2025)
 - **Brand Colors**: Updated to Spyglass Realty color scheme with orange primary (HSL 25, 90%, 52%) and clean black/white design
 - **Logo**: Added Spyglass Realty logo to sidebar header (attached_assets/Large_Logo_1765233192587.jpeg)
