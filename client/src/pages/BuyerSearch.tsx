@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { apiRequest } from "@/lib/queryClient";
@@ -6,6 +6,109 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { cn } from "@/lib/utils";
+
+interface AutocompleteInputProps {
+  placeholder?: string;
+  value: string;
+  onChange: (value: string) => void;
+  endpoint: string;
+  testId?: string;
+  className?: string;
+}
+
+function AutocompleteInput({ placeholder, value, onChange, endpoint, testId, className }: AutocompleteInputProps) {
+  const [inputValue, setInputValue] = useState(value || '');
+  const [suggestions, setSuggestions] = useState<string[]>([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    setInputValue(value || '');
+  }, [value]);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
+        setShowSuggestions(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const fetchSuggestions = useCallback(async (query: string) => {
+    if (query.length < 2) {
+      setSuggestions([]);
+      return;
+    }
+    setIsLoading(true);
+    try {
+      const res = await fetch(`${endpoint}?q=${encodeURIComponent(query)}`);
+      const data = await res.json();
+      setSuggestions(data.suggestions || []);
+    } catch (error) {
+      setSuggestions([]);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [endpoint]);
+
+  useEffect(() => {
+    const debounceTimer = setTimeout(() => {
+      fetchSuggestions(inputValue);
+    }, 300);
+    return () => clearTimeout(debounceTimer);
+  }, [inputValue, fetchSuggestions]);
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const newValue = e.target.value;
+    setInputValue(newValue);
+    setShowSuggestions(true);
+    onChange(newValue);
+  };
+
+  const handleSuggestionClick = (suggestion: string) => {
+    setInputValue(suggestion);
+    onChange(suggestion);
+    setShowSuggestions(false);
+  };
+
+  return (
+    <div ref={containerRef} className="relative">
+      <Input
+        ref={inputRef}
+        placeholder={placeholder}
+        value={inputValue}
+        onChange={handleInputChange}
+        onFocus={() => setShowSuggestions(true)}
+        data-testid={testId}
+        className={cn("h-10", className)}
+      />
+      {showSuggestions && suggestions.length > 0 && (
+        <div className="absolute z-50 w-full mt-1 bg-card border rounded-md shadow-lg max-h-48 overflow-y-auto">
+          {suggestions.map((suggestion, index) => (
+            <div
+              key={index}
+              className="px-3 py-2 cursor-pointer hover-elevate text-sm"
+              onClick={() => handleSuggestionClick(suggestion)}
+              data-testid={`suggestion-${testId}-${index}`}
+            >
+              {suggestion}
+            </div>
+          ))}
+        </div>
+      )}
+      {isLoading && inputValue.length >= 2 && (
+        <div className="absolute right-3 top-1/2 -translate-y-1/2">
+          <div className="h-4 w-4 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+        </div>
+      )}
+    </div>
+  );
+}
 import {
   Select,
   SelectContent,
@@ -917,12 +1020,12 @@ export default function BuyerSearch() {
                 {/* Subdivisions */}
                 <div className="space-y-3">
                   <Label className="text-base font-semibold">Subdivisions</Label>
-                  <Input
-                    placeholder="Subdivisions"
+                  <AutocompleteInput
+                    placeholder="Start typing subdivision..."
                     value={filters.subdivision || ''}
-                    onChange={(e) => updateFilter('subdivision', e.target.value || undefined)}
-                    data-testid="input-subdivision"
-                    className="h-10"
+                    onChange={(value) => updateFilter('subdivision', value || undefined)}
+                    endpoint="/api/autocomplete/subdivisions"
+                    testId="input-subdivision"
                   />
                   <RadioGroup
                     value={filters.subdivisionMode || 'OR'}
@@ -944,12 +1047,12 @@ export default function BuyerSearch() {
                 {/* Cities */}
                 <div className="space-y-3">
                   <Label className="text-base font-semibold">Cities</Label>
-                  <Input
-                    placeholder="Start Typing"
+                  <AutocompleteInput
+                    placeholder="Start typing city..."
                     value={filters.city || ''}
-                    onChange={(e) => updateFilter('city', e.target.value || undefined)}
-                    data-testid="input-city"
-                    className="h-10"
+                    onChange={(value) => updateFilter('city', value || undefined)}
+                    endpoint="/api/autocomplete/cities"
+                    testId="input-city"
                   />
                   <RadioGroup
                     value={filters.cityMode || 'OR'}
@@ -971,12 +1074,12 @@ export default function BuyerSearch() {
                 {/* Zip Codes */}
                 <div className="space-y-3">
                   <Label className="text-base font-semibold">Zip Codes</Label>
-                  <Input
-                    placeholder="Start Typing"
+                  <AutocompleteInput
+                    placeholder="Start typing zip code..."
                     value={filters.postalCode || ''}
-                    onChange={(e) => updateFilter('postalCode', e.target.value || undefined)}
-                    data-testid="input-postalCode"
-                    className="h-10"
+                    onChange={(value) => updateFilter('postalCode', value || undefined)}
+                    endpoint="/api/autocomplete/postalCodes"
+                    testId="input-postalCode"
                   />
                   <RadioGroup
                     value={filters.postalCodeMode || 'OR'}
