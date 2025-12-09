@@ -1006,56 +1006,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
-  // Autocomplete endpoints for location fields (optimized with direct DB queries)
-  
-  // Get unique cities for autocomplete
-  app.get("/api/autocomplete/cities", async (req, res) => {
-    try {
-      const search = (req.query.search as string) || '';
-      const cities = await storage.getAutocompleteCities(search, 50);
-      res.json(cities);
-    } catch (error) {
-      console.error("Cities autocomplete error:", error);
-      res.status(500).json({ error: "Failed to fetch cities" });
-    }
-  });
-  
-  // Get unique zip codes for autocomplete
-  app.get("/api/autocomplete/zipcodes", async (req, res) => {
-    try {
-      const search = (req.query.search as string) || '';
-      const zipcodes = await storage.getAutocompleteZipCodes(search, 50);
-      res.json(zipcodes);
-    } catch (error) {
-      console.error("Zipcodes autocomplete error:", error);
-      res.status(500).json({ error: "Failed to fetch zip codes" });
-    }
-  });
-  
-  // Get unique subdivisions for autocomplete
-  app.get("/api/autocomplete/subdivisions", async (req, res) => {
-    try {
-      const search = (req.query.search as string) || '';
-      const subdivisions = await storage.getAutocompleteSubdivisions(search, 50);
-      res.json(subdivisions);
-    } catch (error) {
-      console.error("Subdivisions autocomplete error:", error);
-      res.status(500).json({ error: "Failed to fetch subdivisions" });
-    }
-  });
-  
-  // Get unique neighborhoods for autocomplete (uses subdivision data)
-  app.get("/api/autocomplete/neighborhoods", async (req, res) => {
-    try {
-      const search = (req.query.search as string) || '';
-      const neighborhoods = await storage.getAutocompleteSubdivisions(search, 50);
-      res.json(neighborhoods);
-    } catch (error) {
-      console.error("Neighborhoods autocomplete error:", error);
-      res.status(500).json({ error: "Failed to fetch neighborhoods" });
-    }
-  });
-
   // Preview matching properties for a seller update
   app.get("/api/seller-updates/:id/preview", async (req, res) => {
     try {
