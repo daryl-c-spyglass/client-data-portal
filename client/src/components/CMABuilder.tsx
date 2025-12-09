@@ -10,11 +10,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { X, Plus, TrendingUp, Search, Loader2, AlertCircle, Home, MousePointerClick } from "lucide-react";
 import type { Property } from "@shared/schema";
 
-interface HomeReviewResponse {
+interface RepliersResponse {
   properties: Property[];
   total: number;
-  hasMore: boolean;
-  source: string;
+  page: number;
+  totalPages: number;
+  resultsPerPage: number;
 }
 
 interface CMABuilderProps {
@@ -36,24 +37,34 @@ export function CMABuilder({ onCreateCMA }: CMABuilderProps) {
   const [searchSubdivision, setSearchSubdivision] = useState("");
   const [searchMinBeds, setSearchMinBeds] = useState("");
   const [searchMaxPrice, setSearchMaxPrice] = useState("");
-  const [searchStatus, setSearchStatus] = useState("Closed");
+  const [searchStatus, setSearchStatus] = useState("Active");
   const [searchEnabled, setSearchEnabled] = useState(false);
 
   const buildSearchQuery = () => {
     const params = new URLSearchParams();
-    if (searchStatus) params.append('statuses', searchStatus);
-    if (searchCity) params.append('cities', searchCity.trim());
-    if (searchSubdivision) params.append('subdivisions', searchSubdivision.trim());
+    // Repliers uses status codes: A=Active, U=Under Contract, S=Sold
+    if (searchStatus) {
+      const statusMap: Record<string, string> = {
+        'Active': 'A',
+        'Under Contract': 'U',
+        'Closed': 'S',
+        'Sold': 'S'
+      };
+      params.set('status', statusMap[searchStatus] || searchStatus);
+    }
+    if (searchCity) params.set('city', searchCity.trim());
+    if (searchSubdivision) params.set('neighborhood', searchSubdivision.trim());
     if (searchMinBeds) params.set('minBeds', searchMinBeds);
     if (searchMaxPrice) params.set('maxPrice', searchMaxPrice);
-    params.set('limit', '20');
+    params.set('resultsPerPage', '20');
+    params.set('class', 'residential');
     return params.toString();
   };
 
-  const { data: searchResponse, isLoading, isError, error, refetch } = useQuery<HomeReviewResponse>({
-    queryKey: ['/api/homereview/properties', buildSearchQuery()],
+  const { data: searchResponse, isLoading, isError, error, refetch } = useQuery<RepliersResponse>({
+    queryKey: ['/api/repliers/listings', buildSearchQuery()],
     queryFn: async () => {
-      const res = await fetch(`/api/homereview/properties?${buildSearchQuery()}`);
+      const res = await fetch(`/api/repliers/listings?${buildSearchQuery()}`);
       if (!res.ok) throw new Error('Failed to search properties');
       return res.json();
     },
@@ -128,10 +139,12 @@ export function CMABuilder({ onCreateCMA }: CMABuilderProps) {
             <Label htmlFor="cma-name">CMA Name</Label>
             <Input
               id="cma-name"
+              name="cma-name"
               placeholder="e.g., Market Analysis for 123 Main St"
               value={cmaName}
               onChange={(e) => setCmaName(e.target.value)}
               data-testid="input-cma-name"
+              autoComplete="on"
             />
           </div>
         </CardContent>
@@ -144,7 +157,7 @@ export function CMABuilder({ onCreateCMA }: CMABuilderProps) {
             Search Properties
           </CardTitle>
           <CardDescription>
-            Find comparable properties from the HomeReview database (83,335+ properties)
+            Find comparable properties from the Repliers database (30,000+ active listings)
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -156,6 +169,8 @@ export function CMABuilder({ onCreateCMA }: CMABuilderProps) {
                 value={searchCity}
                 onChange={(e) => setSearchCity(e.target.value)}
                 data-testid="input-search-city"
+                autoComplete="on"
+                name="city"
               />
             </div>
             <div className="space-y-2">
@@ -165,6 +180,8 @@ export function CMABuilder({ onCreateCMA }: CMABuilderProps) {
                 value={searchSubdivision}
                 onChange={(e) => setSearchSubdivision(e.target.value)}
                 data-testid="input-search-subdivision"
+                autoComplete="on"
+                name="subdivision"
               />
             </div>
             <div className="space-y-2">
@@ -205,7 +222,6 @@ export function CMABuilder({ onCreateCMA }: CMABuilderProps) {
                   <SelectValue placeholder="Select status" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="Closed">Sold</SelectItem>
                   <SelectItem value="Active">Active</SelectItem>
                   <SelectItem value="Under Contract">Under Contract</SelectItem>
                 </SelectContent>
@@ -434,7 +450,7 @@ export function CMABuilder({ onCreateCMA }: CMABuilderProps) {
               <AlertCircle className="w-8 h-8 mx-auto text-destructive mb-2" />
               <p className="text-sm text-destructive mb-2">Unable to search properties</p>
               <p className="text-xs text-muted-foreground">
-                The HomeReview API may be temporarily unavailable. Please try again later.
+                The property search service may be temporarily unavailable. Please try again later.
               </p>
             </div>
           ) : searchResults.length > 0 ? (
