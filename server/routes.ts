@@ -270,10 +270,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
           resultsPerPage: parsedLimit,
         });
 
-        results = (response.listings || []).map((listing: any) => {
+        results = (response.listings || []).map((listing: any, idx: number) => {
           const addr = listing.address || {};
           const details = listing.details || {};
           const map = listing.map || {};
+
+          // Debug: Log raw beds/baths data from Repliers for first 3 listings
+          if (idx < 3) {
+            console.log(`🏠 [${idx}] Repliers listing ${listing.mlsNumber}:`, {
+              'details.bedrooms': details.bedrooms,
+              'listing.bedroomsTotal': listing.bedroomsTotal,
+              'details.bathrooms': details.bathrooms,
+              'listing.bathroomsTotalInteger': listing.bathroomsTotalInteger,
+              'details.numBedrooms': details.numBedrooms,
+              'details.numBathrooms': details.numBathrooms,
+            });
+          }
 
           const fullAddress = [
             addr.streetNumber,
@@ -298,9 +310,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
             return isNaN(num) ? null : num;
           };
 
-          // Get the first bath value if it's an array
-          const bathsRaw = details.bathrooms ?? listing.bathroomsTotalInteger;
-          const baths = Array.isArray(bathsRaw) ? toNumber(bathsRaw[0]) : toNumber(bathsRaw);
+          // Get beds/baths - Repliers uses numBedrooms/numBathrooms or bedrooms/bathrooms
+          const bedsRaw = details.numBedrooms ?? details.bedrooms ?? listing.bedroomsTotal;
+          const beds = toNumber(bedsRaw);
+          
+          // Get baths - handle array format from Repliers
+          const bathsRaw = details.numBathrooms ?? details.bathrooms ?? listing.bathroomsTotalInteger;
+          const baths = Array.isArray(bathsRaw) && bathsRaw.length > 0 ? toNumber(bathsRaw[0]) : toNumber(bathsRaw);
 
           // Get photos from images or photos field (Repliers uses 'images')
           const rawPhotos = listing.images || listing.photos || [];
@@ -317,7 +333,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             listPrice: toNumber(listing.listPrice) || 0,
             closePrice: toNumber(listing.soldPrice) || null,
             status: mappedStatus,
-            beds: toNumber(details.bedrooms ?? listing.bedroomsTotal),
+            beds: beds,
             baths: baths,
             livingArea: toNumber(details.sqft || listing.livingArea),
             yearBuilt: toNumber(details.yearBuilt || listing.yearBuilt),
