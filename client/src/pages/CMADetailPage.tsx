@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useRoute } from "wouter";
+import { useRoute, useLocation } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -14,12 +14,14 @@ import {
   DialogDescription, 
   DialogHeader, 
   DialogTitle,
-  DialogTrigger 
+  DialogTrigger,
+  DialogFooter
 } from "@/components/ui/dialog";
+import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import type { Cma, Property, PropertyStatistics, TimelineDataPoint } from "@shared/schema";
-import { queryClient } from "@/lib/queryClient";
+import { queryClient, apiRequest } from "@/lib/queryClient";
 
 interface ShareResponse {
   shareToken: string;
@@ -29,9 +31,12 @@ interface ShareResponse {
 
 export default function CMADetailPage() {
   const [, params] = useRoute("/cmas/:id");
+  const [, setLocation] = useLocation();
   const id = params?.id;
   const { toast } = useToast();
   const [shareDialogOpen, setShareDialogOpen] = useState(false);
+  const [notesDialogOpen, setNotesDialogOpen] = useState(false);
+  const [notes, setNotes] = useState("");
   const [copied, setCopied] = useState(false);
 
   const { data: cma, isLoading: cmaLoading, refetch: refetchCma } = useQuery<Cma>({
@@ -115,7 +120,71 @@ export default function CMADetailPage() {
     },
   });
 
+  const updateNotesMutation = useMutation({
+    mutationFn: async (newNotes: string) => {
+      const response = await fetch(`/api/cmas/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ notes: newNotes }),
+      });
+      if (!response.ok) throw new Error('Failed to update notes');
+      return response.json();
+    },
+    onSuccess: () => {
+      refetchCma();
+      setNotesDialogOpen(false);
+      toast({
+        title: "Notes saved",
+        description: "Your notes have been updated.",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to save notes.",
+        variant: "destructive",
+      });
+    },
+  });
+
   const properties = cma ? ((cma as any).propertiesData || []) : [];
+
+  // Sync notes state when CMA loads
+  const handleOpenNotesDialog = () => {
+    setNotes(cma?.notes || "");
+    setNotesDialogOpen(true);
+  };
+
+  const handleSaveNotes = () => {
+    updateNotesMutation.mutate(notes);
+  };
+
+  const handleSave = () => {
+    toast({
+      title: "CMA Saved",
+      description: "Your CMA has been saved successfully.",
+    });
+  };
+
+  const handleModifySearch = () => {
+    // Navigate back to create new CMA with similar search criteria
+    toast({
+      title: "Modify Search",
+      description: "This feature allows you to create a new CMA with modified search criteria.",
+    });
+    setLocation('/cmas/new');
+  };
+
+  const handleModifyStats = () => {
+    toast({
+      title: "Modify Stats",
+      description: "Statistics are automatically calculated from the selected properties. To change stats, modify the comparable properties in a new CMA.",
+    });
+  };
+
+  const handlePrint = () => {
+    window.print();
+  };
 
   const isLoading = cmaLoading || statsLoading || timelineLoading;
 
@@ -303,12 +372,49 @@ export default function CMADetailPage() {
         timelineData={timelineData}
         isPreview={true}
         expiresAt={cma.expiresAt ? new Date(cma.expiresAt) : new Date(Date.now() + 30 * 60 * 1000)}
-        onSave={() => console.log("Save")}
+        onSave={handleSave}
         onPublicLink={() => setShareDialogOpen(true)}
-        onModifySearch={() => console.log("Modify search")}
-        onModifyStats={() => console.log("Modify stats")}
-        onAddNotes={() => console.log("Add notes")}
+        onModifySearch={handleModifySearch}
+        onModifyStats={handleModifyStats}
+        onAddNotes={handleOpenNotesDialog}
+        onPrint={handlePrint}
       />
+
+      {/* Notes Dialog */}
+      <Dialog open={notesDialogOpen} onOpenChange={setNotesDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>CMA Notes</DialogTitle>
+            <DialogDescription>
+              Add notes or comments to this CMA report.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4">
+            <Label htmlFor="notes">Notes</Label>
+            <Textarea
+              id="notes"
+              placeholder="Enter your notes here..."
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              rows={6}
+              className="mt-2"
+              data-testid="textarea-notes"
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setNotesDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button 
+              onClick={handleSaveNotes}
+              disabled={updateNotesMutation.isPending}
+              data-testid="button-save-notes"
+            >
+              {updateNotesMutation.isPending ? 'Saving...' : 'Save Notes'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

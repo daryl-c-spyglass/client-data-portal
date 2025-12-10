@@ -1,0 +1,197 @@
+Here’s a prompt you can paste into Replit Agent:
+
+---
+
+I’m attaching screenshots of:
+
+* **Create New CMA** screen
+* **Generated CMA report** (Home Averages, Listings, Timeline, Market Stats tabs)
+
+Please update the CMA flow and report based on the notes below. **Do not change the existing UI layout or general styling**—just fix the behavior, data mapping, and small UX details.
+
+---
+
+## 1) CMA Name – Better Default Name
+
+**Current behavior:**
+If the user doesn’t type a CMA name, it shows as “Untitled CMA”.
+
+**Required behavior:**
+
+* If the CMA Name field is left blank on save/generate:
+
+  * Auto-generate a name using available info, e.g.:
+
+    * If subdivision is filled:
+      `"<Subdivision> CMA – <Status> – <current date/time>"`
+      Example: `"Barton Hills CMA – Sold/Closed – 2025-02-10 3:15 PM"`
+
+    * Else if city is filled:
+      `"<City> CMA – <Status> – <current date/time>"`
+
+    * Else fall back to:
+      `"CMA – <Status> – <current date/time>"`
+
+* The generated name should appear:
+
+  * In the CMA list/grid
+  * At the top of the report (Home Averages / Listings / Timeline / Market Stats)
+  * In any exported PDF filename
+
+---
+
+## 2) Search Properties – Autocomplete for City & Subdivision
+
+On **Create New CMA → Search Properties**:
+
+* For **City** and **Subdivision** fields:
+
+  * Use the same autocomplete behavior we have elsewhere (e.g., Buyer Search / Seller Updates).
+  * As the user types, show suggestions pulled from the same data source used for City/Subdivision (Repliers / DB).
+  * User should be able to pick from suggestions or type a full value manually.
+
+---
+
+## 3) Search Results – Card Data & Behavior
+
+In the **Search Results** section on Create New CMA:
+
+**Current issues:**
+
+* Cards are very minimal; they don’t show enough information.
+
+**Required behavior:**
+
+* Each search result card should show at least:
+
+  * **Address** (full street address)
+  * **Beds**
+  * **Baths**
+  * **Living area (sqft)**
+  * **Price**
+  * **Photo/thumbnail** (first photo from the property’s photo array; fall back to placeholder if no photos)
+
+* When a user clicks on a card:
+
+  * It should work similarly to the Property section – i.e., show the property information (detail view or slide-out) using the same data source and mapping.
+  * Selection as Subject or Comparable should still work as it does now.
+
+Use the same normalized property mapping that is used in the Properties section so data is consistent.
+
+---
+
+## 4) Analysis & “Generate Report” Flow
+
+**Current behavior:**
+
+* After adding comparable properties, the Analysis column shows stats.
+* “Generate Report” creates the CMA report, but there are inconsistencies in the subsequent tabs.
+
+**Required behavior & checks:**
+
+1. After comparables are selected, the **Analysis** card should compute summary stats correctly (avg/median, etc.) based only on the selected comps.
+
+2. When the user clicks **“Generate Report”**:
+
+   * They should be taken to the created CMA report page (Home Averages / Listings / Timeline / Market Stats).
+   * All data shown in the report should match the selected comps from the builder.
+
+3. **Home Averages tab:**
+
+   * Show stats based on the selected comparables.
+   * **Do NOT show the individual property addresses** in the Home Averages table (keep it summary-level).
+
+4. **Listings tab (Price Distribution chart):**
+
+   * Ensure the price distribution chart is using the same data as the CMA (selected comps only).
+   * Values (low/avg/med/high) should match the CMA stats.
+
+5. **Timeline tab:**
+
+   * Currently shows blank data.
+   * Populate the timeline using available data (e.g., closeDate / listDate / status changes) by status:
+
+     * Active
+     * Under Contract
+     * Closed
+   * If there truly is no timeline data, show a clear “No timeline data available” message instead of an empty chart.
+
+6. **Market Stats tab:**
+
+   * Currently shows **0 active listings**, even though Barton Hills example has 2 active listings when searching.
+   * Fix the stats so:
+
+     * Active count, average DOM, price per sqft, etc., are calculated from the same selected comparables.
+   * Double-check that “Active Listings” is correct for the example where Barton Hills has 2 active properties.
+
+---
+
+## 5) Top Yellow Bar – Buttons and Actions
+
+At the top of the CMA report (yellow bar), several actions are currently broken or not wired up:
+
+Buttons:
+
+* **Save + Send**
+* **Public Link**
+* **Modify Search**
+* **Modify Stats**
+* **Notes**
+* **Printer icon** (export)
+
+### Required behavior:
+
+1. **Save + Send**
+
+   * Should save the CMA configuration and mark it as a saved report.
+   * Then open/send the client-facing report (or at least prepare it for sending – use existing intended behavior from the old MLS Grid implementation if there is one).
+   * If email sending is not yet implemented, at least:
+
+     * Save the CMA
+     * Show a confirmation that it was saved successfully
+
+2. **Public Link**
+
+   * Currently the generated public link opens a blank/empty page.
+   * Fix so that:
+
+     * The public link shows the same CMA data as the preview (Home Averages / Listings / Timeline / Market Stats) but in a client-safe/public view.
+     * Verify that the link works when pasted into a new browser tab or shared.
+
+3. **Modify Search**
+
+   * This should allow the user to go back to the CMA builder with the **same search criteria and selected comparables**, not reset everything.
+   * User can adjust filters or add/remove comps and then re-generate the report.
+
+4. **Modify Stats**
+
+   * Clarify the intended purpose (e.g., manual override of stats, toggling which comps are included, etc.).
+   * Implement the intended functionality or hide the button if it’s not ready.
+   * Right now it does nothing; make it either functional or remove it from the UI.
+
+5. **Notes**
+
+   * Should allow the user to add internal notes about the CMA.
+   * Notes should be saved with the CMA record and visible when reopening/editing that CMA.
+   * If notes are not implemented yet, either implement a basic text-notes feature or hide the button.
+
+6. **Printer Icon / Export**
+
+   * This should generate an exportable **PDF** of the CMA report.
+   * The PDF filename should match the CMA name (from section 1) – e.g.,
+     `"<CMA Name>.pdf"`
+   * Content should reflect the same data/layout as the on-screen report, suitable for printing or sending to clients.
+
+---
+
+### Summary
+
+Please:
+
+1. Improve default CMA naming when empty (based on city/subdivision/status + date/time).
+2. Add autocomplete suggestions for City and Subdivision in the CMA Search Properties form.
+3. Enhance CMA search result cards to show address, beds, baths, sqft, price, and photo, and open property info on click.
+4. Ensure “Generate Report” creates a CMA whose Home Averages, Listings (price distribution), Timeline, and Market Stats all reflect the selected comparables and are not blank or inconsistent.
+5. Fix all actions in the yellow bar (Save + Send, Public Link, Modify Search, Modify Stats, Notes, Printer/PDF) so they work as described.
+
+Use the attached screenshots as visual reference, and keep the UI look-and-feel the same—just wire up the data and behaviors correctly.

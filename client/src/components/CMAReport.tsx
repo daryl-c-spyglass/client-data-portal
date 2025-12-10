@@ -19,6 +19,7 @@ interface CMAReportProps {
   onModifySearch?: () => void;
   onModifyStats?: () => void;
   onAddNotes?: () => void;
+  onPrint?: () => void;
 }
 
 export function CMAReport({ 
@@ -31,7 +32,8 @@ export function CMAReport({
   onPublicLink,
   onModifySearch,
   onModifyStats,
-  onAddNotes
+  onAddNotes,
+  onPrint
 }: CMAReportProps) {
   const [activeTab, setActiveTab] = useState("home-averages");
   const [activeListingTab, setActiveListingTab] = useState("all");
@@ -94,7 +96,7 @@ export function CMAReport({
             <Button size="sm" variant="outline" onClick={onAddNotes} data-testid="button-notes">
               Notes
             </Button>
-            <Button size="sm" variant="outline" data-testid="button-print">
+            <Button size="sm" variant="outline" onClick={onPrint} data-testid="button-print">
               <Printer className="w-4 h-4" />
             </Button>
           </div>
@@ -253,9 +255,9 @@ export function CMAReport({
         <TabsContent value="timeline" className="space-y-6">
           <Card>
             <CardHeader>
-              <div className="flex items-center justify-between">
+              <div className="flex items-center justify-between flex-wrap gap-4">
                 <CardTitle>Price Timeline</CardTitle>
-                <div className="flex items-center gap-4">
+                <div className="flex items-center gap-4 flex-wrap">
                   <div className="flex items-center gap-2">
                     <div className="w-3 h-3 rounded-full bg-green-500"></div>
                     <span className="text-sm">Active</span>
@@ -276,39 +278,48 @@ export function CMAReport({
               </div>
             </CardHeader>
             <CardContent>
-              <div className="h-[400px]">
-                <ResponsiveContainer width="100%" height="100%">
-                  <ScatterChart>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis 
-                      dataKey="date" 
-                      type="number"
-                      domain={['dataMin', 'dataMax']}
-                      tickFormatter={(value) => new Date(value).toLocaleDateString()}
-                    />
-                    <YAxis 
-                      dataKey="price"
-                      tickFormatter={(value) => `$${(value / 1000).toFixed(0)}k`}
-                    />
-                    <Tooltip 
-                      formatter={(value, name) => {
-                        if (name === 'price') return `$${Number(value).toLocaleString()}`;
-                        return value;
-                      }}
-                      labelFormatter={(value) => new Date(value).toLocaleDateString()}
-                    />
-                    <Scatter 
-                      name="Properties" 
-                      data={timelineData.map(d => ({ 
-                        ...d, 
-                        date: new Date(d.date).getTime(),
-                        fill: d.status === 'Active' ? '#22c55e' : d.status === 'Under Contract' ? '#eab308' : '#ef4444'
-                      }))} 
-                      fill="hsl(var(--primary))"
-                    />
-                  </ScatterChart>
-                </ResponsiveContainer>
-              </div>
+              {timelineData.length > 0 ? (
+                <div className="h-[400px]">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <ScatterChart>
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis 
+                        dataKey="date" 
+                        type="number"
+                        domain={['dataMin', 'dataMax']}
+                        tickFormatter={(value) => new Date(value).toLocaleDateString()}
+                      />
+                      <YAxis 
+                        dataKey="price"
+                        tickFormatter={(value) => `$${(value / 1000).toFixed(0)}k`}
+                      />
+                      <Tooltip 
+                        formatter={(value, name) => {
+                          if (name === 'price') return `$${Number(value).toLocaleString()}`;
+                          return value;
+                        }}
+                        labelFormatter={(value) => new Date(value).toLocaleDateString()}
+                      />
+                      <Scatter 
+                        name="Properties" 
+                        data={timelineData.map(d => ({ 
+                          ...d, 
+                          date: new Date(d.date).getTime(),
+                          fill: d.status === 'Active' ? '#22c55e' : d.status === 'Under Contract' ? '#eab308' : '#ef4444'
+                        }))} 
+                        fill="hsl(var(--primary))"
+                      />
+                    </ScatterChart>
+                  </ResponsiveContainer>
+                </div>
+              ) : (
+                <div className="h-[400px] flex items-center justify-center">
+                  <div className="text-center text-muted-foreground">
+                    <p className="text-lg font-medium mb-2">No timeline data available</p>
+                    <p className="text-sm">Timeline data requires properties with listing or closing dates.</p>
+                  </div>
+                </div>
+              )}
             </CardContent>
           </Card>
         </TabsContent>

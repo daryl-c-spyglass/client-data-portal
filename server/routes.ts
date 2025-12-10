@@ -578,16 +578,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         } else if (statusType === 'pending') {
           fetchPromises.push(fetchFromRepliers('P'));
         } else if (statusType === 'closed' || statusType === 'sold') {
-          // Try Repliers first for sold listings, then fallback to database
-          fetchPromises.push(
-            fetchFromRepliers('S').then(results => {
-              if (results.length > 0) {
-                return results;
-              }
-              // Fallback to database only if Repliers returns no sold data
-              return fetchFromDatabase();
-            })
-          );
+          // Repliers API only supports 'A' (Active) and 'U' (Under Contract)
+          // For closed/sold listings, always fetch from database
+          fetchPromises.push(fetchFromDatabase());
         }
       }
 
@@ -993,6 +986,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   app.put("/api/cmas/:id", async (req, res) => {
+    try {
+      const cma = await storage.updateCma(req.params.id, req.body);
+      if (!cma) {
+        res.status(404).json({ error: "CMA not found" });
+        return;
+      }
+      res.json(cma);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to update CMA" });
+    }
+  });
+
+  // PATCH for partial updates (like updating notes)
+  app.patch("/api/cmas/:id", async (req, res) => {
     try {
       const cma = await storage.updateCma(req.params.id, req.body);
       if (!cma) {
