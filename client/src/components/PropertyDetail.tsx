@@ -243,7 +243,38 @@ export function PropertyDetail({
           <TabsContent value="history">
             <Card>
               <CardContent className="pt-6">
-                <p className="text-muted-foreground">Property history information coming soon.</p>
+                <div className="space-y-4">
+                  <div>
+                    <h4 className="font-semibold mb-2">Listing Information</h4>
+                    <ul className="space-y-1 text-sm text-muted-foreground">
+                      {property.listingId && <li>MLS #: {property.listingId}</li>}
+                      {property.listingContractDate && <li>List Date: {new Date(property.listingContractDate).toLocaleDateString()}</li>}
+                      {property.listPrice && <li>List Price: ${Number(property.listPrice).toLocaleString()}</li>}
+                      {property.daysOnMarket !== null && property.daysOnMarket !== undefined && <li>Days on Market: {property.daysOnMarket}</li>}
+                    </ul>
+                  </div>
+                  {(property.closePrice || property.closeDate) && (
+                    <div>
+                      <h4 className="font-semibold mb-2">Sale Information</h4>
+                      <ul className="space-y-1 text-sm text-muted-foreground">
+                        {property.closePrice && <li>Sold Price: ${Number(property.closePrice).toLocaleString()}</li>}
+                        {property.closeDate && <li>Sold Date: {new Date(property.closeDate).toLocaleDateString()}</li>}
+                        {property.closePrice && property.listPrice && (
+                          <li>Sale/List Ratio: {((Number(property.closePrice) / Number(property.listPrice)) * 100).toFixed(1)}%</li>
+                        )}
+                      </ul>
+                    </div>
+                  )}
+                  {(property.listAgentMlsId || property.listOfficeMlsId) && (
+                    <div>
+                      <h4 className="font-semibold mb-2">Agent Information</h4>
+                      <ul className="space-y-1 text-sm text-muted-foreground">
+                        {property.listAgentMlsId && <li>Agent MLS ID: {property.listAgentMlsId}</li>}
+                        {property.listOfficeMlsId && <li>Office MLS ID: {property.listOfficeMlsId}</li>}
+                      </ul>
+                    </div>
+                  )}
+                </div>
               </CardContent>
             </Card>
           </TabsContent>
@@ -252,13 +283,21 @@ export function PropertyDetail({
             <Card>
               <CardContent className="pt-6">
                 <div className="space-y-4">
-                  {property.neighborhood && (
-                    <div>
-                      <h4 className="font-semibold mb-2">Neighborhood</h4>
-                      <p className="text-sm text-muted-foreground">{property.neighborhood}</p>
-                    </div>
-                  )}
-                  {(property.elementarySchool || property.middleOrJuniorSchool || property.highSchool) && (
+                  {/* Location Info */}
+                  <div>
+                    <h4 className="font-semibold mb-2">Location</h4>
+                    <ul className="space-y-1 text-sm text-muted-foreground">
+                      {property.subdivision && <li>Subdivision: {property.subdivision}</li>}
+                      {property.neighborhood && <li>Neighborhood: {property.neighborhood}</li>}
+                      <li>City: {property.city || 'N/A'}</li>
+                      <li>State: {property.stateOrProvince || 'TX'}</li>
+                      <li>ZIP: {property.postalCode || 'N/A'}</li>
+                      {property.countyOrParish && <li>County: {property.countyOrParish}</li>}
+                      {property.mlsAreaMajor && <li>MLS Area: {property.mlsAreaMajor}</li>}
+                    </ul>
+                  </div>
+                  {/* Schools */}
+                  {(property.elementarySchool || property.middleOrJuniorSchool || property.highSchool || property.schoolDistrict) && (
                     <div>
                       <h4 className="font-semibold mb-2">Schools</h4>
                       <ul className="space-y-1 text-sm text-muted-foreground">

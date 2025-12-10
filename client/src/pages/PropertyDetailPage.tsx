@@ -121,7 +121,7 @@ export default function PropertyDetailPage() {
             variant="ghost" 
             size="sm" 
             className="mb-4" 
-            onClick={() => setLocation('/buyer-search')}
+            onClick={() => setLocation('/properties')}
             data-testid="button-back-to-search"
           >
             <ArrowLeft className="w-4 h-4 mr-2" />
@@ -145,7 +145,7 @@ export default function PropertyDetailPage() {
             variant="ghost" 
             size="sm" 
             className="mb-4" 
-            onClick={() => setLocation('/buyer-search')}
+            onClick={() => setLocation('/properties')}
             data-testid="button-back-to-search"
           >
             <ArrowLeft className="w-4 h-4 mr-2" />

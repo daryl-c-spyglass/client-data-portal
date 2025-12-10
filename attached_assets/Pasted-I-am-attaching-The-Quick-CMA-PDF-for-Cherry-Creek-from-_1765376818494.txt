@@ -1,0 +1,110 @@
+I am attaching:
+
+- The Quick CMA PDF for Cherry Creek from a 3rd-party system.
+- Screenshots showing:
+  • Cherry Creek property search results
+  • Property detail page where images and details are missing
+
+Please apply the following fixes based on these references.
+
+==================================================
+1) Property Images Missing (List View + Detail View)
+==================================================
+
+None of the property photos appear in the Properties → View Results page or the Property Detail page. Only placeholders are shown, even though Repliers provides real image URLs.
+
+Fix required:
+- Ensure normalized Repliers listings include a `photos` array (from `media`, `images`, or `photos`).
+- Use `photos[0]` as the property card thumbnail.
+- Display a full gallery in the property detail page.
+- Use fallback placeholder **only when no photos exist**.
+
+Update both:
+- List view (Properties → View Results)
+- Property detail view.
+
+==================================================
+2) Cherry Creek Search – Incorrect Behavior
+==================================================
+
+When searching subdivision **Cherry Creek**, the behavior is incorrect:
+
+Expected (based on Quick CMA):
+- Active: Should return several listings (around 3 Active).
+- Under Contract: Should show AUC properties (around 2).
+Actual:
+- The app returns 0 or inconsistent results.
+
+Closed listings:
+- The app shows 16 listings, but unclear if they match Repliers data.
+
+Fix required:
+- Confirm subdivision filter uses: Subdivision LIKE "Cherry Creek%".
+- Ensure status mapping aligns with Repliers:
+  • A = Active
+  • U = Active Under Contract
+  • P = Pending
+  • S = Sold
+- Ensure sqft filter (1200–1800) works correctly.
+- Ensure property type filter pulls correct subtype (Single Family).
+
+==================================================
+3) CMA Math Must Match the Quick CMA PDF
+==================================================
+
+The example Quick CMA for Cherry Creek (1200–1800 sqft) shows:
+
+- 4 closed comps
+- Avg Close Price ≈ $584,500  
+- Median Close Price ≈ $570,000  
+- Avg $/sqft ≈ $351.45  
+- Median $/sqft ≈ $344.07  
+
+Current CMA builder is producing incorrect numbers (e.g., ~$575K for million-dollar listings), meaning:
+
+- Numeric fields may be strings.
+- Wrong fields may be mapped.
+- Wrong listings may be included.
+
+Fix required:
+- Use correct numeric fields from Repliers:
+  • `listPrice`
+  • `closePrice`
+  • `livingArea`
+  • `beds`, `baths`
+- Fix CMA calculations:
+  • Avg / Median price
+  • Avg / Median $/sqft
+  • DOM
+- Ensure CMA stats are calculated ONLY from selected comparables.
+- Reproduce the Cherry Creek CMA (using the same comps) and ensure values match the PDF.
+
+==================================================
+4) Missing Property Information (Detail Page)
+==================================================
+
+These sections are empty even though Repliers provides data:
+
+- Description
+- Features & Amenities
+- Property History
+- Neighborhood
+
+Fix required:
+- Map Repliers fields:
+  • Description → `publicRemarks`
+  • Features & Amenities → `interiorFeatures`, `exteriorFeatures`, `communityFeatures`, `lotFeatures`, etc.
+  • Property History → use any available history or show a clear fallback.
+  • Neighborhood → subdivision name, city, MLS area, ZIP
+
+==================================================
+Summary of Required Fixes
+==================================================
+
+1. Fix property images in both list view and detail view using Repliers `photos[]`.  
+2. Correct Cherry Creek search logic: subdivision filtering, status mapping, property subtype, and sqft filtering.  
+3. Correct CMA math and validate by reproducing the Cherry Creek CMA from the PDF.  
+4. Populate all missing property detail sections using appropriate Repliers fields.  
+5. Keep UI unchanged; only fix the underlying data mapping, search logic, and CMA calculation issues.
+
+Please use the attached Quick CMA PDF and screenshots as references when applying these fixes.

@@ -1,0 +1,122 @@
+I am attaching:
+
+- The Quick CMA PDF for Cherry Creek from a 3rd-party system.
+- Screenshots showing:
+  • Cherry Creek property search results
+  • Property detail page where images and details are missing
+
+Please apply the following fixes based on these references.
+
+==================================================
+1) Property Images Missing (List View + Detail View)
+==================================================
+
+None of the property photos appear in the Properties → View Results page or the Property Detail page. Only placeholders are shown, even though Repliers provides real image URLs.
+
+Fix required:
+- Ensure normalized Repliers listings include a `photos` array (from `media`, `images`, or `photos`).
+- Use `photos[0]` as the property card thumbnail.
+- Display a full gallery in the property detail page.
+- Use fallback placeholder **only when no photos exist**.
+
+Update both:
+- List view (Properties → View Results)
+- Property detail view.
+
+==================================================
+2) Cherry Creek Search – Incorrect Behavior
+==================================================
+
+When searching subdivision **Cherry Creek**, the behavior is incorrect:
+
+Expected (based on Quick CMA):
+- Active: ≈3 listings
+- AUC: ≈2 listings
+Actual:
+- App returns 0 or inconsistent listings.
+
+Closed listings:
+- App shows 16, but unsure if correct.
+
+Fix required:
+- Confirm subdivision filter uses: Subdivision LIKE "Cherry Creek%".
+- Ensure status mapping correctly matches Repliers:
+  • A = Active  
+  • U = Active Under Contract  
+  • P = Pending  
+  • S = Sold  
+- Ensure sqft filter (1200–1800) works.
+- Ensure property subtype filter is correctly mapped (Single Family).
+
+==================================================
+3) CMA Math Must Match Quick CMA PDF
+==================================================
+
+The Quick CMA PDF (Cherry Creek, 1200–1800 sqft) shows:
+
+- Avg Close Price ≈ $584,500  
+- Median Close Price ≈ $570,000  
+- Avg $/sqft ≈ $351.45  
+- Median $/sqft ≈ $344.07  
+
+Current CMA numbers are incorrect (e.g., $575K for comps worth $3M+), indicating:
+
+- Wrong fields used
+- Incorrect normalization
+- Numeric values treated as strings
+
+Fix required:
+- Use correct Repliers fields:
+  • `listPrice`
+  • `closePrice`
+  • `livingArea`
+  • `beds`, `baths`
+- Correct calculations:
+  • Avg / Median price
+  • Avg / Median $/sqft
+  • Min / Max
+  • DOM
+- Only calculate stats from user-selected comps.
+- Reproduce the Cherry Creek CMA from the PDF as validation.
+
+==================================================
+4) Missing Property Information (Detail Page)
+==================================================
+Sections are empty even though Repliers provides the data:
+
+- Description  
+- Features & Amenities  
+- Property History  
+- Neighborhood  
+
+Fix required:
+- Map correct fields:
+  • Description → `publicRemarks`
+  • Features & Amenities → `interiorFeatures`, `exteriorFeatures`, `communityFeatures`, `lotFeatures`, etc.
+  • Property History → use available status/price changes or show a correct fallback.
+  • Neighborhood → subdivision, MLS area, city, ZIP
+
+==================================================
+5) “Back to Search” Button Redirects Incorrectly
+==================================================
+
+Issue:
+- On the property detail page, clicking **Back to Search** currently redirects to **Buyer Search**.
+- Expected behavior: It should return to the **previous page within the Properties search results**, preserving the last filters and scroll position.
+
+Fix required:
+- Update routing so “Back to Search” returns to the user’s last Properties → View Results state.
+- Ensure it does NOT redirect to Buyer Search.
+
+==================================================
+Summary of Required Fixes
+==================================================
+
+1. Fix property images in list + detail views using Repliers `photos[]`.  
+2. Correct Cherry Creek search logic: subdivision, status, sqft, subtype.  
+3. Fix CMA math and validate against the Quick CMA PDF.  
+4. Populate missing property detail sections using correct Repliers fields.  
+5. Fix “Back to Search” so it returns to Properties results, not Buyer Search.  
+6. Keep UI unchanged—only fix data mapping, logic, and calculations.
+
+Please use the attached PDF and screenshots to guide these fixes.
