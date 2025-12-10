@@ -584,6 +584,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
               addr.unitNumber ? `#${addr.unitNumber}` : null,
             ].filter(Boolean).join(' ');
 
+            // Extract photos from Repliers listing - they may use 'images' array with URLs or photoUrl objects
+            const photos: string[] = [];
+            if (listing.images && Array.isArray(listing.images)) {
+              listing.images.forEach((img: any) => {
+                if (typeof img === 'string') {
+                  photos.push(img.startsWith('http') ? img : `https://cdn.repliers.io/${img}`);
+                } else if (img.photoUrl) {
+                  photos.push(img.photoUrl);
+                } else if (img.url) {
+                  photos.push(img.url);
+                }
+              });
+            }
+            if (photos.length === 0 && listing.photos && Array.isArray(listing.photos)) {
+              listing.photos.forEach((p: any) => {
+                if (typeof p === 'string') {
+                  photos.push(p.startsWith('http') ? p : `https://cdn.repliers.io/${p}`);
+                } else if (p.photoUrl) {
+                  photos.push(p.photoUrl);
+                }
+              });
+            }
+
+            // Repliers uses numBedrooms/numBathrooms in details
+            const beds = details.numBedrooms ?? details.bedrooms ?? null;
+            const baths = details.numBathrooms ?? details.bathrooms ?? null;
+
             const normalizedProperty = {
               id: listing.mlsNumber,
               listingId: listing.mlsNumber,
@@ -600,14 +627,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
               unparsedAddress: fullAddress || 'Unknown Address',
               latitude: map.latitude ? String(map.latitude) : null,
               longitude: map.longitude ? String(map.longitude) : null,
-              bedroomsTotal: details.bedrooms ?? null,
-              bathroomsTotalInteger: details.bathrooms ?? null,
+              bedroomsTotal: beds,
+              bathroomsTotalInteger: typeof baths === 'number' ? baths : null,
               livingArea: details.sqft ? String(details.sqft) : null,
               lotSizeSquareFeet: details.lotSize ? String(details.lotSize) : null,
               yearBuilt: details.yearBuilt ?? null,
               garageSpaces: details.garage ?? null,
-              photos: listing.photos || [],
-              photosCount: listing.photos?.length || 0,
+              photos: photos,
+              photosCount: photos.length,
               publicRemarks: details.description || null,
               daysOnMarket: listing.daysOnMarket ?? null,
               listAgentFullName: listing.agent?.name || null,
