@@ -45,6 +45,7 @@ export function CMABuilder({ onCreateCMA }: CMABuilderProps) {
   const [searchStories, setSearchStories] = useState("");
   const [searchMinYearBuilt, setSearchMinYearBuilt] = useState("");
   const [searchMaxYearBuilt, setSearchMaxYearBuilt] = useState("");
+  const [searchSoldDays, setSearchSoldDays] = useState("");
 
   const resetForm = () => {
     setCmaName("");
@@ -63,6 +64,7 @@ export function CMABuilder({ onCreateCMA }: CMABuilderProps) {
     setSearchStories("");
     setSearchMinYearBuilt("");
     setSearchMaxYearBuilt("");
+    setSearchSoldDays("");
   };
 
   const buildSearchQuery = () => {
@@ -82,6 +84,7 @@ export function CMABuilder({ onCreateCMA }: CMABuilderProps) {
     if (searchStories && searchStories !== 'any') params.set('stories', searchStories);
     if (searchMinYearBuilt) params.set('minYearBuilt', searchMinYearBuilt);
     if (searchMaxYearBuilt) params.set('maxYearBuilt', searchMaxYearBuilt);
+    if (searchSoldDays && searchSoldDays !== 'any') params.set('soldDays', searchSoldDays);
     params.set('limit', '20');
     return params.toString();
   };
@@ -286,7 +289,24 @@ export function CMABuilder({ onCreateCMA }: CMABuilderProps) {
               </div>
             </div>
           </div>
-          <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4">
+          <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-4">
+            <div className="space-y-2">
+              <Label>Sold Date</Label>
+              <Select value={searchSoldDays} onValueChange={setSearchSoldDays}>
+                <SelectTrigger data-testid="select-sold-days">
+                  <SelectValue placeholder="Any" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="any">Any</SelectItem>
+                  <SelectItem value="30">0-30 days</SelectItem>
+                  <SelectItem value="60">0-60 days</SelectItem>
+                  <SelectItem value="90">0-90 days</SelectItem>
+                  <SelectItem value="120">0-120 days</SelectItem>
+                  <SelectItem value="150">0-150 days</SelectItem>
+                  <SelectItem value="180">0-180 days</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
             <div className="space-y-2">
               <Label>Min Sq Ft</Label>
               <Input

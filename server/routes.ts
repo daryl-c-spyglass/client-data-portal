@@ -13,6 +13,100 @@ import bcrypt from "bcryptjs";
 import passport from "passport";
 import { requireAuth, requireRole } from "./auth";
 import { fetchExternalUsers, fetchFromExternalApi } from "./external-api";
+import type { PropertyStatistics, TimelineDataPoint } from "@shared/schema";
+
+// Helper function to calculate statistics from property data directly
+function calculateStatisticsFromProperties(properties: any[]): PropertyStatistics {
+  if (properties.length === 0) {
+    return {
+      price: { range: { min: 0, max: 0 }, average: 0, median: 0 },
+      pricePerSqFt: { range: { min: 0, max: 0 }, average: 0, median: 0 },
+      daysOnMarket: { range: { min: 0, max: 0 }, average: 0, median: 0 },
+      livingArea: { range: { min: 0, max: 0 }, average: 0, median: 0 },
+      lotSize: { range: { min: 0, max: 0 }, average: 0, median: 0 },
+      acres: { range: { min: 0, max: 0 }, average: 0, median: 0 },
+      bedrooms: { range: { min: 0, max: 0 }, average: 0, median: 0 },
+      bathrooms: { range: { min: 0, max: 0 }, average: 0, median: 0 },
+      yearBuilt: { range: { min: 0, max: 0 }, average: 0, median: 0 },
+    };
+  }
+
+  const getNumericValue = (val: any): number | null => {
+    if (val == null) return null;
+    const num = Number(val);
+    return isNaN(num) || num <= 0 ? null : num;
+  };
+
+  const getValues = (field: string): number[] => {
+    return properties
+      .map(p => getNumericValue(p[field]))
+      .filter((v): v is number => v !== null);
+  };
+
+  const calculateMedian = (sorted: number[]): number => {
+    if (sorted.length === 0) return 0;
+    const mid = sorted.length / 2;
+    if (sorted.length % 2 === 0) {
+      return (sorted[mid - 1] + sorted[mid]) / 2;
+    }
+    return sorted[Math.floor(mid)];
+  };
+
+  const calculateStats = (values: number[]) => {
+    if (values.length === 0) return { range: { min: 0, max: 0 }, average: 0, median: 0 };
+    const sorted = [...values].sort((a, b) => a - b);
+    return {
+      range: { min: sorted[0], max: sorted[sorted.length - 1] },
+      average: values.reduce((a, b) => a + b, 0) / values.length,
+      median: calculateMedian(sorted),
+    };
+  };
+
+  // Get prices (use closePrice for sold, listPrice otherwise)
+  const prices = properties.map(p => {
+    if (p.standardStatus === 'Closed' && p.closePrice) {
+      return getNumericValue(p.closePrice);
+    }
+    return getNumericValue(p.listPrice);
+  }).filter((v): v is number => v !== null);
+
+  const livingAreas = getValues('livingArea');
+  const pricesPerSqft = properties.map(p => {
+    const price = p.standardStatus === 'Closed' && p.closePrice 
+      ? getNumericValue(p.closePrice) 
+      : getNumericValue(p.listPrice);
+    const area = getNumericValue(p.livingArea);
+    return price && area ? price / area : null;
+  }).filter((v): v is number => v !== null);
+
+  return {
+    price: calculateStats(prices),
+    pricePerSqFt: calculateStats(pricesPerSqft),
+    daysOnMarket: calculateStats(getValues('daysOnMarket')),
+    livingArea: calculateStats(livingAreas),
+    lotSize: calculateStats(getValues('lotSizeSquareFeet')),
+    acres: calculateStats(getValues('lotSizeAcres')),
+    bedrooms: calculateStats(getValues('bedroomsTotal').length > 0 ? getValues('bedroomsTotal') : getValues('beds')),
+    bathrooms: calculateStats(getValues('bathroomsTotalInteger').length > 0 ? getValues('bathroomsTotalInteger') : getValues('baths')),
+    yearBuilt: calculateStats(getValues('yearBuilt')),
+  };
+}
+
+// Helper function to calculate timeline from property data directly
+function calculateTimelineFromProperties(properties: any[]): TimelineDataPoint[] {
+  return properties
+    .filter(p => (p.listingContractDate || p.listDate) && (p.listPrice || p.closePrice) && (p.unparsedAddress || p.address))
+    .map(p => ({
+      date: new Date(p.listingContractDate || p.listDate),
+      price: p.standardStatus === 'Closed' && p.closePrice 
+        ? Number(p.closePrice) 
+        : Number(p.listPrice || 0),
+      status: (p.standardStatus || p.status || 'Active') as 'Active' | 'Under Contract' | 'Closed',
+      propertyId: p.id,
+      address: p.unparsedAddress || p.address || 'Unknown',
+    }))
+    .sort((a, b) => a.date.getTime() - b.date.getTime());
+}
 
 export async function registerRoutes(app: Express): Promise<Server> {
   const mlsGridClient = createMLSGridClient();
@@ -225,6 +319,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         stories,
         minYearBuilt,
         maxYearBuilt,
+        soldDays,
         limit = '50',
       } = req.query as Record<string, string | undefined>;
 
@@ -440,6 +535,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
             if (p.stories === null || p.stories === undefined) return true;
             if (storiesNum === 3) return p.stories >= 3;
             return p.stories === storiesNum;
+          });
+        }
+        // Filter by sold date (only applies to closed properties)
+        if (soldDays) {
+          const daysAgo = parseInt(soldDays, 10);
+          const cutoffDate = new Date();
+          cutoffDate.setDate(cutoffDate.getDate() - daysAgo);
+          filtered = filtered.filter((p: any) => {
+            if (!p.closeDate) return false;
+            const closeDate = new Date(p.closeDate);
+            return closeDate >= cutoffDate;
           });
         }
         if (subdivision) {
@@ -977,21 +1083,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return;
       }
 
-      const propertyIds = [
-        ...(cma.subjectPropertyId ? [cma.subjectPropertyId] : []),
-        ...(cma.comparablePropertyIds || [])
-      ];
+      // Use propertiesData if available (for CMAs created from Repliers API data)
+      // Otherwise fall back to fetching by property IDs
+      let properties: any[] = [];
+      if (cma.propertiesData && Array.isArray(cma.propertiesData) && cma.propertiesData.length > 0) {
+        properties = cma.propertiesData;
+      } else {
+        const propertyIds = [
+          ...(cma.subjectPropertyId ? [cma.subjectPropertyId] : []),
+          ...(cma.comparablePropertyIds || [])
+        ];
 
-      const properties: any[] = [];
-      for (const id of propertyIds) {
-        const property = await storage.getProperty(id);
-        if (property) {
-          properties.push(property);
+        for (const id of propertyIds) {
+          const property = await storage.getProperty(id);
+          if (property) {
+            properties.push(property);
+          }
         }
       }
 
-      const statistics = await storage.calculateStatistics(propertyIds);
-      const timelineData = await storage.getTimelineData(propertyIds);
+      // Calculate statistics from the properties we have
+      const statistics = calculateStatisticsFromProperties(properties);
+      const timelineData = calculateTimelineFromProperties(properties);
 
       // SECURITY: Only return public-safe CMA data (exclude internal notes, userId, etc.)
       res.json({
