@@ -1,0 +1,89 @@
+I have an instruction from my client, and I need you to apply the following updates and corrections to the project.
+
+==================================================
+CLIENT INSTRUCTION – APPLY THESE FIXES
+==================================================
+
+1) The CMA function must produce accurate results that match real-world CMAs.
+   - My client provided a Quick CMA example for Cherry Creek.
+   - When I select the same subdivision and comp criteria, the system should generate the same (or very close) results.
+   - Fix all math and mapping issues that cause incorrect averages, medians, or $/sqft.
+
+2) When entering a subdivision (e.g., “Cherry Creek”), the search should:
+   • Show Active and Under Contract listings if they exist  
+   • Show Closed listings correctly  
+   • Pull all listings from Repliers, not MLS Grid  
+   • Reproduce the same comps used in the provided Quick CMA  
+
+3) Ensure property data (images, details, amenities, descriptions) is being pulled from Repliers.
+   - Photos must appear on the list view and property detail pages.
+   - Descriptions, features & amenities, history, and neighborhood must populate correctly.
+   - The system must NEVER show placeholders unless Repliers truly has no data.
+
+4) Status Mapping must match Repliers:
+   • A = Active  
+   • U = Active Under Contract  
+   • P = Pending  
+   • S = Sold  
+   Make sure these statuses display correctly in Properties, CMA Builder, and Seller Updates.
+
+5) Fix search filters for:
+   • Subdivision  
+   • Square footage range  
+   • Property type / subtype  
+   • Zip code / city / neighborhood  
+   All should use Repliers data and should return proper results.
+
+6) The system should not produce incorrect outputs like:
+   - Showing 0 listings when they exist  
+   - Showing incorrect averages like $575k when comps are $3M+  
+   Fix normalization, numeric parsing, and calculation logic.
+
+7) Ensure the app is using Repliers as the ONLY data source for:
+   • Active listings  
+   • Under Contract listings  
+   • Sold listings (when available)  
+   • CMA data  
+   • Photos & listing details  
+
+==================================================
+ADDITIONAL FIXES REQUIRED (from testing)
+==================================================
+
+8) “Back to Search” on property detail pages should return to the previous Properties search results — NOT to Buyer Search.
+
+9) Property detail page must load:
+   • Gallery images  
+   • Description  
+   • Features & amenities  
+   • Proper neighborhood info  
+   • Accurate bed/bath/living area/year built  
+
+10) CMA Builder must:
+   - Use correct fields: listPrice, closePrice, livingArea, beds, baths, DOM  
+   - Calculate averages, medians, and $/sqft correctly  
+   - Match the provided Quick CMA when selecting the same comps  
+
+==================================================
+FILES PROVIDED
+==================================================
+You have access to:
+• Quick CMA PDF for Cherry Creek  
+• Multiple screenshots showing missing data, missing images, and search errors  
+• Repliers documentation (already used earlier in this project)
+
+Use these references to correct the implementation.
+
+==================================================
+SUMMARY  
+==================================================
+Please:
+
+- Fix CMA accuracy  
+- Fix subdivision search and status filtering  
+- Ensure all data comes from Repliers and is fully mapped  
+- Restore full property images and all property details  
+- Fix “Back to Search” navigation  
+- Validate against the Cherry Creek Quick CMA example  
+
+DO NOT change UI layout or styling — only fix logic, mapping, data flow, and calculations.
