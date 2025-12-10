@@ -123,28 +123,55 @@ interface UnifiedSearchResponse {
   status: string;
 }
 
+interface InitialCMAData {
+  name?: string;
+  searchCriteria?: {
+    city?: string;
+    subdivision?: string;
+    minBeds?: string;
+    maxPrice?: string;
+    statuses?: string[];
+    minSqft?: string;
+    maxSqft?: string;
+    minLotAcres?: string;
+    maxLotAcres?: string;
+    minYearBuilt?: string;
+    maxYearBuilt?: string;
+    stories?: string;
+    garage?: string;
+    propertyType?: string;
+    soldDays?: string;
+  };
+  comparables?: Property[];
+  subjectProperty?: Property | null;
+}
+
 interface CMABuilderProps {
   onCreateCMA: (data: {
     name: string;
     subjectPropertyId?: string;
     comparablePropertyIds: string[];
     propertiesData: any[];
+    searchCriteria?: any;
   }) => void;
+  initialData?: InitialCMAData;
 }
 
-export function CMABuilder({ onCreateCMA }: CMABuilderProps) {
-  const [cmaName, setCmaName] = useState("");
-  const [hasUserEditedName, setHasUserEditedName] = useState(false);
-  const [subjectProperty, setSubjectProperty] = useState<Property | null>(null);
-  const [comparables, setComparables] = useState<Property[]>([]);
+export function CMABuilder({ onCreateCMA, initialData }: CMABuilderProps) {
+  const sc = initialData?.searchCriteria || {};
+  
+  const [cmaName, setCmaName] = useState(initialData?.name || "");
+  const [hasUserEditedName, setHasUserEditedName] = useState(!!initialData?.name);
+  const [subjectProperty, setSubjectProperty] = useState<Property | null>(initialData?.subjectProperty || null);
+  const [comparables, setComparables] = useState<Property[]>(initialData?.comparables || []);
   const searchSectionRef = useRef<HTMLDivElement>(null);
   
-  const [searchCity, setSearchCity] = useState("");
-  const [searchSubdivision, setSearchSubdivision] = useState("");
-  const [searchMinBeds, setSearchMinBeds] = useState("");
-  const [searchMaxPrice, setSearchMaxPrice] = useState("");
-  const [searchStatuses, setSearchStatuses] = useState<string[]>(["active"]);
-  const [searchEnabled, setSearchEnabled] = useState(false);
+  const [searchCity, setSearchCity] = useState(sc.city || "");
+  const [searchSubdivision, setSearchSubdivision] = useState(sc.subdivision || "");
+  const [searchMinBeds, setSearchMinBeds] = useState(sc.minBeds || "");
+  const [searchMaxPrice, setSearchMaxPrice] = useState(sc.maxPrice || "");
+  const [searchStatuses, setSearchStatuses] = useState<string[]>(sc.statuses || ["active"]);
+  const [searchEnabled, setSearchEnabled] = useState(!!initialData?.searchCriteria);
 
   // Generate default CMA name based on subdivision, status, and date/time
   const generateDefaultName = useCallback(() => {
@@ -193,14 +220,14 @@ export function CMABuilder({ onCreateCMA }: CMABuilderProps) {
     setCmaName(e.target.value);
     setHasUserEditedName(true);
   };
-  const [searchMinSqft, setSearchMinSqft] = useState("");
-  const [searchMaxSqft, setSearchMaxSqft] = useState("");
-  const [searchMinLotAcres, setSearchMinLotAcres] = useState("");
-  const [searchMaxLotAcres, setSearchMaxLotAcres] = useState("");
-  const [searchStories, setSearchStories] = useState("");
-  const [searchMinYearBuilt, setSearchMinYearBuilt] = useState("");
-  const [searchMaxYearBuilt, setSearchMaxYearBuilt] = useState("");
-  const [searchSoldDays, setSearchSoldDays] = useState("");
+  const [searchMinSqft, setSearchMinSqft] = useState(sc.minSqft || "");
+  const [searchMaxSqft, setSearchMaxSqft] = useState(sc.maxSqft || "");
+  const [searchMinLotAcres, setSearchMinLotAcres] = useState(sc.minLotAcres || "");
+  const [searchMaxLotAcres, setSearchMaxLotAcres] = useState(sc.maxLotAcres || "");
+  const [searchStories, setSearchStories] = useState(sc.stories || "");
+  const [searchMinYearBuilt, setSearchMinYearBuilt] = useState(sc.minYearBuilt || "");
+  const [searchMaxYearBuilt, setSearchMaxYearBuilt] = useState(sc.maxYearBuilt || "");
+  const [searchSoldDays, setSearchSoldDays] = useState(sc.soldDays || "");
 
   const resetForm = () => {
     setCmaName("");
@@ -331,11 +358,29 @@ export function CMABuilder({ onCreateCMA }: CMABuilderProps) {
       // Use user-provided name or generate a descriptive default
       const finalName = cmaName.trim() || generateDefaultCMAName();
       
+      // Build search criteria to save with CMA for "Modify Search" feature
+      const searchCriteria = {
+        city: searchCity,
+        subdivision: searchSubdivision,
+        minBeds: searchMinBeds,
+        maxPrice: searchMaxPrice,
+        statuses: searchStatuses,
+        minSqft: searchMinSqft,
+        maxSqft: searchMaxSqft,
+        minLotAcres: searchMinLotAcres,
+        maxLotAcres: searchMaxLotAcres,
+        minYearBuilt: searchMinYearBuilt,
+        maxYearBuilt: searchMaxYearBuilt,
+        stories: searchStories,
+        soldDays: searchSoldDays,
+      };
+      
       onCreateCMA({
         name: finalName,
         subjectPropertyId: subjectProperty?.id,
         comparablePropertyIds: comparables.map(p => p.id),
         propertiesData: allProperties,
+        searchCriteria,
       });
       resetForm();
     }

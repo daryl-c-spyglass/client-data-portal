@@ -167,12 +167,8 @@ export default function CMADetailPage() {
   };
 
   const handleModifySearch = () => {
-    // Navigate back to create new CMA with similar search criteria
-    toast({
-      title: "Modify Search",
-      description: "This feature allows you to create a new CMA with modified search criteria.",
-    });
-    setLocation('/cmas/new');
+    // Navigate to CMA builder with current CMA data pre-loaded
+    setLocation(`/cmas/new?from=${id}`);
   };
 
   const handleModifyStats = () => {
