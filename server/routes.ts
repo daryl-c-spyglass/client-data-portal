@@ -1106,7 +1106,55 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return;
       }
 
-      const properties = (cma as any).propertiesData || [];
+      // Use stored propertiesData, or fetch from IDs if not available
+      let properties = (cma as any).propertiesData || [];
+      
+      // If propertiesData is empty but we have comparablePropertyIds, fetch them
+      if (properties.length === 0 && cma.comparablePropertyIds && cma.comparablePropertyIds.length > 0) {
+        console.log('📊 CMA Statistics - No propertiesData, fetching from comparablePropertyIds:', cma.comparablePropertyIds);
+        const repliersClient = isRepliersConfigured() ? getRepliersClient() : null;
+        
+        const fetchedProperties = await Promise.all(
+          cma.comparablePropertyIds.map(async (id: string) => {
+            // Try database first
+            const dbProp = await storage.getProperty(id);
+            if (dbProp) return dbProp;
+            // Fallback: try by listingId
+            const byListingId = await storage.getPropertyByListingId(id);
+            if (byListingId) return byListingId;
+            
+            // Fallback: try Repliers API for active listings
+            if (repliersClient) {
+              try {
+                const listing = await repliersClient.getListing(id);
+                if (listing) {
+                  // Normalize Repliers data to match expected format
+                  const details = listing.details || {};
+                  return {
+                    id: listing.mlsNumber || id,
+                    listingId: listing.mlsNumber || id,
+                    listPrice: listing.listPrice,
+                    closePrice: listing.closePrice || listing.soldPrice,
+                    livingArea: details.sqft || listing.livingArea,
+                    bedroomsTotal: details.numBedrooms || details.bedrooms,
+                    bathroomsTotalInteger: details.numBathrooms || details.bathrooms,
+                    yearBuilt: details.yearBuilt || listing.yearBuilt,
+                    daysOnMarket: listing.daysOnMarket,
+                    lotSizeSquareFeet: details.lotSize || listing.lotSizeSquareFeet,
+                    lotSizeAcres: listing.lotSizeAcres,
+                    standardStatus: listing.status === 'A' ? 'Active' : listing.status === 'S' ? 'Closed' : listing.status,
+                  };
+                }
+              } catch (err) {
+                console.log(`📊 CMA Statistics - Failed to fetch ${id} from Repliers:`, err);
+              }
+            }
+            return null;
+          })
+        );
+        properties = fetchedProperties.filter((p: any) => p !== null);
+        console.log('📊 CMA Statistics - Fetched', properties.length, 'properties from IDs');
+      }
       
       if (properties.length === 0) {
         const emptyStats = { range: { min: 0, max: 0 }, average: 0, median: 0 };
