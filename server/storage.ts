@@ -464,6 +464,15 @@ export class MemStorage implements IStorage {
         .map(p => Number(p[field]))
         .filter(v => !isNaN(v) && v > 0);
 
+    // Correct median calculation for both odd and even length arrays
+    const calculateMedian = (sorted: number[]): number => {
+      const mid = sorted.length / 2;
+      if (sorted.length % 2 === 0) {
+        return (sorted[mid - 1] + sorted[mid]) / 2;
+      }
+      return sorted[Math.floor(mid)];
+    };
+
     const calculateStats = (values: number[]) => {
       if (values.length === 0) return { range: { min: 0, max: 0 }, average: 0, median: 0 };
       
@@ -471,15 +480,20 @@ export class MemStorage implements IStorage {
       const min = sorted[0];
       const max = sorted[sorted.length - 1];
       const average = values.reduce((a, b) => a + b, 0) / values.length;
-      const median = sorted[Math.floor(sorted.length / 2)];
+      const median = calculateMedian(sorted);
       
       return { range: { min, max }, average, median };
     };
 
-    const prices = getNumericValues('listPrice');
+    // Use closePrice for closed listings, fallback to listPrice
+    const prices = properties.map(p => Number(p.closePrice || p.listPrice)).filter(v => !isNaN(v) && v > 0);
     const livingAreas = getNumericValues('livingArea');
     const pricesPerSqFt = properties
-      .map(p => Number(p.listPrice) / Number(p.livingArea))
+      .map(p => {
+        const price = Number(p.closePrice || p.listPrice);
+        const area = Number(p.livingArea);
+        return area > 0 ? price / area : 0;
+      })
       .filter(v => !isNaN(v) && v > 0);
 
     return {
@@ -1034,6 +1048,15 @@ export class DbStorage implements IStorage {
         .map(p => Number(p[field]))
         .filter(v => !isNaN(v) && v > 0);
 
+    // Correct median calculation for both odd and even length arrays
+    const calculateMedian = (sorted: number[]): number => {
+      const mid = sorted.length / 2;
+      if (sorted.length % 2 === 0) {
+        return (sorted[mid - 1] + sorted[mid]) / 2;
+      }
+      return sorted[Math.floor(mid)];
+    };
+
     const calculateStats = (values: number[]) => {
       if (values.length === 0) return { range: { min: 0, max: 0 }, average: 0, median: 0 };
       
@@ -1041,15 +1064,20 @@ export class DbStorage implements IStorage {
       const min = sorted[0];
       const max = sorted[sorted.length - 1];
       const average = values.reduce((a, b) => a + b, 0) / values.length;
-      const median = sorted[Math.floor(sorted.length / 2)];
+      const median = calculateMedian(sorted);
       
       return { range: { min, max }, average, median };
     };
 
-    const prices = getNumericValues('listPrice');
+    // Use closePrice for closed listings, fallback to listPrice
+    const prices = props.map(p => Number(p.closePrice || p.listPrice)).filter(v => !isNaN(v) && v > 0);
     const livingAreas = getNumericValues('livingArea');
     const pricesPerSqFt = props
-      .map(p => Number(p.listPrice) / Number(p.livingArea))
+      .map(p => {
+        const price = Number(p.closePrice || p.listPrice);
+        const area = Number(p.livingArea);
+        return area > 0 ? price / area : 0;
+      })
       .filter(v => !isNaN(v) && v > 0);
 
     return {

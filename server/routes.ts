@@ -302,6 +302,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const bathsRaw = details.bathrooms ?? listing.bathroomsTotalInteger;
           const baths = Array.isArray(bathsRaw) ? toNumber(bathsRaw[0]) : toNumber(bathsRaw);
 
+          // Get photos from images or photos field (Repliers uses 'images')
+          const rawPhotos = listing.images || listing.photos || [];
+          const photos = rawPhotos.map((img: string) => 
+            img.startsWith('http') ? img : `https://cdn.repliers.io/${img}`
+          );
+
           return {
             id: listing.mlsNumber || listing.listingId,
             address: fullAddress || listing.unparsedAddress || 'Unknown Address',
@@ -317,7 +323,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             yearBuilt: toNumber(details.yearBuilt || listing.yearBuilt),
             latitude: toNumber(map.latitude ?? listing.latitude),
             longitude: toNumber(map.longitude ?? listing.longitude),
-            photos: listing.photos || [],
+            photos: photos,
             subdivision: addr.neighborhood || listing.subdivisionName || null,
             daysOnMarket: toNumber(listing.daysOnMarket),
             cumulativeDaysOnMarket: toNumber(listing.cumulativeDaysOnMarket) || toNumber(listing.daysOnMarket),
@@ -325,6 +331,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             lotSizeAcres: toNumber(listing.lotSizeAcres),
             garageSpaces: toNumber(details.garage || listing.garageSpaces),
             closeDate: listing.soldDate || listing.closeDate || null,
+            description: details.description || listing.publicRemarks || null,
           };
         });
 
@@ -384,6 +391,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           lotSizeAcres: toNum(p.lotSizeAcres),
           garageSpaces: toNum(p.garageSpaces),
           closeDate: p.closeDate || null,
+          description: p.publicRemarks || null,
         }));
         
         console.log(`📦 Database returned ${results.length} closed/sold listings`);
@@ -1060,15 +1068,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const getNumericValues = (values: number[]) => values.filter(v => !isNaN(v) && v > 0);
       
+      // Correct median calculation for both odd and even length arrays
+      const calculateMedian = (sorted: number[]): number => {
+        const mid = sorted.length / 2;
+        if (sorted.length % 2 === 0) {
+          // Even length: average of two middle values
+          return (sorted[mid - 1] + sorted[mid]) / 2;
+        } else {
+          // Odd length: middle value
+          return sorted[Math.floor(mid)];
+        }
+      };
+
       const calculateStats = (values: number[]) => {
         if (values.length === 0) return { range: { min: 0, max: 0 }, average: 0, median: 0 };
         const sorted = [...values].sort((a, b) => a - b);
         return {
           range: { min: sorted[0], max: sorted[sorted.length - 1] },
           average: values.reduce((a, b) => a + b, 0) / values.length,
-          median: sorted[Math.floor(sorted.length / 2)],
+          median: calculateMedian(sorted),
         };
       };
+
+      // Debug: Log the property data being used for calculations
+      console.log('📊 CMA Statistics - Processing', properties.length, 'properties');
+      properties.forEach((p: any, idx: number) => {
+        const price = Number(p.closePrice || p.listPrice);
+        const area = Number(p.livingArea);
+        console.log(`  [${idx}] ${p.unparsedAddress || p.address || 'Unknown'}: closePrice=${p.closePrice}, listPrice=${p.listPrice}, livingArea=${area}, $/sqft=${area > 0 ? (price/area).toFixed(2) : 'N/A'}`);
+      });
 
       const prices = getNumericValues(properties.map((p: any) => Number(p.closePrice || p.listPrice)));
       const livingAreas = getNumericValues(properties.map((p: any) => Number(p.livingArea)));

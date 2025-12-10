@@ -25,6 +25,7 @@ export interface NormalizedProperty {
   lotSizeAcres?: number | null;
   garageSpaces?: number | null;
   closeDate?: string | null;
+  description?: string | null;
 }
 
 interface UnifiedSearchResponse {
@@ -88,7 +89,7 @@ export function mapNormalizedToProperty(normalized: NormalizedProperty): Propert
     associationFee: null,
     associationFeeFrequency: null,
     taxAnnualAmount: null,
-    publicRemarks: null,
+    publicRemarks: normalized.description || null,
     privateRemarks: null,
     listingContractDate: null,
     closeDate: normalized.closeDate ?? null,

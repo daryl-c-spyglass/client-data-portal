@@ -1,4 +1,7 @@
 import { useState } from "react";
+import { MapContainer, TileLayer, Marker, Popup } from "react-leaflet";
+import L from "leaflet";
+import "leaflet/dist/leaflet.css";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -15,9 +18,24 @@ import {
   Home, 
   MapPin,
   ChevronLeft,
-  ChevronRight 
+  ChevronRight,
+  Check,
+  Copy
 } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
 import type { Property, Media } from "@shared/schema";
+
+const defaultIcon = L.icon({
+  iconUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png",
+  iconRetinaUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png",
+  shadowUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png",
+  iconSize: [25, 41],
+  iconAnchor: [12, 41],
+  popupAnchor: [1, -34],
+  shadowSize: [41, 41],
+});
+
+L.Marker.prototype.options.icon = defaultIcon;
 
 interface PropertyDetailProps {
   property: Property;
@@ -37,6 +55,9 @@ export function PropertyDetail({
   onScheduleViewing 
 }: PropertyDetailProps) {
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
+  const [saved, setSaved] = useState(false);
+  const [linkCopied, setLinkCopied] = useState(false);
+  const { toast } = useToast();
   
   const formattedPrice = property.listPrice 
     ? new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(Number(property.listPrice))
@@ -46,12 +67,58 @@ export function PropertyDetail({
     ? (Number(property.listPrice) / Number(property.livingArea)).toFixed(2)
     : null;
 
+  const hasCoordinates = property.latitude && property.longitude;
+
   const nextImage = () => {
     setCurrentImageIndex((prev) => (prev + 1) % media.length);
   };
 
   const prevImage = () => {
     setCurrentImageIndex((prev) => (prev - 1 + media.length) % media.length);
+  };
+
+  const handleScheduleViewing = () => {
+    toast({
+      title: "Schedule Viewing",
+      description: "Contact your agent to schedule a viewing for this property.",
+    });
+    onScheduleViewing?.();
+  };
+
+  const handleAddToCMA = () => {
+    toast({
+      title: "Added to CMA",
+      description: "This property has been added to your CMA comparables.",
+    });
+    onAddToCMA?.();
+  };
+
+  const handleSave = () => {
+    setSaved(!saved);
+    toast({
+      title: saved ? "Removed from Saved" : "Property Saved",
+      description: saved ? "Property removed from your saved list." : "Property added to your saved list.",
+    });
+    onSave?.();
+  };
+
+  const handleShare = () => {
+    const url = window.location.href;
+    navigator.clipboard.writeText(url).then(() => {
+      setLinkCopied(true);
+      toast({
+        title: "Link Copied",
+        description: "Property link copied to clipboard.",
+      });
+      setTimeout(() => setLinkCopied(false), 2000);
+    }).catch(() => {
+      toast({
+        title: "Share",
+        description: "Use your browser's share function to share this property.",
+        variant: "destructive",
+      });
+    });
+    onShare?.();
   };
 
   return (
@@ -64,7 +131,7 @@ export function PropertyDetail({
             {media.length > 0 ? (
               <>
                 <img 
-                  src={media[currentImageIndex].mediaURL || media[currentImageIndex].localPath} 
+                  src={media[currentImageIndex].mediaURL || media[currentImageIndex].localPath || undefined} 
                   alt={property.unparsedAddress || ''} 
                   className="w-full h-full object-cover"
                   data-testid="img-property-main"
@@ -119,7 +186,7 @@ export function PropertyDetail({
                   data-testid={`button-thumbnail-${idx}`}
                 >
                   <img 
-                    src={m.mediaURL || m.localPath} 
+                    src={m.mediaURL || m.localPath || undefined} 
                     alt="" 
                     className="w-full h-full object-cover"
                   />
@@ -208,18 +275,45 @@ export function PropertyDetail({
           </TabsContent>
         </Tabs>
 
-        {/* Map Placeholder */}
+        {/* Interactive Map */}
         <Card>
           <CardHeader>
             <CardTitle>Location</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="aspect-video bg-muted rounded-md flex items-center justify-center">
-              <div className="text-center text-muted-foreground">
-                <MapPin className="w-12 h-12 mx-auto mb-2" />
-                <p>Interactive map coming soon</p>
+            {hasCoordinates ? (
+              <div className="aspect-video rounded-md overflow-hidden">
+                <MapContainer
+                  center={[Number(property.latitude), Number(property.longitude)]}
+                  zoom={15}
+                  style={{ height: "100%", width: "100%" }}
+                  scrollWheelZoom={false}
+                >
+                  <TileLayer
+                    attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+                    url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                  />
+                  <Marker position={[Number(property.latitude), Number(property.longitude)]}>
+                    <Popup>
+                      <div className="text-sm">
+                        <strong>{property.unparsedAddress}</strong>
+                        <br />
+                        {property.city}, {property.stateOrProvince} {property.postalCode}
+                        <br />
+                        {formattedPrice}
+                      </div>
+                    </Popup>
+                  </Marker>
+                </MapContainer>
               </div>
-            </div>
+            ) : (
+              <div className="aspect-video bg-muted rounded-md flex items-center justify-center">
+                <div className="text-center text-muted-foreground">
+                  <MapPin className="w-12 h-12 mx-auto mb-2" />
+                  <p>Location coordinates not available</p>
+                </div>
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>
@@ -306,22 +400,22 @@ export function PropertyDetail({
 
               {/* Action Buttons */}
               <div className="space-y-2">
-                <Button className="w-full" onClick={onScheduleViewing} data-testid="button-schedule-viewing">
+                <Button className="w-full" onClick={handleScheduleViewing} data-testid="button-schedule-viewing">
                   <Calendar className="w-4 h-4 mr-2" />
                   Schedule Viewing
                 </Button>
-                <Button className="w-full" variant="outline" onClick={onAddToCMA} data-testid="button-add-to-cma">
+                <Button className="w-full" variant="outline" onClick={handleAddToCMA} data-testid="button-add-to-cma">
                   <Plus className="w-4 h-4 mr-2" />
                   Add to CMA
                 </Button>
                 <div className="grid grid-cols-2 gap-2">
-                  <Button variant="outline" onClick={onSave} data-testid="button-save-property">
-                    <Heart className="w-4 h-4 mr-2" />
-                    Save
+                  <Button variant="outline" onClick={handleSave} data-testid="button-save-property">
+                    {saved ? <Check className="w-4 h-4 mr-2" /> : <Heart className="w-4 h-4 mr-2" />}
+                    {saved ? 'Saved' : 'Save'}
                   </Button>
-                  <Button variant="outline" onClick={onShare} data-testid="button-share-property">
-                    <Share2 className="w-4 h-4 mr-2" />
-                    Share
+                  <Button variant="outline" onClick={handleShare} data-testid="button-share-property">
+                    {linkCopied ? <Check className="w-4 h-4 mr-2" /> : <Share2 className="w-4 h-4 mr-2" />}
+                    {linkCopied ? 'Copied!' : 'Share'}
                   </Button>
                 </div>
               </div>

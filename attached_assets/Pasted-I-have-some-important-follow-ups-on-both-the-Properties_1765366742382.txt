@@ -1,0 +1,108 @@
+I have some important follow-ups on both the Properties section and the CMA calculations, based on real data from Repliers and a legitimate Quick CMA report.
+
+Note: I am attaching an example Quick CMA PDF (Cherry Creek) from a 3rd-party system. Please use this as a reference to validate that our CMA math is correct.
+
+Key reminder:
+- Repliers is the primary source for listing details, numeric data, and photos. Please make sure we are using Repliers wherever possible (both for the list view and property detail view).
+
+==================================================
+1) Properties & Property Detail – must fully use Repliers data
+==================================================
+
+Current problems:
+- In the Properties → View Results:
+  • Property cards still do NOT show real photos, even though Repliers has images.
+- When I click through to a property detail (example: 10350 Blue Bluff RD #14113):
+  • The main image area only shows a placeholder.
+  • Bedrooms and bathrooms show as “–”.
+  • Description says “No description available.”
+  • The Location block says “Interactive map coming soon.”
+  • The action buttons (Schedule Viewing, Add to CMA, Save, Share) do nothing.
+
+Required behavior (using Repliers data):
+- Normalized property model must include (from Repliers):
+  • photos[] (primary + gallery)
+  • bedroomsTotal
+  • bathroomsTotal / bathroomsTotalInteger
+  • livingArea
+  • yearBuilt
+  • publicRemarks
+  • latitude, longitude
+
+- List / card view:
+  • Use the first photo URL from photos[] as the thumbnail.
+  • If no photos exist, fall back to the existing placeholder only as a true fallback.
+
+- Property detail view:
+  • Show the primary image (and gallery if available) from photos[].
+  • Display bedrooms, bathrooms, living area, year built, and description from the normalized fields.
+  • Replace “Interactive map coming soon” with the actual interactive map centered on the property’s coordinates.
+  • Make sure the property ID passed from the card is the same ID used by the detail endpoint so a full record loads.
+
+- Actions:
+  • Schedule Viewing – at minimum, open a simple modal or call a stubbed endpoint (don’t leave it dead).
+  • Add to CMA – integrate with the CMA system so this property can be used as a subject/comparable.
+  • Save – mark the property as saved/favorited for the current user (or stub this with clear feedback).
+  • Share – either generate/copy a shareable link or show a stubbed modal; again, it should not silently do nothing.
+
+==================================================
+2) CMA math bug & Cherry Creek Quick CMA validation
+==================================================
+
+We’ve seen a serious issue with CMA calculations:
+
+- In a previous test, I picked 4 listings between roughly $2.9M and $3.2M and the CMA output was around $575K, which is clearly wrong. This suggests we’re either:
+  • Using the wrong fields,
+  • Treating numbers as strings,
+  • Or mixing up $/sqft values with prices.
+
+I am attaching a **real Quick CMA** for Cherry Creek from a 3rd-party system. This should be used as a concrete test case.
+
+The Cherry Creek CMA (see attached PDF) is configured roughly as:
+- Subdivision: Cherry Creek
+- Sqft range: 1200–1800
+- Property type: Residential, Single Family
+- Focus on Closed listings.
+The report shows, for the closed section:
+- Average and median close prices around the mid-$500Ks.
+- Average and median $/sqft in the mid-$300s.
+- 4 closed comps in that set.
+
+Required fixes:
+
+1) Fix CMA calculation logic
+   - Confirm we are using the correct numeric fields from the normalized listing data:
+     • listPrice → List Price
+     • closePrice → Close Price
+     • livingArea → Square Footage
+     • daysOnMarket / cumulativeDaysOnMarket
+   - Ensure:
+     • All numeric fields are stored and used as numbers, not strings.
+     • We don’t accidentally average $/sqft where we should average prices, or vice versa.
+     • We are not dividing or scaling prices incorrectly (e.g., dividing by 1,000).
+
+   - CMA statistics (min, max, average, median, price per sqft, days on market) must be calculated ONLY from the list of comparable properties the user selects.
+
+2) Validate CMA against the attached Cherry Creek Quick CMA
+   - Using Repliers data in our app:
+     • Run a CMA for Cherry Creek with similar filters (Subdivision, 1200–1800 sqft, Closed status, appropriate date range).
+     • Select the same sold comparables that appear in the attached Quick CMA, as closely as Repliers data allows.
+   - Our CMA output should match, within rounding tolerance, the summary stats in the PDF:
+     • Average and median close price.
+     • Average and median price per sqft.
+     • Count of closed comps (4 in their example).
+
+   - If a specific listing in the PDF is not available in Repliers, document that, but the key requirement is:
+     • For any chosen set of comps, our math must match what a manual calculation on those same records would produce.
+
+3) Guardrails for future correctness
+   - Add small internal checks or comments to ensure:
+     • Numeric parsing is done once (e.g., parseFloat or numeric types in the model).
+     • We can easily log (for debugging) the list of comp IDs and the raw numbers used in calculations.
+
+Summary:
+- Properties list and detail must fully use Repliers data (especially photos, beds, baths, sqft, description, and map).
+- CMA engine math must be corrected so that the averages/medians match what you’d get from manually averaging the same comps.
+- Use the attached Cherry Creek Quick CMA PDF as a validation example: picking the same sold properties in our app should produce essentially the same stats.
+
+Please keep the visual UI exactly as-is and focus only on fixing data mapping, CMA logic, and action wiring.
