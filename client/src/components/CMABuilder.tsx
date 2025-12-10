@@ -253,6 +253,19 @@ export function CMABuilder({ onCreateCMA, initialData }: CMABuilderProps) {
   // Property detail dialog state
   const [selectedProperty, setSelectedProperty] = useState<Property | null>(null);
   const [currentPhotoIndex, setCurrentPhotoIndex] = useState(0);
+  
+  // Autoplay carousel effect - advance every 3 seconds when dialog is open
+  useEffect(() => {
+    if (!selectedProperty) return;
+    const photos = ((selectedProperty as any).photos as string[] | undefined) || [];
+    if (photos.length <= 1) return;
+    
+    const interval = setInterval(() => {
+      setCurrentPhotoIndex(prev => (prev + 1) % photos.length);
+    }, 3000);
+    
+    return () => clearInterval(interval);
+  }, [selectedProperty]);
 
   const resetForm = () => {
     setCmaName("");
@@ -933,9 +946,9 @@ export function CMABuilder({ onCreateCMA, initialData }: CMABuilderProps) {
           ) : searchResults.length > 0 ? (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {searchResults.map((property) => {
-                // Photos may be included in additionalData or media from Repliers API
-                const additionalData = property.additionalData as { photos?: string[] } | null;
-                const primaryPhoto = additionalData?.photos?.[0];
+                // Photos are returned directly from Repliers API in property.photos
+                const photos = (property as any).photos as string[] | undefined;
+                const primaryPhoto = photos?.[0];
                 const pricePerSqft = property.livingArea 
                   ? (property.standardStatus === 'Closed' && property.closePrice 
                       ? Number(property.closePrice) 
@@ -1067,10 +1080,10 @@ export function CMABuilder({ onCreateCMA, initialData }: CMABuilderProps) {
       
       {/* Property Detail Dialog */}
       <Dialog open={!!selectedProperty} onOpenChange={(open) => !open && setSelectedProperty(null)}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-hidden">
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           {selectedProperty && (() => {
-            const additionalData = selectedProperty.additionalData as { photos?: string[] } | null;
-            const photos = additionalData?.photos || [];
+            // Photos are returned directly from Repliers API
+            const photos = ((selectedProperty as any).photos as string[] | undefined) || [];
             const pricePerSqft = selectedProperty.livingArea 
               ? (selectedProperty.standardStatus === 'Closed' && selectedProperty.closePrice 
                   ? Number(selectedProperty.closePrice) 

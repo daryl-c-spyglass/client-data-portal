@@ -2404,7 +2404,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Server-side rendered share page with Open Graph meta tags for social sharing
-  app.get("/share/cma/:token", async (req, res) => {
+  // Only serves SSR for social media bots/crawlers; regular browsers get the React app via Vite
+  app.get("/share/cma/:token", async (req, res, next) => {
+    const userAgent = req.headers['user-agent'] || '';
+    
+    // List of social media crawler/bot user agents that need OG meta tags
+    const botPatterns = [
+      'facebookexternalhit',
+      'Facebot',
+      'Twitterbot',
+      'LinkedInBot',
+      'WhatsApp',
+      'Slackbot',
+      'Discordbot',
+      'TelegramBot',
+      'Pinterest',
+      'Googlebot',
+      'bingbot',
+    ];
+    
+    // Check if this is a bot request
+    const isBot = botPatterns.some(bot => userAgent.toLowerCase().includes(bot.toLowerCase()));
+    
+    // For regular browsers, let Vite handle the request (passes to next middleware)
+    if (!isBot) {
+      return next();
+    }
+    
     // Strip HTML tags and escape remaining content for safe meta tag embedding
     const stripHtml = (str: string): string => {
       return str.replace(/<[^>]*>/g, '').replace(/\s+/g, ' ').trim();
