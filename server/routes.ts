@@ -217,6 +217,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         maxPrice,
         bedsMin,
         bathsMin,
+        minSqft,
+        maxSqft,
         limit = '50',
       } = req.query as Record<string, string | undefined>;
 
@@ -359,6 +361,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
           );
         }
 
+        // Server-side sqft filter (Repliers API may not support directly)
+        if (minSqft) {
+          const min = parseInt(minSqft, 10);
+          results = results.filter(p => p.livingArea !== null && p.livingArea >= min);
+        }
+        if (maxSqft) {
+          const max = parseInt(maxSqft, 10);
+          results = results.filter(p => p.livingArea !== null && p.livingArea <= max);
+        }
+
       } else if (status === 'closed' || status === 'sold') {
         // Note: Repliers API only supports status 'A' (Active) and 'U' (Under Contract)
         // Repliers does NOT support status 'S' (Sold) - it returns a 400 error
@@ -375,6 +387,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
           listPriceMax: maxPrice ? parseInt(maxPrice, 10) : undefined,
           bedroomsMin: bedsMin ? parseInt(bedsMin, 10) : undefined,
           fullBathsMin: bathsMin ? parseInt(bathsMin, 10) : undefined,
+          livingArea: (minSqft || maxSqft) ? {
+            min: minSqft ? parseInt(minSqft, 10) : undefined,
+            max: maxSqft ? parseInt(maxSqft, 10) : undefined,
+          } : undefined,
         }, parsedLimit, 0);
 
         // Helper to get numeric value
