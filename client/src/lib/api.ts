@@ -38,7 +38,8 @@ interface UnifiedSearchResponse {
 function mapStatusToStandard(status: string): string {
   const statusMap: Record<string, string> = {
     'Active': 'Active',
-    'Under Contract': 'Active Under Contract',
+    'Under Contract': 'Under Contract',
+    'Active Under Contract': 'Under Contract',
     'Closed': 'Closed',
     'Sold': 'Closed',
     'Pending': 'Pending',

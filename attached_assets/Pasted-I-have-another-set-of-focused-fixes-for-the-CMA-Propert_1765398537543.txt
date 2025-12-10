@@ -1,0 +1,139 @@
+I have another set of focused fixes for the CMA / Properties experience. Please apply these changes without altering the overall UI design.
+
+==================================================
+
+Property Detail Overlay – Image Controls
+==================================================
+
+On Search Results, when I click on a property address, it opens the floating detail view with images and information.
+
+Current issues with the image carousel:
+
+There is a grey left-side overlay/area that looks like a disabled control.
+
+The navigation UX is unclear.
+
+Required behavior:
+
+Remove the grey left overlay/area entirely.
+
+Keep the automatic carousel (auto-advance every ~3 seconds).
+
+Allow the user to:
+
+Click on the left side of the image to move to the previous photo.
+
+Click on the right side of the image to move to the next photo.
+
+The entire image area should behave like a two-zone control (left = back, right = forward).
+
+==================================================
+2) Sold/Closed Search – Georgetown + Oaks at San Gabriel
+
+In Search Properties, when filtering with:
+
+City: Georgetown
+
+Subdivision: Oaks at San Gabriel
+
+Status: Sold/Closed
+
+The result returns 0 properties, which appears incorrect.
+
+Required:
+
+Verify with Repliers whether Sold/Closed listings exist for this filter.
+
+If yes, fix the search query / normalization so these properties appear correctly.
+
+Ensure the subdivision filter is using the correct LIKE or matching logic for longer subdivision names.
+
+==================================================
+3) Print PDF vs Share CMA – Content Must Match
+
+The Share CMA view displays correct and preferred formatting.
+
+The Print / PDF output still does not match the Share CMA layout.
+
+Required:
+
+Make the PDF output exactly mirror the Share CMA design, including:
+
+Formatting
+
+Section structure
+
+Data values
+
+Ordering of content
+
+Remove any old template discrepancies so both outputs use the same components/data mapping.
+
+==================================================
+4) Info Toggles – Home Average, Listings, Timeline, Market Stats
+
+Tooltip issues still exist:
+
+Tooltip text is cut off.
+
+Long explanations are not readable.
+
+Required:
+
+Fix tooltip width, wrapping, and positioning so full text is readable, OR
+
+Summarize tooltip content into shorter text that displays cleanly.
+
+Ensure hover/tooltip behavior works across all four sections.
+
+==================================================
+5) Market Stats – No Output Despite Having Comparables
+
+Market Stats continues to show no data, even when valid comps were selected.
+
+Required:
+
+Market Stats must display grouped statistics for:
+
+Active
+
+Under Contract
+
+Closed/Sold
+
+Use the exact comparable properties selected during CMA creation.
+
+For each status group show counts, averages, price ranges, etc.
+
+Ensure that status classification uses the correct Repliers status codes.
+
+==================================================
+6) Modify Search (Yellow Box) – Must Follow Current Updates
+
+The Modify Search button in the yellow box should follow all the recent functional updates.
+
+Required behavior:
+
+When Modify Search is clicked:
+
+It should return to the CMA search page with the same filters prefilled.
+
+The previously selected Subject and Comparable properties should remain selected.
+
+The workflow should now incorporate the updated behavior for:
+
+Property type filters
+
+Sold date filters
+
+Correct autocomplete
+
+Accurate search results
+
+Updated card data
+
+Updated carousel behavior
+
+Modify Search must not reset data or misalign the new updated filter logic.
+
+Please implement these updates while keeping the existing UI styling. Focus on data accuracy, carousel behavior improvements, unified PDF/Share layout, readable tooltips, complete Market Stats output, and ensuring Modify Search works correctly with all recent enhancements.

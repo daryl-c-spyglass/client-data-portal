@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { MapContainer, TileLayer, Marker, Popup } from "react-leaflet";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
@@ -58,6 +58,20 @@ export function PropertyDetail({
   const [saved, setSaved] = useState(false);
   const [linkCopied, setLinkCopied] = useState(false);
   const { toast } = useToast();
+  const autoAdvanceRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  useEffect(() => {
+    if (media.length > 1) {
+      autoAdvanceRef.current = setInterval(() => {
+        setCurrentImageIndex((prev) => (prev + 1) % media.length);
+      }, 3000);
+    }
+    return () => {
+      if (autoAdvanceRef.current) {
+        clearInterval(autoAdvanceRef.current);
+      }
+    };
+  }, [media.length]);
   
   const formattedPrice = property.listPrice 
     ? new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(Number(property.listPrice))
@@ -137,32 +151,32 @@ export function PropertyDetail({
                   data-testid="img-property-main"
                 />
                 
-                {/* Navigation Arrows */}
+                {/* Full-width left/right click zones for navigation */}
                 {media.length > 1 && (
                   <>
-                    <Button
-                      size="icon"
-                      variant="secondary"
-                      className="absolute left-4 top-1/2 -translate-y-1/2"
+                    <button
+                      type="button"
+                      className="absolute left-0 top-0 w-1/2 h-full cursor-pointer z-10 flex items-center justify-start pl-4 bg-transparent hover:bg-black/5 transition-colors focus:outline-none"
                       onClick={prevImage}
-                      data-testid="button-prev-image"
+                      aria-label="Previous image"
+                      data-testid="zone-prev-image"
                     >
-                      <ChevronLeft className="w-4 h-4" />
-                    </Button>
-                    <Button
-                      size="icon"
-                      variant="secondary"
-                      className="absolute right-4 top-1/2 -translate-y-1/2"
+                      <ChevronLeft className="w-8 h-8 text-white/80 drop-shadow-lg" />
+                    </button>
+                    <button
+                      type="button"
+                      className="absolute right-0 top-0 w-1/2 h-full cursor-pointer z-10 flex items-center justify-end pr-4 bg-transparent hover:bg-black/5 transition-colors focus:outline-none"
                       onClick={nextImage}
-                      data-testid="button-next-image"
+                      aria-label="Next image"
+                      data-testid="zone-next-image"
                     >
-                      <ChevronRight className="w-4 h-4" />
-                    </Button>
+                      <ChevronRight className="w-8 h-8 text-white/80 drop-shadow-lg" />
+                    </button>
                   </>
                 )}
 
-                {/* Image Counter */}
-                <div className="absolute bottom-4 right-4 bg-black/60 text-white px-3 py-1 rounded-md text-sm">
+                {/* Image Counter - z-20 to stay above navigation zones */}
+                <div className="absolute bottom-4 right-4 bg-black/60 text-white px-3 py-1 rounded-md text-sm z-20 pointer-events-none">
                   {currentImageIndex + 1} / {media.length}
                 </div>
               </>

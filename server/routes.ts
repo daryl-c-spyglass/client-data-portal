@@ -399,7 +399,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
           const statusMap: Record<string, string> = {
             'A': 'Active',
-            'U': 'Active Under Contract',
+            'U': 'Under Contract',
             'S': 'Closed',
             'P': 'Pending',
           };
@@ -515,8 +515,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
             latitude: toNum(p.latitude),
             longitude: toNum(p.longitude),
             photos: p.photos || [],
-            subdivision: p.subdivisionName || null,
-            subdivisionName: p.subdivisionName || null,
+            subdivision: p.subdivision || p.subdivisionName || null,
+            subdivisionName: p.subdivision || p.subdivisionName || null,
             daysOnMarket: toNum(p.daysOnMarket),
             cumulativeDaysOnMarket: toNum(p.cumulativeDaysOnMarket) || toNum(p.daysOnMarket),
             lotSizeSquareFeet: lotSqFt,
@@ -2369,7 +2369,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Get property counts from database
       const allProperties = await storage.getAllProperties();
       const activeProperties = allProperties.filter(p => 
-        p.standardStatus === 'Active' || p.standardStatus === 'Active Under Contract'
+        p.standardStatus === 'Active' || p.standardStatus === 'Under Contract' || p.standardStatus === 'Active Under Contract'
       );
       const closedProperties = allProperties.filter(p => 
         p.standardStatus === 'Closed' || p.standardStatus === 'Sold'

@@ -116,7 +116,7 @@ export function CMAReport({
               <TooltipTrigger asChild onClick={(e) => e.stopPropagation()}>
                 <Info className="w-3 h-3 text-muted-foreground cursor-help" />
               </TooltipTrigger>
-              <TooltipContent side="bottom" className="max-w-sm">
+              <TooltipContent side="bottom" sideOffset={8} className="max-w-md z-50">
                 <p>Aggregated statistics including price, price per square foot, days on market, and property features across all comparable properties.</p>
               </TooltipContent>
             </Tooltip>
@@ -127,7 +127,7 @@ export function CMAReport({
               <TooltipTrigger asChild onClick={(e) => e.stopPropagation()}>
                 <Info className="w-3 h-3 text-muted-foreground cursor-help" />
               </TooltipTrigger>
-              <TooltipContent side="bottom" className="max-w-sm">
+              <TooltipContent side="bottom" sideOffset={8} className="max-w-md z-50">
                 <p>Detailed breakdown of comparable properties by status: Active, Under Contract, and Sold listings with price distribution.</p>
               </TooltipContent>
             </Tooltip>
@@ -138,7 +138,7 @@ export function CMAReport({
               <TooltipTrigger asChild onClick={(e) => e.stopPropagation()}>
                 <Info className="w-3 h-3 text-muted-foreground cursor-help" />
               </TooltipTrigger>
-              <TooltipContent side="bottom" className="max-w-sm">
+              <TooltipContent side="bottom" sideOffset={8} className="max-w-md z-50">
                 <p>Visual chart showing property prices over time with status indicators to identify market trends.</p>
               </TooltipContent>
             </Tooltip>
@@ -149,7 +149,7 @@ export function CMAReport({
               <TooltipTrigger asChild onClick={(e) => e.stopPropagation()}>
                 <Info className="w-3 h-3 text-muted-foreground cursor-help" />
               </TooltipTrigger>
-              <TooltipContent side="bottom" className="max-w-sm">
+              <TooltipContent side="bottom" sideOffset={8} className="max-w-md z-50">
                 <p>Key market indicators including average price, price per square foot, days on market, and list-to-sold ratio.</p>
               </TooltipContent>
             </Tooltip>
