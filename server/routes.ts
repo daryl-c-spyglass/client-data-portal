@@ -2366,6 +2366,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Server-side rendered share page with Open Graph meta tags for social sharing
   app.get("/share/cma/:token", async (req, res) => {
+    // Strip HTML tags and escape remaining content for safe meta tag embedding
+    const stripHtml = (str: string): string => {
+      return str.replace(/<[^>]*>/g, '').replace(/\s+/g, ' ').trim();
+    };
+    
+    const escapeHtml = (str: string): string => {
+      return stripHtml(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+    };
+    
     try {
       const cma = await storage.getCmaByShareToken(req.params.token);
       
@@ -2417,28 +2431,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
 
+      // Escape all user-controlled values for safe HTML embedding
+      const safeTitle = escapeHtml(title);
+      const safeDescription = escapeHtml(description);
+      const safeImage = escapeHtml(image);
+      const safeToken = escapeHtml(req.params.token);
+      const safeUrl = `${req.protocol}://${req.get('host')}/share/cma/${safeToken}`;
+
       // Return HTML with OG meta tags that will be replaced by React app
       const html = `<!DOCTYPE html>
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1" />
-    <title>${title}</title>
-    <meta name="description" content="${description}" />
+    <title>${safeTitle}</title>
+    <meta name="description" content="${safeDescription}" />
     
     <!-- Open Graph / Facebook -->
     <meta property="og:type" content="website" />
-    <meta property="og:url" content="${req.protocol}://${req.get('host')}/share/cma/${req.params.token}" />
-    <meta property="og:title" content="${title}" />
-    <meta property="og:description" content="${description}" />
-    <meta property="og:image" content="${image}" />
+    <meta property="og:url" content="${safeUrl}" />
+    <meta property="og:title" content="${safeTitle}" />
+    <meta property="og:description" content="${safeDescription}" />
+    <meta property="og:image" content="${safeImage}" />
     
     <!-- Twitter -->
     <meta property="twitter:card" content="summary_large_image" />
-    <meta property="twitter:url" content="${req.protocol}://${req.get('host')}/share/cma/${req.params.token}" />
-    <meta property="twitter:title" content="${title}" />
-    <meta property="twitter:description" content="${description}" />
-    <meta property="twitter:image" content="${image}" />
+    <meta property="twitter:url" content="${safeUrl}" />
+    <meta property="twitter:title" content="${safeTitle}" />
+    <meta property="twitter:description" content="${safeDescription}" />
+    <meta property="twitter:image" content="${safeImage}" />
     
     <link rel="icon" type="image/png" href="/favicon.png" />
     <link rel="preconnect" href="https://fonts.googleapis.com">
