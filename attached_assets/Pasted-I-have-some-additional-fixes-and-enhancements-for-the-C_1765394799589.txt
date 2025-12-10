@@ -1,0 +1,133 @@
+I have some additional fixes and enhancements for the CMA Builder and report views. Please treat these as add-ons to my previous prompts, not a replacement.
+
+=====================================
+
+Search Properties – Barton Hills & Images
+=====================================
+
+a) Barton Hills subdivision not showing
+
+In Search Properties, when I type or search for “Barton Hills” in the Subdivision field, it does not appear.
+
+Please:
+
+Make sure Barton Hills is returned in the subdivision autocomplete.
+
+Verify the subdivision query is correctly mapped to Repliers data.
+
+Confirm that searching with:
+
+City: Austin
+
+Subdivision: Barton Hills
+returns the correct properties from Repliers.
+
+b) Thumbnails + full photo carousel on Search Results
+
+In Search Results, the property cards still do not show the exact listing image/thumbnail.
+
+Required behavior:
+
+Pull the first photo from Repliers’ photos/media array and display it as the card thumbnail.
+
+When I click a card:
+
+Open a photo viewer (overlay or in the floating property panel) that:
+
+Shows all available images for that property.
+
+Automatically cycles through the photos like a carousel:
+
+Autoplay every 3 seconds.
+
+Has left/right arrows so the user can manually navigate forward/backward.
+
+The viewer should keep showing all information (address, beds, baths, price, etc.) while the images change.
+
+=====================================
+2) Data Accuracy for Status (Active / Under Contract / Sold)
+
+I suspect that the data source or filters for Active, Under Contract, and Sold/Closed are not accurate.
+
+Please:
+
+Verify that each status filter maps exactly to Repliers’ status codes.
+
+Confirm the counts and results for each status against Repliers directly.
+
+Fix any query or normalization issues so the app’s results match Repliers as closely as possible.
+
+=====================================
+3) Property Detail / Toggle Panel – Text Cut Off
+
+When I toggle/open the property information panel (detail view / floating card), the text and details are cut off and not fully visible.
+
+Fix so that:
+
+All key fields (address, remarks, features, etc.) are fully visible.
+
+If content is long, the panel should be scrollable or expand correctly so no text is clipped.
+
+=====================================
+4) Print & Share – Layout and Behavior
+
+a) Move Print next to Share
+
+In the CMA report view, move the Print (PDF) icon so it appears beside the Share button in the upper right.
+
+The Print button should still generate the same PDF output as before, just relocated.
+
+b) Clean up PDF output icons
+
+In the PDF output, remove:
+
+The chain/link icon.
+
+The share icon.
+
+Those controls should exist only in the web app, not in the exported PDF.
+
+c) Share link should show full report, not blank page
+
+When I click Share, copy the share link, and open it in a new tab, it currently shows a blank page.
+
+Fix so that:
+
+The share link opens a full report view, equivalent to what we see in:
+
+The on-screen preview, and
+
+The PDF result.
+
+The shared page should show the same content as the PDF (Home Averages, Listings, Timeline, Market Stats) in a client-friendly web layout.
+
+=====================================
+5) Market Stats – Status Breakdown Details
+
+In Market Stats → Property Status Breakdown:
+
+For each status (Active, Under Contract, Closed/Sold), the breakdown is missing detailed property information.
+
+Required behavior:
+
+For the chosen comparables and filter set, show:
+
+The exact property addresses included in each status group.
+
+Key information:
+
+Price
+
+Beds / baths
+
+Living area (sqft)
+
+DOM
+
+A property picture/thumbnail for each listing.
+
+The property type (Single Family, Condo, Townhouse, Multi-Family, Land).
+
+This should apply to all statuses (Active, Under Contract, Closed/Sold), and be consistent with the properties actually used in the CMA.
+
+Please apply these changes while keeping the existing UI styling and layout. Focus on fixing the data mapping to Repliers, making the photo behavior richer (thumbnails + carousel), and ensuring Share/Print/Market Stats all reflect the same accurate CMA data.
