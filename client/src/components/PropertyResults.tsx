@@ -8,9 +8,28 @@ import { PropertyListCard } from "./PropertyListCard";
 import { PropertyTable } from "./PropertyTable";
 import type { Property, Media } from "@shared/schema";
 
+// Helper function to convert property.photos array to Media[] format
+function convertPhotosToMedia(property: Property): Media[] {
+  const photos = (property as any).photos as string[] | undefined;
+  if (!photos || photos.length === 0) return [];
+  
+  return photos.map((url, index) => ({
+    id: `${property.id}-photo-${index}`,
+    resourceRecordKey: property.id,
+    mediaKey: `${property.id}-${index}`,
+    mediaURL: url,
+    localPath: null,
+    order: index,
+    caption: null,
+    mediaCategory: null,
+    mediaType: 'image/jpeg',
+    modificationTimestamp: new Date(),
+  } as unknown as Media));
+}
+
 interface PropertyResultsProps {
   properties: Property[];
-  mediaMap: Map<string, Media[]>;
+  mediaMap?: Map<string, Media[]>;
   selectedIds: Set<string>;
   onToggleSelect: (id: string) => void;
   onSelectAll: () => void;
@@ -190,7 +209,7 @@ export function PropertyResults({
             <PropertyCard
               key={property.id}
               property={property}
-              media={mediaMap.get(property.listingId)}
+              media={mediaMap?.get(property.listingId) || convertPhotosToMedia(property)}
               selected={selectedIds.has(property.id)}
               onSelect={() => onToggleSelect(property.id)}
               onAddToCart={() => onAddToCart(property)}
@@ -207,7 +226,7 @@ export function PropertyResults({
             <PropertyListCard
               key={property.id}
               property={property}
-              media={mediaMap.get(property.listingId)}
+              media={mediaMap?.get(property.listingId) || convertPhotosToMedia(property)}
               selected={selectedIds.has(property.id)}
               onSelect={() => onToggleSelect(property.id)}
               onAddToCart={() => onAddToCart(property)}

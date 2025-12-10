@@ -1795,54 +1795,55 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Autocomplete endpoints for search filters
+  // Support both ?q= and ?search= query parameters
   app.get("/api/autocomplete/cities", async (req, res) => {
     try {
-      const query = (req.query.q as string || '').trim();
-      if (query.length < 2) {
-        res.json({ suggestions: [] });
+      const query = ((req.query.q || req.query.search) as string || '').trim();
+      if (query.length < 1) {
+        res.json({ suggestions: [], results: [] });
         return;
       }
       
       const results = await storage.getAutocompleteCities(query, 20);
       const suggestions = results.map(r => r.value);
-      res.json({ suggestions });
+      res.json(results.length > 0 ? results : { suggestions });
     } catch (error: any) {
       console.error("City autocomplete error:", error.message);
-      res.json({ suggestions: [] });
+      res.json({ suggestions: [], results: [] });
     }
   });
 
   app.get("/api/autocomplete/subdivisions", async (req, res) => {
     try {
-      const query = (req.query.q as string || '').trim();
-      if (query.length < 2) {
-        res.json({ suggestions: [] });
+      const query = ((req.query.q || req.query.search) as string || '').trim();
+      if (query.length < 1) {
+        res.json({ suggestions: [], results: [] });
         return;
       }
       
       const results = await storage.getAutocompleteSubdivisions(query, 20);
       const suggestions = results.map(r => r.value);
-      res.json({ suggestions });
+      res.json(results.length > 0 ? results : { suggestions });
     } catch (error: any) {
       console.error("Subdivision autocomplete error:", error.message);
-      res.json({ suggestions: [] });
+      res.json({ suggestions: [], results: [] });
     }
   });
 
   app.get("/api/autocomplete/postalCodes", async (req, res) => {
     try {
-      const query = (req.query.q as string || '').trim();
-      if (query.length < 2) {
-        res.json({ suggestions: [] });
+      const query = ((req.query.q || req.query.search) as string || '').trim();
+      if (query.length < 1) {
+        res.json({ suggestions: [], results: [] });
         return;
       }
       
       const results = await storage.getAutocompleteZipCodes(query, 20);
       const suggestions = results.map(r => r.value);
-      res.json({ suggestions });
+      res.json(results.length > 0 ? results : { suggestions });
     } catch (error: any) {
       console.error("Postal code autocomplete error:", error.message);
-      res.json({ suggestions: [] });
+      res.json({ suggestions: [], results: [] });
     }
   });
   

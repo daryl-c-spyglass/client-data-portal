@@ -1,18 +1,23 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { useLocation } from "wouter";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Map as MapIcon, Search } from "lucide-react";
 import { SearchCriteriaForm } from "@/components/SearchCriteria";
 import { PropertyResults } from "@/components/PropertyResults";
+import { PropertyMapView } from "@/components/PropertyMapView";
 import { unifiedSearch } from "@/lib/api";
+import { useSelectedProperty } from "@/contexts/SelectedPropertyContext";
 import type { Property, Media, SearchCriteria } from "@shared/schema";
 
 export default function Properties() {
   const [activeTab, setActiveTab] = useState("search");
   const [searchCriteria, setSearchCriteria] = useState<SearchCriteria | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [, navigate] = useLocation();
+  const { setSelectedProperty } = useSelectedProperty();
 
   // Fetch total property count
   const { data: countData } = useQuery<{ count: number }>({
@@ -25,11 +30,9 @@ export default function Properties() {
   const { data: properties = [], isLoading, error } = useQuery<Property[]>({
     queryKey: ['/api/search', searchCriteria],
     queryFn: () => unifiedSearch(searchCriteria!),
-    enabled: (activeTab === 'results' && searchCriteria !== null),
+    enabled: (searchCriteria !== null),
+    staleTime: 5 * 60 * 1000, // Cache for 5 minutes
   });
-
-  // Mock media map - will be populated with real data in production
-  const [mediaMap] = useState<Map<string, Media[]>>(new Map());
 
   const handleSearch = (criteria: SearchCriteria) => {
     setSearchCriteria(criteria);
@@ -56,8 +59,31 @@ export default function Properties() {
     }
   };
 
+  // Convert photos to Media format for context
+  const convertPhotosToMedia = (property: Property): Media[] => {
+    const photos = (property as any).photos as string[] | undefined;
+    if (!photos || photos.length === 0) return [];
+    return photos.map((url, index) => ({
+      id: `${property.id}-photo-${index}`,
+      resourceRecordKey: property.id,
+      mediaKey: `${property.id}-${index}`,
+      mediaURL: url,
+      localPath: null,
+      order: index,
+      caption: null,
+      mediaCategory: null,
+      mediaType: 'image/jpeg',
+      modificationTimestamp: new Date(),
+    } as unknown as Media));
+  };
+
   const handlePropertyClick = (property: Property) => {
-    window.location.href = `/properties/${property.id}`;
+    // Set the selected property in context before navigation
+    setSelectedProperty({
+      property,
+      media: convertPhotosToMedia(property),
+    });
+    navigate(`/properties/${property.id}`);
   };
 
   const handleAddToCart = (property: Property) => {
@@ -103,13 +129,31 @@ export default function Properties() {
         </TabsContent>
 
         <TabsContent value="map">
-          <div className="aspect-video bg-muted rounded-md flex items-center justify-center">
-            <div className="text-center text-muted-foreground">
-              <MapIcon className="w-12 h-12 mx-auto mb-4" />
-              <p className="text-lg font-semibold mb-2">Interactive Map View</p>
-              <p className="text-sm">Map integration coming soon with property markers and drawing tools</p>
+          {!searchCriteria ? (
+            <div className="aspect-video bg-muted rounded-md flex items-center justify-center">
+              <div className="text-center text-muted-foreground">
+                <Search className="w-12 h-12 mx-auto mb-4" />
+                <p className="text-lg font-semibold mb-2">No search criteria</p>
+                <p className="text-sm mb-4">Please search for properties first to view them on the map</p>
+                <Button onClick={() => setActiveTab("search")} data-testid="button-goto-search-map">
+                  Go to Search
+                </Button>
+              </div>
             </div>
-          </div>
+          ) : isLoading ? (
+            <div className="aspect-video bg-muted rounded-md flex items-center justify-center">
+              <div className="text-center text-muted-foreground">
+                <div className="h-8 w-8 border-2 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+                <p className="text-sm">Loading properties...</p>
+              </div>
+            </div>
+          ) : (
+            <PropertyMapView
+              properties={properties}
+              onPropertyClick={handlePropertyClick}
+              isLoading={isLoading}
+            />
+          )}
         </TabsContent>
 
         <TabsContent value="results">
@@ -148,7 +192,6 @@ export default function Properties() {
           ) : (
             <PropertyResults
               properties={properties}
-              mediaMap={mediaMap}
               selectedIds={selectedIds}
               onToggleSelect={toggleSelect}
               onSelectAll={selectAll}

@@ -295,7 +295,7 @@ export function SearchCriteriaForm({ onSearch, initialCriteria = {} }: SearchCri
             placeholder="Type to search..."
             values={criteria.neighborhood || []}
             onChange={(values) => updateCriteria('neighborhood', values.length > 0 ? values : undefined)}
-            apiEndpoint="/api/autocomplete/neighborhoods"
+            apiEndpoint="/api/autocomplete/subdivisions"
             testId="input-neighborhood"
           />
         </div>
@@ -331,7 +331,7 @@ export function SearchCriteriaForm({ onSearch, initialCriteria = {} }: SearchCri
             placeholder="Type to search..."
             values={criteria.zipCodes || []}
             onChange={(values) => updateCriteria('zipCodes', values.length > 0 ? values : undefined)}
-            apiEndpoint="/api/autocomplete/zipcodes"
+            apiEndpoint="/api/autocomplete/postalCodes"
             testId="input-zip-codes"
           />
         </div>

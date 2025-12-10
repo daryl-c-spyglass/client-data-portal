@@ -1,0 +1,58 @@
+I’m seeing some issues on the Properties page that still need to be fixed. Please focus on functionality only; do NOT change the UI layout or styling.
+
+Issues:
+
+1) Search Criteria – missing suggestive inputs
+   - The autocomplete/suggestive inputs for these fields are not showing any options:
+     • Neighborhood
+     • Subdivision
+     • Cities
+     • Zip Codes
+   - Expected:
+     • Each of these fields should behave like the school autocomplete you implemented on Buyer Search.
+     • As the user types, suggestions should appear from the underlying data (Repliers/local DB).
+     • Selecting a suggestion should populate the field and be sent as a filter to /api/search.
+
+2) View Results – no property images and detail page broken
+   - In View Results, the property cards are loading, but:
+     • The images/thumbnails are blank.
+     • When I click on a property card and go to the detail page, I see:
+       “Property data not available. Please search for properties and click on a property card to view details.”
+   - Expected:
+     • Each property card should show at least one image, mapped from the normalized listing data (e.g., first photo URL from Repliers).
+     • Clicking a property card should:
+       – Pass the correct property ID (from the unified search result).
+       – Load the full property data on the detail page via the proper endpoint (e.g., GET /api/properties/:id).
+       – Display the address, price, beds/baths, sqft, year built, photos, etc., instead of the “Property data not available” message.
+
+   Please:
+   - Verify that the ID used in the card matches what the detail endpoint expects.
+   - Make sure the detail page is using the same normalized property shape as the search results.
+   - Handle missing-photo cases with a placeholder, not a broken layout.
+
+3) View Map / Interactive Map View not working
+   - On the Properties page, when I click the “View Map” tab, I only see:
+     “Interactive Map View – Map integration coming soon with property markers and drawing tools.”
+   - No properties appear on the map and it looks like a static placeholder.
+
+   Expected:
+   - The “View Map” tab should show an actual interactive map with:
+     • Markers for the properties returned by the last search (using latitude/longitude from the normalized listings).
+     • Basic zoom and pan.
+   - The placeholder text (“coming soon…”) should be replaced by the working map component, but without changing the tab layout or styling.
+
+   Please:
+   - Wire the Properties map view to the same search results data being used in View Results.
+   - Use the existing map component (Leaflet/Mapbox/etc.) you previously integrated for Buyer Search.
+   - Ensure switching between Search Criteria, View Map, and View Results is smooth and does not reload or clear the current search.
+
+Summary:
+- Add autocomplete suggestions for Neighborhood, Subdivision, Cities, and Zip Codes.
+- Fix property images and property detail loading in View Results.
+- Replace the “coming soon” placeholder with a working interactive map that uses the current search results.
+
+I’ve attached screenshots of:
+- View Results with blank images
+- View Map showing the “Interactive Map View” placeholder
+- Property detail page with “Property data not available”
+to help you see the current state.
