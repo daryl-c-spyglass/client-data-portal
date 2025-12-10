@@ -1101,7 +1101,7 @@ export function CMABuilder({ onCreateCMA, initialData }: CMABuilderProps) {
                 
                 {/* Photo Carousel */}
                 {photos.length > 0 ? (
-                  <div className="relative">
+                  <div className="relative group">
                     <div className="aspect-video bg-muted rounded-md overflow-hidden">
                       <img 
                         src={photos[currentPhotoIndex]} 
@@ -1114,22 +1114,22 @@ export function CMABuilder({ onCreateCMA, initialData }: CMABuilderProps) {
                         <Button 
                           size="icon" 
                           variant="secondary"
-                          className="absolute left-2 top-1/2 -translate-y-1/2"
+                          className="absolute left-0 top-1/2 -translate-y-1/2 h-full w-12 rounded-none rounded-l-md bg-black/30 hover:bg-black/50 text-white border-0"
                           onClick={() => setCurrentPhotoIndex(prev => (prev - 1 + photos.length) % photos.length)}
                           data-testid="button-prev-photo"
                         >
-                          <ChevronLeft className="w-4 h-4" />
+                          <ChevronLeft className="w-6 h-6" />
                         </Button>
                         <Button 
                           size="icon" 
                           variant="secondary"
-                          className="absolute right-2 top-1/2 -translate-y-1/2"
+                          className="absolute right-0 top-1/2 -translate-y-1/2 h-full w-12 rounded-none rounded-r-md bg-black/30 hover:bg-black/50 text-white border-0"
                           onClick={() => setCurrentPhotoIndex(prev => (prev + 1) % photos.length)}
                           data-testid="button-next-photo"
                         >
-                          <ChevronRight className="w-4 h-4" />
+                          <ChevronRight className="w-6 h-6" />
                         </Button>
-                        <div className="absolute bottom-2 left-1/2 -translate-x-1/2 bg-black/50 text-white px-2 py-1 rounded text-xs">
+                        <div className="absolute bottom-3 left-1/2 -translate-x-1/2 bg-black/60 text-white px-3 py-1.5 rounded-full text-sm font-medium">
                           {currentPhotoIndex + 1} / {photos.length}
                         </div>
                       </>

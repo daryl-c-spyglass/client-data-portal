@@ -5,7 +5,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, Legend, ResponsiveContainer, ScatterChart, Scatter } from "recharts";
-import { Save, Edit, FileText, Printer, Info } from "lucide-react";
+import { Save, Edit, FileText, Printer, Info, Home } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import type { Property, PropertyStatistics, TimelineDataPoint } from "@shared/schema";
 
@@ -116,8 +116,8 @@ export function CMAReport({
               <TooltipTrigger asChild onClick={(e) => e.stopPropagation()}>
                 <Info className="w-3 h-3 text-muted-foreground cursor-help" />
               </TooltipTrigger>
-              <TooltipContent>
-                <p className="max-w-xs">Aggregated statistics including price, price per square foot, days on market, and property features across all comparable properties.</p>
+              <TooltipContent side="bottom" className="max-w-sm">
+                <p>Aggregated statistics including price, price per square foot, days on market, and property features across all comparable properties.</p>
               </TooltipContent>
             </Tooltip>
           </TabsTrigger>
@@ -127,8 +127,8 @@ export function CMAReport({
               <TooltipTrigger asChild onClick={(e) => e.stopPropagation()}>
                 <Info className="w-3 h-3 text-muted-foreground cursor-help" />
               </TooltipTrigger>
-              <TooltipContent>
-                <p className="max-w-xs">Detailed breakdown of comparable properties by status: Active, Under Contract, and Sold listings with price distribution.</p>
+              <TooltipContent side="bottom" className="max-w-sm">
+                <p>Detailed breakdown of comparable properties by status: Active, Under Contract, and Sold listings with price distribution.</p>
               </TooltipContent>
             </Tooltip>
           </TabsTrigger>
@@ -138,8 +138,8 @@ export function CMAReport({
               <TooltipTrigger asChild onClick={(e) => e.stopPropagation()}>
                 <Info className="w-3 h-3 text-muted-foreground cursor-help" />
               </TooltipTrigger>
-              <TooltipContent>
-                <p className="max-w-xs">Visual chart showing property prices over time with status indicators to identify market trends.</p>
+              <TooltipContent side="bottom" className="max-w-sm">
+                <p>Visual chart showing property prices over time with status indicators to identify market trends.</p>
               </TooltipContent>
             </Tooltip>
           </TabsTrigger>
@@ -149,8 +149,8 @@ export function CMAReport({
               <TooltipTrigger asChild onClick={(e) => e.stopPropagation()}>
                 <Info className="w-3 h-3 text-muted-foreground cursor-help" />
               </TooltipTrigger>
-              <TooltipContent>
-                <p className="max-w-xs">Key market indicators including average price, price per square foot, days on market, and list-to-sold ratio.</p>
+              <TooltipContent side="bottom" className="max-w-sm">
+                <p>Key market indicators including average price, price per square foot, days on market, and list-to-sold ratio.</p>
               </TooltipContent>
             </Tooltip>
           </TabsTrigger>
@@ -431,35 +431,151 @@ export function CMAReport({
             </Card>
           </div>
 
-          {/* Status Breakdown */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">Property Status Breakdown</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div className="flex items-center gap-3 p-3 rounded-md bg-green-50 dark:bg-green-950/30 border border-green-200 dark:border-green-800">
-                  <div className="w-3 h-3 rounded-full bg-green-500"></div>
-                  <div>
-                    <div className="text-lg font-bold text-green-700 dark:text-green-400">{activeProperties.length}</div>
-                    <p className="text-xs text-green-600 dark:text-green-500">Active Listings</p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-3 p-3 rounded-md bg-yellow-50 dark:bg-yellow-950/30 border border-yellow-200 dark:border-yellow-800">
-                  <div className="w-3 h-3 rounded-full bg-yellow-500"></div>
-                  <div>
-                    <div className="text-lg font-bold text-yellow-700 dark:text-yellow-400">{underContractProperties.length}</div>
-                    <p className="text-xs text-yellow-600 dark:text-yellow-500">Under Contract</p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-3 p-3 rounded-md bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800">
-                  <div className="w-3 h-3 rounded-full bg-red-500"></div>
-                  <div>
-                    <div className="text-lg font-bold text-red-700 dark:text-red-400">{soldProperties.length}</div>
-                    <p className="text-xs text-red-600 dark:text-red-500">Sold/Closed</p>
-                  </div>
-                </div>
+          {/* Status Breakdown with Property Details */}
+          {/* Active Properties */}
+          <Card className="border-green-200 dark:border-green-800">
+            <CardHeader className="bg-green-50 dark:bg-green-950/30 rounded-t-lg">
+              <div className="flex items-center gap-3">
+                <div className="w-4 h-4 rounded-full bg-green-500"></div>
+                <CardTitle className="text-base text-green-700 dark:text-green-400">
+                  Active Listings ({activeProperties.length})
+                </CardTitle>
               </div>
+            </CardHeader>
+            <CardContent className="pt-4">
+              {activeProperties.length > 0 ? (
+                <div className="space-y-3">
+                  {activeProperties.map((property) => {
+                    const photos = (property as any).photos as string[] | undefined;
+                    const primaryPhoto = photos?.[0];
+                    const price = property.listPrice ? Number(property.listPrice) : 0;
+                    const pricePerSqft = property.livingArea ? price / Number(property.livingArea) : null;
+                    return (
+                      <div key={property.id} className="flex gap-3 p-2 rounded-md border bg-card">
+                        {primaryPhoto ? (
+                          <img src={primaryPhoto} alt={property.unparsedAddress || ''} className="w-20 h-20 object-cover rounded-md flex-shrink-0" />
+                        ) : (
+                          <div className="w-20 h-20 bg-muted rounded-md flex items-center justify-center flex-shrink-0">
+                            <Home className="w-6 h-6 text-muted-foreground/50" />
+                          </div>
+                        )}
+                        <div className="flex-1 min-w-0">
+                          <p className="font-semibold text-sm truncate">{property.unparsedAddress}</p>
+                          <p className="text-lg font-bold text-primary">${price.toLocaleString()}</p>
+                          <div className="flex flex-wrap gap-x-3 text-xs text-muted-foreground">
+                            <span>{property.bedroomsTotal || 0} beds</span>
+                            <span>{property.bathroomsTotalInteger || 0} baths</span>
+                            {property.livingArea && <span>{Number(property.livingArea).toLocaleString()} sqft</span>}
+                            {pricePerSqft && <span>${pricePerSqft.toFixed(0)}/sqft</span>}
+                            {property.daysOnMarket && <span>{property.daysOnMarket} DOM</span>}
+                          </div>
+                          <p className="text-xs text-muted-foreground">{property.propertySubType || property.propertyType}</p>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <p className="text-sm text-muted-foreground text-center py-4">No active listings in this CMA</p>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Under Contract Properties */}
+          <Card className="border-yellow-200 dark:border-yellow-800">
+            <CardHeader className="bg-yellow-50 dark:bg-yellow-950/30 rounded-t-lg">
+              <div className="flex items-center gap-3">
+                <div className="w-4 h-4 rounded-full bg-yellow-500"></div>
+                <CardTitle className="text-base text-yellow-700 dark:text-yellow-400">
+                  Under Contract ({underContractProperties.length})
+                </CardTitle>
+              </div>
+            </CardHeader>
+            <CardContent className="pt-4">
+              {underContractProperties.length > 0 ? (
+                <div className="space-y-3">
+                  {underContractProperties.map((property) => {
+                    const photos = (property as any).photos as string[] | undefined;
+                    const primaryPhoto = photos?.[0];
+                    const price = property.listPrice ? Number(property.listPrice) : 0;
+                    const pricePerSqft = property.livingArea ? price / Number(property.livingArea) : null;
+                    return (
+                      <div key={property.id} className="flex gap-3 p-2 rounded-md border bg-card">
+                        {primaryPhoto ? (
+                          <img src={primaryPhoto} alt={property.unparsedAddress || ''} className="w-20 h-20 object-cover rounded-md flex-shrink-0" />
+                        ) : (
+                          <div className="w-20 h-20 bg-muted rounded-md flex items-center justify-center flex-shrink-0">
+                            <Home className="w-6 h-6 text-muted-foreground/50" />
+                          </div>
+                        )}
+                        <div className="flex-1 min-w-0">
+                          <p className="font-semibold text-sm truncate">{property.unparsedAddress}</p>
+                          <p className="text-lg font-bold text-primary">${price.toLocaleString()}</p>
+                          <div className="flex flex-wrap gap-x-3 text-xs text-muted-foreground">
+                            <span>{property.bedroomsTotal || 0} beds</span>
+                            <span>{property.bathroomsTotalInteger || 0} baths</span>
+                            {property.livingArea && <span>{Number(property.livingArea).toLocaleString()} sqft</span>}
+                            {pricePerSqft && <span>${pricePerSqft.toFixed(0)}/sqft</span>}
+                            {property.daysOnMarket && <span>{property.daysOnMarket} DOM</span>}
+                          </div>
+                          <p className="text-xs text-muted-foreground">{property.propertySubType || property.propertyType}</p>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <p className="text-sm text-muted-foreground text-center py-4">No under contract listings in this CMA</p>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Sold/Closed Properties */}
+          <Card className="border-red-200 dark:border-red-800">
+            <CardHeader className="bg-red-50 dark:bg-red-950/30 rounded-t-lg">
+              <div className="flex items-center gap-3">
+                <div className="w-4 h-4 rounded-full bg-red-500"></div>
+                <CardTitle className="text-base text-red-700 dark:text-red-400">
+                  Sold/Closed ({soldProperties.length})
+                </CardTitle>
+              </div>
+            </CardHeader>
+            <CardContent className="pt-4">
+              {soldProperties.length > 0 ? (
+                <div className="space-y-3">
+                  {soldProperties.map((property) => {
+                    const photos = (property as any).photos as string[] | undefined;
+                    const primaryPhoto = photos?.[0];
+                    const price = property.closePrice ? Number(property.closePrice) : (property.listPrice ? Number(property.listPrice) : 0);
+                    const pricePerSqft = property.livingArea ? price / Number(property.livingArea) : null;
+                    return (
+                      <div key={property.id} className="flex gap-3 p-2 rounded-md border bg-card">
+                        {primaryPhoto ? (
+                          <img src={primaryPhoto} alt={property.unparsedAddress || ''} className="w-20 h-20 object-cover rounded-md flex-shrink-0" />
+                        ) : (
+                          <div className="w-20 h-20 bg-muted rounded-md flex items-center justify-center flex-shrink-0">
+                            <Home className="w-6 h-6 text-muted-foreground/50" />
+                          </div>
+                        )}
+                        <div className="flex-1 min-w-0">
+                          <p className="font-semibold text-sm truncate">{property.unparsedAddress}</p>
+                          <p className="text-lg font-bold text-primary">${price.toLocaleString()}</p>
+                          <div className="flex flex-wrap gap-x-3 text-xs text-muted-foreground">
+                            <span>{property.bedroomsTotal || 0} beds</span>
+                            <span>{property.bathroomsTotalInteger || 0} baths</span>
+                            {property.livingArea && <span>{Number(property.livingArea).toLocaleString()} sqft</span>}
+                            {pricePerSqft && <span>${pricePerSqft.toFixed(0)}/sqft</span>}
+                            {property.closeDate && <span>Sold: {new Date(property.closeDate).toLocaleDateString()}</span>}
+                          </div>
+                          <p className="text-xs text-muted-foreground">{property.propertySubType || property.propertyType}</p>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <p className="text-sm text-muted-foreground text-center py-4">No sold/closed listings in this CMA</p>
+              )}
             </CardContent>
           </Card>
 

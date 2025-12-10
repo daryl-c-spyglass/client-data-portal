@@ -1,0 +1,122 @@
+I have more follow-up issues based on the latest build. Please treat these as incremental to my previous prompts.
+
+=====================================
+
+Sold/Closed Results – Austin + Barton Hills
+=====================================
+
+In Search Properties, when I use:
+
+City: Austin
+
+Subdivision: Barton Hills
+
+Status: Sold/Closed
+
+I am getting no results.
+
+Please verify:
+
+That this combination actually has Sold/Closed listings in Repliers.
+
+That the query is correctly filtering by subdivision + city + status.
+
+If Repliers has Sold/Closed listings for this filter, fix the search logic so those listings appear.
+
+=====================================
+2) Carousel Arrows Positioning on Property Detail
+
+In the property detail / image viewer, when I click a property in search results:
+
+The arrow controls for previous/next are not placed directly on or next to the image area.
+
+It feels like the arrows are not clearly tied to the image carousel.
+
+Required behavior:
+
+The left/right arrows should be visually attached to the image frame (overlayed on the sides, or immediately adjacent).
+
+Clicking the arrows should clearly move the currently visible image forward/backward in the carousel.
+
+Autoplay every ~3 seconds should still work, but manual arrows must override and feel natural.
+
+=====================================
+3) “Modify Search” – CMA Name Duplicating “(Modified)”
+
+In the yellow bar, when I click Modify Search:
+
+The CMA name gets “(Modified)” appended every time I modify and save.
+
+Example:
+Barton Hills West - Sold/Closed & Active - 12/11/2025 3:26 AM (Modified) (Modified)
+
+Fix the naming logic so:
+
+“(Modified)” is added at most once, or
+
+We use a cleaner pattern (e.g., overwrite any existing “(Modified)” suffix instead of stacking multiple copies).
+
+=====================================
+4) Info Tooltips – Home Averages / Listings / Timeline / Market Stats
+
+When I hover the info icons (or tooltips) for:
+
+Home Averages
+
+Listings
+
+Timeline
+
+Market Stats
+
+The tooltip text is cut off / clipped and not fully readable.
+
+Please adjust:
+
+Tooltip width and positioning so the entire help text is readable.
+
+Allow wrapping to multiple lines if needed.
+
+Ensure this works on desktop resolutions (like the screenshots I provided).
+
+=====================================
+5) Market Stats – Under Contract Section Empty (Specific CMA)
+
+Using this CMA report as a test case:
+
+“Barton Hills West - Sold/Closed & Active - 12/11/2025 3:26 AM (Modified) (Modified)”
+
+In Market Stats → Property Status Breakdown, the Under Contract section shows no results.
+
+I want this section (and the others) to show:
+
+The list of addresses that are under contract.
+
+Key information (price, beds, baths, sqft, DOM, property type).
+
+A property picture/thumbnail for each listing.
+
+Please:
+
+Confirm whether there are Under Contract comparables feeding this CMA from Repliers.
+
+If yes, fix the logic so those listings appear under Under Contract with full details and images.
+
+Make sure the behavior is consistent for Active, Under Contract, and Closed/Sold across Market Stats.
+
+=====================================
+6) Match PDF Layout to Share Link Layout
+
+I like the data layout and structure shown in the Share Link view.
+
+Please update the PDF export so that:
+
+The PDF output matches the same layout, section order, and data presentation as the Share Link view.
+
+Wherever possible, reuse the same components/structure so the client experience is consistent between:
+
+In-app Share Link view
+
+Exported PDF report
+
+Please implement these fixes while keeping the existing UI layout and styling. Focus on search accuracy (especially Sold/Closed for Austin + Barton Hills), proper carousel controls, clean CMA naming on Modify Search, readable tooltips, complete Market Stats breakdown (with addresses/info/photos), and making the PDF output match the Share Link format.

@@ -115,8 +115,14 @@ export default function CMANew() {
       ? propertiesData.filter((p: any) => p.id !== subjectId)
       : propertiesData;
     
+    // Append "(Modified)" only if not already present
+    let modifiedName = cma.name || 'CMA';
+    if (!modifiedName.includes('(Modified)')) {
+      modifiedName = `${modifiedName} (Modified)`;
+    }
+    
     return {
-      name: `${cma.name || 'CMA'} (Modified)`,
+      name: modifiedName,
       searchCriteria,
       comparables: comparables as Property[],
       subjectProperty: subjectProperty as Property | null,
