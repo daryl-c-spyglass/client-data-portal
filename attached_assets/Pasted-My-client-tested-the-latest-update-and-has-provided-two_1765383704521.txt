@@ -1,0 +1,58 @@
+My client tested the latest update and has provided two additional required fixes. Please implement the following:
+
+==================================================
+1) Add “Sold Date Range” Filter to CMA and Property Search
+==================================================
+
+Add a new field called **Sold Date** with a dropdown that allows users to filter sold listings by how recent the sale was.
+
+Dropdown options:
+
+• 0–30 days  
+• 0–60 days  
+• 0–90 days  
+• 0–120 days  
+• 0–150 days  
+• 0–180 days  
+
+Behavior requirements:
+
+- This filter should be available where SOLD listings are queried:  
+  • CMA Builder  
+  • Property search (when status = Closed/Sold)
+
+- The filter should limit results to listings whose `closeDate` falls within the selected day range relative to *today*.
+
+- Make sure you use the correct Repliers field for close date (usually `closeDate` or equivalent).
+
+==================================================
+2) Fix the “Public Link” Feature
+==================================================
+
+When clicking **Public Link**, the system generates a URL, but when sharing or posting the link, it displays an empty or incorrect preview (see screenshot).  
+This must be fixed.
+
+Requirements:
+
+- Ensure the public page renders correctly when accessed directly.  
+- The preview metadata must be correct for external sharing (Open Graph / social preview).  
+  Include:  
+  • Title  
+  • Description  
+  • Thumbnail image  
+  • Correct URL  
+
+- The public link should display the CMA or property data properly, not an empty template.
+
+==================================================
+Summary of Required Tasks
+==================================================
+
+1. Add “Sold Date” dropdown with 6 preset ranges.  
+2. Apply sold date filtering to CMA Builder and property search for Closed/Sold listings.  
+3. Fix Public Link page so that:  
+   • It loads correctly  
+   • Shows the correct preview when shared  
+   • Displays the proper CMA or property content
+
+Make these updates without altering existing UI styles or layouts.

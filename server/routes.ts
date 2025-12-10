@@ -567,6 +567,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       };
 
       // Fetch from each selected status source
+      // Per client requirement: Use Repliers as primary data source for ALL statuses
       const fetchPromises: Promise<NormalizedProperty[]>[] = [];
       
       for (const statusType of statusList) {
@@ -574,8 +575,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
           fetchPromises.push(fetchFromRepliers('A'));
         } else if (statusType === 'under_contract') {
           fetchPromises.push(fetchFromRepliers('U'));
+        } else if (statusType === 'pending') {
+          fetchPromises.push(fetchFromRepliers('P'));
         } else if (statusType === 'closed' || statusType === 'sold') {
-          fetchPromises.push(fetchFromDatabase());
+          // Try Repliers first for sold listings, then fallback to database
+          fetchPromises.push(
+            fetchFromRepliers('S').then(results => {
+              if (results.length > 0) {
+                return results;
+              }
+              // Fallback to database only if Repliers returns no sold data
+              return fetchFromDatabase();
+            })
+          );
         }
       }
 
@@ -2350,6 +2362,102 @@ export async function registerRoutes(app: Express): Promise<Server> {
       mapboxConfigured: isMapboxConfigured(),
       timestamp: new Date().toISOString() 
     });
+  });
+
+  // Server-side rendered share page with Open Graph meta tags for social sharing
+  app.get("/share/cma/:token", async (req, res) => {
+    try {
+      const cma = await storage.getCmaByShareToken(req.params.token);
+      
+      // Default meta values
+      let title = "Property Market Analysis | Spyglass Realty";
+      let description = "View this Comparative Market Analysis report from Spyglass Realty. Get insights on property values and market trends.";
+      let image = "https://spyglassrealty.com/images/og-default.jpg";
+      let propertyCount = 0;
+      let avgPrice = "";
+      
+      if (cma) {
+        // Use CMA data for meta tags
+        title = `${cma.name} | CMA Report`;
+        
+        // Calculate stats for description
+        let properties: any[] = [];
+        if (cma.propertiesData && Array.isArray(cma.propertiesData)) {
+          properties = cma.propertiesData;
+        }
+        
+        propertyCount = properties.length;
+        
+        if (propertyCount > 0) {
+          const prices = properties.map(p => {
+            if (p.standardStatus === 'Closed' && p.closePrice) {
+              return Number(p.closePrice);
+            }
+            return Number(p.listPrice || 0);
+          }).filter(p => p > 0);
+          
+          if (prices.length > 0) {
+            const avg = prices.reduce((a, b) => a + b, 0) / prices.length;
+            avgPrice = new Intl.NumberFormat('en-US', { 
+              style: 'currency', 
+              currency: 'USD', 
+              maximumFractionDigits: 0 
+            }).format(avg);
+          }
+          
+          // Get first property image for OG image
+          const firstPropWithImage = properties.find(p => 
+            (p.photos && p.photos.length > 0) || p.media?.[0]?.mediaURL
+          );
+          if (firstPropWithImage) {
+            image = firstPropWithImage.photos?.[0] || firstPropWithImage.media?.[0]?.mediaURL || image;
+          }
+          
+          description = `Comparative Market Analysis with ${propertyCount} properties. ${avgPrice ? `Average price: ${avgPrice}. ` : ''}Prepared by Spyglass Realty.`;
+        }
+      }
+
+      // Return HTML with OG meta tags that will be replaced by React app
+      const html = `<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1" />
+    <title>${title}</title>
+    <meta name="description" content="${description}" />
+    
+    <!-- Open Graph / Facebook -->
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="${req.protocol}://${req.get('host')}/share/cma/${req.params.token}" />
+    <meta property="og:title" content="${title}" />
+    <meta property="og:description" content="${description}" />
+    <meta property="og:image" content="${image}" />
+    
+    <!-- Twitter -->
+    <meta property="twitter:card" content="summary_large_image" />
+    <meta property="twitter:url" content="${req.protocol}://${req.get('host')}/share/cma/${req.params.token}" />
+    <meta property="twitter:title" content="${title}" />
+    <meta property="twitter:description" content="${description}" />
+    <meta property="twitter:image" content="${image}" />
+    
+    <link rel="icon" type="image/png" href="/favicon.png" />
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@100..900&display=swap" rel="stylesheet">
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>`;
+
+      res.setHeader('Content-Type', 'text/html');
+      res.send(html);
+    } catch (error) {
+      console.error("Error serving shared CMA page:", error);
+      // Fallback to default page
+      res.redirect('/');
+    }
   });
 
   const httpServer = createServer(app);
