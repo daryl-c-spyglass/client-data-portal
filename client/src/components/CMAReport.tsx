@@ -18,6 +18,8 @@ interface CMAReportProps {
   isPreview?: boolean;
   expiresAt?: Date;
   visibleMetrics?: StatMetricKey[];
+  notes?: string | null;
+  reportTitle?: string;
   onSave?: () => void;
   onPublicLink?: () => void;
   onModifySearch?: () => void;
@@ -35,6 +37,8 @@ export function CMAReport({
   isPreview,
   expiresAt,
   visibleMetrics = ALL_METRICS,
+  notes,
+  reportTitle,
   onSave,
   onPublicLink,
   onModifySearch,
@@ -96,15 +100,80 @@ export function CMAReport({
               <Edit className="w-4 h-4 mr-2" />
               Modify Search
             </Button>
-            <Button size="sm" variant="outline" onClick={onModifyStats} data-testid="button-modify-stats">
-              <FileText className="w-4 h-4 mr-2" />
-              Modify Stats
-            </Button>
+            {activeTab === "home-averages" && (
+              <Button size="sm" variant="outline" onClick={onModifyStats} data-testid="button-modify-stats">
+                <FileText className="w-4 h-4 mr-2" />
+                Modify Stats
+              </Button>
+            )}
             <Button size="sm" variant="outline" onClick={onAddNotes} data-testid="button-notes">
               Notes
             </Button>
           </div>
         </div>
+      )}
+
+      {/* Print-only Summary Section - mirrors Share CMA layout for print/PDF */}
+      <div className="hidden print:block space-y-6">
+        {/* Report Title */}
+        {reportTitle && (
+          <div className="border-b pb-4">
+            <h1 className="text-2xl font-bold">{reportTitle}</h1>
+            <p className="text-sm text-muted-foreground">Comparative Market Analysis</p>
+          </div>
+        )}
+
+        {/* Key Stats Cards Row - matches Share view */}
+        <div className="grid grid-cols-3 gap-4">
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-lg">Average Price</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-2xl font-bold text-primary">${Math.round(statistics.price.average).toLocaleString()}</p>
+              <p className="text-xs text-muted-foreground">
+                Range: ${statistics.price.range.min.toLocaleString()} - ${statistics.price.range.max.toLocaleString()}
+              </p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-lg">Price Per Sqft</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-2xl font-bold">${statistics.pricePerSqFt.average.toFixed(0)}<span className="text-sm">/sqft</span></p>
+              <p className="text-xs text-muted-foreground">
+                Range: ${statistics.pricePerSqFt.range.min.toFixed(0)} - ${statistics.pricePerSqFt.range.max.toFixed(0)}
+              </p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-lg">Avg Living Area</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-2xl font-bold">{Math.round(statistics.livingArea.average).toLocaleString()}<span className="text-sm"> sqft</span></p>
+              <p className="text-xs text-muted-foreground">
+                {statistics.bedrooms.average.toFixed(1)} beds / {statistics.bathrooms.average.toFixed(1)} baths avg
+              </p>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+
+      {/* Agent Notes Section - shown when notes exist */}
+      {notes && (
+        <Card className="border-primary/20 bg-primary/5">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base flex items-center gap-2">
+              <FileText className="w-4 h-4" />
+              Agent Notes
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-sm whitespace-pre-wrap">{notes}</p>
+          </CardContent>
+        </Card>
       )}
 
       {/* Main Tabs */}
@@ -344,23 +413,47 @@ export function CMAReport({
                 <div className="h-[400px]">
                   <ResponsiveContainer width="100%" height="100%">
                     <ScatterChart>
-                      <CartesianGrid strokeDasharray="3 3" />
+                      <CartesianGrid strokeDasharray="3 3" className="stroke-muted/50" />
                       <XAxis 
                         dataKey="date" 
                         type="number"
                         domain={['dataMin', 'dataMax']}
-                        tickFormatter={(value) => new Date(value).toLocaleDateString()}
+                        tickFormatter={(value) => new Date(value).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                        className="text-xs"
                       />
                       <YAxis 
                         dataKey="price"
                         tickFormatter={(value) => `$${(value / 1000).toFixed(0)}k`}
+                        className="text-xs"
                       />
                       <RechartsTooltip 
-                        formatter={(value, name) => {
-                          if (name === 'price') return `$${Number(value).toLocaleString()}`;
-                          return value;
+                        content={({ active, payload }) => {
+                          if (active && payload && payload.length > 0) {
+                            const data = payload[0].payload;
+                            const statusColor = data.status === 'Active' ? 'text-green-600' : 
+                                               data.status === 'Under Contract' ? 'text-yellow-600' : 'text-red-600';
+                            return (
+                              <div className="bg-popover border rounded-lg shadow-lg p-3 text-sm">
+                                <p className="font-semibold text-foreground mb-1">{data.address || 'Property'}</p>
+                                <div className="space-y-1 text-muted-foreground">
+                                  <p className="flex justify-between gap-4">
+                                    <span>Status:</span>
+                                    <span className={`font-medium ${statusColor}`}>{data.status}</span>
+                                  </p>
+                                  <p className="flex justify-between gap-4">
+                                    <span>{data.status === 'Closed' ? 'Sold Price:' : 'List Price:'}</span>
+                                    <span className="font-medium text-foreground">${Number(data.price).toLocaleString()}</span>
+                                  </p>
+                                  <p className="flex justify-between gap-4">
+                                    <span>{data.status === 'Closed' ? 'Sold Date:' : 'List Date:'}</span>
+                                    <span className="font-medium text-foreground">{new Date(data.date).toLocaleDateString()}</span>
+                                  </p>
+                                </div>
+                              </div>
+                            );
+                          }
+                          return null;
                         }}
-                        labelFormatter={(value) => new Date(value).toLocaleDateString()}
                       />
                       <Scatter 
                         name="Properties" 

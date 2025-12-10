@@ -1,0 +1,174 @@
+I have additional fixes that must be applied to the CMA report UI, especially the yellow action bar, information toggles, and the charts. Please treat these as required updates alongside my previous prompts.
+
+==================================================
+
+Floating Image Carousel – Remove Gray Overlay & Improve Navigation
+==================================================
+
+In the floating property detail view, the image carousel currently shows a gray area/overlay on the left (and sometimes right) that looks like a disabled forward/backward control.
+
+Required behavior:
+
+Remove the gray overlay entirely (no grey bar/blocks on the sides).
+
+Use the image itself for navigation:
+
+Left half of the image → go to previous photo (change cursor to indicate this).
+
+Right half of the image → go to next photo (change cursor to indicate this).
+
+Keep the auto-carousel active (auto-advance every ~3 seconds). Manual clicks should not disable autoplay.
+
+==================================================
+2) Print PDF Output – Must Match Share Link Output
+
+The Print / PDF output is still not aligned with the Share link (Share CMA) layout.
+
+Required:
+
+Make the PDF report exactly mirror the Share CMA layout:
+
+Same section order
+
+Same styling and structure
+
+Same photos, stats, and comparable details
+
+Same market stats and timeline presentation
+
+Use the Share CMA view as the single source of truth for how the report should look.
+
+Remove any legacy template differences so the content and layout are consistent.
+
+==================================================
+3) Yellow Box – “Modify Search” Must Follow All Current Updates
+
+The Modify Search button in the yellow bar must reflect the updated CMA workflow.
+
+Required behavior:
+
+When clicked:
+
+Return to the CMA search/builder screen with all filters pre-filled:
+
+City, Subdivision, Property Type, Sold Date Range, Status, etc.
+
+Previously selected Subject property should remain selected.
+
+Previously selected Comparable properties (up to 5) should remain selected.
+
+Search results should still be visible for further adjustments.
+
+Do not reset or clear the CMA.
+
+Ensure this uses the current logic for:
+
+Property type filter
+
+Sold Date filter
+
+Autocomplete for City/Subdivision
+
+Updated search results and cards
+
+==================================================
+4) Information Toggles – Must Display Full Content
+
+The info tooltips/toggles for:
+
+Home Average
+
+Listings
+
+Timeline
+
+Market Stats
+
+are still cutting off content.
+
+Required:
+
+Fix tooltip containers so all information is visible:
+
+Proper text wrapping
+
+Adequate max-width
+
+No clipping or hidden text
+
+If necessary, summarize longer explanations into shorter, readable text for each section.
+
+==================================================
+5) Modify Stats – Only Show When Home Average is Selected
+
+The Modify Stats control in the yellow box should:
+
+Only be visible when the Home Average tab/section is active.
+
+Be hidden on:
+
+Listings
+
+Timeline
+
+Market Stats
+
+This makes its purpose clearer and keeps the UI clean.
+
+==================================================
+6) Notes Feature – Clarify Purpose & Where It Appears
+
+The Notes feature is currently unclear.
+
+Required:
+
+Clearly define Notes as “agent notes / commentary about this CMA”.
+
+Make Notes visible and labeled in the UI (so the user knows where to type).
+
+Ensure Notes show up in:
+
+The Share CMA view
+
+The PDF report
+
+Make it obvious to the user that these notes will appear in the client-facing report (e.g., a label like “These notes will appear on the shared CMA/PDF”).
+
+==================================================
+7) Make Price Timeline Interactive and Professional
+
+The Timeline / Price Timeline chart currently feels static and boring.
+
+Required improvements:
+
+Make the Price Timeline interactive, but still clean and professional:
+
+On hover over a data point, show a tooltip with:
+
+Address (or short label)
+
+Status (Active / Under Contract / Closed)
+
+List Price / Close Price
+
+Date (e.g., closeDate or listDate)
+
+Allow basic interactions such as:
+
+Hover highlighting for individual points
+
+Clear distinction by status (e.g., different marker shapes or subtle variations)
+
+Keep the color palette subtle and professional (no overly bright colors).
+
+Ensure the timeline:
+
+Plots the selected comps only
+
+Uses the correct dates (e.g., closeDate for sold, listDate for active/UC)
+
+If there is truly no data, display a clear message:
+
+“No timeline data available for the selected properties.”
+
+Please implement these updates while preserving the existing overall UI styling. Focus on fixing behavior, data mapping, tooltips, reports, and making the Price Timeline feel interactive and professional without adding visual clutter.

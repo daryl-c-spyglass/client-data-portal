@@ -396,6 +396,8 @@ export default function CMADetailPage() {
         isPreview={true}
         expiresAt={cma.expiresAt ? new Date(cma.expiresAt) : new Date(Date.now() + 30 * 60 * 1000)}
         visibleMetrics={visibleMetrics}
+        notes={cma.notes}
+        reportTitle={cma.name}
         onSave={handleSave}
         onPublicLink={() => setShareDialogOpen(true)}
         onModifySearch={handleModifySearch}
@@ -408,22 +410,25 @@ export default function CMADetailPage() {
       <Dialog open={notesDialogOpen} onOpenChange={setNotesDialogOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>CMA Notes</DialogTitle>
+            <DialogTitle>Agent Notes</DialogTitle>
             <DialogDescription>
-              Add notes or comments to this CMA report.
+              Add commentary or notes about this CMA for your client.
             </DialogDescription>
           </DialogHeader>
-          <div className="py-4">
-            <Label htmlFor="notes">Notes</Label>
+          <div className="py-4 space-y-2">
+            <Label htmlFor="notes">Your Notes</Label>
             <Textarea
               id="notes"
-              placeholder="Enter your notes here..."
+              placeholder="Enter your notes or commentary about this CMA..."
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
               rows={6}
               className="mt-2"
               data-testid="textarea-notes"
             />
+            <p className="text-xs text-muted-foreground">
+              These notes will appear on the shared CMA report and PDF.
+            </p>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setNotesDialogOpen(false)}>
