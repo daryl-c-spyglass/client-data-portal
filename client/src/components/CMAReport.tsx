@@ -4,8 +4,9 @@ import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, ScatterChart, Scatter } from "recharts";
-import { Save, Link as LinkIcon, Edit, FileText, Printer } from "lucide-react";
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, Legend, ResponsiveContainer, ScatterChart, Scatter } from "recharts";
+import { Save, Edit, FileText, Printer, Info } from "lucide-react";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import type { Property, PropertyStatistics, TimelineDataPoint } from "@shared/schema";
 
 type StatMetricKey = 'price' | 'pricePerSqFt' | 'daysOnMarket' | 'livingArea' | 'lotSize' | 'acres' | 'bedrooms' | 'bathrooms' | 'yearBuilt';
@@ -76,20 +77,16 @@ export function CMAReport({
 
   return (
     <div className="space-y-6">
-      {/* Preview Banner */}
+      {/* Preview Banner - hidden in print/PDF */}
       {isPreview && expiresAt && (
-        <div className="bg-yellow-100 dark:bg-yellow-900/20 border border-yellow-400 dark:border-yellow-600 rounded-md p-4 flex items-center justify-between gap-4 flex-wrap">
+        <div className="bg-yellow-100 dark:bg-yellow-900/20 border border-yellow-400 dark:border-yellow-600 rounded-md p-4 flex items-center justify-between gap-4 flex-wrap print:hidden">
           <p className="text-sm">
-            You are seeing a preview of the report. This link will expire in 30 minutes.
+            You are seeing a preview of the report.
           </p>
           <div className="flex items-center gap-2 flex-wrap">
             <Button size="sm" onClick={onSave} data-testid="button-save-send">
               <Save className="w-4 h-4 mr-2" />
               Save + Send
-            </Button>
-            <Button size="sm" variant="outline" onClick={onPublicLink} data-testid="button-share">
-              <LinkIcon className="w-4 h-4 mr-2" />
-              Share
             </Button>
             <Button size="sm" variant="outline" onClick={onPrint} data-testid="button-print">
               <Printer className="w-4 h-4 mr-2" />
@@ -113,10 +110,50 @@ export function CMAReport({
       {/* Main Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab}>
         <TabsList className="grid w-full grid-cols-4">
-          <TabsTrigger value="home-averages" data-testid="tab-home-averages">Home Averages</TabsTrigger>
-          <TabsTrigger value="listings" data-testid="tab-listings">Listings</TabsTrigger>
-          <TabsTrigger value="timeline" data-testid="tab-timeline">Timeline</TabsTrigger>
-          <TabsTrigger value="market-stats" data-testid="tab-market-stats">Market Stats</TabsTrigger>
+          <TabsTrigger value="home-averages" data-testid="tab-home-averages" className="flex items-center gap-1">
+            Home Averages
+            <Tooltip>
+              <TooltipTrigger asChild onClick={(e) => e.stopPropagation()}>
+                <Info className="w-3 h-3 text-muted-foreground cursor-help" />
+              </TooltipTrigger>
+              <TooltipContent>
+                <p className="max-w-xs">Aggregated statistics including price, price per square foot, days on market, and property features across all comparable properties.</p>
+              </TooltipContent>
+            </Tooltip>
+          </TabsTrigger>
+          <TabsTrigger value="listings" data-testid="tab-listings" className="flex items-center gap-1">
+            Listings
+            <Tooltip>
+              <TooltipTrigger asChild onClick={(e) => e.stopPropagation()}>
+                <Info className="w-3 h-3 text-muted-foreground cursor-help" />
+              </TooltipTrigger>
+              <TooltipContent>
+                <p className="max-w-xs">Detailed breakdown of comparable properties by status: Active, Under Contract, and Sold listings with price distribution.</p>
+              </TooltipContent>
+            </Tooltip>
+          </TabsTrigger>
+          <TabsTrigger value="timeline" data-testid="tab-timeline" className="flex items-center gap-1">
+            Timeline
+            <Tooltip>
+              <TooltipTrigger asChild onClick={(e) => e.stopPropagation()}>
+                <Info className="w-3 h-3 text-muted-foreground cursor-help" />
+              </TooltipTrigger>
+              <TooltipContent>
+                <p className="max-w-xs">Visual chart showing property prices over time with status indicators to identify market trends.</p>
+              </TooltipContent>
+            </Tooltip>
+          </TabsTrigger>
+          <TabsTrigger value="market-stats" data-testid="tab-market-stats" className="flex items-center gap-1">
+            Market Stats
+            <Tooltip>
+              <TooltipTrigger asChild onClick={(e) => e.stopPropagation()}>
+                <Info className="w-3 h-3 text-muted-foreground cursor-help" />
+              </TooltipTrigger>
+              <TooltipContent>
+                <p className="max-w-xs">Key market indicators including average price, price per square foot, days on market, and list-to-sold ratio.</p>
+              </TooltipContent>
+            </Tooltip>
+          </TabsTrigger>
         </TabsList>
 
         {/* Home Averages Tab */}
@@ -264,7 +301,7 @@ export function CMAReport({
                         <CartesianGrid strokeDasharray="3 3" />
                         <XAxis dataKey="name" />
                         <YAxis />
-                        <Tooltip formatter={(value) => `$${Number(value).toLocaleString()}`} />
+                        <RechartsTooltip formatter={(value) => `$${Number(value).toLocaleString()}`} />
                         <Legend />
                         <Bar dataKey="value" fill="hsl(var(--primary))" />
                       </BarChart>
@@ -318,7 +355,7 @@ export function CMAReport({
                         dataKey="price"
                         tickFormatter={(value) => `$${(value / 1000).toFixed(0)}k`}
                       />
-                      <Tooltip 
+                      <RechartsTooltip 
                         formatter={(value, name) => {
                           if (name === 'price') return `$${Number(value).toLocaleString()}`;
                           return value;
@@ -351,19 +388,20 @@ export function CMAReport({
 
         {/* Market Stats Tab */}
         <TabsContent value="market-stats" className="space-y-6">
+          {/* Key Metrics Row */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
             <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 gap-1">
                 <CardTitle className="text-sm font-medium">Avg Price</CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold">${Math.round(statistics.price.average).toLocaleString()}</div>
-                <p className="text-xs text-muted-foreground">Across all listings</p>
+                <p className="text-xs text-muted-foreground">Across all {allProperties.length} comparables</p>
               </CardContent>
             </Card>
 
             <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 gap-1">
                 <CardTitle className="text-sm font-medium">Avg DOM</CardTitle>
               </CardHeader>
               <CardContent>
@@ -373,7 +411,7 @@ export function CMAReport({
             </Card>
 
             <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 gap-1">
                 <CardTitle className="text-sm font-medium">Price/SqFt</CardTitle>
               </CardHeader>
               <CardContent>
@@ -383,12 +421,87 @@ export function CMAReport({
             </Card>
 
             <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Active Listings</CardTitle>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 gap-1">
+                <CardTitle className="text-sm font-medium">Price Range</CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">{activeProperties.length}</div>
-                <p className="text-xs text-muted-foreground">Currently on market</p>
+                <div className="text-lg font-bold">${(statistics.price.range.min / 1000).toFixed(0)}K - ${(statistics.price.range.max / 1000).toFixed(0)}K</div>
+                <p className="text-xs text-muted-foreground">Min to max</p>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Status Breakdown */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">Property Status Breakdown</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="flex items-center gap-3 p-3 rounded-md bg-green-50 dark:bg-green-950/30 border border-green-200 dark:border-green-800">
+                  <div className="w-3 h-3 rounded-full bg-green-500"></div>
+                  <div>
+                    <div className="text-lg font-bold text-green-700 dark:text-green-400">{activeProperties.length}</div>
+                    <p className="text-xs text-green-600 dark:text-green-500">Active Listings</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-3 p-3 rounded-md bg-yellow-50 dark:bg-yellow-950/30 border border-yellow-200 dark:border-yellow-800">
+                  <div className="w-3 h-3 rounded-full bg-yellow-500"></div>
+                  <div>
+                    <div className="text-lg font-bold text-yellow-700 dark:text-yellow-400">{underContractProperties.length}</div>
+                    <p className="text-xs text-yellow-600 dark:text-yellow-500">Under Contract</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-3 p-3 rounded-md bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800">
+                  <div className="w-3 h-3 rounded-full bg-red-500"></div>
+                  <div>
+                    <div className="text-lg font-bold text-red-700 dark:text-red-400">{soldProperties.length}</div>
+                    <p className="text-xs text-red-600 dark:text-red-500">Sold/Closed</p>
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Additional Metrics */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 gap-1">
+                <CardTitle className="text-sm font-medium">Median Price</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">${Math.round(statistics.price.median).toLocaleString()}</div>
+                <p className="text-xs text-muted-foreground">50th percentile</p>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 gap-1">
+                <CardTitle className="text-sm font-medium">Avg SqFt</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">{Math.round(statistics.livingArea.average).toLocaleString()}</div>
+                <p className="text-xs text-muted-foreground">Living area</p>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 gap-1">
+                <CardTitle className="text-sm font-medium">Avg Beds</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">{statistics.bedrooms.average.toFixed(1)}</div>
+                <p className="text-xs text-muted-foreground">Bedrooms</p>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 gap-1">
+                <CardTitle className="text-sm font-medium">Avg Baths</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">{statistics.bathrooms.average.toFixed(1)}</div>
+                <p className="text-xs text-muted-foreground">Bathrooms</p>
               </CardContent>
             </Card>
           </div>

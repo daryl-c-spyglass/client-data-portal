@@ -8,7 +8,9 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
-import { X, Plus, TrendingUp, Search, Loader2, AlertCircle, Home, MousePointerClick } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { X, Plus, TrendingUp, Search, Loader2, AlertCircle, Home, MousePointerClick, RotateCcw, ChevronLeft, ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { Property } from "@shared/schema";
 
@@ -53,7 +55,15 @@ function AutocompleteInput({ placeholder, value, onChange, endpoint, testId, cla
     try {
       const res = await fetch(`${endpoint}?q=${encodeURIComponent(query)}`);
       const data = await res.json();
-      setSuggestions(data.suggestions || []);
+      // Handle both array response and { suggestions: [] } format
+      if (Array.isArray(data)) {
+        // API returns array of { value, count } objects
+        setSuggestions(data.map((item: any) => typeof item === 'string' ? item : item.value));
+      } else if (data.suggestions) {
+        setSuggestions(data.suggestions);
+      } else {
+        setSuggestions([]);
+      }
     } catch (error) {
       setSuggestions([]);
     } finally {
@@ -122,6 +132,16 @@ interface UnifiedSearchResponse {
   count: number;
   status: string;
 }
+
+// Property type options for the dropdown
+const PROPERTY_TYPES = [
+  { value: 'any', label: 'Any' },
+  { value: 'Single Family Residential', label: 'Single Family Residential' },
+  { value: 'Condominium', label: 'Condominium' },
+  { value: 'Townhouse', label: 'Townhouse' },
+  { value: 'Multi-Family', label: 'Multi-Family' },
+  { value: 'Land', label: 'Land' },
+];
 
 interface InitialCMAData {
   name?: string;
@@ -228,6 +248,11 @@ export function CMABuilder({ onCreateCMA, initialData }: CMABuilderProps) {
   const [searchMinYearBuilt, setSearchMinYearBuilt] = useState(sc.minYearBuilt || "");
   const [searchMaxYearBuilt, setSearchMaxYearBuilt] = useState(sc.maxYearBuilt || "");
   const [searchSoldDays, setSearchSoldDays] = useState(sc.soldDays || "");
+  const [searchPropertyType, setSearchPropertyType] = useState(sc.propertyType || "");
+  
+  // Property detail dialog state
+  const [selectedProperty, setSelectedProperty] = useState<Property | null>(null);
+  const [currentPhotoIndex, setCurrentPhotoIndex] = useState(0);
 
   const resetForm = () => {
     setCmaName("");
@@ -248,6 +273,25 @@ export function CMABuilder({ onCreateCMA, initialData }: CMABuilderProps) {
     setSearchMinYearBuilt("");
     setSearchMaxYearBuilt("");
     setSearchSoldDays("");
+    setSearchPropertyType("");
+  };
+  
+  const clearFilters = () => {
+    setSearchCity("");
+    setSearchSubdivision("");
+    setSearchMinBeds("");
+    setSearchMaxPrice("");
+    setSearchStatuses(["active"]);
+    setSearchMinSqft("");
+    setSearchMaxSqft("");
+    setSearchMinLotAcres("");
+    setSearchMaxLotAcres("");
+    setSearchStories("");
+    setSearchMinYearBuilt("");
+    setSearchMaxYearBuilt("");
+    setSearchSoldDays("");
+    setSearchPropertyType("");
+    setSearchEnabled(false);
   };
 
   const buildSearchQuery = () => {
@@ -268,6 +312,12 @@ export function CMABuilder({ onCreateCMA, initialData }: CMABuilderProps) {
     if (searchMinYearBuilt) params.set('minYearBuilt', searchMinYearBuilt);
     if (searchMaxYearBuilt) params.set('maxYearBuilt', searchMaxYearBuilt);
     if (searchSoldDays && searchSoldDays !== 'any') params.set('soldDays', searchSoldDays);
+    if (searchPropertyType && searchPropertyType !== 'any') params.set('propertySubType', searchPropertyType);
+    // Sort by listing date for active/under contract
+    if (searchStatuses.includes('active') || searchStatuses.includes('under_contract')) {
+      params.set('sortBy', 'listingContractDate');
+      params.set('sortOrder', 'desc');
+    }
     params.set('limit', '20');
     return params.toString();
   };
@@ -304,7 +354,11 @@ export function CMABuilder({ onCreateCMA, initialData }: CMABuilderProps) {
   };
 
   const handleAddComparable = (property: Property) => {
-    if (comparables.length < 6 && !comparables.find(p => p.id === property.id)) {
+    if (comparables.length >= 5) {
+      // Max 5 comparables allowed
+      return;
+    }
+    if (!comparables.find(p => p.id === property.id)) {
       setComparables([...comparables, property]);
     }
   };
@@ -373,6 +427,7 @@ export function CMABuilder({ onCreateCMA, initialData }: CMABuilderProps) {
         maxYearBuilt: searchMaxYearBuilt,
         stories: searchStories,
         soldDays: searchSoldDays,
+        propertyType: searchPropertyType,
       };
       
       onCreateCMA({
@@ -430,10 +485,21 @@ export function CMABuilder({ onCreateCMA, initialData }: CMABuilderProps) {
 
       <Card ref={searchSectionRef}>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Search className="w-5 h-5" />
-            Search Properties
-          </CardTitle>
+          <div className="flex items-center justify-between flex-wrap gap-2">
+            <CardTitle className="flex items-center gap-2">
+              <Search className="w-5 h-5" />
+              Search Properties
+            </CardTitle>
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={clearFilters}
+              data-testid="button-clear-filters"
+            >
+              <RotateCcw className="w-4 h-4 mr-1" />
+              Clear Filters
+            </Button>
+          </div>
           <CardDescription>
             Find comparable properties from the Repliers database (30,000+ active listings)
           </CardDescription>
@@ -494,36 +560,47 @@ export function CMABuilder({ onCreateCMA, initialData }: CMABuilderProps) {
               </Select>
             </div>
             <div className="space-y-2">
-              <Label>Status</Label>
-              <div className="flex flex-wrap gap-4 pt-2">
-                <div className="flex items-center space-x-2">
-                  <Checkbox 
-                    id="status-active"
-                    checked={searchStatuses.includes("active")}
-                    onCheckedChange={() => toggleStatus("active")}
-                    data-testid="checkbox-status-active"
-                  />
-                  <label htmlFor="status-active" className="text-sm cursor-pointer">Active</label>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <Checkbox 
-                    id="status-under-contract"
-                    checked={searchStatuses.includes("under_contract")}
-                    onCheckedChange={() => toggleStatus("under_contract")}
-                    data-testid="checkbox-status-under-contract"
-                  />
-                  <label htmlFor="status-under-contract" className="text-sm cursor-pointer">Under Contract</label>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <Checkbox 
-                    id="status-closed"
-                    checked={searchStatuses.includes("closed")}
-                    onCheckedChange={() => toggleStatus("closed")}
-                    data-testid="checkbox-status-closed"
-                  />
-                  <label htmlFor="status-closed" className="text-sm cursor-pointer">Sold/Closed</label>
-                </div>
-              </div>
+              <Label>Property Type</Label>
+              <Select value={searchPropertyType} onValueChange={setSearchPropertyType}>
+                <SelectTrigger data-testid="select-property-type">
+                  <SelectValue placeholder="Any" />
+                </SelectTrigger>
+                <SelectContent>
+                  {PROPERTY_TYPES.map(type => (
+                    <SelectItem key={type.value} value={type.value}>{type.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <div className="flex flex-wrap gap-4 items-center">
+            <Label className="text-sm font-medium">Status:</Label>
+            <div className="flex items-center space-x-2">
+              <Checkbox 
+                id="status-active"
+                checked={searchStatuses.includes("active")}
+                onCheckedChange={() => toggleStatus("active")}
+                data-testid="checkbox-status-active"
+              />
+              <label htmlFor="status-active" className="text-sm cursor-pointer">Active</label>
+            </div>
+            <div className="flex items-center space-x-2">
+              <Checkbox 
+                id="status-under-contract"
+                checked={searchStatuses.includes("under_contract")}
+                onCheckedChange={() => toggleStatus("under_contract")}
+                data-testid="checkbox-status-under-contract"
+              />
+              <label htmlFor="status-under-contract" className="text-sm cursor-pointer">Under Contract</label>
+            </div>
+            <div className="flex items-center space-x-2">
+              <Checkbox 
+                id="status-closed"
+                checked={searchStatuses.includes("closed")}
+                onCheckedChange={() => toggleStatus("closed")}
+                data-testid="checkbox-status-closed"
+              />
+              <label htmlFor="status-closed" className="text-sm cursor-pointer">Sold/Closed</label>
             </div>
           </div>
           <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-4">
@@ -694,7 +771,7 @@ export function CMABuilder({ onCreateCMA, initialData }: CMABuilderProps) {
           <CardHeader>
             <CardTitle className="flex items-center justify-between">
               <span>Comparable Properties</span>
-              <Badge>{comparables.length} / 6</Badge>
+              <Badge>{comparables.length} / 5</Badge>
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -731,9 +808,16 @@ export function CMABuilder({ onCreateCMA, initialData }: CMABuilderProps) {
                     </div>
                   </div>
                 ))}
-                <p className="text-xs text-muted-foreground text-center pt-2">
-                  Add up to {6 - comparables.length} more properties
-                </p>
+                {comparables.length < 5 && (
+                  <p className="text-xs text-muted-foreground text-center pt-2">
+                    Add up to {5 - comparables.length} more properties
+                  </p>
+                )}
+                {comparables.length >= 5 && (
+                  <p className="text-xs text-amber-600 text-center pt-2">
+                    Maximum 5 comparables reached
+                  </p>
+                )}
               </div>
             ) : (
               <div className="text-center py-8 text-muted-foreground">
@@ -858,8 +942,33 @@ export function CMABuilder({ onCreateCMA, initialData }: CMABuilderProps) {
                       : Number(property.listPrice || 0)) / Number(property.livingArea)
                   : null;
                 
+                // Format listing date
+                const listingDate = property.listingContractDate 
+                  ? new Date(property.listingContractDate).toLocaleDateString()
+                  : null;
+                
+                // Get status badge styling
+                const getStatusBadge = () => {
+                  if (property.standardStatus === 'Closed') {
+                    return <Badge variant="secondary" className="flex-shrink-0">Sold</Badge>;
+                  } else if (property.standardStatus === 'Active') {
+                    return <Badge variant="default" className="flex-shrink-0 bg-green-600 hover:bg-green-600">Active</Badge>;
+                  } else if (property.standardStatus === 'Active Under Contract' || property.standardStatus === 'Under Contract') {
+                    return <Badge variant="default" className="flex-shrink-0 bg-amber-500 hover:bg-amber-500">Under Contract</Badge>;
+                  }
+                  return <Badge variant="secondary" className="flex-shrink-0">{property.standardStatus}</Badge>;
+                };
+                
                 return (
-                  <Card key={property.id} className="overflow-hidden">
+                  <Card 
+                    key={property.id} 
+                    className="overflow-hidden cursor-pointer hover-elevate"
+                    onClick={() => {
+                      setSelectedProperty(property);
+                      setCurrentPhotoIndex(0);
+                    }}
+                    data-testid={`card-property-${property.id}`}
+                  >
                     <div className="flex">
                       {primaryPhoto ? (
                         <div className="w-32 h-32 flex-shrink-0">
@@ -886,9 +995,7 @@ export function CMABuilder({ onCreateCMA, initialData }: CMABuilderProps) {
                               </p>
                             )}
                           </div>
-                          <Badge variant={property.standardStatus === 'Closed' ? 'secondary' : 'default'} className="flex-shrink-0">
-                            {property.standardStatus === 'Closed' ? 'Sold' : property.standardStatus}
-                          </Badge>
+                          {getStatusBadge()}
                         </div>
                         
                         <div className="flex items-center gap-2">
@@ -904,12 +1011,17 @@ export function CMABuilder({ onCreateCMA, initialData }: CMABuilderProps) {
                           {property.livingArea && (
                             <span>{Number(property.livingArea).toLocaleString()} sqft</span>
                           )}
-                          {property.closeDate && (
-                            <span>Sold {new Date(property.closeDate).toLocaleDateString()}</span>
+                        </div>
+                        
+                        {/* Date display based on status */}
+                        <div className="flex flex-wrap gap-x-2 gap-y-1 text-xs text-muted-foreground">
+                          {listingDate && <span>Listed: {listingDate}</span>}
+                          {property.standardStatus === 'Closed' && property.closeDate && (
+                            <span>• Sold: {new Date(property.closeDate).toLocaleDateString()}</span>
                           )}
                         </div>
                         
-                        <div className="flex gap-2 pt-1">
+                        <div className="flex gap-2 pt-1" onClick={(e) => e.stopPropagation()}>
                           <Button
                             size="sm"
                             variant="outline"
@@ -924,7 +1036,7 @@ export function CMABuilder({ onCreateCMA, initialData }: CMABuilderProps) {
                             size="sm"
                             className="flex-1"
                             onClick={() => handleAddComparable(property)}
-                            disabled={comparables.some(p => p.id === property.id) || comparables.length >= 6}
+                            disabled={comparables.some(p => p.id === property.id) || comparables.length >= 5}
                             data-testid={`button-add-comparable-${property.id}`}
                           >
                             <Plus className="w-3 h-3 mr-1" />
@@ -952,6 +1064,166 @@ export function CMABuilder({ onCreateCMA, initialData }: CMABuilderProps) {
           )}
         </CardContent>
       </Card>
+      
+      {/* Property Detail Dialog */}
+      <Dialog open={!!selectedProperty} onOpenChange={(open) => !open && setSelectedProperty(null)}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-hidden">
+          {selectedProperty && (() => {
+            const additionalData = selectedProperty.additionalData as { photos?: string[] } | null;
+            const photos = additionalData?.photos || [];
+            const pricePerSqft = selectedProperty.livingArea 
+              ? (selectedProperty.standardStatus === 'Closed' && selectedProperty.closePrice 
+                  ? Number(selectedProperty.closePrice) 
+                  : Number(selectedProperty.listPrice || 0)) / Number(selectedProperty.livingArea)
+              : null;
+            const listingDate = selectedProperty.listingContractDate 
+              ? new Date(selectedProperty.listingContractDate).toLocaleDateString()
+              : null;
+              
+            return (
+              <>
+                <DialogHeader>
+                  <DialogTitle className="text-lg">{selectedProperty.unparsedAddress}</DialogTitle>
+                </DialogHeader>
+                
+                {/* Photo Carousel */}
+                {photos.length > 0 ? (
+                  <div className="relative">
+                    <div className="aspect-video bg-muted rounded-md overflow-hidden">
+                      <img 
+                        src={photos[currentPhotoIndex]} 
+                        alt={`Property photo ${currentPhotoIndex + 1}`}
+                        className="w-full h-full object-cover"
+                      />
+                    </div>
+                    {photos.length > 1 && (
+                      <>
+                        <Button 
+                          size="icon" 
+                          variant="secondary"
+                          className="absolute left-2 top-1/2 -translate-y-1/2"
+                          onClick={() => setCurrentPhotoIndex(prev => (prev - 1 + photos.length) % photos.length)}
+                          data-testid="button-prev-photo"
+                        >
+                          <ChevronLeft className="w-4 h-4" />
+                        </Button>
+                        <Button 
+                          size="icon" 
+                          variant="secondary"
+                          className="absolute right-2 top-1/2 -translate-y-1/2"
+                          onClick={() => setCurrentPhotoIndex(prev => (prev + 1) % photos.length)}
+                          data-testid="button-next-photo"
+                        >
+                          <ChevronRight className="w-4 h-4" />
+                        </Button>
+                        <div className="absolute bottom-2 left-1/2 -translate-x-1/2 bg-black/50 text-white px-2 py-1 rounded text-xs">
+                          {currentPhotoIndex + 1} / {photos.length}
+                        </div>
+                      </>
+                    )}
+                  </div>
+                ) : (
+                  <div className="aspect-video bg-muted rounded-md flex items-center justify-center">
+                    <Home className="w-16 h-16 text-muted-foreground/50" />
+                  </div>
+                )}
+                
+                <ScrollArea className="max-h-[40vh]">
+                  <div className="space-y-4 p-1">
+                    {/* Price and Status */}
+                    <div className="flex items-center justify-between gap-4">
+                      <div>
+                        <p className="text-2xl font-bold text-primary">{getPriceDisplay(selectedProperty)}</p>
+                        {pricePerSqft && (
+                          <p className="text-sm text-muted-foreground">${pricePerSqft.toFixed(0)}/sqft</p>
+                        )}
+                      </div>
+                      {selectedProperty.standardStatus === 'Closed' ? (
+                        <Badge variant="secondary" className="text-base px-3 py-1">Sold</Badge>
+                      ) : selectedProperty.standardStatus === 'Active' ? (
+                        <Badge className="bg-green-600 hover:bg-green-600 text-base px-3 py-1">Active</Badge>
+                      ) : (
+                        <Badge className="bg-amber-500 hover:bg-amber-500 text-base px-3 py-1">Under Contract</Badge>
+                      )}
+                    </div>
+                    
+                    {/* Property Details */}
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                      <div className="text-center p-3 bg-muted rounded-md">
+                        <p className="text-2xl font-bold">{selectedProperty.bedroomsTotal || 0}</p>
+                        <p className="text-xs text-muted-foreground">Beds</p>
+                      </div>
+                      <div className="text-center p-3 bg-muted rounded-md">
+                        <p className="text-2xl font-bold">{selectedProperty.bathroomsTotalInteger || 0}</p>
+                        <p className="text-xs text-muted-foreground">Baths</p>
+                      </div>
+                      <div className="text-center p-3 bg-muted rounded-md">
+                        <p className="text-2xl font-bold">{selectedProperty.livingArea ? Number(selectedProperty.livingArea).toLocaleString() : 'N/A'}</p>
+                        <p className="text-xs text-muted-foreground">Sq Ft</p>
+                      </div>
+                      <div className="text-center p-3 bg-muted rounded-md">
+                        <p className="text-2xl font-bold">{selectedProperty.yearBuilt || 'N/A'}</p>
+                        <p className="text-xs text-muted-foreground">Year Built</p>
+                      </div>
+                    </div>
+                    
+                    {/* Dates */}
+                    <div className="flex flex-wrap gap-4 text-sm">
+                      {listingDate && (
+                        <div>
+                          <span className="text-muted-foreground">Listed: </span>
+                          <span className="font-medium">{listingDate}</span>
+                        </div>
+                      )}
+                      {selectedProperty.standardStatus === 'Closed' && selectedProperty.closeDate && (
+                        <div>
+                          <span className="text-muted-foreground">Sold: </span>
+                          <span className="font-medium">{new Date(selectedProperty.closeDate).toLocaleDateString()}</span>
+                        </div>
+                      )}
+                      {selectedProperty.subdivision && (
+                        <div>
+                          <span className="text-muted-foreground">Subdivision: </span>
+                          <span className="font-medium">{selectedProperty.subdivision}</span>
+                        </div>
+                      )}
+                    </div>
+                    
+                    {/* Action Buttons */}
+                    <div className="flex gap-3 pt-2">
+                      <Button
+                        variant="outline"
+                        className="flex-1"
+                        onClick={() => {
+                          handleSetSubject(selectedProperty);
+                          setSelectedProperty(null);
+                        }}
+                        disabled={subjectProperty?.id === selectedProperty.id}
+                        data-testid="button-dialog-set-subject"
+                      >
+                        <Home className="w-4 h-4 mr-2" />
+                        Set as Subject
+                      </Button>
+                      <Button
+                        className="flex-1"
+                        onClick={() => {
+                          handleAddComparable(selectedProperty);
+                          setSelectedProperty(null);
+                        }}
+                        disabled={comparables.some(p => p.id === selectedProperty.id) || comparables.length >= 5}
+                        data-testid="button-dialog-add-comparable"
+                      >
+                        <Plus className="w-4 h-4 mr-2" />
+                        Add as Comparable
+                      </Button>
+                    </div>
+                  </div>
+                </ScrollArea>
+              </>
+            );
+          })()}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

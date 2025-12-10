@@ -1,0 +1,468 @@
+I’m continuing work on the CMA Builder / Search Properties flow. This prompt is in addition to my previous instructions; please treat these as extra requirements, not a replacement.
+=============================================
+A) Search Properties – Filters & Behavior
+
+
+Property Type Filter (New)
+
+
+In Create New CMA → Search Properties, add a Property Type dropdown with these options:
+
+
+Any
+
+
+Single Family Residential
+
+
+Condominium
+
+
+Townhouse
+
+
+Multi-Family
+
+
+Land
+
+
+Behavior:
+
+
+This must be a functional filter that maps to the correct Repliers fields (propertySubType / propertyType, etc.).
+
+
+When “Any” is selected, keep current behavior (no type restriction).
+
+
+For all other values, limit results to that specific category.
+
+
+
+
+City & Subdivision Autocomplete STILL Not Working
+
+
+
+
+The suggestive/autocomplete output for City and Subdivision is still not appearing when I type.
+
+
+Please wire these fields to the same autocomplete logic and data source used elsewhere (Buyer Search / Seller Updates).
+
+
+As the user types, show suggestions from Repliers/DB.
+
+
+User should be able to:
+
+
+Select from suggestions, or
+
+
+Type a full custom value.
+
+
+
+
+
+
+Cherry Creek Counts vs Repliers
+
+
+Using Search Properties with:
+
+
+City: Austin
+
+
+Subdivision: Cherry Creek
+
+
+Status: Active → Only 1 result is found
+
+
+Status: Sold/Closed → 0 results
+
+
+Status: Under Contract → 20 results
+
+
+Please:
+
+
+Verify these counts against the actual Repliers data source.
+
+
+Confirm that status, subdivision, and filters are mapped correctly (same issue as in my Cherry Creek Quick CMA reference).
+
+
+Fix any mismatches in query or normalization so results accurately reflect Repliers.
+
+
+
+
+Listing Date + Status Text on Search Results Cards
+
+
+In the Search Results (X found) list:
+
+
+For Sold properties:
+
+
+Show Listing Date first, then Sold Date.
+
+
+
+
+For non-sold properties (Active, Under Contract):
+
+
+Show Listing Date, followed by a green text label:
+
+
+Example: Active (in green) or Under Contract (in a distinct, appropriate style).
+
+
+
+
+
+
+
+
+Clicking Search Result → Floating Detail Card
+
+
+Currently when I click a search result card, nothing meaningful happens.
+Required behavior:
+
+
+Clicking a result card should open a floating overlay card (or slide-out) that shows:
+
+
+Property photos (gallery)
+
+
+Full address
+
+
+Beds / baths
+
+
+Living area (sqft)
+
+
+Price
+
+
+Listing date, status, any key details available from Repliers
+
+
+
+
+This information should come from the same normalized Repliers data used in the Properties section.
+
+
+The card should be fully clickable and allow:
+
+
+“Set as Subject”
+
+
+“Add as Comparable”
+
+
+Without closing or breaking the overlay.
+
+
+
+
+
+
+Status vs Sold Date (Under Contract)
+
+
+
+
+When I filter Status = Under Contract, search results are still showing Sold Date, which is misleading.
+
+
+For Under Contract listings:
+
+
+Do not show Sold Date.
+
+
+Show listing date and/or contract date (or just listing date + “Under Contract”).
+
+
+
+
+
+
+Sorting by Listing Date (Active & Under Contract)
+
+
+In Search Results, when the filter includes Active and/or Under Contract:
+
+
+Sort the results by Listing Date, newest to oldest.
+
+
+This should be the default ordering for these statuses.
+
+
+
+
+Comparable Properties – Max Count = 5
+
+
+In the Comparable Properties section:
+
+
+Limit the number of comparables to 5 (not 6).
+
+
+If the user tries to add more than 5:
+
+
+Prevent the action and optionally show a small message like:
+
+
+“You can add up to 5 comparable properties.”
+
+
+
+
+
+
+
+
+Clear Filters / Reset Button
+
+
+In the upper right of the Search Properties area:
+
+
+Add a “Clear Filters” / “Reset” control.
+
+
+Clicking it should:
+
+
+Reset all filter fields (City, Subdivision, Status, Sold Date, property type, etc.) back to defaults.
+
+
+Clear Search Results list and Subject/Comparable selection if appropriate (use the same behavior we have elsewhere for reset).
+
+
+
+
+
+
+Images & Carousel
+
+
+
+
+In Search Results:
+
+
+Thumbnails for properties are still not showing.
+
+
+Make sure each card uses the first photo from Repliers (photos/media array) as a thumbnail.
+
+
+
+
+When the user clicks into a property (floating card / detail view):
+
+
+Show all available photos in a carousel.
+
+
+Allow the user to click/scroll through multiple images.
+
+
+
+
+
+
+Generate Report – Next Step
+
+
+
+
+After the user finishes selecting Subject and Comparables and the search section is complete:
+
+
+The “Generate Report” flow should clearly be the next step.
+
+
+Clicking it should:
+
+
+Use the chosen filters and selected comparables.
+
+
+Navigate directly to the CMA calculations/report pages (Home Averages, Listings, Timeline, Market Stats).
+
+
+
+
+
+
+=============================================
+B) Yellow Box & Report Actions
+In the yellow bar at the top of the CMA report:
+
+
+Remove Link Icon (Duplicate Share)
+
+
+
+
+The small link icon in the yellow box should be removed, because sharing is already handled by the Share button in the upper right.
+
+
+Avoid redundant share controls.
+
+
+
+
+PDF Output – Remove Yellow Strip
+
+
+
+
+When using the Printer / PDF functionality:
+
+
+Remove the yellow preview strip (“You are seeing a preview of the report…”) from the PDF output.
+
+
+The printed PDF should look clean and client-facing, without internal preview messaging.
+
+
+
+
+
+
+Share Button Preview = Same as PDF
+
+
+
+
+The Share button (upper right) should:
+
+
+Show a preview that matches the PDF content.
+
+
+The public/shared view should be effectively the same layout as what’s printed, just in web form.
+
+
+
+
+
+
+Notes Option
+
+
+
+
+The Notes option seems to have disappeared / is not visible.
+
+
+Please:
+
+
+Restore the Notes feature (if it was removed),
+
+
+Or clearly expose where Notes live in the UI.
+
+
+
+
+Notes should still be tied to the CMA and be accessible from the CMA report.
+
+
+=============================================
+C) Tab Help Icons & Market Stats Enhancements
+For the four main CMA tabs:
+
+
+Home Averages
+
+
+Listings
+
+
+Timeline
+
+
+Market Stats
+
+
+
+
+Info / Help Icons
+
+
+
+
+Add a small info icon near each tab title.
+
+
+On hover or click, show a brief explanation of:
+
+
+What data this tab is showing.
+
+
+How the data is calculated (e.g., averages based on selected comparables, etc.).
+
+
+
+
+
+
+Market Stats – Show Filters & Status Breakdown
+
+
+In Market Stats:
+
+
+Market Stats should reflect the same filters and comparables the user used in the CMA.
+
+
+Show a clear breakdown by status and property type:
+
+
+Active
+
+
+Under Contract
+
+
+Closed/Sold
+
+
+
+
+For each segment, show:
+
+
+Counts and key metrics (price, DOM, $/sqft, etc.)
+
+
+Indicate the property type(s) being included (Single Family, Condo, etc.) so it’s obvious what the stats represent.
+
+
+
+
+Please implement all of the above while keeping the existing UX look-and-feel. Focus on wiring the filters correctly to Repliers, fixing the data mapping, and improving the CMA workflow and report usability.
