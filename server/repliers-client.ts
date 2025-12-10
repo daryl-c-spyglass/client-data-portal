@@ -35,6 +35,7 @@ interface RepliersListing {
   mlsNumber: string;
   listPrice: number;
   soldPrice?: number;
+  closePrice?: number;
   originalPrice?: number;
   status: string;
   address: {
@@ -52,6 +53,8 @@ interface RepliersListing {
   details: {
     bedrooms?: number;
     bathrooms?: number;
+    numBedrooms?: number;
+    numBathrooms?: number;
     sqft?: number;
     lotSize?: number;
     yearBuilt?: number;
@@ -66,9 +69,14 @@ interface RepliersListing {
     longitude?: number;
   };
   photos?: string[];
+  images?: string[];
   listDate?: string;
   soldDate?: string;
   daysOnMarket?: number;
+  livingArea?: number;
+  yearBuilt?: number;
+  lotSizeSquareFeet?: number;
+  lotSizeAcres?: number;
   office?: {
     name?: string;
     phone?: string;

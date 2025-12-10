@@ -261,15 +261,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
 
         const repliersStatus = status === 'active' ? 'A' : 'U';
+        // Fetch more results if we need to filter by subdivision (Repliers uses neighborhood)
+        const effectiveLimit = subdivision ? Math.min(parsedLimit * 10, 200) : parsedLimit;
         const response = await repliersClient.searchListings({
           status: repliersStatus,
           postalCode: postalCode,
           city: city,
+          neighborhood: subdivision, // Repliers uses 'neighborhood' for MLS subdivision
           minPrice: minPrice ? parseInt(minPrice, 10) : undefined,
           maxPrice: maxPrice ? parseInt(maxPrice, 10) : undefined,
           minBeds: bedsMin ? parseInt(bedsMin, 10) : undefined,
           minBaths: bathsMin ? parseInt(bathsMin, 10) : undefined,
-          resultsPerPage: parsedLimit,
+          resultsPerPage: effectiveLimit,
         });
 
         results = (response.listings || []).map((listing: any, idx: number) => {
