@@ -296,8 +296,8 @@ export default function CMADetailPage() {
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between flex-wrap gap-4">
+    <div className="space-y-6 cma-print">
+      <div className="flex items-center justify-between flex-wrap gap-4 print:hidden">
         <div>
           <Link href="/cmas">
             <Button variant="ghost" size="sm" className="mb-4" data-testid="button-back-to-cmas">

@@ -76,7 +76,7 @@ export function CMAReport({
   ];
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 cma-print">
       {/* Preview Banner - hidden in print/PDF */}
       {isPreview && expiresAt && (
         <div className="bg-yellow-100 dark:bg-yellow-900/20 border border-yellow-400 dark:border-yellow-600 rounded-md p-4 flex items-center justify-between gap-4 flex-wrap print:hidden">

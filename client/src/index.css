@@ -286,3 +286,83 @@
     inset: -1px;
   }
 }
+
+/* Print Styles for CMA Reports - Scoped to .cma-print wrapper */
+@media print {
+  /* Hide sidebar and navigation globally when printing */
+  [data-sidebar],
+  [data-testid="button-sidebar-toggle"] {
+    display: none !important;
+  }
+  
+  /* CMA Report-specific print styles */
+  .cma-print {
+    /* Show all tab content */
+    [role="tablist"] {
+      display: none !important;
+    }
+    
+    [role="tabpanel"],
+    [role="tabpanel"][data-state="inactive"] {
+      display: block !important;
+      opacity: 1 !important;
+      visibility: visible !important;
+      height: auto !important;
+      overflow: visible !important;
+      margin-bottom: 2rem !important;
+    }
+  }
+  
+  /* Hide CMA action buttons and banners when printing */
+  .cma-print [data-testid="button-save-send"],
+  .cma-print [data-testid="button-public-link"],
+  .cma-print [data-testid="button-print"],
+  .cma-print [data-testid="button-modify-search"],
+  .cma-print [data-testid="button-modify-stats"],
+  .cma-print [data-testid="button-notes"],
+  .cma-print .print\\:hidden {
+    display: none !important;
+  }
+  
+  /* Force white background for print */
+  body {
+    background: white !important;
+  }
+  
+  /* CMA Cards print-friendly */
+  .cma-print .card {
+    break-inside: avoid;
+    page-break-inside: avoid;
+    border: 1px solid #e5e7eb !important;
+    margin-bottom: 1rem !important;
+  }
+  
+  /* CMA Tables print-friendly */
+  .cma-print table {
+    border-collapse: collapse;
+    width: 100%;
+  }
+  
+  .cma-print th,
+  .cma-print td {
+    border: 1px solid #e5e7eb !important;
+    padding: 0.5rem !important;
+    text-align: left;
+  }
+  
+  /* CMA Images fit properly */
+  .cma-print img {
+    max-width: 100% !important;
+    height: auto !important;
+  }
+  
+  /* CMA Charts render properly */
+  .cma-print .recharts-wrapper {
+    page-break-inside: avoid;
+  }
+  
+  /* Remove shadows in CMA reports */
+  .cma-print * {
+    box-shadow: none !important;
+  }
+}
