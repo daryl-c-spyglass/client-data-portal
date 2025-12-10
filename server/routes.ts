@@ -219,6 +219,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         bathsMin,
         minSqft,
         maxSqft,
+        minLotAcres,
+        maxLotAcres,
+        stories,
+        minYearBuilt,
+        maxYearBuilt,
         limit = '50',
       } = req.query as Record<string, string | undefined>;
 
@@ -261,8 +266,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
 
         const repliersStatus = status === 'active' ? 'A' : 'U';
-        // Fetch more results if we need to filter by subdivision (Repliers uses neighborhood)
-        const effectiveLimit = subdivision ? Math.min(parsedLimit * 10, 200) : parsedLimit;
+        // Check if we need server-side filtering for parameters Repliers doesn't support
+        const needsServerSideFiltering = minLotAcres || maxLotAcres || stories || minYearBuilt || maxYearBuilt;
+        // Fetch more results if we need to filter by subdivision or other server-side params
+        const effectiveLimit = (subdivision || needsServerSideFiltering) ? Math.min(parsedLimit * 10, 200) : parsedLimit;
         const response = await repliersClient.searchListings({
           status: repliersStatus,
           postalCode: postalCode,
@@ -272,6 +279,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           maxPrice: maxPrice ? parseInt(maxPrice, 10) : undefined,
           minBeds: bedsMin ? parseInt(bedsMin, 10) : undefined,
           minBaths: bathsMin ? parseInt(bathsMin, 10) : undefined,
+          minSqft: minSqft ? parseInt(minSqft, 10) : undefined,
+          maxSqft: maxSqft ? parseInt(maxSqft, 10) : undefined,
           resultsPerPage: effectiveLimit,
         });
 
@@ -353,6 +362,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             garageSpaces: toNumber(details.garage || listing.garageSpaces),
             closeDate: listing.soldDate || listing.closeDate || null,
             description: details.description || listing.publicRemarks || null,
+            stories: toNumber((details as any).stories || (listing as any).storiesTotal || (listing as any).stories),
           };
         });
 
@@ -372,6 +382,43 @@ export async function registerRoutes(app: Express): Promise<Server> {
         if (maxSqft) {
           const max = parseInt(maxSqft, 10);
           results = results.filter(p => p.livingArea !== null && p.livingArea <= max);
+        }
+        
+        // Server-side lot size filter (in acres)
+        if (minLotAcres) {
+          const minAcres = parseFloat(minLotAcres);
+          results = results.filter((p: any) => {
+            const acres = p.lotSizeAcres || (p.lotSizeSquareFeet ? p.lotSizeSquareFeet / 43560 : null);
+            return acres !== null && acres >= minAcres;
+          });
+        }
+        if (maxLotAcres) {
+          const maxAcres = parseFloat(maxLotAcres);
+          results = results.filter((p: any) => {
+            const acres = p.lotSizeAcres || (p.lotSizeSquareFeet ? p.lotSizeSquareFeet / 43560 : null);
+            return acres !== null && acres <= maxAcres;
+          });
+        }
+        
+        // Server-side year built filter
+        if (minYearBuilt) {
+          const minYear = parseInt(minYearBuilt, 10);
+          results = results.filter(p => p.yearBuilt !== null && p.yearBuilt >= minYear);
+        }
+        if (maxYearBuilt) {
+          const maxYear = parseInt(maxYearBuilt, 10);
+          results = results.filter(p => p.yearBuilt !== null && p.yearBuilt <= maxYear);
+        }
+        
+        // Server-side stories filter (would need to map from property data if available)
+        if (stories) {
+          const storiesNum = parseInt(stories, 10);
+          results = results.filter((p: any) => {
+            const propStories = p.stories || p.storiesTotal;
+            if (propStories === null || propStories === undefined) return true; // Include if unknown
+            if (storiesNum === 3) return propStories >= 3; // 3+ stories
+            return propStories === storiesNum;
+          });
         }
 
       } else if (status === 'closed' || status === 'sold') {
@@ -427,7 +474,40 @@ export async function registerRoutes(app: Express): Promise<Server> {
           garageSpaces: toNum(p.garageSpaces),
           closeDate: p.closeDate || null,
           description: p.publicRemarks || null,
+          stories: toNum(p.stories) || toNum(p.storiesTotal),
         }));
+        
+        // Apply additional filters for closed listings
+        if (minLotAcres) {
+          const minAcres = parseFloat(minLotAcres);
+          results = results.filter((p: any) => {
+            const acres = p.lotSizeAcres || (p.lotSizeSquareFeet ? p.lotSizeSquareFeet / 43560 : null);
+            return acres !== null && acres >= minAcres;
+          });
+        }
+        if (maxLotAcres) {
+          const maxAcres = parseFloat(maxLotAcres);
+          results = results.filter((p: any) => {
+            const acres = p.lotSizeAcres || (p.lotSizeSquareFeet ? p.lotSizeSquareFeet / 43560 : null);
+            return acres !== null && acres <= maxAcres;
+          });
+        }
+        if (minYearBuilt) {
+          const minYear = parseInt(minYearBuilt, 10);
+          results = results.filter(p => p.yearBuilt !== null && p.yearBuilt >= minYear);
+        }
+        if (maxYearBuilt) {
+          const maxYear = parseInt(maxYearBuilt, 10);
+          results = results.filter(p => p.yearBuilt !== null && p.yearBuilt <= maxYear);
+        }
+        if (stories) {
+          const storiesNum = parseInt(stories, 10);
+          results = results.filter((p: any) => {
+            if (p.stories === null || p.stories === undefined) return true;
+            if (storiesNum === 3) return p.stories >= 3;
+            return p.stories === storiesNum;
+          });
+        }
         
         console.log(`📦 Database returned ${results.length} closed/sold listings`);
 

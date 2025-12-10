@@ -37,6 +37,32 @@ export function CMABuilder({ onCreateCMA }: CMABuilderProps) {
   const [searchMaxPrice, setSearchMaxPrice] = useState("");
   const [searchStatus, setSearchStatus] = useState("Active");
   const [searchEnabled, setSearchEnabled] = useState(false);
+  const [searchMinSqft, setSearchMinSqft] = useState("");
+  const [searchMaxSqft, setSearchMaxSqft] = useState("");
+  const [searchMinLotAcres, setSearchMinLotAcres] = useState("");
+  const [searchMaxLotAcres, setSearchMaxLotAcres] = useState("");
+  const [searchStories, setSearchStories] = useState("");
+  const [searchMinYearBuilt, setSearchMinYearBuilt] = useState("");
+  const [searchMaxYearBuilt, setSearchMaxYearBuilt] = useState("");
+
+  const resetForm = () => {
+    setCmaName("");
+    setSubjectProperty(null);
+    setComparables([]);
+    setSearchCity("");
+    setSearchSubdivision("");
+    setSearchMinBeds("");
+    setSearchMaxPrice("");
+    setSearchStatus("Active");
+    setSearchEnabled(false);
+    setSearchMinSqft("");
+    setSearchMaxSqft("");
+    setSearchMinLotAcres("");
+    setSearchMaxLotAcres("");
+    setSearchStories("");
+    setSearchMinYearBuilt("");
+    setSearchMaxYearBuilt("");
+  };
 
   const buildSearchQuery = () => {
     const params = new URLSearchParams();
@@ -52,8 +78,15 @@ export function CMABuilder({ onCreateCMA }: CMABuilderProps) {
     }
     if (searchCity) params.set('city', searchCity.trim());
     if (searchSubdivision) params.set('subdivision', searchSubdivision.trim());
-    if (searchMinBeds) params.set('bedsMin', searchMinBeds);
-    if (searchMaxPrice) params.set('maxPrice', searchMaxPrice);
+    if (searchMinBeds && searchMinBeds !== 'any') params.set('bedsMin', searchMinBeds);
+    if (searchMaxPrice && searchMaxPrice !== 'any') params.set('maxPrice', searchMaxPrice);
+    if (searchMinSqft) params.set('minSqft', searchMinSqft);
+    if (searchMaxSqft) params.set('maxSqft', searchMaxSqft);
+    if (searchMinLotAcres) params.set('minLotAcres', searchMinLotAcres);
+    if (searchMaxLotAcres) params.set('maxLotAcres', searchMaxLotAcres);
+    if (searchStories && searchStories !== 'any') params.set('stories', searchStories);
+    if (searchMinYearBuilt) params.set('minYearBuilt', searchMinYearBuilt);
+    if (searchMaxYearBuilt) params.set('maxYearBuilt', searchMaxYearBuilt);
     params.set('limit', '20');
     return params.toString();
   };
@@ -102,6 +135,7 @@ export function CMABuilder({ onCreateCMA }: CMABuilderProps) {
         comparablePropertyIds: comparables.map(p => p.id),
         propertiesData: allProperties,
       });
+      resetForm();
     }
   };
 
@@ -224,6 +258,84 @@ export function CMABuilder({ onCreateCMA }: CMABuilderProps) {
                   <SelectItem value="Closed">Closed/Sold</SelectItem>
                 </SelectContent>
               </Select>
+            </div>
+          </div>
+          <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4">
+            <div className="space-y-2">
+              <Label>Min Sq Ft</Label>
+              <Input
+                type="number"
+                placeholder="e.g., 1500"
+                value={searchMinSqft}
+                onChange={(e) => setSearchMinSqft(e.target.value)}
+                data-testid="input-min-sqft"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Max Sq Ft</Label>
+              <Input
+                type="number"
+                placeholder="e.g., 3000"
+                value={searchMaxSqft}
+                onChange={(e) => setSearchMaxSqft(e.target.value)}
+                data-testid="input-max-sqft"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Min Lot (Acres)</Label>
+              <Input
+                type="number"
+                step="0.01"
+                placeholder="e.g., 0.25"
+                value={searchMinLotAcres}
+                onChange={(e) => setSearchMinLotAcres(e.target.value)}
+                data-testid="input-min-lot-acres"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Max Lot (Acres)</Label>
+              <Input
+                type="number"
+                step="0.01"
+                placeholder="e.g., 1.0"
+                value={searchMaxLotAcres}
+                onChange={(e) => setSearchMaxLotAcres(e.target.value)}
+                data-testid="input-max-lot-acres"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Stories</Label>
+              <Select value={searchStories} onValueChange={setSearchStories}>
+                <SelectTrigger data-testid="select-stories">
+                  <SelectValue placeholder="Any" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="any">Any</SelectItem>
+                  <SelectItem value="1">1</SelectItem>
+                  <SelectItem value="2">2</SelectItem>
+                  <SelectItem value="3">3+</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>Min Year Built</Label>
+              <Input
+                type="number"
+                placeholder="e.g., 1990"
+                value={searchMinYearBuilt}
+                onChange={(e) => setSearchMinYearBuilt(e.target.value)}
+                data-testid="input-min-year-built"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Max Year Built</Label>
+              <Input
+                type="number"
+                placeholder="e.g., 2024"
+                value={searchMaxYearBuilt}
+                onChange={(e) => setSearchMaxYearBuilt(e.target.value)}
+                data-testid="input-max-year-built"
+              />
             </div>
           </div>
           <Button onClick={handleSearch} disabled={isLoading} data-testid="button-search-properties">
