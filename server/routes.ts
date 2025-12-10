@@ -411,9 +411,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
             return isNaN(num) ? null : num;
           };
 
-          const bedsRaw = details.numBedrooms ?? details.bedrooms ?? listing.bedroomsTotal;
+          const bedsRaw = details.numBedrooms ?? details.bedrooms ?? listing.bedroomsTotal ?? listing.bedrooms;
           const beds = toNumber(bedsRaw);
-          const bathsRaw = details.numBathrooms ?? details.bathrooms ?? listing.bathroomsTotalInteger;
+          const bathsRaw = details.numBathrooms ?? details.bathrooms ?? details.numBathroom ?? listing.bathroomsTotalInteger ?? listing.bathrooms ?? listing.bathroomsTotal;
           const baths = Array.isArray(bathsRaw) && bathsRaw.length > 0 ? toNumber(bathsRaw[0]) : toNumber(bathsRaw);
 
           const rawPhotos = listing.images || listing.photos || [];
@@ -421,31 +421,45 @@ export async function registerRoutes(app: Express): Promise<Server> {
             img.startsWith('http') ? img : `https://cdn.repliers.io/${img}`
           );
 
+          // Calculate lot size in acres from square feet if not provided
+          const lotSqFt = toNumber(details.lotSize || listing.lotSizeSquareFeet);
+          const lotAcres = toNumber(listing.lotSizeAcres) || (lotSqFt ? lotSqFt / 43560 : null);
+
           return {
             id: listing.mlsNumber || listing.listingId,
             address: fullAddress || listing.unparsedAddress || 'Unknown Address',
+            unparsedAddress: fullAddress || listing.unparsedAddress || 'Unknown Address',
             city: addr.city || listing.city || '',
             state: addr.state || listing.stateOrProvince || 'TX',
             postalCode: addr.zip || listing.postalCode || '',
             listPrice: toNumber(listing.listPrice) || 0,
             closePrice: toNumber(listing.soldPrice) || null,
             status: mappedStatus,
+            standardStatus: mappedStatus,
+            // Include both field names for compatibility
             beds: beds,
             baths: baths,
+            bedroomsTotal: beds,
+            bathroomsTotalInteger: baths,
             livingArea: toNumber(details.sqft || listing.livingArea),
             yearBuilt: toNumber(details.yearBuilt || listing.yearBuilt),
             latitude: toNumber(map.latitude ?? listing.latitude),
             longitude: toNumber(map.longitude ?? listing.longitude),
             photos: photos,
             subdivision: addr.neighborhood || listing.subdivisionName || null,
+            subdivisionName: addr.neighborhood || listing.subdivisionName || null,
             daysOnMarket: toNumber(listing.daysOnMarket),
             cumulativeDaysOnMarket: toNumber(listing.cumulativeDaysOnMarket) || toNumber(listing.daysOnMarket),
-            lotSizeSquareFeet: toNumber(details.lotSize || listing.lotSizeSquareFeet),
-            lotSizeAcres: toNumber(listing.lotSizeAcres),
+            lotSizeSquareFeet: lotSqFt,
+            lotSizeAcres: lotAcres,
             garageSpaces: toNumber(details.garage || listing.garageSpaces),
             closeDate: listing.soldDate || listing.closeDate || null,
+            listDate: listing.listDate || listing.listingContractDate || null,
+            listingContractDate: listing.listDate || listing.listingContractDate || null,
             description: details.description || listing.publicRemarks || null,
             stories: toNumber((details as any).stories || (listing as any).storiesTotal || (listing as any).stories),
+            propertyType: details.propertyType || listing.propertyType || 'Residential',
+            propertySubType: details.style || listing.propertySubType || null,
           } as any;
         });
       };
@@ -473,32 +487,50 @@ export async function registerRoutes(app: Express): Promise<Server> {
           return isNaN(num) ? null : num;
         };
 
-        let results = dbResults.map((p: any) => ({
-          id: p.listingId || p.id,
-          address: p.unparsedAddress || [p.streetNumber, p.streetName, p.streetSuffix].filter(Boolean).join(' '),
-          city: p.city || '',
-          state: p.stateOrProvince || 'TX',
-          postalCode: p.postalCode || '',
-          listPrice: toNum(p.listPrice) || 0,
-          closePrice: toNum(p.closePrice) || null,
-          status: 'Closed',
-          beds: toNum(p.bedroomsTotal),
-          baths: toNum(p.bathroomsTotalInteger),
-          livingArea: toNum(p.livingArea),
-          yearBuilt: toNum(p.yearBuilt),
-          latitude: toNum(p.latitude),
-          longitude: toNum(p.longitude),
-          photos: p.photos || [],
-          subdivision: p.subdivisionName || null,
-          daysOnMarket: toNum(p.daysOnMarket),
-          cumulativeDaysOnMarket: toNum(p.cumulativeDaysOnMarket) || toNum(p.daysOnMarket),
-          lotSizeSquareFeet: toNum(p.lotSizeSquareFeet),
-          lotSizeAcres: toNum(p.lotSizeAcres),
-          garageSpaces: toNum(p.garageSpaces),
-          closeDate: p.closeDate || null,
-          description: p.publicRemarks || null,
-          stories: toNum(p.stories) || toNum(p.storiesTotal),
-        })) as any[];
+        let results = dbResults.map((p: any) => {
+          const address = p.unparsedAddress || [p.streetNumber, p.streetName, p.streetSuffix].filter(Boolean).join(' ');
+          const beds = toNum(p.bedroomsTotal);
+          const baths = toNum(p.bathroomsTotalInteger);
+          const lotSqFt = toNum(p.lotSizeSquareFeet);
+          const lotAcres = toNum(p.lotSizeAcres) || (lotSqFt ? lotSqFt / 43560 : null);
+          
+          return {
+            id: p.listingId || p.id,
+            address: address,
+            unparsedAddress: address,
+            city: p.city || '',
+            state: p.stateOrProvince || 'TX',
+            postalCode: p.postalCode || '',
+            listPrice: toNum(p.listPrice) || 0,
+            closePrice: toNum(p.closePrice) || null,
+            status: 'Closed',
+            standardStatus: 'Closed',
+            // Include both field names for compatibility
+            beds: beds,
+            baths: baths,
+            bedroomsTotal: beds,
+            bathroomsTotalInteger: baths,
+            livingArea: toNum(p.livingArea),
+            yearBuilt: toNum(p.yearBuilt),
+            latitude: toNum(p.latitude),
+            longitude: toNum(p.longitude),
+            photos: p.photos || [],
+            subdivision: p.subdivisionName || null,
+            subdivisionName: p.subdivisionName || null,
+            daysOnMarket: toNum(p.daysOnMarket),
+            cumulativeDaysOnMarket: toNum(p.cumulativeDaysOnMarket) || toNum(p.daysOnMarket),
+            lotSizeSquareFeet: lotSqFt,
+            lotSizeAcres: lotAcres,
+            garageSpaces: toNum(p.garageSpaces),
+            closeDate: p.closeDate || null,
+            listDate: p.listDate || p.listingContractDate || null,
+            listingContractDate: p.listDate || p.listingContractDate || null,
+            description: p.publicRemarks || null,
+            stories: toNum(p.stories) || toNum(p.storiesTotal),
+            propertyType: p.propertyType || 'Residential',
+            propertySubType: p.propertySubType || null,
+          };
+        }) as any[];
 
         return results;
       };

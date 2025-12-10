@@ -1,0 +1,434 @@
+I’m continuing work on the IDXGridData / CMA Builder app that uses Repliers as the primary data source.
+
+I’ve attached:
+
+The Quick CMA 2740 PDF for Cherry Creek (shows Active, Active Under Contract, and Closed comps). 
+
+Quick CMA 2740
+
+Screenshots of:
+
+Create New CMA (Cherry Creek search)
+
+CMA output pages (Home Averages, Listings, Timeline, Market Stats)
+
+Property detail pages and property search results
+
+Please use these as the source of truth to fix and enhance the CMA experience.
+
+Below are the remaining issues and required fixes.
+
+==================================================
+
+Search Properties – Autocomplete for City & Subdivision
+==================================================
+
+In Create New CMA → Search Properties:
+
+For the City and Subdivision fields:
+
+Use the same autocomplete behavior we have elsewhere (e.g., Buyer Search / Seller Updates).
+
+As the user types, show suggestions pulled from the same data source used for City/Subdivision (Repliers / DB).
+
+User should be able to:
+
+Pick from a suggestion, OR
+
+Type a full value manually (free text is still allowed).
+
+Make sure this uses the same autocomplete API / logic already implemented in Buyer Search / Seller Updates so behavior is consistent.
+
+==================================================
+2) Search Results – Card Data & Behavior (Create New CMA)
+
+In Create New CMA → Search Properties → Search Results:
+
+Current issue:
+Cards are very minimal and don’t show enough information (often missing address and photo).
+
+Required card layout (for each result):
+
+Each search result card should show at least:
+
+Full address (street + city + state + ZIP)
+
+Beds
+
+Baths
+
+Living area (sqft)
+
+Price (list or close price depending on status)
+
+Photo/thumbnail:
+
+Use the first photo from the property’s photo array (Repliers photos/media)
+
+Fall back to a placeholder only if no photos exist
+
+Card click behavior:
+
+When a user clicks on a card:
+
+It should behave like the Property section:
+
+Show the property information (detail view or slide-out) using the same data source and mapping.
+
+The “Set as Subject” and “Add as Comparable” actions should continue to work exactly as they do now.
+
+Important:
+Use the same normalized property mapping that is used in the Properties section so the data (address, beds, baths, sqft, price, photos) is consistent between Properties and CMA.
+
+==================================================
+3) CMA Name – Better Default Naming
+
+In Create New CMA → CMA Information:
+
+If the user does not manually enter a CMA Name:
+
+Instead of “Untitled” or a generic name, generate a smart default using:
+
+City or Subdivision or Status (whichever is present/most specific)
+
+current date and time
+
+Example:
+
+Cherry Creek – Active – 2025-12-10 1:38 AM
+
+Barton Hills – Closed – 2025-12-11 03:23 PM
+
+This looks like it’s partially working already (e.g., “Barton Hills - Active - 12/11/2025 1:23 AM”), but please ensure this logic is consistent and used whenever a user leaves CMA Name blank.
+
+==================================================
+4) Analysis & “Generate Report” Flow
+
+After the user selects comparable properties in Create New CMA:
+
+The Analysis panel should update based on the selected comps.
+
+The “Generate Report” button should:
+
+Create the CMA,
+
+Then navigate directly to the CMA report view (Home Averages / Listings / Timeline / Market Stats).
+
+4.1 Home Averages Tab
+
+Home Averages should show the statistics for the selected comps.
+
+Do not include full property addresses in the Home Averages summary rows (only stats).
+
+4.2 Listings Tab – Price Distribution
+
+Ensure the Price Distribution chart is correctly aligned with the CMA data (the same comps and stats as in Home Averages).
+
+4.3 Timeline Tab
+
+Current issue:
+
+Timeline tab shows blank data.
+
+Required behavior:
+
+Populate the timeline using available data, such as:
+
+closeDate
+
+listDate
+
+status changes by status bucket:
+
+Active
+
+Under Contract
+
+Closed
+
+If there truly is no timeline data for the selected comps:
+
+Show a clear message like:
+“No timeline data available for the selected comparables.”
+
+Instead of an empty chart.
+
+4.4 Market Stats Tab
+
+Current issue:
+
+Market Stats sometimes shows 0 Active Listings even when there are active properties for the same search (example: Barton Hills had 2 active listings in search, but Market Stats showed 0).
+
+Required behavior:
+
+Ensure Market Stats correctly reflects:
+
+Active listings count
+
+Other stats based on the same comps/search used for the CMA.
+
+Use the same underlying data as the CMA statistics (no double-filtering that might drop actives).
+
+==================================================
+5) Top Yellow Bar – Buttons and Actions
+
+In the yellow bar at the top of the CMA report (Home Averages / Listings / Timeline / Market Stats):
+
+Buttons: Save + Send, Public Link, Modify Search, Modify Stats, Notes, Printer.
+
+5.1 Save + Send
+
+Make this functional:
+
+Either trigger the existing “Save + Send” workflow,
+
+Or implement a basic placeholder behavior that can later be wired into email sending.
+
+Do not leave it as a non-working button.
+
+5.2 Public Link vs Share + Printer (Redundant Behavior)
+
+Current issues:
+
+The Public Link button currently generates a link, but the link opens a blank/empty page.
+
+There is also a Share button in the upper right corner; behavior overlaps with Public Link.
+
+The Printer icon is inside the yellow bar, not near Share.
+
+Required changes:
+
+Treat Public Link in the yellow bar as redundant and remove or repurpose it.
+
+The Share button (upper right) should remain and:
+
+Generate a client-safe public view of the same CMA content:
+
+Home Averages
+
+Listings
+
+Timeline
+
+Market Stats
+
+The public link should:
+
+Work when pasted into a new browser tab or shared.
+
+Show a stable, read-only version of the CMA (no editing controls).
+
+The preview for this public view should look similar to what the user sees in the PDF output.
+
+Move the Printer icon next to the Share button (top-right), but keep functionality:
+
+Clicking Printer should generate/download a PDF of the CMA.
+
+The PDF file name should match the CMA name (e.g., Barton Hills - Active - 12-11-2025 1-23 AM.pdf).
+
+5.3 Public Link (if you keep it)
+
+If you decide to keep the Public Link label in the yellow bar:
+
+It must behave consistently with the Share public view:
+
+Show the same CMA data as the preview.
+
+Not be blank.
+
+5.4 Modify Search
+
+Current issue:
+
+Modify Search tends to reset everything instead of preserving the last search and comparables.
+
+Required behavior:
+
+When the user clicks Modify Search, they should:
+
+Be taken back to the same CMA Builder with:
+
+All previous search criteria pre-filled.
+
+The previously selected comparables and subject property preserved.
+
+The user can then:
+
+Adjust filters,
+
+Add/remove comps,
+
+Re-generate the report.
+
+5.5 Modify Stats
+
+Implement or fix Modify Stats so it has a clear purpose:
+
+For example, allow adjusting which metrics are shown (price, DOM, $/sqft) or customizing included comps.
+
+At minimum, it should not be a dead button; if not fully implemented, provide a clear “coming soon” or disable it gracefully.
+
+5.6 Notes
+
+Make Notes functional:
+
+Allow the user to add and save free-text notes tied to the CMA.
+
+Notes should persist with the CMA and be visible when reopening it.
+
+==================================================
+6) Sold Date Range Filter (CMA + Properties)
+
+Add a new field called Sold Date with a dropdown that allows users to filter sold listings by how recent the sale was.
+
+Dropdown options:
+
+0–30 days
+
+0–60 days
+
+0–90 days
+
+0–120 days
+
+0–150 days
+
+0–180 days
+
+Behavior requirements:
+
+This filter should be available anywhere SOLD listings are queried:
+
+CMA Builder
+
+Create New CMA → Search Properties, when Sold/Closed is selected.
+
+Properties search page
+
+When status = Closed/Sold.
+
+The filter should limit results to listings whose closeDate falls within the selected day range relative to today.
+
+Example:
+
+0–90 days → closeDate >= (today - 90 days)
+
+Use the correct Repliers close-date field (typically closeDate or equivalent) when building the query.
+
+If the user does not select a Sold Date range:
+
+Treat it as “no date limit” (maintain current behavior).
+
+==================================================
+7) Cherry Creek CMA – Consistency with Quick CMA 2740 (Active / AUC / Closed)
+
+I’ve attached Quick CMA 2740 for Cherry Creek, which is our reference. 
+
+Quick CMA 2740
+
+Key details from the PDF (Subdivision = Cherry Creek, Single Family, 1200–1800 sqft):
+
+Active Listings (3):
+
+2301 Brookhill Dr – Cherry Creek 4 – 1,467 sqft – $575,000
+
+6502 Aldford Cir – Cherry Creek Ph 06 Sec 01 – 1,221 sqft – $500,000
+
+7741 Manassas Dr – Cherry Creek Ph 07 Sec 03 – 1,551 sqft – $639,000
+
+Active Under Contract (2):
+
+6014 London Dr – Cherry Creek Ph 06 Sec 02 Amd – 1,374 sqft – $474,900
+
+5706 Cherry Creek Dr – Cherry Creek Ph 02 Sec 03 – 1,800 sqft – $509,900
+
+Closed (4):
+
+2714 Harleyhill Dr – Cherry Creek Ph 04 Sec 02 – 1,783 sqft – $640,000 (close)
+
+7906 Swindon Ln – Cherry Creek Ph 07 Sec 06 – 1,749 sqft – $575,000 (close)
+
+2803 Harleyhill Dr – Cherry Creek Ph 04 Sec 02 – 1,668 sqft – $565,000 (close)
+
+7803 Seminary Ridge Dr – Cherry Creek Ph 07 Sec 03 – 1,597 sqft – $558,000 (close)
+
+When I build a CMA in our app with:
+
+City: Austin
+
+Subdivision: Cherry Creek
+
+Property type: Single Family (same as PDF)
+
+Sqft Range: 1200–1800
+
+Status: Active + Under Contract + Closed (where applicable)
+
+Current issues in our app:
+
+In Create New CMA → Search Properties for Cherry Creek:
+
+I often see only 1 result in Search Results (instead of multiple actives).
+
+That one result:
+
+Does not show the address.
+
+Does not show a property image.
+
+Active/Under Contract listings in our app do not match the counts from the Quick CMA PDF (should be 3 active + 2 AUC).
+
+Required fixes:
+
+Ensure that the CMA search query against Repliers is correctly filtering using:
+
+Status:
+
+Active, Active Under Contract, Pending (as appropriate)
+
+Property Sub Type:
+
+Single Family / equivalent
+
+Subdivision:
+
+Subdivision LIKE 'Cherry Creek%'
+
+Sqft range:
+
+Between 1200 and 1800
+
+Confirm that:
+
+The returned results from Repliers for Cherry Creek match or closely match the Quick CMA 2740 reference (3 active, 2 AUC, 4 closed) when using equivalent filters.
+
+Any discrepancies are due to live data differences, not mapping or filter bugs.
+
+Fix the Search Results card mapping so that for Cherry Creek (and all CMA searches):
+
+Each card shows address, beds, baths, sqft, price, thumbnail photo (as described in section 2).
+
+The data clearly corresponds to the properties from Repliers (e.g., Brookhill, Aldford, Manassas, London, Cherry Creek Dr, etc.).
+
+Use the Cherry Creek CMA from Quick CMA 2740 as a validation test:
+
+When selecting the same (or closest equivalent) closed comps from Repliers, our app’s CMA statistics (average/median price, $/sqft, DOM) should match or be very close to the values in the PDF.
+
+==================================================
+8) General Notes
+
+Please keep the existing UI layout and styling (cards, tabs, yellow bar, etc.).
+
+All changes should focus on:
+
+Data mapping from Repliers,
+
+Search/filter logic (including Sold Date),
+
+CMA statistics calculations,
+
+Behavior of CMA navigation (Modify Search, public/share link, printer/PDF),
+
+Making the CMA report data-rich and consistent with the Properties section.
+
+If anything is unclear, please infer behavior from the attached screenshots and Quick CMA 2740 PDF and align our implementation as closely as possible to that reference.
