@@ -4,6 +4,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
 import { ArrowLeft, Share2, Link as LinkIcon, Copy, Check, Trash2 } from "lucide-react";
 import { Link } from "wouter";
 import { CMAReport } from "@/components/CMAReport";
@@ -23,6 +24,21 @@ import { Label } from "@/components/ui/label";
 import type { Cma, Property, PropertyStatistics, TimelineDataPoint } from "@shared/schema";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 
+// Available metrics for statistics display - keys must match CMAReport's StatMetricKey
+export const STAT_METRICS = [
+  { key: 'price', label: 'Price' },
+  { key: 'pricePerSqFt', label: 'Price/SqFt' },
+  { key: 'daysOnMarket', label: 'Days on Market' },
+  { key: 'livingArea', label: 'Living SqFt' },
+  { key: 'lotSize', label: 'Lot SqFt' },
+  { key: 'acres', label: 'Acres' },
+  { key: 'bedrooms', label: 'Beds' },
+  { key: 'bathrooms', label: 'Baths' },
+  { key: 'yearBuilt', label: 'Year Built' },
+] as const;
+
+export type StatMetricKey = typeof STAT_METRICS[number]['key'];
+
 interface ShareResponse {
   shareToken: string;
   shareUrl: string;
@@ -36,8 +52,22 @@ export default function CMADetailPage() {
   const { toast } = useToast();
   const [shareDialogOpen, setShareDialogOpen] = useState(false);
   const [notesDialogOpen, setNotesDialogOpen] = useState(false);
+  const [statsDialogOpen, setStatsDialogOpen] = useState(false);
   const [notes, setNotes] = useState("");
   const [copied, setCopied] = useState(false);
+  
+  // Visible metrics state - all enabled by default
+  const [visibleMetrics, setVisibleMetrics] = useState<StatMetricKey[]>(
+    STAT_METRICS.map(m => m.key)
+  );
+  
+  const toggleMetric = (key: StatMetricKey) => {
+    setVisibleMetrics(prev => 
+      prev.includes(key) 
+        ? prev.filter(k => k !== key)
+        : [...prev, key]
+    );
+  };
 
   const { data: cma, isLoading: cmaLoading, refetch: refetchCma } = useQuery<Cma>({
     queryKey: ['/api/cmas', id],
@@ -172,10 +202,7 @@ export default function CMADetailPage() {
   };
 
   const handleModifyStats = () => {
-    toast({
-      title: "Modify Stats",
-      description: "Statistics are automatically calculated from the selected properties. To change stats, modify the comparable properties in a new CMA.",
-    });
+    setStatsDialogOpen(true);
   };
 
   const handlePrint = () => {
@@ -368,6 +395,7 @@ export default function CMADetailPage() {
         timelineData={timelineData}
         isPreview={true}
         expiresAt={cma.expiresAt ? new Date(cma.expiresAt) : new Date(Date.now() + 30 * 60 * 1000)}
+        visibleMetrics={visibleMetrics}
         onSave={handleSave}
         onPublicLink={() => setShareDialogOpen(true)}
         onModifySearch={handleModifySearch}
@@ -407,6 +435,48 @@ export default function CMADetailPage() {
               data-testid="button-save-notes"
             >
               {updateNotesMutation.isPending ? 'Saving...' : 'Save Notes'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Stats Visibility Dialog */}
+      <Dialog open={statsDialogOpen} onOpenChange={setStatsDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Customize Statistics</DialogTitle>
+            <DialogDescription>
+              Choose which metrics to show in the Home Averages tab.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4 space-y-3">
+            {STAT_METRICS.map((metric) => (
+              <div key={metric.key} className="flex items-center space-x-3">
+                <Checkbox
+                  id={`metric-${metric.key}`}
+                  checked={visibleMetrics.includes(metric.key)}
+                  onCheckedChange={() => toggleMetric(metric.key)}
+                  data-testid={`checkbox-metric-${metric.key}`}
+                />
+                <Label htmlFor={`metric-${metric.key}`} className="cursor-pointer">
+                  {metric.label}
+                </Label>
+              </div>
+            ))}
+          </div>
+          <DialogFooter>
+            <Button 
+              variant="outline" 
+              onClick={() => setVisibleMetrics(STAT_METRICS.map(m => m.key))}
+              data-testid="button-reset-stats"
+            >
+              Show All
+            </Button>
+            <Button 
+              onClick={() => setStatsDialogOpen(false)}
+              data-testid="button-apply-stats"
+            >
+              Apply
             </Button>
           </DialogFooter>
         </DialogContent>

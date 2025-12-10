@@ -8,12 +8,15 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, Responsive
 import { Save, Link as LinkIcon, Edit, FileText, Printer } from "lucide-react";
 import type { Property, PropertyStatistics, TimelineDataPoint } from "@shared/schema";
 
+type StatMetricKey = 'price' | 'pricePerSqFt' | 'daysOnMarket' | 'livingArea' | 'lotSize' | 'acres' | 'bedrooms' | 'bathrooms' | 'yearBuilt';
+
 interface CMAReportProps {
   properties: Property[];
   statistics: PropertyStatistics;
   timelineData: TimelineDataPoint[];
   isPreview?: boolean;
   expiresAt?: Date;
+  visibleMetrics?: StatMetricKey[];
   onSave?: () => void;
   onPublicLink?: () => void;
   onModifySearch?: () => void;
@@ -22,12 +25,15 @@ interface CMAReportProps {
   onPrint?: () => void;
 }
 
+const ALL_METRICS: StatMetricKey[] = ['price', 'pricePerSqFt', 'daysOnMarket', 'livingArea', 'lotSize', 'acres', 'bedrooms', 'bathrooms', 'yearBuilt'];
+
 export function CMAReport({ 
   properties, 
   statistics, 
   timelineData, 
   isPreview,
   expiresAt,
+  visibleMetrics = ALL_METRICS,
   onSave,
   onPublicLink,
   onModifySearch,
@@ -81,9 +87,13 @@ export function CMAReport({
               <Save className="w-4 h-4 mr-2" />
               Save + Send
             </Button>
-            <Button size="sm" variant="outline" onClick={onPublicLink} data-testid="button-public-link">
+            <Button size="sm" variant="outline" onClick={onPublicLink} data-testid="button-share">
               <LinkIcon className="w-4 h-4 mr-2" />
-              Public Link
+              Share
+            </Button>
+            <Button size="sm" variant="outline" onClick={onPrint} data-testid="button-print">
+              <Printer className="w-4 h-4 mr-2" />
+              Print
             </Button>
             <Button size="sm" variant="outline" onClick={onModifySearch} data-testid="button-modify-search">
               <Edit className="w-4 h-4 mr-2" />
@@ -95,9 +105,6 @@ export function CMAReport({
             </Button>
             <Button size="sm" variant="outline" onClick={onAddNotes} data-testid="button-notes">
               Notes
-            </Button>
-            <Button size="sm" variant="outline" onClick={onPrint} data-testid="button-print">
-              <Printer className="w-4 h-4" />
             </Button>
           </div>
         </div>
@@ -129,86 +136,104 @@ export function CMAReport({
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  <TableRow>
-                    <TableCell className="font-medium">Price</TableCell>
-                    <TableCell data-testid="text-price-range">
-                      ${statistics.price.range.min.toLocaleString()} - ${statistics.price.range.max.toLocaleString()}
-                    </TableCell>
-                    <TableCell data-testid="text-price-average">
-                      ${Math.round(statistics.price.average).toLocaleString()}
-                    </TableCell>
-                    <TableCell data-testid="text-price-median">
-                      ${Math.round(statistics.price.median).toLocaleString()}
-                    </TableCell>
-                  </TableRow>
-                  <TableRow>
-                    <TableCell className="font-medium">Price/SqFt</TableCell>
-                    <TableCell>
-                      ${statistics.pricePerSqFt.range.min.toFixed(2)}/SqFt - ${statistics.pricePerSqFt.range.max.toFixed(2)}/SqFt
-                    </TableCell>
-                    <TableCell>
-                      ${statistics.pricePerSqFt.average.toFixed(2)}/SqFt
-                    </TableCell>
-                    <TableCell>
-                      ${statistics.pricePerSqFt.median.toFixed(2)}/SqFt
-                    </TableCell>
-                  </TableRow>
-                  <TableRow>
-                    <TableCell className="font-medium">Days on Market</TableCell>
-                    <TableCell>
-                      {statistics.daysOnMarket.range.min} - {statistics.daysOnMarket.range.max}
-                    </TableCell>
-                    <TableCell>{Math.round(statistics.daysOnMarket.average)}</TableCell>
-                    <TableCell>{Math.round(statistics.daysOnMarket.median)}</TableCell>
-                  </TableRow>
-                  <TableRow>
-                    <TableCell className="font-medium">Liv SqFt</TableCell>
-                    <TableCell>
-                      {statistics.livingArea.range.min.toLocaleString()} SqFt - {statistics.livingArea.range.max.toLocaleString()} SqFt
-                    </TableCell>
-                    <TableCell>{Math.round(statistics.livingArea.average).toLocaleString()} SqFt</TableCell>
-                    <TableCell>{Math.round(statistics.livingArea.median).toLocaleString()} SqFt</TableCell>
-                  </TableRow>
-                  <TableRow>
-                    <TableCell className="font-medium">Lot SqFt</TableCell>
-                    <TableCell>
-                      {statistics.lotSize.range.min.toLocaleString()} SqFt - {statistics.lotSize.range.max.toLocaleString()} SqFt
-                    </TableCell>
-                    <TableCell>{Math.round(statistics.lotSize.average).toLocaleString()} SqFt</TableCell>
-                    <TableCell>{Math.round(statistics.lotSize.median).toLocaleString()} SqFt</TableCell>
-                  </TableRow>
-                  <TableRow>
-                    <TableCell className="font-medium">Acres</TableCell>
-                    <TableCell>
-                      {statistics.acres.range.min.toFixed(2)} Acres - {statistics.acres.range.max.toFixed(2)} Acres
-                    </TableCell>
-                    <TableCell>{statistics.acres.average.toFixed(2)} Acres</TableCell>
-                    <TableCell>{statistics.acres.median.toFixed(2)} Acres</TableCell>
-                  </TableRow>
-                  <TableRow>
-                    <TableCell className="font-medium">Beds</TableCell>
-                    <TableCell>
-                      {statistics.bedrooms.range.min} - {statistics.bedrooms.range.max}
-                    </TableCell>
-                    <TableCell>{statistics.bedrooms.average.toFixed(1)}</TableCell>
-                    <TableCell>{statistics.bedrooms.median}</TableCell>
-                  </TableRow>
-                  <TableRow>
-                    <TableCell className="font-medium">Baths</TableCell>
-                    <TableCell>
-                      {statistics.bathrooms.range.min} - {statistics.bathrooms.range.max}
-                    </TableCell>
-                    <TableCell>{statistics.bathrooms.average.toFixed(1)}</TableCell>
-                    <TableCell>{statistics.bathrooms.median}</TableCell>
-                  </TableRow>
-                  <TableRow>
-                    <TableCell className="font-medium">Year Built</TableCell>
-                    <TableCell>
-                      {statistics.yearBuilt.range.min} - {statistics.yearBuilt.range.max}
-                    </TableCell>
-                    <TableCell>{Math.round(statistics.yearBuilt.average)}</TableCell>
-                    <TableCell>{statistics.yearBuilt.median}</TableCell>
-                  </TableRow>
+                  {visibleMetrics.includes('price') && (
+                    <TableRow>
+                      <TableCell className="font-medium">Price</TableCell>
+                      <TableCell data-testid="text-price-range">
+                        ${statistics.price.range.min.toLocaleString()} - ${statistics.price.range.max.toLocaleString()}
+                      </TableCell>
+                      <TableCell data-testid="text-price-average">
+                        ${Math.round(statistics.price.average).toLocaleString()}
+                      </TableCell>
+                      <TableCell data-testid="text-price-median">
+                        ${Math.round(statistics.price.median).toLocaleString()}
+                      </TableCell>
+                    </TableRow>
+                  )}
+                  {visibleMetrics.includes('pricePerSqFt') && (
+                    <TableRow>
+                      <TableCell className="font-medium">Price/SqFt</TableCell>
+                      <TableCell>
+                        ${statistics.pricePerSqFt.range.min.toFixed(2)}/SqFt - ${statistics.pricePerSqFt.range.max.toFixed(2)}/SqFt
+                      </TableCell>
+                      <TableCell>
+                        ${statistics.pricePerSqFt.average.toFixed(2)}/SqFt
+                      </TableCell>
+                      <TableCell>
+                        ${statistics.pricePerSqFt.median.toFixed(2)}/SqFt
+                      </TableCell>
+                    </TableRow>
+                  )}
+                  {visibleMetrics.includes('daysOnMarket') && (
+                    <TableRow>
+                      <TableCell className="font-medium">Days on Market</TableCell>
+                      <TableCell>
+                        {statistics.daysOnMarket.range.min} - {statistics.daysOnMarket.range.max}
+                      </TableCell>
+                      <TableCell>{Math.round(statistics.daysOnMarket.average)}</TableCell>
+                      <TableCell>{Math.round(statistics.daysOnMarket.median)}</TableCell>
+                    </TableRow>
+                  )}
+                  {visibleMetrics.includes('livingArea') && (
+                    <TableRow>
+                      <TableCell className="font-medium">Liv SqFt</TableCell>
+                      <TableCell>
+                        {statistics.livingArea.range.min.toLocaleString()} SqFt - {statistics.livingArea.range.max.toLocaleString()} SqFt
+                      </TableCell>
+                      <TableCell>{Math.round(statistics.livingArea.average).toLocaleString()} SqFt</TableCell>
+                      <TableCell>{Math.round(statistics.livingArea.median).toLocaleString()} SqFt</TableCell>
+                    </TableRow>
+                  )}
+                  {visibleMetrics.includes('lotSize') && (
+                    <TableRow>
+                      <TableCell className="font-medium">Lot SqFt</TableCell>
+                      <TableCell>
+                        {statistics.lotSize.range.min.toLocaleString()} SqFt - {statistics.lotSize.range.max.toLocaleString()} SqFt
+                      </TableCell>
+                      <TableCell>{Math.round(statistics.lotSize.average).toLocaleString()} SqFt</TableCell>
+                      <TableCell>{Math.round(statistics.lotSize.median).toLocaleString()} SqFt</TableCell>
+                    </TableRow>
+                  )}
+                  {visibleMetrics.includes('acres') && (
+                    <TableRow>
+                      <TableCell className="font-medium">Acres</TableCell>
+                      <TableCell>
+                        {statistics.acres.range.min.toFixed(2)} Acres - {statistics.acres.range.max.toFixed(2)} Acres
+                      </TableCell>
+                      <TableCell>{statistics.acres.average.toFixed(2)} Acres</TableCell>
+                      <TableCell>{statistics.acres.median.toFixed(2)} Acres</TableCell>
+                    </TableRow>
+                  )}
+                  {visibleMetrics.includes('bedrooms') && (
+                    <TableRow>
+                      <TableCell className="font-medium">Beds</TableCell>
+                      <TableCell>
+                        {statistics.bedrooms.range.min} - {statistics.bedrooms.range.max}
+                      </TableCell>
+                      <TableCell>{statistics.bedrooms.average.toFixed(1)}</TableCell>
+                      <TableCell>{statistics.bedrooms.median}</TableCell>
+                    </TableRow>
+                  )}
+                  {visibleMetrics.includes('bathrooms') && (
+                    <TableRow>
+                      <TableCell className="font-medium">Baths</TableCell>
+                      <TableCell>
+                        {statistics.bathrooms.range.min} - {statistics.bathrooms.range.max}
+                      </TableCell>
+                      <TableCell>{statistics.bathrooms.average.toFixed(1)}</TableCell>
+                      <TableCell>{statistics.bathrooms.median}</TableCell>
+                    </TableRow>
+                  )}
+                  {visibleMetrics.includes('yearBuilt') && (
+                    <TableRow>
+                      <TableCell className="font-medium">Year Built</TableCell>
+                      <TableCell>
+                        {statistics.yearBuilt.range.min} - {statistics.yearBuilt.range.max}
+                      </TableCell>
+                      <TableCell>{Math.round(statistics.yearBuilt.average)}</TableCell>
+                      <TableCell>{statistics.yearBuilt.median}</TableCell>
+                    </TableRow>
+                  )}
                 </TableBody>
               </Table>
             </CardContent>
