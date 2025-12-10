@@ -45,6 +45,19 @@ export interface IStorage {
   getProperty(id: string): Promise<Property | undefined>;
   getPropertyByListingId(listingId: string): Promise<Property | undefined>;
   getProperties(criteria: SearchCriteria, limit?: number, offset?: number): Promise<Property[]>;
+  searchProperties(filters: {
+    city?: string;
+    postalCode?: string;
+    minPrice?: number;
+    maxPrice?: number;
+    minBeds?: number;
+    minBaths?: number;
+    minSqft?: number;
+    maxSqft?: number;
+    subdivision?: string;
+    status?: string;
+    limit?: number;
+  }): Promise<Property[]>;
   createProperty(property: InsertProperty): Promise<Property>;
   updateProperty(id: string, property: Partial<Property>): Promise<Property | undefined>;
   deleteProperty(id: string): Promise<boolean>;
@@ -286,6 +299,56 @@ export class MemStorage implements IStorage {
 
   async getPropertyCount(): Promise<number> {
     return Array.from(this.properties.values()).filter(p => p.mlgCanView).length;
+  }
+
+  async searchProperties(filters: {
+    city?: string;
+    postalCode?: string;
+    minPrice?: number;
+    maxPrice?: number;
+    minBeds?: number;
+    minBaths?: number;
+    minSqft?: number;
+    maxSqft?: number;
+    subdivision?: string;
+    status?: string;
+    limit?: number;
+  }): Promise<Property[]> {
+    let props = Array.from(this.properties.values()).filter(p => p.mlgCanView);
+
+    if (filters.city) {
+      props = props.filter(p => p.city?.toLowerCase().includes(filters.city!.toLowerCase()));
+    }
+    if (filters.postalCode) {
+      props = props.filter(p => p.postalCode === filters.postalCode);
+    }
+    if (filters.minPrice !== undefined) {
+      props = props.filter(p => p.listPrice && Number(p.listPrice) >= filters.minPrice!);
+    }
+    if (filters.maxPrice !== undefined) {
+      props = props.filter(p => p.listPrice && Number(p.listPrice) <= filters.maxPrice!);
+    }
+    if (filters.minBeds !== undefined) {
+      props = props.filter(p => p.bedroomsTotal && p.bedroomsTotal >= filters.minBeds!);
+    }
+    if (filters.minBaths !== undefined) {
+      props = props.filter(p => p.bathroomsTotalInteger && p.bathroomsTotalInteger >= filters.minBaths!);
+    }
+    if (filters.minSqft !== undefined) {
+      props = props.filter(p => p.livingArea && Number(p.livingArea) >= filters.minSqft!);
+    }
+    if (filters.maxSqft !== undefined) {
+      props = props.filter(p => p.livingArea && Number(p.livingArea) <= filters.maxSqft!);
+    }
+    if (filters.subdivision) {
+      props = props.filter(p => p.subdivision?.toLowerCase().includes(filters.subdivision!.toLowerCase()));
+    }
+    if (filters.status) {
+      props = props.filter(p => p.standardStatus === filters.status);
+    }
+
+    const effectiveLimit = filters.limit ?? 100;
+    return props.slice(0, effectiveLimit);
   }
 
   // Media operations
@@ -905,6 +968,61 @@ export class DbStorage implements IStorage {
       .from(properties)
       .where(eq(properties.mlgCanView, true));
     return result[0]?.count || 0;
+  }
+
+  async searchProperties(filters: {
+    city?: string;
+    postalCode?: string;
+    minPrice?: number;
+    maxPrice?: number;
+    minBeds?: number;
+    minBaths?: number;
+    minSqft?: number;
+    maxSqft?: number;
+    subdivision?: string;
+    status?: string;
+    limit?: number;
+  }): Promise<Property[]> {
+    const conditions = [eq(properties.mlgCanView, true)];
+
+    if (filters.city) {
+      conditions.push(ilike(properties.city, `%${filters.city}%`));
+    }
+    if (filters.postalCode) {
+      conditions.push(eq(properties.postalCode, filters.postalCode));
+    }
+    if (filters.minPrice !== undefined) {
+      conditions.push(gte(properties.listPrice, String(filters.minPrice)));
+    }
+    if (filters.maxPrice !== undefined) {
+      conditions.push(lte(properties.listPrice, String(filters.maxPrice)));
+    }
+    if (filters.minBeds !== undefined) {
+      conditions.push(gte(properties.bedroomsTotal, filters.minBeds));
+    }
+    if (filters.minBaths !== undefined) {
+      conditions.push(gte(properties.bathroomsTotalInteger, filters.minBaths));
+    }
+    if (filters.minSqft !== undefined) {
+      conditions.push(gte(properties.livingArea, String(filters.minSqft)));
+    }
+    if (filters.maxSqft !== undefined) {
+      conditions.push(lte(properties.livingArea, String(filters.maxSqft)));
+    }
+    if (filters.subdivision) {
+      conditions.push(ilike(properties.subdivision, `%${filters.subdivision}%`));
+    }
+    if (filters.status) {
+      conditions.push(eq(properties.standardStatus, filters.status));
+    }
+
+    const effectiveLimit = filters.limit ?? 100;
+
+    return await this.db
+      .select()
+      .from(properties)
+      .where(and(...conditions))
+      .limit(effectiveLimit);
   }
 
   async getMedia(id: string): Promise<Media | undefined> {

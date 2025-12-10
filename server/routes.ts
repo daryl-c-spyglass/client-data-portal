@@ -209,7 +209,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/search", async (req, res) => {
     try {
       const {
-        status = 'active',
+        status,
+        statuses, // Comma-separated list of statuses (active,under_contract,closed)
         postalCode,
         subdivision,
         city,
@@ -228,6 +229,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
       } = req.query as Record<string, string | undefined>;
 
       const parsedLimit = Math.min(parseInt(limit || '50', 10), 200);
+
+      // Parse statuses - support both single status and comma-separated list
+      let statusList: string[] = [];
+      if (statuses) {
+        statusList = statuses.split(',').map(s => s.trim().toLowerCase());
+      } else if (status) {
+        statusList = [status.toLowerCase()];
+      } else {
+        statusList = ['active'];
+      }
 
       // Normalize results to consistent format
       interface NormalizedProperty {
@@ -250,31 +261,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
         daysOnMarket: number | null;
       }
 
-      let results: NormalizedProperty[] = [];
-
-      if (status === 'active' || status === 'under_contract') {
-        // Use Repliers API for active listings
+      let allResults: NormalizedProperty[] = [];
+      
+      // Helper function to fetch from Repliers
+      const fetchFromRepliers = async (repliersStatus: string): Promise<NormalizedProperty[]> => {
         if (!isRepliersConfigured()) {
-          res.status(503).json({ error: 'Repliers API not configured' });
-          return;
+          return [];
         }
-
         const repliersClient = getRepliersClient();
         if (!repliersClient) {
-          res.status(503).json({ error: 'Repliers client not available' });
-          return;
+          return [];
         }
 
-        const repliersStatus = status === 'active' ? 'A' : 'U';
-        // Check if we need server-side filtering for parameters Repliers doesn't support
         const needsServerSideFiltering = minLotAcres || maxLotAcres || stories || minYearBuilt || maxYearBuilt;
-        // Fetch more results if we need to filter by subdivision or other server-side params
         const effectiveLimit = (subdivision || needsServerSideFiltering) ? Math.min(parsedLimit * 10, 200) : parsedLimit;
+        
         const response = await repliersClient.searchListings({
           status: repliersStatus,
           postalCode: postalCode,
           city: city,
-          neighborhood: subdivision, // Repliers uses 'neighborhood' for MLS subdivision
+          neighborhood: subdivision,
           minPrice: minPrice ? parseInt(minPrice, 10) : undefined,
           maxPrice: maxPrice ? parseInt(maxPrice, 10) : undefined,
           minBeds: bedsMin ? parseInt(bedsMin, 10) : undefined,
@@ -284,22 +290,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
           resultsPerPage: effectiveLimit,
         });
 
-        results = (response.listings || []).map((listing: any, idx: number) => {
+        return (response.listings || []).map((listing: any) => {
           const addr = listing.address || {};
           const details = listing.details || {};
           const map = listing.map || {};
-
-          // Debug: Log raw beds/baths data from Repliers for first 3 listings
-          if (idx < 3) {
-            console.log(`🏠 [${idx}] Repliers listing ${listing.mlsNumber}:`, {
-              'details.bedrooms': details.bedrooms,
-              'listing.bedroomsTotal': listing.bedroomsTotal,
-              'details.bathrooms': details.bathrooms,
-              'listing.bathroomsTotalInteger': listing.bathroomsTotalInteger,
-              'details.numBedrooms': details.numBedrooms,
-              'details.numBathrooms': details.numBathrooms,
-            });
-          }
 
           const fullAddress = [
             addr.streetNumber,
@@ -308,7 +302,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
             addr.unitNumber ? `#${addr.unitNumber}` : null,
           ].filter(Boolean).join(' ');
 
-          // Map Repliers status codes to MLS-standard values
           const statusMap: Record<string, string> = {
             'A': 'Active',
             'U': 'Active Under Contract',
@@ -317,22 +310,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
           };
           const mappedStatus = statusMap[listing.status] || listing.status || 'Active';
 
-          // Helper to get numeric value
           const toNumber = (val: any): number | null => {
             if (val == null) return null;
             const num = Number(val);
             return isNaN(num) ? null : num;
           };
 
-          // Get beds/baths - Repliers uses numBedrooms/numBathrooms or bedrooms/bathrooms
           const bedsRaw = details.numBedrooms ?? details.bedrooms ?? listing.bedroomsTotal;
           const beds = toNumber(bedsRaw);
-          
-          // Get baths - handle array format from Repliers
           const bathsRaw = details.numBathrooms ?? details.bathrooms ?? listing.bathroomsTotalInteger;
           const baths = Array.isArray(bathsRaw) && bathsRaw.length > 0 ? toNumber(bathsRaw[0]) : toNumber(bathsRaw);
 
-          // Get photos from images or photos field (Repliers uses 'images')
           const rawPhotos = listing.images || listing.photos || [];
           const photos = rawPhotos.map((img: string) => 
             img.startsWith('http') ? img : `https://cdn.repliers.io/${img}`
@@ -363,94 +351,34 @@ export async function registerRoutes(app: Express): Promise<Server> {
             closeDate: listing.soldDate || listing.closeDate || null,
             description: details.description || listing.publicRemarks || null,
             stories: toNumber((details as any).stories || (listing as any).storiesTotal || (listing as any).stories),
-          };
+          } as any;
         });
+      };
+      
+      // Helper function to fetch from database (closed/sold)
+      const fetchFromDatabase = async (): Promise<NormalizedProperty[]> => {
+        const filters: any = {};
+        if (city) filters.city = city;
+        if (postalCode) filters.postalCode = postalCode;
+        if (minPrice) filters.minPrice = parseInt(minPrice, 10);
+        if (maxPrice) filters.maxPrice = parseInt(maxPrice, 10);
+        if (bedsMin) filters.minBeds = parseInt(bedsMin, 10);
+        if (bathsMin) filters.minBaths = parseInt(bathsMin, 10);
+        if (minSqft) filters.minSqft = parseInt(minSqft, 10);
+        if (maxSqft) filters.maxSqft = parseInt(maxSqft, 10);
+        if (subdivision) filters.subdivision = subdivision;
+        filters.status = 'Closed';
+        filters.limit = parsedLimit * 3; // Fetch more for server-side filtering
 
-        // Server-side subdivision filter (Repliers doesn't support subdivision param directly)
-        if (subdivision) {
-          const subdivisionLower = subdivision.toLowerCase();
-          results = results.filter(p => 
-            p.subdivision?.toLowerCase().includes(subdivisionLower)
-          );
-        }
-
-        // Server-side sqft filter (Repliers API may not support directly)
-        if (minSqft) {
-          const min = parseInt(minSqft, 10);
-          results = results.filter(p => p.livingArea !== null && p.livingArea >= min);
-        }
-        if (maxSqft) {
-          const max = parseInt(maxSqft, 10);
-          results = results.filter(p => p.livingArea !== null && p.livingArea <= max);
-        }
+        const dbResults = await storage.searchProperties(filters);
         
-        // Server-side lot size filter (in acres)
-        if (minLotAcres) {
-          const minAcres = parseFloat(minLotAcres);
-          results = results.filter((p: any) => {
-            const acres = p.lotSizeAcres || (p.lotSizeSquareFeet ? p.lotSizeSquareFeet / 43560 : null);
-            return acres !== null && acres >= minAcres;
-          });
-        }
-        if (maxLotAcres) {
-          const maxAcres = parseFloat(maxLotAcres);
-          results = results.filter((p: any) => {
-            const acres = p.lotSizeAcres || (p.lotSizeSquareFeet ? p.lotSizeSquareFeet / 43560 : null);
-            return acres !== null && acres <= maxAcres;
-          });
-        }
-        
-        // Server-side year built filter
-        if (minYearBuilt) {
-          const minYear = parseInt(minYearBuilt, 10);
-          results = results.filter(p => p.yearBuilt !== null && p.yearBuilt >= minYear);
-        }
-        if (maxYearBuilt) {
-          const maxYear = parseInt(maxYearBuilt, 10);
-          results = results.filter(p => p.yearBuilt !== null && p.yearBuilt <= maxYear);
-        }
-        
-        // Server-side stories filter (would need to map from property data if available)
-        if (stories) {
-          const storiesNum = parseInt(stories, 10);
-          results = results.filter((p: any) => {
-            const propStories = p.stories || p.storiesTotal;
-            if (propStories === null || propStories === undefined) return true; // Include if unknown
-            if (storiesNum === 3) return propStories >= 3; // 3+ stories
-            return propStories === storiesNum;
-          });
-        }
-
-      } else if (status === 'closed' || status === 'sold') {
-        // Note: Repliers API only supports status 'A' (Active) and 'U' (Under Contract)
-        // Repliers does NOT support status 'S' (Sold) - it returns a 400 error
-        // Therefore, closed/sold listings must come from the local PostgreSQL database
-        // which contains historical MLS Grid data
-        console.log('📦 Using local database for closed/sold listings (Repliers does not support sold status)...');
-        
-        const dbResults = await storage.getProperties({
-          status: ['Closed'],
-          zipCodes: postalCode ? [postalCode] : undefined,
-          subdivisions: subdivision ? [subdivision] : undefined,
-          cities: city ? [city] : undefined,
-          listPriceMin: minPrice ? parseInt(minPrice, 10) : undefined,
-          listPriceMax: maxPrice ? parseInt(maxPrice, 10) : undefined,
-          bedroomsMin: bedsMin ? parseInt(bedsMin, 10) : undefined,
-          fullBathsMin: bathsMin ? parseInt(bathsMin, 10) : undefined,
-          livingArea: (minSqft || maxSqft) ? {
-            min: minSqft ? parseInt(minSqft, 10) : undefined,
-            max: maxSqft ? parseInt(maxSqft, 10) : undefined,
-          } : undefined,
-        }, parsedLimit, 0);
-
-        // Helper to get numeric value
         const toNum = (val: any): number | null => {
           if (val == null) return null;
           const num = Number(val);
           return isNaN(num) ? null : num;
         };
 
-        results = dbResults.map((p: any) => ({
+        let results = dbResults.map((p: any) => ({
           id: p.listingId || p.id,
           address: p.unparsedAddress || [p.streetNumber, p.streetName, p.streetSuffix].filter(Boolean).join(' '),
           city: p.city || '',
@@ -475,58 +403,100 @@ export async function registerRoutes(app: Express): Promise<Server> {
           closeDate: p.closeDate || null,
           description: p.publicRemarks || null,
           stories: toNum(p.stories) || toNum(p.storiesTotal),
-        }));
+        })) as any[];
+
+        return results;
+      };
+
+      // Apply server-side filters
+      const applyFilters = (results: any[]): any[] => {
+        let filtered = results;
         
-        // Apply additional filters for closed listings
         if (minLotAcres) {
           const minAcres = parseFloat(minLotAcres);
-          results = results.filter((p: any) => {
+          filtered = filtered.filter((p: any) => {
             const acres = p.lotSizeAcres || (p.lotSizeSquareFeet ? p.lotSizeSquareFeet / 43560 : null);
             return acres !== null && acres >= minAcres;
           });
         }
         if (maxLotAcres) {
           const maxAcres = parseFloat(maxLotAcres);
-          results = results.filter((p: any) => {
+          filtered = filtered.filter((p: any) => {
             const acres = p.lotSizeAcres || (p.lotSizeSquareFeet ? p.lotSizeSquareFeet / 43560 : null);
             return acres !== null && acres <= maxAcres;
           });
         }
         if (minYearBuilt) {
           const minYear = parseInt(minYearBuilt, 10);
-          results = results.filter(p => p.yearBuilt !== null && p.yearBuilt >= minYear);
+          filtered = filtered.filter(p => p.yearBuilt !== null && p.yearBuilt >= minYear);
         }
         if (maxYearBuilt) {
           const maxYear = parseInt(maxYearBuilt, 10);
-          results = results.filter(p => p.yearBuilt !== null && p.yearBuilt <= maxYear);
+          filtered = filtered.filter(p => p.yearBuilt !== null && p.yearBuilt <= maxYear);
         }
         if (stories) {
           const storiesNum = parseInt(stories, 10);
-          results = results.filter((p: any) => {
+          filtered = filtered.filter((p: any) => {
             if (p.stories === null || p.stories === undefined) return true;
             if (storiesNum === 3) return p.stories >= 3;
             return p.stories === storiesNum;
           });
         }
+        if (subdivision) {
+          const subdivisionLower = subdivision.toLowerCase();
+          filtered = filtered.filter(p => 
+            p.subdivision?.toLowerCase().includes(subdivisionLower)
+          );
+        }
+        if (minSqft) {
+          const min = parseInt(minSqft, 10);
+          filtered = filtered.filter(p => p.livingArea !== null && p.livingArea >= min);
+        }
+        if (maxSqft) {
+          const max = parseInt(maxSqft, 10);
+          filtered = filtered.filter(p => p.livingArea !== null && p.livingArea <= max);
+        }
         
-        console.log(`📦 Database returned ${results.length} closed/sold listings`);
+        return filtered;
+      };
 
-      } else {
-        res.status(400).json({ error: 'Invalid status. Use: active, under_contract, closed, or sold' });
-        return;
+      // Fetch from each selected status source
+      const fetchPromises: Promise<NormalizedProperty[]>[] = [];
+      
+      for (const statusType of statusList) {
+        if (statusType === 'active') {
+          fetchPromises.push(fetchFromRepliers('A'));
+        } else if (statusType === 'under_contract') {
+          fetchPromises.push(fetchFromRepliers('U'));
+        } else if (statusType === 'closed' || statusType === 'sold') {
+          fetchPromises.push(fetchFromDatabase());
+        }
       }
 
+      // Wait for all fetches to complete
+      const resultsArrays = await Promise.all(fetchPromises);
+      
+      // Combine and apply filters
+      for (const results of resultsArrays) {
+        allResults = allResults.concat(applyFilters(results));
+      }
+
+      // Remove duplicates (by id) and limit
+      const uniqueResults = Array.from(new Map(allResults.map(r => [r.id, r])).values());
+      const finalResults = uniqueResults.slice(0, parsedLimit);
+
+      console.log(`📦 Multi-status search returned ${finalResults.length} listings from ${statusList.join(', ')}`);
+
       res.json({
-        properties: results,
-        count: results.length,
-        status: status,
+        properties: finalResults,
+        count: finalResults.length,
+        statuses: statusList,
       });
     } catch (error) {
       console.error('Unified search error:', error);
       res.status(500).json({ error: 'Search failed' });
     }
   });
-
   // Property routes
   app.get("/api/properties/search", async (req, res) => {
     try {

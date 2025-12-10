@@ -7,6 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Checkbox } from "@/components/ui/checkbox";
 import { X, Plus, TrendingUp, Search, Loader2, AlertCircle, Home, MousePointerClick } from "lucide-react";
 import type { Property } from "@shared/schema";
 
@@ -35,7 +36,7 @@ export function CMABuilder({ onCreateCMA }: CMABuilderProps) {
   const [searchSubdivision, setSearchSubdivision] = useState("");
   const [searchMinBeds, setSearchMinBeds] = useState("");
   const [searchMaxPrice, setSearchMaxPrice] = useState("");
-  const [searchStatus, setSearchStatus] = useState("Active");
+  const [searchStatuses, setSearchStatuses] = useState<string[]>(["active"]);
   const [searchEnabled, setSearchEnabled] = useState(false);
   const [searchMinSqft, setSearchMinSqft] = useState("");
   const [searchMaxSqft, setSearchMaxSqft] = useState("");
@@ -53,7 +54,7 @@ export function CMABuilder({ onCreateCMA }: CMABuilderProps) {
     setSearchSubdivision("");
     setSearchMinBeds("");
     setSearchMaxPrice("");
-    setSearchStatus("Active");
+    setSearchStatuses(["active"]);
     setSearchEnabled(false);
     setSearchMinSqft("");
     setSearchMaxSqft("");
@@ -66,15 +67,9 @@ export function CMABuilder({ onCreateCMA }: CMABuilderProps) {
 
   const buildSearchQuery = () => {
     const params = new URLSearchParams();
-    // Use unified search status values: active, under_contract, closed
-    if (searchStatus) {
-      const statusMap: Record<string, string> = {
-        'Active': 'active',
-        'Under Contract': 'under_contract',
-        'Closed': 'closed',
-        'Sold': 'closed'
-      };
-      params.set('status', statusMap[searchStatus] || 'active');
+    // Support multiple statuses as comma-separated values
+    if (searchStatuses.length > 0) {
+      params.set('statuses', searchStatuses.join(','));
     }
     if (searchCity) params.set('city', searchCity.trim());
     if (searchSubdivision) params.set('subdivision', searchSubdivision.trim());
@@ -89,6 +84,18 @@ export function CMABuilder({ onCreateCMA }: CMABuilderProps) {
     if (searchMaxYearBuilt) params.set('maxYearBuilt', searchMaxYearBuilt);
     params.set('limit', '20');
     return params.toString();
+  };
+  
+  const toggleStatus = (status: string) => {
+    setSearchStatuses(prev => {
+      if (prev.includes(status)) {
+        // Don't allow deselecting all statuses
+        if (prev.length === 1) return prev;
+        return prev.filter(s => s !== status);
+      } else {
+        return [...prev, status];
+      }
+    });
   };
 
   const { data: searchResponse, isLoading, isError, error, refetch } = useQuery<UnifiedSearchResponse>({
@@ -248,16 +255,35 @@ export function CMABuilder({ onCreateCMA }: CMABuilderProps) {
             </div>
             <div className="space-y-2">
               <Label>Status</Label>
-              <Select value={searchStatus} onValueChange={setSearchStatus}>
-                <SelectTrigger data-testid="select-status">
-                  <SelectValue placeholder="Select status" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="Active">Active</SelectItem>
-                  <SelectItem value="Under Contract">Under Contract</SelectItem>
-                  <SelectItem value="Closed">Closed/Sold</SelectItem>
-                </SelectContent>
-              </Select>
+              <div className="flex flex-wrap gap-4 pt-2">
+                <div className="flex items-center space-x-2">
+                  <Checkbox 
+                    id="status-active"
+                    checked={searchStatuses.includes("active")}
+                    onCheckedChange={() => toggleStatus("active")}
+                    data-testid="checkbox-status-active"
+                  />
+                  <label htmlFor="status-active" className="text-sm cursor-pointer">Active</label>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <Checkbox 
+                    id="status-under-contract"
+                    checked={searchStatuses.includes("under_contract")}
+                    onCheckedChange={() => toggleStatus("under_contract")}
+                    data-testid="checkbox-status-under-contract"
+                  />
+                  <label htmlFor="status-under-contract" className="text-sm cursor-pointer">Under Contract</label>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <Checkbox 
+                    id="status-closed"
+                    checked={searchStatuses.includes("closed")}
+                    onCheckedChange={() => toggleStatus("closed")}
+                    data-testid="checkbox-status-closed"
+                  />
+                  <label htmlFor="status-closed" className="text-sm cursor-pointer">Sold/Closed</label>
+                </div>
+              </div>
             </div>
           </div>
           <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4">
