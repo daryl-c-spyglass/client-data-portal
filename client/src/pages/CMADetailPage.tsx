@@ -5,7 +5,8 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
-import { ArrowLeft, Share2, Link as LinkIcon, Copy, Check, Trash2 } from "lucide-react";
+import { ArrowLeft, Share2, Link as LinkIcon, Copy, Check, Trash2, ExternalLink } from "lucide-react";
+import { SiFacebook, SiX, SiInstagram, SiTiktok } from "react-icons/si";
 import { Link } from "wouter";
 import { CMAReport } from "@/components/CMAReport";
 import { useToast } from "@/hooks/use-toast";
@@ -51,10 +52,20 @@ export default function CMADetailPage() {
   const id = params?.id;
   const { toast } = useToast();
   const [shareDialogOpen, setShareDialogOpen] = useState(false);
+  const [emailShareDialogOpen, setEmailShareDialogOpen] = useState(false);
   const [notesDialogOpen, setNotesDialogOpen] = useState(false);
   const [statsDialogOpen, setStatsDialogOpen] = useState(false);
   const [notes, setNotes] = useState("");
   const [copied, setCopied] = useState(false);
+  
+  // Email share form state
+  const [emailForm, setEmailForm] = useState({
+    yourName: '',
+    yourEmail: '',
+    friendName: '',
+    friendEmail: '',
+    comments: 'Check out this CMA report I created for you.',
+  });
   
   // Visible metrics state - all enabled by default
   const [visibleMetrics, setVisibleMetrics] = useState<StatMetricKey[]>(
@@ -190,10 +201,69 @@ export default function CMADetailPage() {
   };
 
   const handleSave = () => {
+    // CMA is already saved - just show confirmation
     toast({
       title: "CMA Saved",
       description: "Your CMA has been saved successfully.",
     });
+  };
+
+  const emailShareMutation = useMutation({
+    mutationFn: async (data: typeof emailForm) => {
+      // First ensure we have a public link
+      if (!cma?.publicLink) {
+        await shareMutation.mutateAsync();
+      }
+      // Then send the email
+      const response = await fetch(`/api/cmas/${id}/email-share`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          senderName: data.yourName,
+          senderEmail: data.yourEmail,
+          recipientName: data.friendName,
+          recipientEmail: data.friendEmail,
+          message: data.comments,
+        }),
+      });
+      if (!response.ok) throw new Error('Failed to send email');
+      return response.json();
+    },
+    onSuccess: () => {
+      setEmailShareDialogOpen(false);
+      toast({
+        title: "CMA Shared",
+        description: "Your CMA has been sent via email.",
+      });
+      // Reset form
+      setEmailForm({
+        yourName: '',
+        yourEmail: '',
+        friendName: '',
+        friendEmail: '',
+        comments: 'Check out this CMA report I created for you.',
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to send email. Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleEmailShare = () => {
+    // Validate form
+    if (!emailForm.yourName || !emailForm.yourEmail || !emailForm.friendName || !emailForm.friendEmail) {
+      toast({
+        title: "Required fields missing",
+        description: "Please fill in all required fields.",
+        variant: "destructive",
+      });
+      return;
+    }
+    emailShareMutation.mutate(emailForm);
   };
 
   const handleModifySearch = () => {
@@ -354,6 +424,73 @@ export default function CMADetailPage() {
                       Link expires: {new Date(cma.expiresAt).toLocaleDateString()}
                     </p>
                   )}
+                  
+                  {/* Social Media Sharing */}
+                  <div className="space-y-2 pt-4 border-t">
+                    <Label>Share on Social Media</Label>
+                    <div className="flex gap-2 flex-wrap">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          const url = encodeURIComponent(getShareUrl());
+                          const text = encodeURIComponent(`Check out this CMA report: ${cma.name}`);
+                          window.open(`https://www.facebook.com/sharer/sharer.php?u=${url}`, '_blank', 'width=600,height=400');
+                        }}
+                        data-testid="button-share-facebook"
+                      >
+                        <SiFacebook className="w-4 h-4 mr-2" />
+                        Facebook
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          const url = encodeURIComponent(getShareUrl());
+                          const text = encodeURIComponent(`Check out this CMA report: ${cma.name}`);
+                          window.open(`https://twitter.com/intent/tweet?url=${url}&text=${text}`, '_blank', 'width=600,height=400');
+                        }}
+                        data-testid="button-share-x"
+                      >
+                        <SiX className="w-4 h-4 mr-2" />
+                        X
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          handleCopyLink();
+                          toast({
+                            title: "Link copied for Instagram",
+                            description: "Paste this link in your Instagram bio or story.",
+                          });
+                        }}
+                        data-testid="button-share-instagram"
+                      >
+                        <SiInstagram className="w-4 h-4 mr-2" />
+                        Instagram
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          handleCopyLink();
+                          toast({
+                            title: "Link copied for TikTok",
+                            description: "Paste this link in your TikTok bio.",
+                          });
+                        }}
+                        data-testid="button-share-tiktok"
+                      >
+                        <SiTiktok className="w-4 h-4 mr-2" />
+                        TikTok
+                      </Button>
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      Instagram and TikTok: Link copied to clipboard. Paste in your bio or story.
+                    </p>
+                  </div>
+                  
                   <div className="flex justify-between pt-4">
                     <Button
                       variant="destructive"
@@ -399,6 +536,7 @@ export default function CMADetailPage() {
         notes={cma.notes}
         reportTitle={cma.name}
         onSave={handleSave}
+        onShareCMA={() => setEmailShareDialogOpen(true)}
         onPublicLink={() => setShareDialogOpen(true)}
         onModifySearch={handleModifySearch}
         onModifyStats={handleModifyStats}
@@ -482,6 +620,89 @@ export default function CMADetailPage() {
               data-testid="button-apply-stats"
             >
               Apply
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Email Share CMA Dialog */}
+      <Dialog open={emailShareDialogOpen} onOpenChange={setEmailShareDialogOpen}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Email CMA to a Friend</DialogTitle>
+            <DialogDescription>
+              Share this CMA report with your client via email.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="your-name">Your Name *</Label>
+                <Input
+                  id="your-name"
+                  placeholder="Your Name"
+                  value={emailForm.yourName}
+                  onChange={(e) => setEmailForm(prev => ({ ...prev, yourName: e.target.value }))}
+                  data-testid="input-your-name"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="friend-name">Friend's Name *</Label>
+                <Input
+                  id="friend-name"
+                  placeholder="Friend's Name"
+                  value={emailForm.friendName}
+                  onChange={(e) => setEmailForm(prev => ({ ...prev, friendName: e.target.value }))}
+                  data-testid="input-friend-name"
+                />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="your-email">Your Email Address *</Label>
+                <Input
+                  id="your-email"
+                  type="email"
+                  placeholder="name@website.com"
+                  value={emailForm.yourEmail}
+                  onChange={(e) => setEmailForm(prev => ({ ...prev, yourEmail: e.target.value }))}
+                  data-testid="input-your-email"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="friend-email">Friend's Email Address *</Label>
+                <Input
+                  id="friend-email"
+                  type="email"
+                  placeholder="name@website.com"
+                  value={emailForm.friendEmail}
+                  onChange={(e) => setEmailForm(prev => ({ ...prev, friendEmail: e.target.value }))}
+                  data-testid="input-friend-email"
+                />
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="comments">Comments</Label>
+              <Textarea
+                id="comments"
+                placeholder="Add a personal message..."
+                value={emailForm.comments}
+                onChange={(e) => setEmailForm(prev => ({ ...prev, comments: e.target.value }))}
+                rows={3}
+                data-testid="textarea-email-comments"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEmailShareDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button 
+              onClick={handleEmailShare}
+              disabled={emailShareMutation.isPending}
+              data-testid="button-send-email-share"
+            >
+              {emailShareMutation.isPending ? 'Sending...' : 'Share'}
             </Button>
           </DialogFooter>
         </DialogContent>

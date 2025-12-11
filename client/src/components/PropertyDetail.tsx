@@ -59,16 +59,45 @@ export function PropertyDetail({
   const [linkCopied, setLinkCopied] = useState(false);
   const { toast } = useToast();
   const autoAdvanceRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const pauseTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  useEffect(() => {
+  // Function to start auto-advance
+  const startAutoAdvance = () => {
+    if (autoAdvanceRef.current) {
+      clearInterval(autoAdvanceRef.current);
+    }
     if (media.length > 1) {
       autoAdvanceRef.current = setInterval(() => {
         setCurrentImageIndex((prev) => (prev + 1) % media.length);
       }, 3000);
     }
+  };
+
+  // Function to pause and resume auto-advance after manual navigation
+  const pauseAndResumeAutoAdvance = () => {
+    // Clear existing timers
+    if (autoAdvanceRef.current) {
+      clearInterval(autoAdvanceRef.current);
+      autoAdvanceRef.current = null;
+    }
+    if (pauseTimeoutRef.current) {
+      clearTimeout(pauseTimeoutRef.current);
+    }
+    
+    // Resume after 3 seconds
+    pauseTimeoutRef.current = setTimeout(() => {
+      startAutoAdvance();
+    }, 3000);
+  };
+
+  useEffect(() => {
+    startAutoAdvance();
     return () => {
       if (autoAdvanceRef.current) {
         clearInterval(autoAdvanceRef.current);
+      }
+      if (pauseTimeoutRef.current) {
+        clearTimeout(pauseTimeoutRef.current);
       }
     };
   }, [media.length]);
@@ -85,10 +114,12 @@ export function PropertyDetail({
 
   const nextImage = () => {
     setCurrentImageIndex((prev) => (prev + 1) % media.length);
+    pauseAndResumeAutoAdvance();
   };
 
   const prevImage = () => {
     setCurrentImageIndex((prev) => (prev - 1 + media.length) % media.length);
+    pauseAndResumeAutoAdvance();
   };
 
   const handleScheduleViewing = () => {
@@ -193,7 +224,10 @@ export function PropertyDetail({
               {media.slice(0, 6).map((m, idx) => (
                 <button
                   key={m.id}
-                  onClick={() => setCurrentImageIndex(idx)}
+                  onClick={() => {
+                    setCurrentImageIndex(idx);
+                    pauseAndResumeAutoAdvance();
+                  }}
                   className={`aspect-square rounded-md overflow-hidden border-2 ${
                     idx === currentImageIndex ? 'border-primary' : 'border-transparent'
                   }`}

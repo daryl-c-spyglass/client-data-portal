@@ -1120,6 +1120,117 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Email share CMA to a friend
+  app.post("/api/cmas/:id/email-share", async (req, res) => {
+    try {
+      const cma = await storage.getCma(req.params.id);
+      if (!cma) {
+        res.status(404).json({ error: "CMA not found" });
+        return;
+      }
+
+      const { senderName, senderEmail, recipientName, recipientEmail, message } = req.body;
+
+      if (!senderName || !senderEmail || !recipientName || !recipientEmail) {
+        res.status(400).json({ error: "All fields are required" });
+        return;
+      }
+
+      // Ensure CMA has a public link
+      if (!cma.publicLink) {
+        res.status(400).json({ error: "CMA must have a public link to share" });
+        return;
+      }
+
+      const shareUrl = `${req.protocol}://${req.get('host')}/share/cma/${cma.publicLink}`;
+
+      // Get property data for summary
+      const properties = (cma.propertiesData as any[]) || [];
+      const avgPrice = properties.length > 0 
+        ? properties.reduce((sum, p) => sum + (Number(p.closePrice) || Number(p.listPrice) || 0), 0) / properties.length
+        : 0;
+
+      // Generate email HTML
+      const htmlContent = `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+          <h2 style="color: #F37216;">CMA Report Shared with You</h2>
+          <p>Hi ${recipientName},</p>
+          <p>${senderName} has shared a Comparative Market Analysis with you.</p>
+          
+          ${message ? `<p style="background-color: #f5f5f5; padding: 15px; border-radius: 8px; font-style: italic;">${message}</p>` : ''}
+          
+          <div style="background: linear-gradient(135deg, #F37216 0%, #e66100 100%); color: white; padding: 20px; border-radius: 12px; margin: 20px 0;">
+            <h3 style="margin: 0 0 10px 0; color: white;">${cma.name}</h3>
+            <p style="margin: 5px 0; color: white;">${properties.length} Comparable Properties</p>
+            ${avgPrice > 0 ? `<p style="margin: 5px 0; font-size: 24px; font-weight: bold; color: white;">Avg: $${Math.round(avgPrice).toLocaleString()}</p>` : ''}
+          </div>
+          
+          <a href="${shareUrl}" style="display: inline-block; background-color: #F37216; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold;">View Full CMA Report</a>
+          
+          <p style="margin-top: 30px; font-size: 12px; color: #666;">
+            This email was sent by ${senderName} (${senderEmail}) via the MLS Grid IDX Platform.
+          </p>
+        </div>
+      `;
+
+      const textContent = `
+CMA Report Shared with You
+
+Hi ${recipientName},
+
+${senderName} has shared a Comparative Market Analysis with you.
+
+${message ? `"${message}"` : ''}
+
+CMA: ${cma.name}
+${properties.length} Comparable Properties
+${avgPrice > 0 ? `Average Price: $${Math.round(avgPrice).toLocaleString()}` : ''}
+
+View the full report: ${shareUrl}
+
+This email was sent by ${senderName} (${senderEmail}) via the MLS Grid IDX Platform.
+      `;
+
+      // Send via SendGrid if configured, otherwise log
+      const SENDGRID_API_KEY = process.env.SENDGRID_API_KEY;
+      const FROM_EMAIL = process.env.FROM_EMAIL || "updates@mlsgrid-idx.com";
+      const FROM_NAME = process.env.FROM_NAME || "MLS Grid IDX Platform";
+
+      if (SENDGRID_API_KEY) {
+        const response = await fetch('https://api.sendgrid.com/v3/mail/send', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${SENDGRID_API_KEY}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            personalizations: [{ to: [{ email: recipientEmail, name: recipientName }] }],
+            from: { email: FROM_EMAIL, name: FROM_NAME },
+            reply_to: { email: senderEmail, name: senderName },
+            subject: `${senderName} shared a CMA with you: ${cma.name}`,
+            content: [
+              { type: 'text/plain', value: textContent },
+              { type: 'text/html', value: htmlContent },
+            ],
+          }),
+        });
+
+        if (!response.ok) {
+          throw new Error('Failed to send email via SendGrid');
+        }
+      } else {
+        console.log('📧 [CMA Email Share] SendGrid not configured. Email would have been sent:');
+        console.log(`   To: ${recipientEmail}`);
+        console.log(`   Subject: ${senderName} shared a CMA with you: ${cma.name}`);
+      }
+
+      res.json({ success: true, message: "CMA shared successfully" });
+    } catch (error) {
+      console.error("Error sharing CMA via email:", error);
+      res.status(500).json({ error: "Failed to share CMA" });
+    }
+  });
+
   // Public CMA access via share token (no auth required, but sanitized response)
   app.get("/api/share/cma/:token", async (req, res) => {
     try {

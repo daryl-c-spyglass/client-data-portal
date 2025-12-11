@@ -1,0 +1,283 @@
+You are working on our CMA web app that uses MLS Grid data. 
+
+Important:
+- Go through the tasks BELOW **one by one, in order**, and do NOT skip any.
+- After finishing ALL tasks and tests, write a **detailed final report** describing:
+  - What you changed for each bullet item.
+  - What tests you ran.
+  - The results of those tests (pass/fail + notes).
+
+====================================================
+1) CMA list ordering and sort options
+====================================================
+Context:
+- In the CMAs section there is a list of CMA results (around 34 items).
+
+Requirements:
+- By default, order this list **newest to oldest** based on:
+  - Date modified (preferred), or
+  - Date created (fallback if modified date not available).
+- Add a control that lets the user change sort order:
+  - Newest → Oldest
+  - Oldest → Newest (optional but good)
+  - Alphabetical A–Z by CMA name/title
+  - Alphabetical Z–A by CMA name/title
+- Make sure:
+  - The default is “Newest to Oldest”.
+  - The control’s current selection is clearly indicated.
+  - Sorting is stable and works even when there are many CMAs.
+
+Testing:
+- With multiple CMAs having different create/modify dates and different names:
+  - Confirm default order is newest → oldest.
+  - Confirm each alternative sort option reorders correctly.
+
+====================================================
+2) Tooltips for “Subject Property, Comparable Properties & Analysis”
+====================================================
+Context:
+- In Create CMA, there are sections: “Subject Property”, “Comparable Properties”, and “Analysis”.
+
+Requirements:
+- For each section label, add a small information icon (e.g. lowercase “i” or standard info icon) placed next to the section header.
+- On hover (desktop) or tap (mobile), show a tooltip explaining that section’s purpose, e.g.:
+  - Subject Property: brief description of what the user should enter.
+  - Comparable Properties: explanation of selecting comps.
+  - Analysis: explanation of how the analysis is generated/used.
+- Ensure:
+  - Tooltip text is **fully visible** (no clipping, no overflow hidden).
+  - Tooltip uses a high z-index and is not cut off by parent containers.
+  - Works both on desktop and mobile.
+
+Testing:
+- Hover each info icon and confirm full text shows.
+- Confirm tooltips still display correctly in various viewport sizes.
+
+====================================================
+3) Search result UI – Georgetown / Oaks at San Gabriel / Under Contract
+====================================================
+Context:
+- On search result, test with:
+  - City: Georgetown
+  - Subdivision: Oaks at San Gabriel
+  - Status: Under Contract
+
+Requirements:
+- When you open (click) one property from these results:
+  - There is currently a grey area on the lower left of the listing image/section; **remove this grey area** so the layout is clean.
+
+Image navigation behavior (UPDATED):
+- Keep the automatic carousel active:
+  - Images should auto-advance every **3 seconds** by default.
+- Allow the user to manually navigate:
+  - Backward and forward arrows/buttons must still be present.
+  - If the user clicks backward/forward, the carousel should move instantly to the requested image.
+- After a manual click:
+  - The carousel should **pause for 3 seconds**, then resume automatic sliding.
+- Ensure:
+  - No grey box appears on the lower-left area of the listing image.
+  - Navigation is smooth and does not conflict with auto-slide timing.
+  - Manual controls work on desktop and mobile (tap).
+
+Testing:
+- Run the exact search (Georgetown / Oaks at San Gabriel / Under Contract).
+- Open a listing and confirm:
+  - Grey block at lower-left is gone.
+  - Photos auto-advance every 3 seconds.
+  - Clicking arrows moves immediately to the next/previous photo.
+  - After manual navigation, auto-advance resumes after about 3 seconds.
+
+====================================================
+4) CMA share icon – social media sharing
+====================================================
+Context:
+- After generating a CMA, there is a share icon in the upper right that currently only produces a shareable link.
+
+Requirements:
+- Keep the existing shareable link functionality.
+- Extend it so users can share to:
+  - Facebook
+  - Instagram
+  - X (formerly Twitter)
+  - TikTok
+- Use each platform’s appropriate share mechanism:
+  - For web, typically URL-based share for Facebook/X; Instagram/TikTok might be link copying or the closest viable share flow.
+- The CMA public/share URL should be the link used for social sharing.
+- UI:
+  - When clicking the share icon, show a dropdown/menu or modal with:
+    - “Copy share link”
+    - “Share to Facebook”
+    - “Share to X”
+    - “Share to Instagram”
+    - “Share to TikTok”
+
+Testing:
+- Click each social share option:
+  - Confirm it opens the correct share URL/flow with the CMA link prefilled where possible.
+  - Confirm “Copy share link” copies the correct URL.
+
+====================================================
+5) Save + Send behaviour – split Save and Share CMA (email flow)
+====================================================
+Context:
+- Currently there is a “Save+Send”-style behaviour.
+
+Requirements – Save:
+- Separate **Save** from **Send/Share**.
+- Save:
+  - Saves the CMA but does **not** send anything.
+  - Do **not** auto-save a CMA. Only save when the user explicitly clicks Save.
+- Ensure:
+  - Saved CMAs appear in the CMAs list (from item #1).
+  - Save state is obvious to the user (e.g., success message).
+
+Requirements – Share CMA (Email listing style):
+- For the **Share CMA** action, use an email form similar to a typical “Email this listing to a friend” popup.
+- When user chooses “Share CMA” (email), show a modal with:
+  - Your Name (required)
+  - Your Email Address (required)
+  - Friend’s Name (required)
+  - Friend’s Email Address (required)
+  - Comments / Message (multiline)
+- Prefill the comments box with a default text along the lines of:
+  - “Check out this CMA report I created for you.”
+- In the email sent to the friend:
+  - Include a “card” with key CMA summary details (e.g. subject property address, main stats, link to full CMA).
+  - Include the message from the Comments field.
+- Validate required fields and show clear errors if missing/invalid.
+- Respect existing email sending infrastructure (reuse it if already implemented for other “Email listing to a friend” flows).
+
+Testing:
+- Confirm:
+  - CMA is **not** saved automatically.
+  - Clicking Save persists the CMA and it appears in the CMA list.
+  - Clicking Share CMA opens the email modal.
+  - Validation works.
+  - A test email is successfully sent (or at least simulated in dev) with correct content and CMA link.
+
+====================================================
+6) UI – Move print icon near Share, and Notes PDF behaviour
+====================================================
+6a) Move Print icon:
+- In the yellow box section (CMA view), move the **Print** icon/features so it appears **next to the Share control** in the upper-right.
+- The Share and Print actions should be visually grouped.
+
+6b) Notes – PDF icon, Agent Note floating card, preview:
+- On “Notes”, add a **PDF icon** to indicate notes are printable/exportable as PDF.
+- When the user clicks on Notes:
+  - Open a floating card/modal titled “Agent Note”.
+  - Allow the agent to enter or edit a note about this CMA.
+- When the user saves the note:
+  - Persist it with the CMA.
+  - Provide a **Preview button** that shows how the note will appear in PDF form.
+    - This preview can be a styled HTML view that corresponds to the final PDF layout.
+- Ensure:
+  - Notes are included when generating the CMA PDF.
+  - The PDF icon is visually clear but not intrusive.
+
+Testing:
+- Click Notes → floating “Agent Note” card opens.
+- Save a note, then:
+  - Confirm the note is saved and persists on reload.
+  - Confirm Preview shows the formatted note.
+  - Confirm PDF export includes the note.
+
+====================================================
+7) Home Average, Listings, Timeline, Market Stats – tooltip/info visibility
+====================================================
+Context:
+- Currently, the information on Home Average, Listings, Timeline, and Market Stats is still being cut off.
+
+Requirements:
+- Ensure all tooltip/hover information in these sections is fully visible:
+  - No clipping or cut-off texts.
+  - Use appropriate positioning and z-index.
+  - Avoid parent containers with `overflow: hidden` that cause clipping; use portals/overlays if needed.
+- The same fix should consistently apply wherever these info tooltips appear.
+
+Testing:
+- Hover/tap on each info icon/hover target in:
+  - Home Average
+  - Listings
+  - Timeline
+  - Market Stats
+- Confirm the entire text is visible on various screen sizes.
+
+====================================================
+8) Market Stats – listing pictures/images not showing
+====================================================
+Context:
+- In Market Stats, the pictures/images for the chosen property listings are not showing.
+
+Requirements:
+- Fix the Market Stats section so that:
+  - For each listing displayed in Market Stats, show the associated property thumbnail/primary image.
+  - Reuse existing listing image URLs and display logic used elsewhere in the app.
+- Ensure:
+  - Images have sensible aspect ratio and don’t break layout.
+  - Fallback image is provided if a listing has no photos.
+
+Testing:
+- Open Market Stats for a CMA with multiple properties.
+- Confirm each listing entry shows its thumbnail.
+- Confirm fallback behaviour if no image is available.
+
+====================================================
+9) Add “CMA Market Review” section in Market Stats
+====================================================
+Context:
+- The user wants an additional readable summary under Market Stats.
+
+Requirements:
+- In the Market Stats area, add a new section at the **bottom** called “CMA Market Review”.
+- This should be a text block summarizing the market context for the CMA, for example:
+  - Pricing trends
+  - Inventory level
+  - Days on market
+  - Brief interpretation of the stats above
+- You can use any existing analytics or stats already calculated; the text can be templated plus dynamic values.
+- Ensure:
+  - This section appears under the numeric/stat cards and any listing table.
+  - It is clearly labeled and readable.
+
+Testing:
+- Generate a CMA and view Market Stats.
+- Confirm “CMA Market Review” appears at the bottom with appropriate text.
+
+====================================================
+10) Reorder metrics – median price and averages above “Active Listings”
+====================================================
+Context:
+- In Market Stats, there are values like:
+  - Median Price
+  - Avg SqFt
+  - Avg Beds
+  - Avg Baths
+  - Active Listings (and possibly others)
+
+Requirements:
+- Change layout ordering so that:
+  - Median Price, Avg SqFt, Avg Beds, and Avg Baths are shown **above** the Active Listings section.
+- Ensure:
+  - The visual hierarchy makes sense.
+  - No data is removed; only re-ordered.
+
+Testing:
+- Open Market Stats and confirm the order:
+  - First: Median Price, Avg SqFt, Avg Beds, Avg Baths.
+  - After those: Active Listings information.
+
+====================================================
+Final step – Detailed report
+====================================================
+After implementing and testing ALL items 1–10:
+
+- Produce a **detailed written report** covering:
+  - For each numbered item:
+    - What code changes you made.
+    - Files/components touched.
+    - Tests performed (with sample inputs like the exact search in #3).
+    - Test results (pass/fail, and any edge cases).
+  - Any limitations or follow-up items you recommend.
+
+Make sure the report is clear enough that a non-developer stakeholder can understand what was implemented and verified.

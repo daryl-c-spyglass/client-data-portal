@@ -1,19 +1,51 @@
+import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { FileText, Plus, Calendar } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { FileText, Plus, Calendar, ArrowUpDown } from "lucide-react";
 import { Link } from "wouter";
 import type { Cma } from "@shared/schema";
 
+type SortOption = 'newest' | 'oldest' | 'az' | 'za';
+
 export default function CMAs() {
+  const [sortOption, setSortOption] = useState<SortOption>('newest');
+  
   const { data: cmas = [], isLoading } = useQuery<Cma[]>({
     queryKey: ['/api/cmas'],
   });
 
+  // Sort CMAs based on selected option
+  const sortedCmas = useMemo(() => {
+    const sorted = [...cmas];
+    
+    switch (sortOption) {
+      case 'newest':
+        return sorted.sort((a, b) => {
+          const dateA = new Date(a.updatedAt || a.createdAt).getTime();
+          const dateB = new Date(b.updatedAt || b.createdAt).getTime();
+          return dateB - dateA; // Newest first
+        });
+      case 'oldest':
+        return sorted.sort((a, b) => {
+          const dateA = new Date(a.updatedAt || a.createdAt).getTime();
+          const dateB = new Date(b.updatedAt || b.createdAt).getTime();
+          return dateA - dateB; // Oldest first
+        });
+      case 'az':
+        return sorted.sort((a, b) => a.name.localeCompare(b.name));
+      case 'za':
+        return sorted.sort((a, b) => b.name.localeCompare(a.name));
+      default:
+        return sorted;
+    }
+  }, [cmas, sortOption]);
+
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between flex-wrap gap-4">
         <div>
           <h1 className="text-3xl font-bold mb-2" data-testid="text-cmas-title">CMAs</h1>
           <p className="text-muted-foreground">
@@ -23,12 +55,30 @@ export default function CMAs() {
             }
           </p>
         </div>
-        <Link href="/cmas/new">
-          <Button data-testid="button-create-new-cma">
-            <Plus className="w-4 h-4 mr-2" />
-            Create New CMA
-          </Button>
-        </Link>
+        <div className="flex items-center gap-3">
+          {cmas.length > 0 && (
+            <div className="flex items-center gap-2">
+              <ArrowUpDown className="w-4 h-4 text-muted-foreground" />
+              <Select value={sortOption} onValueChange={(val) => setSortOption(val as SortOption)}>
+                <SelectTrigger className="w-[180px]" data-testid="select-cma-sort">
+                  <SelectValue placeholder="Sort by..." />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="newest" data-testid="sort-newest">Newest to Oldest</SelectItem>
+                  <SelectItem value="oldest" data-testid="sort-oldest">Oldest to Newest</SelectItem>
+                  <SelectItem value="az" data-testid="sort-az">Name A-Z</SelectItem>
+                  <SelectItem value="za" data-testid="sort-za">Name Z-A</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+          <Link href="/cmas/new">
+            <Button data-testid="button-create-new-cma">
+              <Plus className="w-4 h-4 mr-2" />
+              Create New CMA
+            </Button>
+          </Link>
+        </div>
       </div>
 
       {isLoading ? (
@@ -45,9 +95,9 @@ export default function CMAs() {
             </Card>
           ))}
         </div>
-      ) : cmas.length > 0 ? (
+      ) : sortedCmas.length > 0 ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {cmas.map((cma) => (
+          {sortedCmas.map((cma) => (
             <Link key={cma.id} href={`/cmas/${cma.id}`}>
               <Card className="hover-elevate active-elevate-2 cursor-pointer" data-testid={`card-cma-${cma.id}`}>
                 <CardHeader>
@@ -61,6 +111,11 @@ export default function CMAs() {
                     <Calendar className="w-4 h-4" />
                     <span>Created {new Date(cma.createdAt).toLocaleDateString()}</span>
                   </div>
+                  {cma.updatedAt && new Date(cma.updatedAt).getTime() !== new Date(cma.createdAt).getTime() && (
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <span>Modified {new Date(cma.updatedAt).toLocaleDateString()}</span>
+                    </div>
+                  )}
                   <p className="text-sm text-muted-foreground">
                     {cma.comparablePropertyIds.length} comparable properties
                   </p>

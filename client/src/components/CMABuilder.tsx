@@ -10,7 +10,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Checkbox } from "@/components/ui/checkbox";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { X, Plus, TrendingUp, Search, Loader2, AlertCircle, Home, MousePointerClick, RotateCcw, ChevronLeft, ChevronRight } from "lucide-react";
+import { X, Plus, TrendingUp, Search, Loader2, AlertCircle, Home, MousePointerClick, RotateCcw, ChevronLeft, ChevronRight, Info } from "lucide-react";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import type { Property } from "@shared/schema";
 
@@ -725,8 +726,18 @@ export function CMABuilder({ onCreateCMA, initialData }: CMABuilderProps) {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <Card>
           <CardHeader>
-            <CardTitle className="flex items-center justify-between">
-              <span>Subject Property</span>
+            <CardTitle className="flex items-center justify-between gap-2">
+              <span className="flex items-center gap-2">
+                Subject Property
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Info className="w-4 h-4 text-muted-foreground cursor-help" />
+                  </TooltipTrigger>
+                  <TooltipContent side="bottom" className="max-w-xs z-[100]">
+                    <p>The property you are creating this CMA for. This is typically your client's home that they want to sell or a property they're considering buying.</p>
+                  </TooltipContent>
+                </Tooltip>
+              </span>
               <Badge variant="outline">Optional</Badge>
             </CardTitle>
           </CardHeader>
@@ -782,8 +793,18 @@ export function CMABuilder({ onCreateCMA, initialData }: CMABuilderProps) {
 
         <Card>
           <CardHeader>
-            <CardTitle className="flex items-center justify-between">
-              <span>Comparable Properties</span>
+            <CardTitle className="flex items-center justify-between gap-2">
+              <span className="flex items-center gap-2">
+                Comparable Properties
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Info className="w-4 h-4 text-muted-foreground cursor-help" />
+                  </TooltipTrigger>
+                  <TooltipContent side="bottom" className="max-w-xs z-[100]">
+                    <p>Similar properties in the area that help establish market value. Select up to 5 properties with similar features, location, and condition to the subject property.</p>
+                  </TooltipContent>
+                </Tooltip>
+              </span>
               <Badge>{comparables.length} / 5</Badge>
             </CardTitle>
           </CardHeader>
@@ -844,7 +865,17 @@ export function CMABuilder({ onCreateCMA, initialData }: CMABuilderProps) {
 
         <Card>
           <CardHeader>
-            <CardTitle>Analysis</CardTitle>
+            <CardTitle className="flex items-center gap-2">
+              Analysis
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Info className="w-4 h-4 text-muted-foreground cursor-help" />
+                </TooltipTrigger>
+                <TooltipContent side="bottom" className="max-w-xs z-[100]">
+                  <p>Summary statistics calculated from your selected comparable properties including average price, square footage, and price per sqft to help determine fair market value.</p>
+                </TooltipContent>
+              </Tooltip>
+            </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             {comparables.length > 0 ? (

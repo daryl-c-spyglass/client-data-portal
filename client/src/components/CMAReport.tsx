@@ -5,7 +5,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, Legend, ResponsiveContainer, ScatterChart, Scatter } from "recharts";
-import { Save, Edit, FileText, Printer, Info, Home } from "lucide-react";
+import { Save, Edit, FileText, Printer, Info, Home, Mail } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import type { Property, PropertyStatistics, TimelineDataPoint } from "@shared/schema";
 
@@ -21,6 +21,7 @@ interface CMAReportProps {
   notes?: string | null;
   reportTitle?: string;
   onSave?: () => void;
+  onShareCMA?: () => void;
   onPublicLink?: () => void;
   onModifySearch?: () => void;
   onModifyStats?: () => void;
@@ -40,6 +41,7 @@ export function CMAReport({
   notes,
   reportTitle,
   onSave,
+  onShareCMA,
   onPublicLink,
   onModifySearch,
   onModifyStats,
@@ -88,9 +90,13 @@ export function CMAReport({
             You are seeing a preview of the report.
           </p>
           <div className="flex items-center gap-2 flex-wrap">
-            <Button size="sm" onClick={onSave} data-testid="button-save-send">
+            <Button size="sm" onClick={onSave} data-testid="button-save-cma">
               <Save className="w-4 h-4 mr-2" />
-              Save + Send
+              Save
+            </Button>
+            <Button size="sm" variant="outline" onClick={onShareCMA} data-testid="button-share-cma-email">
+              <Mail className="w-4 h-4 mr-2" />
+              Share CMA
             </Button>
             <Button size="sm" variant="outline" onClick={onPrint} data-testid="button-print">
               <Printer className="w-4 h-4 mr-2" />
