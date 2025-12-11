@@ -350,15 +350,26 @@
     text-align: left;
   }
   
-  /* Hide property images in print mode - NO images in PDF output */
-  .cma-print img:not(.print-show) {
+  /* Hide ALL property images in print mode - NO images in PDF output */
+  .cma-print img {
     display: none !important;
+    visibility: hidden !important;
   }
   
-  /* Hide property thumbnail containers in print mode */
+  /* Hide all image containers in property cards */
   .cma-print [data-testid^="listing-card-"] img,
   .cma-print [data-testid^="card-property-"] img,
-  .cma-print [data-testid^="home-avg-card-"] img {
+  .cma-print [data-testid^="home-avg-card-"] img,
+  .cma-print [data-testid^="market-stats-card-"] img {
+    display: none !important;
+    visibility: hidden !important;
+  }
+  
+  /* Hide image wrapper divs that contain property photos */
+  .cma-print .property-image,
+  .cma-print .property-thumbnail,
+  .cma-print [class*="property-image"],
+  .cma-print [class*="thumbnail"] {
     display: none !important;
   }
   
@@ -402,5 +413,23 @@
   .cma-print [data-testid="tab-market-stats"],
   .cma-print [role="tabpanel"] > .space-y-6 > .card:nth-child(n+3) {
     page-break-before: auto;
+  }
+  
+  /* CMA Market Review in print - ensure it's fully visible and doesn't break */
+  .cma-print .print-cma-market-review {
+    display: block !important;
+    page-break-inside: avoid;
+    break-inside: avoid;
+    margin-top: 1rem !important;
+    border: 1px solid #e5e7eb !important;
+  }
+  
+  /* Ensure the CMA Market Review content renders with proper colors in print */
+  .cma-print .print-cma-market-review h4,
+  .cma-print .print-cma-market-review p,
+  .cma-print .print-cma-market-review span {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+    color-adjust: exact !important;
   }
 }

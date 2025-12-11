@@ -1,0 +1,80 @@
+```text
+You are working ONLY on the CMA RESULT page → Print to PDF feature (NOT IDX or public pages).
+
+Goal:
+Fix the CMA Print to PDF output so that it ALWAYS includes the entire **CMA Market Review** from the Market Stats section, even if it requires adding extra pages to the PDF.
+
+Scope:
+- CMA Result page
+- Market Stats section
+- CMA Market Review content
+- Print → PDF output
+
+Do NOT modify:
+- IDX print
+- Any non-CMA PDFs
+- MLS Grid or Repliers replication logic
+
+========================================
+TASK: CMA Market Review in Print PDF
+========================================
+
+Problem:
+- The current CMA Print to PDF output either omits or truncates the CMA Market Review from the Market Stats section.
+
+Requirements:
+
+1. Include the full CMA Market Review in the PDF
+   - Locate the **exact same CMA Market Review content** that appears under the Market Stats section in the CMA Result UI.
+   - Ensure this entire text block is rendered in the PDF:
+     • No truncation
+     • No partial output
+     • Preserve paragraphs / line breaks reasonably.
+
+2. Positioning in the PDF
+   - Place the CMA Market Review in the PDF in a logical position consistent with the UI, typically:
+     • After the main Market Stats numbers/graphs section.
+   - You may reference how the **Share CMA link output** structures Market Stats + Market Review and mirror that structure in the PDF.
+
+3. Allow multiple pages
+   - If including the full CMA Market Review causes the PDF to overflow:
+     • Allow the PDF to span multiple pages (2+ pages is acceptable).
+     • DO NOT cut off or remove the Market Review to force a single page.
+   - Make sure the layout is clean when the content flows onto page 2 or beyond.
+
+4. No property images
+   - Maintain the existing rule that **property images must not appear in the PDF**:
+     • No thumbnails
+     • No carousel photos
+   - Only include textual and numeric data plus the Market Review text.
+
+5. Data source
+   - The CMA Market Review content in the PDF must come from the **same source** and logic as:
+     • The Market Stats → CMA Market Review section in the CMA Result UI.
+     • The Share CMA link output (if it already includes Market Review).
+   - There must be no divergence between what users see on-screen, what appears in the Share view, and what is printed.
+
+========================================
+Testing (you MUST perform these)
+========================================
+
+1. Generate a CMA with a non-trivial CMA Market Review (multiple sentences/paragraphs).
+2. Print to PDF:
+   - Confirm:
+     • Market Stats show as expected.
+     • The entire CMA Market Review text is present and readable (no truncation).
+     • If content requires more than one page, the PDF contains multiple pages and all content is intact.
+     • No property images appear in the PDF.
+
+3. Open the Share CMA link for the same CMA:
+   - Confirm the CMA Market Review text matches the text in the PDF.
+
+========================================
+Report
+========================================
+
+In your final notes, specify:
+- Which components/templates were updated for the PDF.
+- How/where the CMA Market Review content is pulled from.
+- How many pages the sample CMA PDF used in testing, and confirmation that all Market Review text was included.
+```
