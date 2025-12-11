@@ -576,8 +576,12 @@ export const EXCLUDED_PROPERTY_TYPES = [
 ];
 
 /**
- * Detect if a property is likely a rental listing masquerading as a "Closed" sale.
+ * Detect if a property is likely a rental listing (not a for-sale listing).
  * Returns true if the property appears to be a rental, false if it's a legitimate sale.
+ * 
+ * This works for ALL statuses:
+ * - Closed/Sold: checks closePrice
+ * - Active/Under Contract: checks listPrice
  * 
  * @param property - Property object with closePrice, listPrice, livingArea, standardStatus, propertySubType
  * @returns true if likely a rental, false if likely a legitimate sale
@@ -592,30 +596,44 @@ export function isLikelyRentalProperty(property: {
   propertyType?: string | null;
 }): boolean {
   const closePrice = Number(property.closePrice || 0);
+  const listPrice = Number(property.listPrice || 0);
   const livingArea = Number(property.livingArea || 0);
-  const status = property.standardStatus || property.status || '';
+  const status = (property.standardStatus || property.status || '').toLowerCase();
   const propType = property.propertySubType || property.propertyType || '';
-  
-  // Only apply rental detection to "Closed" or "Sold" properties
-  if (status !== 'Closed' && status !== 'Sold') {
-    return false;
-  }
   
   // Skip detection for property types that commonly have low sale prices
   if (EXCLUDED_PROPERTY_TYPES.some(t => propType.toLowerCase().includes(t.toLowerCase()))) {
     return false;
   }
   
-  // If closePrice is very low (< threshold), it's likely monthly rent
-  if (closePrice > 0 && closePrice < MIN_SALE_PRICE_THRESHOLD) {
+  // Determine which price to check based on status
+  // For Closed/Sold properties, use closePrice
+  // For Active/Under Contract properties, use listPrice
+  let priceToCheck = 0;
+  if (status === 'closed' || status === 'sold') {
+    priceToCheck = closePrice;
+  } else if (status === 'active' || status === 'under contract' || status === 'pending') {
+    priceToCheck = listPrice;
+  } else {
+    // For unknown statuses, check both prices
+    priceToCheck = closePrice > 0 ? closePrice : listPrice;
+  }
+  
+  // If price is zero or not set, can't determine if rental
+  if (priceToCheck <= 0) {
+    return false;
+  }
+  
+  // If price is very low (< threshold), it's likely monthly rent
+  if (priceToCheck < MIN_SALE_PRICE_THRESHOLD) {
     return true;
   }
   
-  // If we have both closePrice and livingArea, check price per sqft
+  // If we have both price and livingArea, check price per sqft
   // Rental listings have extremely low $/sqft (typically $1-5/sqft for monthly rent)
   // Real sales are typically $50-500+/sqft depending on market
-  if (closePrice > 0 && livingArea > 0) {
-    const pricePerSqft = closePrice / livingArea;
+  if (livingArea > 0) {
+    const pricePerSqft = priceToCheck / livingArea;
     if (pricePerSqft < MIN_PRICE_PER_SQFT_THRESHOLD) {
       return true;
     }

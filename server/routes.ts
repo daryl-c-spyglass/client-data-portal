@@ -17,13 +17,17 @@ import type { PropertyStatistics, TimelineDataPoint } from "@shared/schema";
 
 // Wrapper around shared filterOutRentalProperties that adds logging
 function filterOutRentals(properties: any[]): any[] {
-  const beforeCount = properties.length;
   const rentals = properties.filter(p => isLikelyRentalProperty(p));
   const validProperties = filterOutRentalProperties(properties);
   
   if (rentals.length > 0) {
     rentals.forEach(p => {
-      console.log(`🏠 Rental detected: ${p.unparsedAddress || p.address} - closePrice: $${Number(p.closePrice).toLocaleString()}`);
+      const status = (p.standardStatus || p.status || '').toLowerCase();
+      const price = (status === 'closed' || status === 'sold') 
+        ? Number(p.closePrice || 0) 
+        : Number(p.listPrice || 0);
+      const priceLabel = (status === 'closed' || status === 'sold') ? 'closePrice' : 'listPrice';
+      console.log(`🏠 Rental detected: ${p.unparsedAddress || p.address} (${p.standardStatus || p.status}) - ${priceLabel}: $${price.toLocaleString()}`);
     });
     console.log(`🏠 Filtered out ${rentals.length} rental properties from analysis`);
   }

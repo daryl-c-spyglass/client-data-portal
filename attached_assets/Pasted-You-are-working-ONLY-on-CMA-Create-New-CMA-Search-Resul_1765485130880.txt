@@ -1,0 +1,64 @@
+You are working ONLY on CMA → Create New CMA → Search Results (NOT IDX).
+
+Issue:
+Active and Under Contract CMA search results still show low-dollar properties such as:
+- $1,395
+- $1,400
+- $1,800
+- $1,895
+- $2,200
+
+These amounts are rental/lease prices and should NEVER appear under:
+- Active (for-sale)
+- Under Contract (for-sale)
+- Sold (for-sale)
+
+We already implemented rental filtering inside CMA Detail/Analysis, but the filtering was NOT applied to CMA Search Results. As a result, rental properties are still appearing in Active & UC searches.
+
+=====================================
+REQUIRED FIX
+=====================================
+
+1. Apply the same rental filtering logic to the CMA Search Results endpoint.
+
+Use functions in shared/schema.ts:
+- isLikelyRentalProperty()
+- filterOutRentalProperties()
+
+2. After fetching properties from Repliers in the CMA search API:
+   - Filter OUT rental listings BEFORE returning them to the frontend.
+   - This MUST apply to ALL selected statuses:
+     • Active
+     • Under Contract
+     • Sold/Closed
+
+3. The “Search Results (N found)” count must use the filtered list.
+
+4. Confirm property type filtering is respected:
+   - Only include Single Family Residence sale listings.
+   - Rental or lease listings, even if marked Active/UC, must be excluded.
+
+=====================================
+TESTING REQUIRED
+=====================================
+
+1. Perform a CMA search with:
+   - Subdivision: Cherry Creek
+   - Property Type: Single Family Residence
+   - Status: Active
+   - Status: Under Contract
+
+2. Confirm:
+   - Rental-price listings ($1,395–$2,200) NO LONGER appear.
+   - Only real for-sale listings with realistic pricing ($300k–$600k+) show.
+
+3. Repeat the same check for Sold listings.
+
+=====================================
+FINAL REPORT
+=====================================
+
+Include:
+- Which endpoints were updated.
+- Which rental properties are now correctly filtered out.
+- Confirmation that Active, UC, and Sold CMA searches now return ONLY real for-sale comps.
