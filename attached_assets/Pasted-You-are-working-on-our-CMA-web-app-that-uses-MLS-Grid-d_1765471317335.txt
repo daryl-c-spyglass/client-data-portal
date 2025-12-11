@@ -1,0 +1,198 @@
+You are working on our CMA web app that uses MLS Grid data and listing photos/data from Repliers.
+
+This is a THIRD round of QA fixes.  
+These tasks are IN ADDITION to previous rounds and must NOT break what already works.
+
+Important:
+- Go through each item **one by one, in order**.
+- Use **Repliers** as the data source for listing images/thumbnails wherever specified.
+- After you complete all items, produce a **detailed report** of:
+  - What you changed per item
+  - Files/components touched
+  - Tests run + results
+
+====================================================
+1) Search results – property images missing again + floating card (from Repliers)
+====================================================
+Context:
+- On search results, property images are missing.
+- When clicking a property, there should be a floating card with full info and photos.
+- All listing photos / thumbnails must come from **Repliers** data.
+
+Requirements:
+- On the search results page:
+  - Restore property thumbnail images using **Repliers** photo data.
+  - Each property card must show a primary image.
+- On property click:
+  - Open a floating card/modal that shows:
+    - Property details (address, price, beds, baths, sq ft, status, etc.)
+    - Property photos sourced from Repliers.
+- Image behavior in floating card:
+  - Use an automatic carousel:
+    - Auto-advance every **3 seconds**.
+  - Provide backward/forward controls:
+    - Clicking next/prev moves immediately.
+    - Auto-advance resumes after a short pause (~3 seconds).
+
+Testing:
+- Run a search that returns multiple results.
+- Confirm:
+  - Thumbnails are visible in the list and come from Repliers.
+  - Clicking any listing opens floating card with correct data + images.
+  - Carousel autoplay + manual arrows both work.
+
+====================================================
+2) Move Print icon beside Share link (yellow box)
+====================================================
+Context:
+- The Print control is still inside the yellow box, not next to the Share link.
+
+Requirements:
+- In the CMA view, move the **Print** icon/feature:
+  - Remove it from inside the yellow box.
+  - Place it **beside the Share link** on the upper right (grouped with Share).
+- Keep styling consistent with Share (icon size, alignment, spacing).
+
+Testing:
+- Open a CMA:
+  - Confirm Share link and Print icon appear next to each other in the upper-right.
+  - Confirm both actions still function.
+
+====================================================
+3) Property thumbnail images for chosen listings still not showing (from Repliers)
+====================================================
+Context:
+- In sections where chosen listings are displayed (e.g., Market Stats, selected comps, or other summary lists), thumbnails are still missing.
+
+Requirements:
+- For every UI section that displays a list of **chosen listings** (e.g., in Market Stats, selected comps, etc.):
+  - Ensure each listing has a thumbnail image.
+  - All thumbnails must be loaded from **Repliers**.
+  - Reuse the same logic/source as search results where possible.
+  - Provide a fallback image/icon if a listing has no available photos.
+
+Testing:
+- Open Market Stats and any views that show chosen listings:
+  - Confirm thumbnails appear for each listing.
+  - Confirm images are consistent with Repliers data.
+  - Confirm fallback appears if photos are missing.
+
+====================================================
+4) Section ordering by counts – Sold/Closed, Under Contract, Active
+====================================================
+Context:
+- Sections for Active Listings, Under Contract, and Sold/Closed should be ordered based on how many properties they contain.
+
+Requirements:
+- For sections:
+  - Sold/Closed
+  - Under Contract
+  - Active Listings
+- Determine how many properties each section has.
+- Sort the sections in **descending order of count**, e.g.:
+  - If Sold/Closed has 5, Under Contract has 3, Active has 0:
+    - Display as:
+      - Sold/Closed (5)
+      - Under Contract (3)
+      - Active Listings (0)
+- Show the count in parentheses next to the section label.
+
+Testing:
+- Use a CMA where:
+  - The three sections have different property counts.
+- Confirm:
+  - Order is highest → lowest count.
+  - Sections with zero still appear but are last.
+
+====================================================
+5) Email CMA to Friend – still not receiving email + dynamic domain
+====================================================
+Context:
+- “Email CMA to Friend” is still not delivering emails (e.g. to daryl@spyglassrealty.com).
+- The sending behavior must be robust and not hard-coded for one domain.
+
+Requirements:
+- Email delivery:
+  - Ensure emails are actually sent via the app’s configured email provider (SMTP/transactional service).
+  - Do **NOT** use the raw “Your Email Address” as the SMTP From address (this can break SPF/DMARC).
+- Dynamic domain:
+  - Make the sender configuration **dynamic**, based on the current application domain or environment settings.
+  - Use config/env vars for:
+    - From address (e.g. no-reply@<current-domain>)
+    - From name (app or company name)
+- “Your Email Address” field:
+  - Use this as:
+    - Reply-To address of the outgoing email.
+    - Optionally CC the user (if appropriate).
+- Email content:
+  - Must be HTML.
+  - Must include:
+    - CMA summary (subject property, key stats)
+    - HTML-formatted text
+    - A clear link to view the full CMA online.
+    - The user’s comment.
+  - In the Comments description or default text, ensure it explains:
+    - “The CMA will be sent in HTML format including a link to view it online.”
+
+Testing:
+- Configure a realistic sender domain in the app.
+- Send a test CMA email to a real address (e.g., daryl@spyglassrealty.com).
+- Confirm:
+  - Email is delivered to inbox (or at least not hard-bounced).
+  - Reply-To is the value from “Your Email Address”.
+  - Body is HTML and contains summary + link + comment.
+
+====================================================
+6) Price Timeline – add days counters for each listing
+====================================================
+Context:
+- The price timeline needs to show time-on-market style information depending on status:
+  - Closed: days until sold
+  - Active: days active so far
+  - Under Contract: days under contract/leased
+
+Requirements:
+- Extend the existing **Price Timeline** (currently a line graph from previous work) to include “days” data.
+
+Definitions (suggested):
+- For **Sold/Closed** listings:
+  - Days on Market = difference between List Date and Close Date (or equivalent fields).
+- For **Active** listings:
+  - Days Active = current date – List Date.
+- For **Under Contract** listings:
+  - Days Under Contract = current date – Under Contract Date (or status change date).
+  - If a specific “under contract date” is not available, pick the best available proxy (document in the report).
+
+UI behavior:
+- On hover or tap at a point in the Price Timeline:
+  - Tooltip should show:
+    - Status (Active / Under Contract / Sold/Closed)
+    - Price
+    - Date
+    - Appropriate days label, such as:
+      - “Days on Market: X days” for Sold/Closed
+      - “Days Active: X days” for Active
+      - “Days Under Contract: X days” for Under Contract
+- You may also show this “days” information near the timeline (e.g., as a sublabel), but tooltip is required.
+
+Testing:
+- Use sample data with:
+  - At least one Active, one Under Contract, and one Sold/Closed property.
+- Confirm:
+  - Hovering each point shows correct status + price + date + days.
+  - Calculations are correct based on data and today’s date.
+
+====================================================
+Final step – Detailed report
+====================================================
+After implementing and testing ALL items 1–6:
+
+Create a detailed report that includes:
+- For each item:
+  - Summary of changes
+  - Files/components touched
+  - Data sources used (especially where Repliers is involved)
+  - Tests run and their results
+- Any known limitations, assumptions (e.g., how Under Contract days are calculated), or follow-up work recommended.
+
+The report should be understandable by non-technical stakeholders (client, product owner).

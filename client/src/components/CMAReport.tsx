@@ -98,10 +98,6 @@ export function CMAReport({
               <Mail className="w-4 h-4 mr-2" />
               Share CMA
             </Button>
-            <Button size="sm" variant="outline" onClick={onPrint} data-testid="button-print">
-              <Printer className="w-4 h-4 mr-2" />
-              Print
-            </Button>
             <Button size="sm" variant="outline" onClick={onModifySearch} data-testid="button-modify-search">
               <Edit className="w-4 h-4 mr-2" />
               Modify Search
@@ -463,6 +459,19 @@ export function CMAReport({
                                     <span>{data.status === 'Closed' ? 'Sold Date:' : 'List Date:'}</span>
                                     <span className="font-medium text-foreground">{new Date(data.date).toLocaleDateString()}</span>
                                   </p>
+                                  {data.daysOnMarket !== null && data.daysOnMarket !== undefined && (
+                                    <p className="flex justify-between gap-4">
+                                      <span>Days on Market:</span>
+                                      <span className="font-medium text-foreground">{data.daysOnMarket} days</span>
+                                    </p>
+                                  )}
+                                  {data.cumulativeDaysOnMarket !== null && data.cumulativeDaysOnMarket !== undefined && 
+                                   data.cumulativeDaysOnMarket !== data.daysOnMarket && (
+                                    <p className="flex justify-between gap-4">
+                                      <span>Cumulative DOM:</span>
+                                      <span className="font-medium text-foreground">{data.cumulativeDaysOnMarket} days</span>
+                                    </p>
+                                  )}
                                 </div>
                               </div>
                             );
@@ -657,159 +666,100 @@ export function CMAReport({
             </CardContent>
           </Card>
 
-          {/* Status Breakdown with Property Details */}
-          {/* Active Properties */}
-          <Card className="border-green-200 dark:border-green-800">
-            <CardHeader className="bg-green-50 dark:bg-green-950/30 rounded-t-lg">
-              <div className="flex items-center gap-3">
-                <div className="w-4 h-4 rounded-full bg-green-500"></div>
-                <CardTitle className="text-base text-green-700 dark:text-green-400">
-                  Active Listings ({activeProperties.length})
-                </CardTitle>
-              </div>
-            </CardHeader>
-            <CardContent className="pt-4">
-              {activeProperties.length > 0 ? (
-                <div className="space-y-3">
-                  {activeProperties.map((property) => {
-                    // Check multiple possible photo sources
-                    const photos = (property as any).photos as string[] | undefined;
-                    const media = (property as any).media as any[] | undefined;
-                    const primaryPhoto = photos?.[0] || media?.[0]?.mediaURL || media?.[0]?.mediaUrl;
-                    const price = property.listPrice ? Number(property.listPrice) : 0;
-                    const pricePerSqft = property.livingArea ? price / Number(property.livingArea) : null;
-                    return (
-                      <div key={property.id} className="flex gap-3 p-2 rounded-md border bg-card">
-                        {primaryPhoto ? (
-                          <img src={primaryPhoto} alt={property.unparsedAddress || ''} className="w-20 h-20 object-cover rounded-md flex-shrink-0" />
-                        ) : (
-                          <div className="w-20 h-20 bg-muted rounded-md flex items-center justify-center flex-shrink-0">
-                            <Home className="w-6 h-6 text-muted-foreground/50" />
+          {/* Status Breakdown with Property Details - Sorted by count descending */}
+          {(() => {
+            const statusSections = [
+              {
+                key: 'active',
+                label: 'Active Listings',
+                properties: activeProperties,
+                borderClass: 'border-green-200 dark:border-green-800',
+                bgClass: 'bg-green-50 dark:bg-green-950/30',
+                dotClass: 'bg-green-500',
+                titleClass: 'text-green-700 dark:text-green-400',
+                emptyText: 'No active listings in this CMA',
+                isSold: false
+              },
+              {
+                key: 'under-contract',
+                label: 'Under Contract',
+                properties: underContractProperties,
+                borderClass: 'border-yellow-200 dark:border-yellow-800',
+                bgClass: 'bg-yellow-50 dark:bg-yellow-950/30',
+                dotClass: 'bg-yellow-500',
+                titleClass: 'text-yellow-700 dark:text-yellow-400',
+                emptyText: 'No under contract listings in this CMA',
+                isSold: false
+              },
+              {
+                key: 'sold',
+                label: 'Sold/Closed',
+                properties: soldProperties,
+                borderClass: 'border-red-200 dark:border-red-800',
+                bgClass: 'bg-red-50 dark:bg-red-950/30',
+                dotClass: 'bg-red-500',
+                titleClass: 'text-red-700 dark:text-red-400',
+                emptyText: 'No sold/closed listings in this CMA',
+                isSold: true
+              }
+            ];
+            
+            const sortedSections = [...statusSections].sort((a, b) => b.properties.length - a.properties.length);
+            
+            return sortedSections.map((section) => (
+              <Card key={section.key} className={section.borderClass}>
+                <CardHeader className={`${section.bgClass} rounded-t-lg`}>
+                  <div className="flex items-center gap-3">
+                    <div className={`w-4 h-4 rounded-full ${section.dotClass}`}></div>
+                    <CardTitle className={`text-base ${section.titleClass}`}>
+                      {section.label} ({section.properties.length})
+                    </CardTitle>
+                  </div>
+                </CardHeader>
+                <CardContent className="pt-4">
+                  {section.properties.length > 0 ? (
+                    <div className="space-y-3">
+                      {section.properties.map((property) => {
+                        const photos = (property as any).photos as string[] | undefined;
+                        const media = (property as any).media as any[] | undefined;
+                        const primaryPhoto = photos?.[0] || media?.[0]?.mediaURL || media?.[0]?.mediaUrl;
+                        const price = section.isSold 
+                          ? (property.closePrice ? Number(property.closePrice) : (property.listPrice ? Number(property.listPrice) : 0))
+                          : (property.listPrice ? Number(property.listPrice) : 0);
+                        const pricePerSqft = property.livingArea ? price / Number(property.livingArea) : null;
+                        return (
+                          <div key={property.id} className="flex gap-3 p-2 rounded-md border bg-card">
+                            {primaryPhoto ? (
+                              <img src={primaryPhoto} alt={property.unparsedAddress || ''} className="w-20 h-20 object-cover rounded-md flex-shrink-0" />
+                            ) : (
+                              <div className="w-20 h-20 bg-muted rounded-md flex items-center justify-center flex-shrink-0">
+                                <Home className="w-6 h-6 text-muted-foreground/50" />
+                              </div>
+                            )}
+                            <div className="flex-1 min-w-0">
+                              <p className="font-semibold text-sm truncate">{property.unparsedAddress}</p>
+                              <p className="text-lg font-bold text-primary">${price.toLocaleString()}</p>
+                              <div className="flex flex-wrap gap-x-3 text-xs text-muted-foreground">
+                                <span>{property.bedroomsTotal || 0} beds</span>
+                                <span>{property.bathroomsTotalInteger || 0} baths</span>
+                                {property.livingArea && <span>{Number(property.livingArea).toLocaleString()} sqft</span>}
+                                {pricePerSqft && <span>${pricePerSqft.toFixed(0)}/sqft</span>}
+                                {section.isSold && property.closeDate && <span>Sold: {new Date(property.closeDate).toLocaleDateString()}</span>}
+                                {!section.isSold && property.daysOnMarket && <span>{property.daysOnMarket} DOM</span>}
+                              </div>
+                              <p className="text-xs text-muted-foreground">{property.propertySubType || property.propertyType}</p>
+                            </div>
                           </div>
-                        )}
-                        <div className="flex-1 min-w-0">
-                          <p className="font-semibold text-sm truncate">{property.unparsedAddress}</p>
-                          <p className="text-lg font-bold text-primary">${price.toLocaleString()}</p>
-                          <div className="flex flex-wrap gap-x-3 text-xs text-muted-foreground">
-                            <span>{property.bedroomsTotal || 0} beds</span>
-                            <span>{property.bathroomsTotalInteger || 0} baths</span>
-                            {property.livingArea && <span>{Number(property.livingArea).toLocaleString()} sqft</span>}
-                            {pricePerSqft && <span>${pricePerSqft.toFixed(0)}/sqft</span>}
-                            {property.daysOnMarket && <span>{property.daysOnMarket} DOM</span>}
-                          </div>
-                          <p className="text-xs text-muted-foreground">{property.propertySubType || property.propertyType}</p>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              ) : (
-                <p className="text-sm text-muted-foreground text-center py-4">No active listings in this CMA</p>
-              )}
-            </CardContent>
-          </Card>
-
-          {/* Under Contract Properties */}
-          <Card className="border-yellow-200 dark:border-yellow-800">
-            <CardHeader className="bg-yellow-50 dark:bg-yellow-950/30 rounded-t-lg">
-              <div className="flex items-center gap-3">
-                <div className="w-4 h-4 rounded-full bg-yellow-500"></div>
-                <CardTitle className="text-base text-yellow-700 dark:text-yellow-400">
-                  Under Contract ({underContractProperties.length})
-                </CardTitle>
-              </div>
-            </CardHeader>
-            <CardContent className="pt-4">
-              {underContractProperties.length > 0 ? (
-                <div className="space-y-3">
-                  {underContractProperties.map((property) => {
-                    // Check multiple possible photo sources
-                    const photos = (property as any).photos as string[] | undefined;
-                    const media = (property as any).media as any[] | undefined;
-                    const primaryPhoto = photos?.[0] || media?.[0]?.mediaURL || media?.[0]?.mediaUrl;
-                    const price = property.listPrice ? Number(property.listPrice) : 0;
-                    const pricePerSqft = property.livingArea ? price / Number(property.livingArea) : null;
-                    return (
-                      <div key={property.id} className="flex gap-3 p-2 rounded-md border bg-card">
-                        {primaryPhoto ? (
-                          <img src={primaryPhoto} alt={property.unparsedAddress || ''} className="w-20 h-20 object-cover rounded-md flex-shrink-0" />
-                        ) : (
-                          <div className="w-20 h-20 bg-muted rounded-md flex items-center justify-center flex-shrink-0">
-                            <Home className="w-6 h-6 text-muted-foreground/50" />
-                          </div>
-                        )}
-                        <div className="flex-1 min-w-0">
-                          <p className="font-semibold text-sm truncate">{property.unparsedAddress}</p>
-                          <p className="text-lg font-bold text-primary">${price.toLocaleString()}</p>
-                          <div className="flex flex-wrap gap-x-3 text-xs text-muted-foreground">
-                            <span>{property.bedroomsTotal || 0} beds</span>
-                            <span>{property.bathroomsTotalInteger || 0} baths</span>
-                            {property.livingArea && <span>{Number(property.livingArea).toLocaleString()} sqft</span>}
-                            {pricePerSqft && <span>${pricePerSqft.toFixed(0)}/sqft</span>}
-                            {property.daysOnMarket && <span>{property.daysOnMarket} DOM</span>}
-                          </div>
-                          <p className="text-xs text-muted-foreground">{property.propertySubType || property.propertyType}</p>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              ) : (
-                <p className="text-sm text-muted-foreground text-center py-4">No under contract listings in this CMA</p>
-              )}
-            </CardContent>
-          </Card>
-
-          {/* Sold/Closed Properties */}
-          <Card className="border-red-200 dark:border-red-800">
-            <CardHeader className="bg-red-50 dark:bg-red-950/30 rounded-t-lg">
-              <div className="flex items-center gap-3">
-                <div className="w-4 h-4 rounded-full bg-red-500"></div>
-                <CardTitle className="text-base text-red-700 dark:text-red-400">
-                  Sold/Closed ({soldProperties.length})
-                </CardTitle>
-              </div>
-            </CardHeader>
-            <CardContent className="pt-4">
-              {soldProperties.length > 0 ? (
-                <div className="space-y-3">
-                  {soldProperties.map((property) => {
-                    // Check multiple possible photo sources
-                    const photos = (property as any).photos as string[] | undefined;
-                    const media = (property as any).media as any[] | undefined;
-                    const primaryPhoto = photos?.[0] || media?.[0]?.mediaURL || media?.[0]?.mediaUrl;
-                    const price = property.closePrice ? Number(property.closePrice) : (property.listPrice ? Number(property.listPrice) : 0);
-                    const pricePerSqft = property.livingArea ? price / Number(property.livingArea) : null;
-                    return (
-                      <div key={property.id} className="flex gap-3 p-2 rounded-md border bg-card">
-                        {primaryPhoto ? (
-                          <img src={primaryPhoto} alt={property.unparsedAddress || ''} className="w-20 h-20 object-cover rounded-md flex-shrink-0" />
-                        ) : (
-                          <div className="w-20 h-20 bg-muted rounded-md flex items-center justify-center flex-shrink-0">
-                            <Home className="w-6 h-6 text-muted-foreground/50" />
-                          </div>
-                        )}
-                        <div className="flex-1 min-w-0">
-                          <p className="font-semibold text-sm truncate">{property.unparsedAddress}</p>
-                          <p className="text-lg font-bold text-primary">${price.toLocaleString()}</p>
-                          <div className="flex flex-wrap gap-x-3 text-xs text-muted-foreground">
-                            <span>{property.bedroomsTotal || 0} beds</span>
-                            <span>{property.bathroomsTotalInteger || 0} baths</span>
-                            {property.livingArea && <span>{Number(property.livingArea).toLocaleString()} sqft</span>}
-                            {pricePerSqft && <span>${pricePerSqft.toFixed(0)}/sqft</span>}
-                            {property.closeDate && <span>Sold: {new Date(property.closeDate).toLocaleDateString()}</span>}
-                          </div>
-                          <p className="text-xs text-muted-foreground">{property.propertySubType || property.propertyType}</p>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              ) : (
-                <p className="text-sm text-muted-foreground text-center py-4">No sold/closed listings in this CMA</p>
-              )}
-            </CardContent>
-          </Card>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <p className="text-sm text-muted-foreground text-center py-4">{section.emptyText}</p>
+                  )}
+                </CardContent>
+              </Card>
+            ));
+          })()}
         </TabsContent>
       </Tabs>
     </div>

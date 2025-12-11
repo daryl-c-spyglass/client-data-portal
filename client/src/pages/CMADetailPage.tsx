@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
-import { ArrowLeft, Share2, Link as LinkIcon, Copy, Check, Trash2, ExternalLink } from "lucide-react";
+import { ArrowLeft, Share2, Link as LinkIcon, Copy, Check, Trash2, ExternalLink, Printer } from "lucide-react";
 import { SiFacebook, SiX, SiInstagram, SiTiktok } from "react-icons/si";
 import { Link } from "wouter";
 import { CMAReport } from "@/components/CMAReport";
@@ -207,6 +207,8 @@ export default function CMADetailPage() {
     });
   };
 
+  const [emailFallbackUrl, setEmailFallbackUrl] = useState<string | null>(null);
+  
   const emailShareMutation = useMutation({
     mutationFn: async (data: typeof emailForm) => {
       // First ensure we have a public link
@@ -228,12 +230,23 @@ export default function CMADetailPage() {
       if (!response.ok) throw new Error('Failed to send email');
       return response.json();
     },
-    onSuccess: () => {
-      setEmailShareDialogOpen(false);
-      toast({
-        title: "CMA Shared",
-        description: "Your CMA has been sent via email.",
-      });
+    onSuccess: (data) => {
+      if (data.emailSent) {
+        setEmailShareDialogOpen(false);
+        toast({
+          title: "CMA Shared",
+          description: "Your CMA has been sent via email.",
+        });
+        setEmailFallbackUrl(null);
+      } else {
+        // Email service not configured - show fallback with URL
+        setEmailFallbackUrl(data.shareUrl);
+        toast({
+          title: "Email Not Sent",
+          description: data.message,
+          variant: "destructive",
+        });
+      }
       // Reset form
       setEmailForm({
         yourName: '',
@@ -383,13 +396,18 @@ export default function CMADetailPage() {
           )}
         </div>
 
-        <Dialog open={shareDialogOpen} onOpenChange={setShareDialogOpen}>
-          <DialogTrigger asChild>
-            <Button variant="outline" data-testid="button-share-cma">
-              <Share2 className="w-4 h-4 mr-2" />
-              Share
-            </Button>
-          </DialogTrigger>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" onClick={handlePrint} data-testid="button-print-header">
+            <Printer className="w-4 h-4 mr-2" />
+            Print
+          </Button>
+          <Dialog open={shareDialogOpen} onOpenChange={setShareDialogOpen}>
+            <DialogTrigger asChild>
+              <Button variant="outline" data-testid="button-share-cma">
+                <Share2 className="w-4 h-4 mr-2" />
+                Share
+              </Button>
+            </DialogTrigger>
           <DialogContent>
             <DialogHeader>
               <DialogTitle>Share CMA</DialogTitle>
@@ -518,6 +536,7 @@ export default function CMADetailPage() {
             </div>
           </DialogContent>
         </Dialog>
+        </div>
       </div>
 
       <CMAReport
@@ -686,6 +705,32 @@ export default function CMADetailPage() {
                 data-testid="textarea-email-comments"
               />
             </div>
+            {emailFallbackUrl && (
+              <div className="p-3 bg-muted rounded-md space-y-2">
+                <p className="text-sm text-muted-foreground">
+                  Email service not configured. Share this link manually:
+                </p>
+                <div className="flex items-center gap-2">
+                  <Input 
+                    value={emailFallbackUrl} 
+                    readOnly 
+                    className="text-xs"
+                    data-testid="input-fallback-share-url"
+                  />
+                  <Button 
+                    size="sm" 
+                    variant="outline"
+                    onClick={() => {
+                      navigator.clipboard.writeText(emailFallbackUrl);
+                      toast({ title: "Copied!", description: "Link copied to clipboard." });
+                    }}
+                    data-testid="button-copy-fallback-url"
+                  >
+                    <Copy className="w-4 h-4" />
+                  </Button>
+                </div>
+              </div>
+            )}
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setEmailShareDialogOpen(false)}>

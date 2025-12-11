@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 
 interface AutocompleteInputProps {
   placeholder?: string;
@@ -129,6 +130,15 @@ import {
   Save,
   Filter,
   AlertCircle,
+  ChevronLeft,
+  ChevronRight,
+  Bed,
+  Bath,
+  Maximize,
+  MapPin,
+  Calendar,
+  Home,
+  ExternalLink,
 } from "lucide-react";
 import { PropertyCard } from "@/components/PropertyCard";
 import { PropertyMapView } from "@/components/PropertyMapView";
@@ -349,6 +359,91 @@ export default function BuyerSearch() {
     searchState?.searchTriggered ? 1 : 0
   );
   const pageSize = 50;
+  
+  // Floating card state
+  const [floatingCardOpen, setFloatingCardOpen] = useState(false);
+  const [floatingCardProperty, setFloatingCardProperty] = useState<{
+    property: Property;
+    media: Media[];
+  } | null>(null);
+  const [carouselIndex, setCarouselIndex] = useState(0);
+  const autoAdvanceRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const pauseTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Carousel auto-advance logic
+  const startAutoAdvance = useCallback(() => {
+    if (autoAdvanceRef.current) {
+      clearInterval(autoAdvanceRef.current);
+    }
+    if (floatingCardProperty?.media && floatingCardProperty.media.length > 1) {
+      autoAdvanceRef.current = setInterval(() => {
+        setCarouselIndex((prev) => (prev + 1) % (floatingCardProperty.media.length || 1));
+      }, 3000);
+    }
+  }, [floatingCardProperty?.media]);
+
+  const pauseAndResumeAutoAdvance = useCallback(() => {
+    if (autoAdvanceRef.current) {
+      clearInterval(autoAdvanceRef.current);
+      autoAdvanceRef.current = null;
+    }
+    if (pauseTimeoutRef.current) {
+      clearTimeout(pauseTimeoutRef.current);
+    }
+    pauseTimeoutRef.current = setTimeout(() => {
+      startAutoAdvance();
+    }, 3000);
+  }, [startAutoAdvance]);
+
+  useEffect(() => {
+    if (floatingCardOpen && floatingCardProperty?.media && floatingCardProperty.media.length > 1) {
+      startAutoAdvance();
+    }
+    return () => {
+      if (autoAdvanceRef.current) {
+        clearInterval(autoAdvanceRef.current);
+      }
+      if (pauseTimeoutRef.current) {
+        clearTimeout(pauseTimeoutRef.current);
+      }
+    };
+  }, [floatingCardOpen, floatingCardProperty?.media, startAutoAdvance]);
+
+  const handlePropertyClick = (property: Property, photos: string[]) => {
+    const propertyId = property.listingId || property.id;
+    const media = photos.length > 0 ? convertPhotosToMedia(photos, propertyId) : [];
+    setFloatingCardProperty({ property, media });
+    setCarouselIndex(0);
+    setFloatingCardOpen(true);
+  };
+
+  const handleNextImage = () => {
+    if (floatingCardProperty?.media) {
+      setCarouselIndex((prev) => (prev + 1) % floatingCardProperty.media.length);
+      pauseAndResumeAutoAdvance();
+    }
+  };
+
+  const handlePrevImage = () => {
+    if (floatingCardProperty?.media) {
+      setCarouselIndex((prev) => (prev - 1 + floatingCardProperty.media.length) % floatingCardProperty.media.length);
+      pauseAndResumeAutoAdvance();
+    }
+  };
+
+  const handleViewFullDetails = () => {
+    if (floatingCardProperty) {
+      const propertyId = floatingCardProperty.property.listingId || floatingCardProperty.property.id;
+      setSearchState({
+        properties: properties || [],
+        totalCount: totalCount || 0,
+        filters,
+        searchTriggered: true
+      });
+      setSelectedProperty(floatingCardProperty);
+      setLocation(`/properties/${propertyId}`);
+    }
+  };
 
   const convertPhotosToMedia = (photos: string[], propertyId: string): Media[] => {
     return photos.map((url, index) => ({
@@ -2825,19 +2920,10 @@ export default function BuyerSearch() {
                     properties={properties}
                     isLoading={isLoading}
                     onPropertyClick={(property) => {
-                    const propertyId = property.listingId || property.id;
-                    const propertyWithPhotos = property as Property & { photos?: string[] };
-                    const media = propertyWithPhotos.photos?.length ? convertPhotosToMedia(propertyWithPhotos.photos, propertyId) : [];
-                    setSearchState({
-                      properties,
-                      totalCount,
-                      filters,
-                      searchTriggered: true
-                    });
-                    setSelectedProperty({ property, media });
-                    setLocation(`/properties/${propertyId}`);
-                  }}
-                />
+                      const propertyWithPhotos = property as Property & { photos?: string[] };
+                      handlePropertyClick(property, propertyWithPhotos.photos || []);
+                    }}
+                  />
                 </>
               ) : (
                 <>
@@ -2850,16 +2936,7 @@ export default function BuyerSearch() {
                           key={property.id} 
                           property={property}
                           media={media}
-                          onClick={() => {
-                            setSearchState({
-                              properties,
-                              totalCount,
-                              filters,
-                              searchTriggered: true
-                            });
-                            setSelectedProperty({ property, media });
-                            setLocation(`/properties/${propertyId}`);
-                          }}
+                          onClick={() => handlePropertyClick(property, property.photos || [])}
                         />
                       );
                     })}
@@ -2906,6 +2983,199 @@ export default function BuyerSearch() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Floating Property Card Sheet */}
+      <Sheet open={floatingCardOpen} onOpenChange={setFloatingCardOpen}>
+        <SheetContent side="right" className="w-full sm:max-w-lg overflow-y-auto">
+          {floatingCardProperty && (
+            <>
+              <SheetHeader className="sr-only">
+                <SheetTitle>Property Details</SheetTitle>
+              </SheetHeader>
+              
+              {/* Image Carousel */}
+              <div className="relative aspect-[16/9] bg-muted rounded-lg overflow-hidden mb-4 -mx-6 -mt-6">
+                {floatingCardProperty.media.length > 0 ? (
+                  <>
+                    <img 
+                      src={floatingCardProperty.media[carouselIndex]?.mediaURL} 
+                      alt={floatingCardProperty.property.unparsedAddress || 'Property'} 
+                      className="w-full h-full object-cover"
+                      data-testid="img-floating-card-property"
+                    />
+                    {/* Carousel Controls */}
+                    {floatingCardProperty.media.length > 1 && (
+                      <>
+                        <Button 
+                          size="icon" 
+                          variant="ghost" 
+                          className="absolute left-2 top-1/2 -translate-y-1/2 bg-black/40 hover:bg-black/60 text-white"
+                          onClick={handlePrevImage}
+                          data-testid="button-carousel-prev"
+                        >
+                          <ChevronLeft className="w-5 h-5" />
+                        </Button>
+                        <Button 
+                          size="icon" 
+                          variant="ghost" 
+                          className="absolute right-2 top-1/2 -translate-y-1/2 bg-black/40 hover:bg-black/60 text-white"
+                          onClick={handleNextImage}
+                          data-testid="button-carousel-next"
+                        >
+                          <ChevronRight className="w-5 h-5" />
+                        </Button>
+                        <div className="absolute bottom-2 left-1/2 -translate-x-1/2 flex gap-1">
+                          {floatingCardProperty.media.map((_, idx) => (
+                            <div 
+                              key={idx} 
+                              className={cn(
+                                "w-2 h-2 rounded-full transition-colors",
+                                idx === carouselIndex ? "bg-white" : "bg-white/50"
+                              )}
+                            />
+                          ))}
+                        </div>
+                      </>
+                    )}
+                    {/* Photo Count */}
+                    <div className="absolute top-2 right-2 bg-black/60 text-white text-xs px-2 py-1 rounded">
+                      {carouselIndex + 1} / {floatingCardProperty.media.length}
+                    </div>
+                  </>
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center text-muted-foreground">
+                    <Home className="w-16 h-16 opacity-50" />
+                  </div>
+                )}
+                {/* Status Badge */}
+                {floatingCardProperty.property.standardStatus && (
+                  <div className="absolute top-2 left-2">
+                    <Badge 
+                      className={cn(
+                        floatingCardProperty.property.standardStatus === 'Active' && "bg-emerald-500 text-white",
+                        floatingCardProperty.property.standardStatus === 'Under Contract' && "bg-amber-500 text-white",
+                        floatingCardProperty.property.standardStatus === 'Closed' && "bg-slate-500 text-white"
+                      )}
+                    >
+                      {floatingCardProperty.property.standardStatus}
+                    </Badge>
+                  </div>
+                )}
+              </div>
+
+              {/* Price */}
+              <div className="mb-4">
+                <p className="text-2xl font-bold text-primary" data-testid="text-floating-price">
+                  {floatingCardProperty.property.listPrice 
+                    ? new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(Number(floatingCardProperty.property.listPrice))
+                    : 'Price upon request'}
+                </p>
+                {floatingCardProperty.property.listPrice && floatingCardProperty.property.livingArea && (
+                  <p className="text-sm text-muted-foreground">
+                    ${(Number(floatingCardProperty.property.listPrice) / Number(floatingCardProperty.property.livingArea)).toFixed(0)}/sqft
+                  </p>
+                )}
+              </div>
+
+              {/* Address */}
+              <div className="flex items-start gap-2 mb-4">
+                <MapPin className="w-4 h-4 mt-0.5 text-muted-foreground shrink-0" />
+                <div>
+                  <p className="font-medium" data-testid="text-floating-address">
+                    {floatingCardProperty.property.unparsedAddress || 'Address not available'}
+                  </p>
+                  <p className="text-sm text-muted-foreground">
+                    {[
+                      floatingCardProperty.property.city,
+                      floatingCardProperty.property.stateOrProvince,
+                      floatingCardProperty.property.postalCode
+                    ].filter(Boolean).join(', ')}
+                  </p>
+                </div>
+              </div>
+
+              <Separator className="my-4" />
+
+              {/* Key Stats */}
+              <div className="grid grid-cols-3 gap-4 mb-4">
+                {floatingCardProperty.property.bedroomsTotal !== null && (
+                  <div className="text-center">
+                    <div className="flex items-center justify-center gap-1 text-muted-foreground mb-1">
+                      <Bed className="w-4 h-4" />
+                    </div>
+                    <p className="font-semibold" data-testid="text-floating-beds">{floatingCardProperty.property.bedroomsTotal}</p>
+                    <p className="text-xs text-muted-foreground">Beds</p>
+                  </div>
+                )}
+                {floatingCardProperty.property.bathroomsTotalInteger !== null && (
+                  <div className="text-center">
+                    <div className="flex items-center justify-center gap-1 text-muted-foreground mb-1">
+                      <Bath className="w-4 h-4" />
+                    </div>
+                    <p className="font-semibold" data-testid="text-floating-baths">{floatingCardProperty.property.bathroomsTotalInteger}</p>
+                    <p className="text-xs text-muted-foreground">Baths</p>
+                  </div>
+                )}
+                {floatingCardProperty.property.livingArea && (
+                  <div className="text-center">
+                    <div className="flex items-center justify-center gap-1 text-muted-foreground mb-1">
+                      <Maximize className="w-4 h-4" />
+                    </div>
+                    <p className="font-semibold" data-testid="text-floating-sqft">{Number(floatingCardProperty.property.livingArea).toLocaleString()}</p>
+                    <p className="text-xs text-muted-foreground">Sq Ft</p>
+                  </div>
+                )}
+              </div>
+
+              {/* Additional Details */}
+              <div className="space-y-2 mb-4">
+                {floatingCardProperty.property.yearBuilt && (
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">Year Built</span>
+                    <span className="font-medium">{floatingCardProperty.property.yearBuilt}</span>
+                  </div>
+                )}
+                {floatingCardProperty.property.propertySubType && (
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">Property Type</span>
+                    <span className="font-medium">{floatingCardProperty.property.propertySubType}</span>
+                  </div>
+                )}
+                {(floatingCardProperty.property as any).garageSpaces && (
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">Garage</span>
+                    <span className="font-medium">{(floatingCardProperty.property as any).garageSpaces} spaces</span>
+                  </div>
+                )}
+                {floatingCardProperty.property.daysOnMarket !== null && floatingCardProperty.property.daysOnMarket !== undefined && (
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">Days on Market</span>
+                    <span className="font-medium">{floatingCardProperty.property.daysOnMarket} days</span>
+                  </div>
+                )}
+                {(floatingCardProperty.property.subdivision || (floatingCardProperty.property as any).subdivisionName) && (
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">Subdivision</span>
+                    <span className="font-medium">{floatingCardProperty.property.subdivision || (floatingCardProperty.property as any).subdivisionName}</span>
+                  </div>
+                )}
+              </div>
+
+              <Separator className="my-4" />
+
+              {/* View Full Details Button */}
+              <Button 
+                className="w-full" 
+                onClick={handleViewFullDetails}
+                data-testid="button-view-full-details"
+              >
+                <ExternalLink className="w-4 h-4 mr-2" />
+                View Full Details
+              </Button>
+            </>
+          )}
+        </SheetContent>
+      </Sheet>
     </div>
   );
 }

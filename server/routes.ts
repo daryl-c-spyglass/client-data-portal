@@ -104,6 +104,8 @@ function calculateTimelineFromProperties(properties: any[]): TimelineDataPoint[]
       status: (p.standardStatus || p.status || 'Active') as 'Active' | 'Under Contract' | 'Closed',
       propertyId: p.id,
       address: p.unparsedAddress || p.address || 'Unknown',
+      daysOnMarket: p.daysOnMarket ?? null,
+      cumulativeDaysOnMarket: p.cumulativeDaysOnMarket ?? p.daysOnMarket ?? null,
     }))
     .sort((a, b) => a.date.getTime() - b.date.getTime());
 }
@@ -1216,13 +1218,18 @@ This email was sent by ${senderName} (${senderEmail}) via the MLS Grid IDX Platf
         if (!response.ok) {
           throw new Error('Failed to send email via SendGrid');
         }
+        res.json({ success: true, message: "Email sent successfully", emailSent: true, shareUrl });
       } else {
         console.log('📧 [CMA Email Share] SendGrid not configured. Email would have been sent:');
         console.log(`   To: ${recipientEmail}`);
         console.log(`   Subject: ${senderName} shared a CMA with you: ${cma.name}`);
+        res.json({ 
+          success: true, 
+          message: "Email service not configured. Copy the link below to share manually.", 
+          emailSent: false, 
+          shareUrl 
+        });
       }
-
-      res.json({ success: true, message: "CMA shared successfully" });
     } catch (error) {
       console.error("Error sharing CMA via email:", error);
       res.status(500).json({ error: "Failed to share CMA" });
@@ -1579,6 +1586,9 @@ This email was sent by ${senderName} (${senderEmail}) via the MLS Grid IDX Platf
           price: Number(p.closePrice || p.listPrice),
           status: p.standardStatus || 'Unknown',
           propertyId: p.id || p.listingId,
+          address: p.unparsedAddress || p.address || 'Unknown',
+          daysOnMarket: p.daysOnMarket ?? null,
+          cumulativeDaysOnMarket: p.cumulativeDaysOnMarket ?? p.daysOnMarket ?? null,
         }))
         .sort((a: any, b: any) => new Date(a.date).getTime() - new Date(b.date).getTime());
 

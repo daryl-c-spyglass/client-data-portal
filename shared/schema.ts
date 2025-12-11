@@ -535,4 +535,6 @@ export interface TimelineDataPoint {
   status: 'Active' | 'Under Contract' | 'Closed';
   propertyId: string;
   address: string;
+  daysOnMarket?: number | null;
+  cumulativeDaysOnMarket?: number | null;
 }
