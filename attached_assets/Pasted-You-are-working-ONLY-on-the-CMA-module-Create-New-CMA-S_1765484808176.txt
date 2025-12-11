@@ -1,0 +1,90 @@
+You are working ONLY on the CMA module → “Create New CMA” → Search Results (NOT IDX or public search).
+
+Issue:
+When I search CMAs with:
+- Subdivision: Cherry Creek
+- Property Type: Single Family Residence
+- Status: Sold
+
+…the Search Results still show obviously low-price “sales” (e.g. $1,800, $1,850, $1,895, $1,400, $1,395, $2,200). These are actually rentals/leases that should not appear in a Sold CMA search.
+
+The rental filtering you recently added only affects the CMA Detail / Analysis endpoint, not the initial CMA Search Results.
+
+Use the attached screenshot as reference: results include properties like:
+- 8602 Bisbee Ct – $1,895
+- 2830 Gettysburg Dr – $2,200
+- 8504 Apple Carric Cv #B – $1,400
+- 5936 Cherry Loop #A – $1,395
+- 3318 Silkgrass Bnd – $1,800
+…all with “Sold” badges but clearly rental-style pricing.
+
+========================================
+1) Apply rental filtering to CMA Search Results
+========================================
+
+Requirements:
+
+1. Reuse the centralized rental detection logic you already created:
+   - `isLikelyRentalProperty()`
+   - `filterOutRentalProperties()`
+   - in `shared/schema.ts`
+
+2. In the CMA **search endpoint** used by “Create New CMA”:
+   - After fetching properties from Repliers, but BEFORE returning them to the frontend:
+     • Call `filterOutRentalProperties()` to remove any likely rentals from the result set.
+   - This must be done for ALL status filters in the CMA search, especially:
+     • Sold / Closed
+     • Active
+     • Under Contract
+
+3. Ensure that:
+   - The “Search Results (N found)” count reflects the filtered list (rentals are not counted).
+   - The UI only shows true sale listings (e.g., $188,000, $214,000, $292,000, etc.), not monthly rent amounts.
+
+========================================
+2) Confirm property type & status behavior
+========================================
+
+1. Verify that when the user selects:
+   - Property Type = Single Family Residence
+   - Status = Sold
+   - Subdivision = Cherry Creek
+
+…the backend:
+   - Filters ONLY Single Family Residential sale listings.
+   - Excludes rental/lease records, even if they are marked as “Sold” or “Closed” in the MLS but priced like rent.
+
+2. Make sure the same rental detection is NOT limited to the CMA Detail endpoint; it must be consistently used in:
+   - CMA search results endpoint
+   - CMA detail/analysis endpoint
+   - Any other CMA endpoints that surface comparable lists.
+
+========================================
+3) Testing you MUST perform
+========================================
+
+1. Run a CMA search with:
+   - Subdivision: Cherry Creek
+   - Property Type: Single Family Residence
+   - Status: Sold
+
+2. Verify:
+   - The low-price rentals ($1,395–$2,200) are NO LONGER present in Search Results.
+   - Only realistic sale prices remain (e.g., $188k, $214k, $292k, $297.5k, $330k, $401k, etc.).
+   - “Search Results (N found)” count matches the number of non-rental properties shown.
+
+3. Generate a CMA from these search results and confirm:
+   - Rentals are still properly filtered out in:
+     • Properties Used in Analysis
+     • Market Stats
+     • Timeline
+     • Any other CMA lists.
+
+========================================
+4) Report back
+========================================
+
+In your final notes, please include:
+- Which CMA search endpoint(s) you updated to use `filterOutRentalProperties()`.
+- A list of at least 3 addresses that were previously shown as low-price rentals and are now correctly filtered out in CMA searches.
+- Confirmation that the Cherry Creek Single Family / Sold search returns only true sale comps with realistic prices.

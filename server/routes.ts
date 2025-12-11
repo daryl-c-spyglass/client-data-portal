@@ -790,9 +790,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
         allResults = allResults.concat(applyFilters(statusFilteredResults));
       }
 
-      // Remove duplicates (by id) and limit
+      // Remove duplicates (by id)
       const uniqueResults = Array.from(new Map(allResults.map(r => [r.id, r])).values());
-      const finalResults = uniqueResults.slice(0, parsedLimit);
+      
+      // Apply rental filtering to remove properties that are actually rentals
+      // (e.g., closePrice is monthly rent, not sale price)
+      const beforeRentalFilter = uniqueResults.length;
+      const nonRentalResults = filterOutRentals(uniqueResults);
+      if (beforeRentalFilter !== nonRentalResults.length) {
+        console.log(`📦 Search: Filtered out ${beforeRentalFilter - nonRentalResults.length} rental properties from search results`);
+      }
+      
+      // Apply limit after rental filtering
+      const finalResults = nonRentalResults.slice(0, parsedLimit);
 
       console.log(`📦 Multi-status search returned ${finalResults.length} listings from ${statusList.join(', ')}`);
 
@@ -894,7 +904,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Pass limit and offset to storage layer for database-level pagination
       const paginatedProperties = await storage.getProperties(criteria, limit, offset);
       
-      res.json(paginatedProperties);
+      // Apply rental filtering to remove properties that are actually rentals
+      const filteredProperties = filterOutRentals(paginatedProperties);
+      
+      res.json(filteredProperties);
     } catch (error) {
       if (error instanceof z.ZodError) {
         console.error("Search validation error:", error.errors);
