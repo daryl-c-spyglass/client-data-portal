@@ -1132,35 +1132,38 @@ export function CMABuilder({ onCreateCMA, initialData }: CMABuilderProps) {
                 
                 {/* Photo Carousel */}
                 {photos.length > 0 ? (
-                  <div className="relative group">
-                    <div className="aspect-video bg-muted rounded-md overflow-hidden">
-                      <img 
-                        src={photos[currentPhotoIndex]} 
-                        alt={`Property photo ${currentPhotoIndex + 1}`}
-                        className="w-full h-full object-cover"
-                      />
-                    </div>
+                  <div className="relative aspect-video bg-muted rounded-md overflow-hidden">
+                    <img 
+                      src={photos[currentPhotoIndex]} 
+                      alt={`Property photo ${currentPhotoIndex + 1}`}
+                      className="w-full h-full object-cover"
+                      data-testid="img-cma-carousel"
+                    />
+                    {/* Click zones for navigation - invisible, covering full halves */}
                     {photos.length > 1 && (
                       <>
-                        <Button 
-                          size="icon" 
-                          variant="secondary"
-                          className="absolute left-0 top-1/2 -translate-y-1/2 h-full w-12 rounded-none rounded-l-md bg-black/30 hover:bg-black/50 text-white border-0"
-                          onClick={() => setCurrentPhotoIndex(prev => (prev - 1 + photos.length) % photos.length)}
-                          data-testid="button-prev-photo"
+                        {/* Left click zone - covers left half */}
+                        <div 
+                          className="absolute left-0 top-0 w-1/2 h-full cursor-pointer z-10 group"
+                          onClick={(e) => { e.stopPropagation(); setCurrentPhotoIndex(prev => (prev - 1 + photos.length) % photos.length); }}
+                          data-testid="zone-cma-carousel-prev"
                         >
-                          <ChevronLeft className="w-6 h-6" />
-                        </Button>
-                        <Button 
-                          size="icon" 
-                          variant="secondary"
-                          className="absolute right-0 top-1/2 -translate-y-1/2 h-full w-12 rounded-none rounded-r-md bg-black/30 hover:bg-black/50 text-white border-0"
-                          onClick={() => setCurrentPhotoIndex(prev => (prev + 1) % photos.length)}
-                          data-testid="button-next-photo"
+                          <div className="absolute left-3 top-1/2 -translate-y-1/2 bg-black/50 hover:bg-black/70 text-white p-2 rounded-full transition-all opacity-70 group-hover:opacity-100">
+                            <ChevronLeft className="w-5 h-5" />
+                          </div>
+                        </div>
+                        {/* Right click zone - covers right half */}
+                        <div 
+                          className="absolute right-0 top-0 w-1/2 h-full cursor-pointer z-10 group"
+                          onClick={(e) => { e.stopPropagation(); setCurrentPhotoIndex(prev => (prev + 1) % photos.length); }}
+                          data-testid="zone-cma-carousel-next"
                         >
-                          <ChevronRight className="w-6 h-6" />
-                        </Button>
-                        <div className="absolute bottom-3 left-1/2 -translate-x-1/2 bg-black/60 text-white px-3 py-1.5 rounded-full text-sm font-medium">
+                          <div className="absolute right-3 top-1/2 -translate-y-1/2 bg-black/50 hover:bg-black/70 text-white p-2 rounded-full transition-all opacity-70 group-hover:opacity-100">
+                            <ChevronRight className="w-5 h-5" />
+                          </div>
+                        </div>
+                        {/* Photo counter */}
+                        <div className="absolute bottom-3 left-1/2 -translate-x-1/2 bg-black/60 text-white px-3 py-1.5 rounded-full text-sm font-medium z-20">
                           {currentPhotoIndex + 1} / {photos.length}
                         </div>
                       </>
