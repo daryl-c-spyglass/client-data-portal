@@ -540,3 +540,105 @@ export interface TimelineDataPoint {
   daysUnderContract?: number | null;
   cumulativeDaysOnMarket?: number | null;
 }
+
+// ============================================================================
+// RENTAL DETECTION LOGIC (shared between server and client)
+// ============================================================================
+// These thresholds help identify rental listings that are incorrectly marked 
+// as "Closed" sales. In the MLS, closePrice for rentals represents monthly rent,
+// not sale price.
+// ============================================================================
+
+/**
+ * Minimum expected sale price for a residential property.
+ * Properties with closePrice below this are likely rental listings.
+ * Note: This may incorrectly filter some edge cases like manufactured homes,
+ * rural land, or distressed properties. Those cases are rare in typical CMA usage.
+ */
+export const MIN_SALE_PRICE_THRESHOLD = 20000;
+
+/**
+ * Minimum price per square foot to be considered a legitimate sale.
+ * Rental listings typically have $/sqft in the $1-5 range (monthly rent / sqft).
+ * Legitimate sales are typically $50-500+/sqft depending on the market.
+ */
+export const MIN_PRICE_PER_SQFT_THRESHOLD = 10;
+
+/**
+ * Property types that are typically NOT subject to rental detection.
+ * These types often have legitimate low sale prices.
+ */
+export const EXCLUDED_PROPERTY_TYPES = [
+  'Unimproved Land',
+  'Land',
+  'Lot',
+  'Ranch', // Often large acreage with low $/sqft
+];
+
+/**
+ * Detect if a property is likely a rental listing masquerading as a "Closed" sale.
+ * Returns true if the property appears to be a rental, false if it's a legitimate sale.
+ * 
+ * @param property - Property object with closePrice, listPrice, livingArea, standardStatus, propertySubType
+ * @returns true if likely a rental, false if likely a legitimate sale
+ */
+export function isLikelyRentalProperty(property: {
+  closePrice?: number | string | null;
+  listPrice?: number | string | null;
+  livingArea?: number | string | null;
+  standardStatus?: string | null;
+  status?: string | null;
+  propertySubType?: string | null;
+  propertyType?: string | null;
+}): boolean {
+  const closePrice = Number(property.closePrice || 0);
+  const livingArea = Number(property.livingArea || 0);
+  const status = property.standardStatus || property.status || '';
+  const propType = property.propertySubType || property.propertyType || '';
+  
+  // Only apply rental detection to "Closed" or "Sold" properties
+  if (status !== 'Closed' && status !== 'Sold') {
+    return false;
+  }
+  
+  // Skip detection for property types that commonly have low sale prices
+  if (EXCLUDED_PROPERTY_TYPES.some(t => propType.toLowerCase().includes(t.toLowerCase()))) {
+    return false;
+  }
+  
+  // If closePrice is very low (< threshold), it's likely monthly rent
+  if (closePrice > 0 && closePrice < MIN_SALE_PRICE_THRESHOLD) {
+    return true;
+  }
+  
+  // If we have both closePrice and livingArea, check price per sqft
+  // Rental listings have extremely low $/sqft (typically $1-5/sqft for monthly rent)
+  // Real sales are typically $50-500+/sqft depending on market
+  if (closePrice > 0 && livingArea > 0) {
+    const pricePerSqft = closePrice / livingArea;
+    if (pricePerSqft < MIN_PRICE_PER_SQFT_THRESHOLD) {
+      return true;
+    }
+  }
+  
+  return false;
+}
+
+/**
+ * Filter out rental properties from an array of properties.
+ * Use this when preparing property data for CMA analysis.
+ * 
+ * @param properties - Array of property objects
+ * @returns Filtered array with rental properties removed
+ */
+export function filterOutRentalProperties<T extends {
+  closePrice?: number | string | null;
+  listPrice?: number | string | null;
+  livingArea?: number | string | null;
+  standardStatus?: string | null;
+  status?: string | null;
+  propertySubType?: string | null;
+  propertyType?: string | null;
+}>(properties: T[]): T[] {
+  return properties.filter(p => !isLikelyRentalProperty(p));
+}

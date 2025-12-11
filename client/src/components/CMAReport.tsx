@@ -12,6 +12,7 @@ import { Separator } from "@/components/ui/separator";
 import { Checkbox } from "@/components/ui/checkbox";
 import { cn } from "@/lib/utils";
 import type { Property, PropertyStatistics, TimelineDataPoint, Media } from "@shared/schema";
+import { isLikelyRentalProperty, filterOutRentalProperties } from "@shared/schema";
 
 type StatMetricKey = 'price' | 'pricePerSqFt' | 'daysOnMarket' | 'livingArea' | 'lotSize' | 'acres' | 'bedrooms' | 'bathrooms' | 'yearBuilt';
 
@@ -122,11 +123,20 @@ export function CMAReport({
     }
   };
 
-  // Group properties by status
+  // Group properties by status, filtering out rentals from sold properties
+  // Uses shared rental detection logic from @shared/schema
   const allProperties = properties;
-  const soldProperties = properties.filter(p => p.standardStatus === 'Closed');
+  const closedProperties = properties.filter(p => p.standardStatus === 'Closed');
+  const soldProperties = filterOutRentalProperties(closedProperties);
+  const rentalProperties = closedProperties.filter(p => isLikelyRentalProperty(p));
   const underContractProperties = properties.filter(p => p.standardStatus === 'Under Contract');
   const activeProperties = properties.filter(p => p.standardStatus === 'Active');
+  
+  // Log filtered rentals for debugging
+  if (rentalProperties.length > 0) {
+    console.log(`CMAReport: Filtered ${rentalProperties.length} rental properties from Sold section:`, 
+      rentalProperties.map(p => `${p.unparsedAddress}: $${Number(p.closePrice).toLocaleString()}`));
+  }
 
   // Prepare chart data
   const priceRangeData = [

@@ -1,0 +1,119 @@
+You are working ONLY on the CMA module → CMA RESULT page → “Properties Used in Analysis” section.
+
+Goal:
+Investigate and fix why the SOLD property amounts shown in “Properties Used in Analysis” are extremely low (e.g., $1,800, $1,850, $1,895, $188,000, $214,000) and likely incorrect for closing sale prices.
+
+Use the screenshot as a reference: “Properties Used in Analysis (5)” with 3318 Silkgrass Bnd, 2103 Falcon Hill Dr, 8602 Bisbee Ct, 0 Deatonhill Dr, Lindeman Ln – all flagged as Sold, but with suspiciously low dollar amounts.
+
+====================================================
+1) Confirm which field is being used for the displayed SOLD price
+====================================================
+
+For the properties listed in the screenshot (all Sold):
+
+- 3318 Silkgrass Bnd
+- 2103 Falcon Hill Dr
+- 8602 Bisbee Ct
+- 0 Deatonhill Dr
+- Lindeman Ln
+
+Do the following:
+
+1. Query the underlying data source (Repliers) for each of these exact properties and inspect:
+   - ListPrice
+   - ClosePrice / SoldPrice / PurchasePrice
+   - Rent-related fields (e.g., LeaseAmount, MonthlyRent, etc.)
+   - PricePerSquareFoot or any per-unit price fields
+   - Any currency/amount fields that might be used in mapping
+
+2. Identify which field our CMA “Properties Used in Analysis” UI is currently reading for the main price displayed in orange.
+
+3. Determine whether the values shown ($1,800, $1,850, $1,895, etc.) correspond to:
+   - Monthly rent
+   - Per-square-foot pricing
+   - A mis-scaled amount (e.g., divided by 1000 or 100)
+   - Or some other incorrect mapping
+
+====================================================
+2) Audit price mapping for SOLD properties in CMA
+====================================================
+
+1. Locate the code responsible for populating the “Properties Used in Analysis” list in CMA Result:
+   - Component or template used to render this section.
+   - API/endpoint that feeds this data (CMA analysis endpoint).
+
+2. Verify that for SOLD properties, the **displayed amount** is always using the appropriate SOLD price from Repliers (e.g., ClosePrice, ClosePricePublic) and NOT:
+   - ListPrice
+   - Rent/lease price
+   - Price per month
+   - Price per square foot
+   - Any field that could be misinterpreted as total sale price.
+
+3. Confirm any currency/amount scaling:
+   - Ensure we are not dividing or multiplying by 100 or 1000 incorrectly.
+   - Ensure cents vs dollars are handled correctly.
+
+4. Verify that the same, correct SOLD price field is used consistently in:
+   - “Properties Used in Analysis” list
+   - Market Stats
+   - Timeline
+   - Floating property card for Sold listings
+
+====================================================
+3) Cross-check against external references
+====================================================
+
+For at least one or two of these properties:
+
+- Compare the SOLD price in Repliers with:
+  - The price shown in the MLS (if available)
+  - Public portals (e.g., Zillow) as a sanity check
+
+Confirm that Repliers ClosePrice matches real-world sale price. If Repliers data itself is wrong, note that in the report; if our mapping is wrong, fix it.
+
+====================================================
+4) Fix any incorrect mapping and formatting
+====================================================
+
+If you find that the wrong field is used or values are mis-scaled:
+
+1. Update the CMA price mapping logic so that:
+   - SOLD properties always display the correct Repliers SOLD/CLOSE price.
+   - Active/Under Contract properties display the correct LIST price.
+   - Rent-related or per-unit fields are NEVER used as the main dollar amount in CMA analysis.
+
+2. Ensure price formatting:
+   - Use standard currency formatting (e.g., $643,000 not $643000 or $643).
+
+3. Add tests to cover:
+   - A Sold property with a realistic sale price.
+   - A rental property (if present) to ensure rent does not get misused in CMA Sold pricing.
+   - A property with both list and close prices present.
+
+====================================================
+5) Testing in CMA Result UI
+====================================================
+
+1. Re-generate a CMA that includes the same or similar Sold properties.
+2. Go to CMA Result → “Properties Used in Analysis”.
+3. Confirm:
+   - Each Sold property shows a realistic sale price that matches Repliers ClosePrice.
+   - The suspicious low values ($1,800, $1,850, $1,895) are corrected to the true sale prices.
+   - The floating card for each Sold property also shows the same correct sold price.
+4. Confirm that Active and Under Contract properties are unaffected and still show appropriate list prices.
+
+====================================================
+6) Report back
+====================================================
+
+In your final notes, provide:
+
+1. For each property in the screenshot:
+   - Repliers ClosePrice and ListPrice.
+   - Which field we were using before, and which field we use now.
+
+2. The exact root cause (e.g., “we were using <LeaseAmount> instead of ClosePrice for Sold entries”).
+
+3. Files/components and lines of code updated.
+
+4. Confirmation that the CMA Result UI now shows correct SOLD prices in “Properties Used in Analysis” and related sections.

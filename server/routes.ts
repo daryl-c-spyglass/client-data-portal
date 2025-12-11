@@ -6,7 +6,7 @@ import { triggerManualSync } from "./mlsgrid-sync";
 import { getHomeReviewClient, mapHomeReviewPropertyToSchema, type PropertySearchParams } from "./homereview-client";
 import { initRepliersClient, getRepliersClient, isRepliersConfigured } from "./repliers-client";
 import { geocodeAddress, geocodeProperties, isMapboxConfigured } from "./mapbox-geocoding";
-import { searchCriteriaSchema, insertCmaSchema, insertUserSchema, insertSellerUpdateSchema, updateSellerUpdateSchema, updateLeadGateSettingsSchema } from "@shared/schema";
+import { searchCriteriaSchema, insertCmaSchema, insertUserSchema, insertSellerUpdateSchema, updateSellerUpdateSchema, updateLeadGateSettingsSchema, isLikelyRentalProperty, filterOutRentalProperties } from "@shared/schema";
 import { findMatchingProperties, calculateMarketSummary } from "./seller-update-service";
 import { z } from "zod";
 import bcrypt from "bcryptjs";
@@ -14,6 +14,21 @@ import passport from "passport";
 import { requireAuth, requireRole } from "./auth";
 import { fetchExternalUsers, fetchFromExternalApi } from "./external-api";
 import type { PropertyStatistics, TimelineDataPoint } from "@shared/schema";
+
+// Wrapper around shared filterOutRentalProperties that adds logging
+function filterOutRentals(properties: any[]): any[] {
+  const beforeCount = properties.length;
+  const rentals = properties.filter(p => isLikelyRentalProperty(p));
+  const validProperties = filterOutRentalProperties(properties);
+  
+  if (rentals.length > 0) {
+    rentals.forEach(p => {
+      console.log(`🏠 Rental detected: ${p.unparsedAddress || p.address} - closePrice: $${Number(p.closePrice).toLocaleString()}`);
+    });
+    console.log(`🏠 Filtered out ${rentals.length} rental properties from analysis`);
+  }
+  return validProperties;
+}
 
 // Helper function to calculate statistics from property data directly
 function calculateStatisticsFromProperties(properties: any[]): PropertyStatistics {
@@ -1154,6 +1169,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
         res.status(404).json({ error: "CMA not found" });
         return;
       }
+      
+      // Filter out rental properties from propertiesData if present
+      // This ensures consistent data for all API consumers
+      if ((cma as any).propertiesData && Array.isArray((cma as any).propertiesData)) {
+        const originalCount = (cma as any).propertiesData.length;
+        (cma as any).propertiesData = filterOutRentals((cma as any).propertiesData);
+        if ((cma as any).propertiesData.length !== originalCount) {
+          console.log(`📋 CMA Detail - Filtered ${originalCount - (cma as any).propertiesData.length} rental properties`);
+        }
+      }
+      
       res.json(cma);
     } catch (error) {
       res.status(500).json({ error: "Failed to fetch CMA" });
@@ -1603,6 +1629,15 @@ This email was sent by ${senderName} (${senderEmail}) via the MLS Grid IDX Platf
       // Use stored propertiesData, or fetch from IDs if not available
       let properties = (cma as any).propertiesData || [];
       
+      // Always filter out rental properties (apply to both stored propertiesData and fetched properties)
+      if (properties.length > 0) {
+        const beforeCount = properties.length;
+        properties = filterOutRentals(properties);
+        if (properties.length !== beforeCount) {
+          console.log(`📊 CMA Statistics - Filtered ${beforeCount - properties.length} rental properties from stored propertiesData`);
+        }
+      }
+      
       // If propertiesData is empty but we have comparablePropertyIds, fetch them
       if (properties.length === 0 && cma.comparablePropertyIds && cma.comparablePropertyIds.length > 0) {
         console.log('📊 CMA Statistics - No propertiesData, fetching from comparablePropertyIds:', cma.comparablePropertyIds);
@@ -1657,6 +1692,13 @@ This email was sent by ${senderName} (${senderEmail}) via the MLS Grid IDX Platf
         );
         properties = fetchedProperties.filter((p: any) => p !== null);
         console.log('📊 CMA Statistics - Fetched', properties.length, 'properties from IDs');
+      }
+      
+      // Filter out rental properties (where closePrice is actually monthly rent, not sale price)
+      const originalCount = properties.length;
+      properties = filterOutRentals(properties);
+      if (properties.length !== originalCount) {
+        console.log(`📊 CMA Statistics - Filtered ${originalCount - properties.length} rental properties, ${properties.length} valid properties remain`);
       }
       
       if (properties.length === 0) {
@@ -1750,7 +1792,9 @@ This email was sent by ${senderName} (${senderEmail}) via the MLS Grid IDX Platf
         return;
       }
 
-      const properties = (cma as any).propertiesData || [];
+      // Get properties and filter out rentals
+      const rawProperties = (cma as any).propertiesData || [];
+      const properties = filterOutRentals(rawProperties);
       
       const timelineData = properties
         .filter((p: any) => p.closeDate || p.listingContractDate)
