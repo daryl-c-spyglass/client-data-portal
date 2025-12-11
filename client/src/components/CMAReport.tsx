@@ -487,7 +487,7 @@ export function CMAReport({
 
         {/* Market Stats Tab */}
         <TabsContent value="market-stats" className="space-y-6">
-          {/* Key Metrics Row */}
+          {/* Key Metrics Row - Prioritized: Avg Price, Median Price, Price/SqFt, Avg DOM */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
             <Card>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 gap-1">
@@ -501,11 +501,11 @@ export function CMAReport({
 
             <Card>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 gap-1">
-                <CardTitle className="text-sm font-medium">Avg DOM</CardTitle>
+                <CardTitle className="text-sm font-medium">Median Price</CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">{Math.round(statistics.daysOnMarket.average)}</div>
-                <p className="text-xs text-muted-foreground">Days on market</p>
+                <div className="text-2xl font-bold">${Math.round(statistics.price.median).toLocaleString()}</div>
+                <p className="text-xs text-muted-foreground">50th percentile</p>
               </CardContent>
             </Card>
 
@@ -521,14 +521,71 @@ export function CMAReport({
 
             <Card>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 gap-1">
-                <CardTitle className="text-sm font-medium">Price Range</CardTitle>
+                <CardTitle className="text-sm font-medium">Avg DOM</CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="text-lg font-bold">${(statistics.price.range.min / 1000).toFixed(0)}K - ${(statistics.price.range.max / 1000).toFixed(0)}K</div>
-                <p className="text-xs text-muted-foreground">Min to max</p>
+                <div className="text-2xl font-bold">{Math.round(statistics.daysOnMarket.average)}</div>
+                <p className="text-xs text-muted-foreground">Days on market</p>
               </CardContent>
             </Card>
           </div>
+
+          {/* CMA Market Review Summary */}
+          <Card className="border-primary/30 bg-primary/5">
+            <CardHeader>
+              <CardTitle className="text-lg flex items-center gap-2">
+                <FileText className="w-5 h-5" />
+                CMA Market Review
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <h4 className="font-semibold text-sm">Market Overview</h4>
+                  <p className="text-sm text-muted-foreground">
+                    Based on {allProperties.length} comparable properties, the average price is{' '}
+                    <span className="font-semibold text-foreground">${Math.round(statistics.price.average).toLocaleString()}</span>{' '}
+                    with a median of{' '}
+                    <span className="font-semibold text-foreground">${Math.round(statistics.price.median).toLocaleString()}</span>.
+                    {' '}Prices range from ${statistics.price.range.min.toLocaleString()} to ${statistics.price.range.max.toLocaleString()}.
+                  </p>
+                </div>
+                <div className="space-y-2">
+                  <h4 className="font-semibold text-sm">Price Per Square Foot</h4>
+                  <p className="text-sm text-muted-foreground">
+                    Average price per square foot is{' '}
+                    <span className="font-semibold text-foreground">${statistics.pricePerSqFt.average.toFixed(2)}</span>{' '}
+                    across comparable properties. This ranges from ${statistics.pricePerSqFt.range.min.toFixed(2)} to ${statistics.pricePerSqFt.range.max.toFixed(2)}/sqft.
+                  </p>
+                </div>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-2">
+                <div className="space-y-1">
+                  <h4 className="font-semibold text-sm">Days on Market</h4>
+                  <p className="text-sm text-muted-foreground">
+                    Average: <span className="font-semibold text-foreground">{Math.round(statistics.daysOnMarket.average)} days</span>
+                  </p>
+                </div>
+                <div className="space-y-1">
+                  <h4 className="font-semibold text-sm">Property Size</h4>
+                  <p className="text-sm text-muted-foreground">
+                    Avg: <span className="font-semibold text-foreground">{Math.round(statistics.livingArea.average).toLocaleString()} sqft</span>
+                  </p>
+                </div>
+                <div className="space-y-1">
+                  <h4 className="font-semibold text-sm">Bed/Bath</h4>
+                  <p className="text-sm text-muted-foreground">
+                    Avg: <span className="font-semibold text-foreground">{statistics.bedrooms.average.toFixed(1)} beds / {statistics.bathrooms.average.toFixed(1)} baths</span>
+                  </p>
+                </div>
+              </div>
+              <div className="pt-2 border-t">
+                <p className="text-xs text-muted-foreground italic">
+                  This analysis is based on {activeProperties.length} active, {underContractProperties.length} under contract, and {soldProperties.length} sold/closed properties in your selection.
+                </p>
+              </div>
+            </CardContent>
+          </Card>
 
           {/* Status Breakdown with Property Details */}
           {/* Active Properties */}
@@ -545,8 +602,10 @@ export function CMAReport({
               {activeProperties.length > 0 ? (
                 <div className="space-y-3">
                   {activeProperties.map((property) => {
+                    // Check multiple possible photo sources
                     const photos = (property as any).photos as string[] | undefined;
-                    const primaryPhoto = photos?.[0];
+                    const media = (property as any).media as any[] | undefined;
+                    const primaryPhoto = photos?.[0] || media?.[0]?.mediaURL || media?.[0]?.mediaUrl;
                     const price = property.listPrice ? Number(property.listPrice) : 0;
                     const pricePerSqft = property.livingArea ? price / Number(property.livingArea) : null;
                     return (
@@ -594,8 +653,10 @@ export function CMAReport({
               {underContractProperties.length > 0 ? (
                 <div className="space-y-3">
                   {underContractProperties.map((property) => {
+                    // Check multiple possible photo sources
                     const photos = (property as any).photos as string[] | undefined;
-                    const primaryPhoto = photos?.[0];
+                    const media = (property as any).media as any[] | undefined;
+                    const primaryPhoto = photos?.[0] || media?.[0]?.mediaURL || media?.[0]?.mediaUrl;
                     const price = property.listPrice ? Number(property.listPrice) : 0;
                     const pricePerSqft = property.livingArea ? price / Number(property.livingArea) : null;
                     return (
@@ -643,8 +704,10 @@ export function CMAReport({
               {soldProperties.length > 0 ? (
                 <div className="space-y-3">
                   {soldProperties.map((property) => {
+                    // Check multiple possible photo sources
                     const photos = (property as any).photos as string[] | undefined;
-                    const primaryPhoto = photos?.[0];
+                    const media = (property as any).media as any[] | undefined;
+                    const primaryPhoto = photos?.[0] || media?.[0]?.mediaURL || media?.[0]?.mediaUrl;
                     const price = property.closePrice ? Number(property.closePrice) : (property.listPrice ? Number(property.listPrice) : 0);
                     const pricePerSqft = property.livingArea ? price / Number(property.livingArea) : null;
                     return (
@@ -678,15 +741,15 @@ export function CMAReport({
             </CardContent>
           </Card>
 
-          {/* Additional Metrics */}
+          {/* Additional Metrics - Property Features */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
             <Card>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 gap-1">
-                <CardTitle className="text-sm font-medium">Median Price</CardTitle>
+                <CardTitle className="text-sm font-medium">Price Range</CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">${Math.round(statistics.price.median).toLocaleString()}</div>
-                <p className="text-xs text-muted-foreground">50th percentile</p>
+                <div className="text-lg font-bold">${(statistics.price.range.min / 1000).toFixed(0)}K - ${(statistics.price.range.max / 1000).toFixed(0)}K</div>
+                <p className="text-xs text-muted-foreground">Min to max</p>
               </CardContent>
             </Card>
 
