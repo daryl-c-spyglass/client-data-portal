@@ -1,0 +1,198 @@
+You are working on our CMA web app that uses MLS Grid data.
+
+This is a SECOND round of QA fixes.  
+Treat ALL tasks below as NEW tasks based on regression/QA feedback.
+
+Important:
+- Work through each item **one by one, in order**.
+- After completing all fixes + testing, produce a **detailed report** showing:
+  - What was changed.
+  - Components/files affected.
+  - Tests performed.
+  - Test results (pass/fail + notes).
+
+====================================================
+1) Search results – property images missing + floating card behavior
+====================================================
+Context:
+- Property images disappeared after the last update.
+
+Requirements:
+- Restore property images in SEARCH RESULTS:
+  - Each listing card must display a thumbnail/primary photo.
+- When a user CLICKs a property:
+  - Open a floating card/modal showing:
+    - Property information (address, beds, baths, sq ft, status, etc.)
+    - Property images
+
+Image carousel behavior:
+- Use an **automatic carousel**:
+  - Auto-slide every **3 seconds**
+- Include backward/forward controls:
+  - Clicking an arrow should immediately switch image
+  - After clicking, auto-slide resumes after ~3 seconds
+- Ensure smooth timing without conflicts
+
+Testing:
+- Run a search with multiple results.
+- Confirm:
+  - Thumbnails appear
+  - Floating card opens
+  - Carousel autoplays + manual controls work
+
+====================================================
+2) Tooltip / toggle information – Home Average, Listings, Timeline, Market Stats
+====================================================
+Context:
+- Hover/tap text is STILL cut off.
+
+Requirements:
+- Inspect ALL toggle/info icons in:
+  - Home Average
+  - Listings
+  - Timeline
+  - Market Stats
+- Fix visibility issues:
+  - All text MUST show fully
+- Check for:
+  - overflow:hidden containers
+  - missing portals
+  - low z-index
+  - incorrect tooltip positioning
+
+Testing:
+- On desktop + mobile, confirm ALL tooltips show complete text.
+
+====================================================
+3) Price Timeline – convert dots to interactive line graph
+====================================================
+Requirements:
+- Replace the current dot-style timeline with an **interactive line graph**.
+- Line chart must:
+  - Connect all data points
+  - Show date on X-axis
+  - Show price on Y-axis
+  - On hover/tap: show tooltip with exact date + price
+
+Testing:
+- Confirm line renders correctly
+- Confirm tooltips show correct values
+
+====================================================
+4) Reorder Market Stats – move metrics above CMA Market Review
+====================================================
+Requirements:
+Move these metrics ABOVE CMA Market Review:
+  - Price Range
+  - Avg SqFt
+  - Avg Beds
+  - Avg Baths
+
+Order should be:
+1. Metrics (Price Range, Avg SqFt, Avg Beds, Avg Baths)
+2. CMA Market Review (text summary)
+
+Testing:
+- Confirm metrics appear above CMA Market Review.
+
+====================================================
+5) Email CMA to Friend – deliverability, Reply-To, HTML email
+====================================================
+Context:
+- Email was not received when using address: daryl@spyglassrealty.com.
+- The sender field must not break deliverability.
+
+Requirements:
+
+Email sending:
+- MUST send FROM the app's sending domain (NOT user email).
+- User’s “Your Email Address” becomes:
+  - Reply-To field
+  - Optionally CC (if supported)
+
+Email content MUST be HTML and include:
+- CMA Summary (address, key stats)
+- CMA link embedded in body
+- User's comments
+- Clear messaging that email includes HTML and a link
+
+Testing:
+- Send to a real email address
+- Confirm:
+  - Email is received
+  - Reply-To is correct
+  - HTML formatting works
+  - CMA link opens
+
+====================================================
+6) Share CMA link – Instagram & TikTok behavior
+====================================================
+Context:
+- Facebook & X work correctly.
+- Instagram & TikTok do not open correctly.
+
+Requirements:
+For Instagram:
+- Either open Instagram web with a share context OR
+- Copy CMA link to clipboard + show message:
+  “Link copied! Paste into your Instagram post, story, or DM.”
+
+For TikTok:
+- Same fallback approach as Instagram.
+
+Requirements:
+- Buttons MUST NOT be non-functional.
+- Must always:
+  - Copy link OR
+  - Open platform with next-step instructions
+
+Testing:
+- Confirm Instagram & TikTok share buttons:
+  - Copy link to clipboard
+  - Show confirmation message OR open proper page
+
+====================================================
+7) Remove expiration on Share CMA link
+====================================================
+Requirements:
+- Remove expiration entirely.
+- Share links must remain valid indefinitely.
+- Remove any UI that references expiration.
+
+Testing:
+- Generate a new share link and confirm:
+  - No expiration value exists
+  - Link loads successfully
+
+====================================================
+8) Market Stats – property thumbnail images missing (NEW)
+====================================================
+Context:
+- Thumbnail images in Market Stats listing section are missing.
+
+Requirements:
+- Restore property thumbnail/primary images inside Market Stats.
+- For each property listed in Market Stats:
+  - Display a thumbnail image
+  - Use the same image logic used in search results & CMA report
+  - Include fallback image if no photos exist
+
+Testing:
+- Open Market Stats with multiple properties:
+  - Confirm thumbnails appear for each property
+  - Confirm fallback image appears when needed
+
+====================================================
+Final step – Detailed report
+====================================================
+After implementing and testing ALL items 1–8:
+
+Produce a detailed written report including:
+- Per-item explanation of:
+  - What was changed
+  - Files/components touched
+  - Testing performed
+  - Test results
+- Note any limitations or suggested follow-up items.
+
+Report must be written so non-technical stakeholders can understand it.

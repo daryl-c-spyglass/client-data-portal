@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, Legend, ResponsiveContainer, ScatterChart, Scatter } from "recharts";
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, Legend, ResponsiveContainer, LineChart, Line, ReferenceLine } from "recharts";
 import { Save, Edit, FileText, Printer, Info, Home, Mail } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import type { Property, PropertyStatistics, TimelineDataPoint } from "@shared/schema";
@@ -408,8 +408,8 @@ export function CMAReport({
                     <span className="text-sm">Closed</span>
                   </div>
                   <div className="flex items-center gap-2">
-                    <div className="w-3 h-3 bg-blue-500"></div>
-                    <span className="text-sm">Trend Line</span>
+                    <div className="w-3 h-1 bg-blue-500"></div>
+                    <span className="text-sm">Avg Price</span>
                   </div>
                 </div>
               </div>
@@ -418,19 +418,28 @@ export function CMAReport({
               {timelineData.length > 0 ? (
                 <div className="h-[400px]">
                   <ResponsiveContainer width="100%" height="100%">
-                    <ScatterChart>
+                    <LineChart 
+                      data={timelineData
+                        .map(d => ({ 
+                          ...d, 
+                          dateNum: new Date(d.date).getTime(),
+                          dateLabel: new Date(d.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+                        }))
+                        .sort((a, b) => a.dateNum - b.dateNum)
+                      }
+                    >
                       <CartesianGrid strokeDasharray="3 3" className="stroke-muted/50" />
                       <XAxis 
-                        dataKey="date" 
-                        type="number"
-                        domain={['dataMin', 'dataMax']}
-                        tickFormatter={(value) => new Date(value).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                        dataKey="dateLabel"
                         className="text-xs"
+                        tick={{ fontSize: 11 }}
                       />
                       <YAxis 
                         dataKey="price"
                         tickFormatter={(value) => `$${(value / 1000).toFixed(0)}k`}
                         className="text-xs"
+                        tick={{ fontSize: 11 }}
+                        domain={['auto', 'auto']}
                       />
                       <RechartsTooltip 
                         content={({ active, payload }) => {
@@ -461,16 +470,34 @@ export function CMAReport({
                           return null;
                         }}
                       />
-                      <Scatter 
-                        name="Properties" 
-                        data={timelineData.map(d => ({ 
-                          ...d, 
-                          date: new Date(d.date).getTime(),
-                          fill: d.status === 'Active' ? '#22c55e' : d.status === 'Under Contract' ? '#eab308' : '#ef4444'
-                        }))} 
-                        fill="hsl(var(--primary))"
+                      <ReferenceLine 
+                        y={statistics.price.average} 
+                        stroke="#3b82f6" 
+                        strokeDasharray="5 5" 
+                        label={{ value: 'Avg', position: 'right', fontSize: 11, fill: '#3b82f6' }}
                       />
-                    </ScatterChart>
+                      <Line 
+                        type="monotone"
+                        dataKey="price" 
+                        stroke="hsl(var(--primary))"
+                        strokeWidth={2}
+                        dot={({ cx, cy, payload }) => {
+                          const color = payload.status === 'Active' ? '#22c55e' : 
+                                       payload.status === 'Under Contract' ? '#eab308' : '#ef4444';
+                          return (
+                            <circle 
+                              cx={cx} 
+                              cy={cy} 
+                              r={6} 
+                              fill={color} 
+                              stroke="white" 
+                              strokeWidth={2}
+                            />
+                          );
+                        }}
+                        activeDot={{ r: 8, stroke: 'white', strokeWidth: 2 }}
+                      />
+                    </LineChart>
                   </ResponsiveContainer>
                 </div>
               ) : (
@@ -526,6 +553,49 @@ export function CMAReport({
               <CardContent>
                 <div className="text-2xl font-bold">{Math.round(statistics.daysOnMarket.average)}</div>
                 <p className="text-xs text-muted-foreground">Days on market</p>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Secondary Metrics - Property Features (moved above CMA Market Review per QA request) */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 gap-1">
+                <CardTitle className="text-sm font-medium">Price Range</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-lg font-bold">${(statistics.price.range.min / 1000).toFixed(0)}K - ${(statistics.price.range.max / 1000).toFixed(0)}K</div>
+                <p className="text-xs text-muted-foreground">Min to max</p>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 gap-1">
+                <CardTitle className="text-sm font-medium">Avg SqFt</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">{Math.round(statistics.livingArea.average).toLocaleString()}</div>
+                <p className="text-xs text-muted-foreground">Living area</p>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 gap-1">
+                <CardTitle className="text-sm font-medium">Avg Beds</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">{statistics.bedrooms.average.toFixed(1)}</div>
+                <p className="text-xs text-muted-foreground">Bedrooms</p>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 gap-1">
+                <CardTitle className="text-sm font-medium">Avg Baths</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">{statistics.bathrooms.average.toFixed(1)}</div>
+                <p className="text-xs text-muted-foreground">Bathrooms</p>
               </CardContent>
             </Card>
           </div>
@@ -740,49 +810,6 @@ export function CMAReport({
               )}
             </CardContent>
           </Card>
-
-          {/* Additional Metrics - Property Features */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 gap-1">
-                <CardTitle className="text-sm font-medium">Price Range</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-lg font-bold">${(statistics.price.range.min / 1000).toFixed(0)}K - ${(statistics.price.range.max / 1000).toFixed(0)}K</div>
-                <p className="text-xs text-muted-foreground">Min to max</p>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 gap-1">
-                <CardTitle className="text-sm font-medium">Avg SqFt</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{Math.round(statistics.livingArea.average).toLocaleString()}</div>
-                <p className="text-xs text-muted-foreground">Living area</p>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 gap-1">
-                <CardTitle className="text-sm font-medium">Avg Beds</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{statistics.bedrooms.average.toFixed(1)}</div>
-                <p className="text-xs text-muted-foreground">Bedrooms</p>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 gap-1">
-                <CardTitle className="text-sm font-medium">Avg Baths</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{statistics.bathrooms.average.toFixed(1)}</div>
-                <p className="text-xs text-muted-foreground">Bathrooms</p>
-              </CardContent>
-            </Card>
-          </div>
         </TabsContent>
       </Tabs>
     </div>

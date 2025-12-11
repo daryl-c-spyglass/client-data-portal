@@ -1074,19 +1074,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Always generate a new token (regenerates if one already exists)
+      // Share links are now permanent - no expiration
       const shareToken = crypto.randomUUID();
-      const expiresAt = new Date();
-      expiresAt.setDate(expiresAt.getDate() + 30);
 
       await storage.updateCma(req.params.id, {
         publicLink: shareToken,
-        expiresAt,
+        expiresAt: null, // No expiration - links are permanent
       });
 
       res.json({
         shareToken,
         shareUrl: `/share/cma/${shareToken}`,
-        expiresAt,
       });
     } catch (error) {
       console.error("Error generating share link:", error);
@@ -1240,10 +1238,8 @@ This email was sent by ${senderName} (${senderEmail}) via the MLS Grid IDX Platf
         return;
       }
 
-      if (cma.expiresAt && new Date(cma.expiresAt) < new Date()) {
-        res.status(410).json({ error: "This share link has expired" });
-        return;
-      }
+      // Note: Share links are now permanent - no expiration check needed
+      // Legacy: expiresAt may still exist in old CMAs but is ignored
 
       // Use propertiesData if available (for CMAs created from Repliers API data)
       // Otherwise fall back to fetching by property IDs
@@ -1274,7 +1270,6 @@ This email was sent by ${senderName} (${senderEmail}) via the MLS Grid IDX Platf
           id: cma.id,
           name: cma.name,
           createdAt: cma.createdAt,
-          expiresAt: cma.expiresAt,
         },
         properties,
         statistics,

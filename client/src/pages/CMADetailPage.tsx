@@ -43,7 +43,6 @@ export type StatMetricKey = typeof STAT_METRICS[number]['key'];
 interface ShareResponse {
   shareToken: string;
   shareUrl: string;
-  expiresAt: string;
 }
 
 export default function CMADetailPage() {
@@ -419,11 +418,6 @@ export default function CMADetailPage() {
                       </Button>
                     </div>
                   </div>
-                  {cma.expiresAt && (
-                    <p className="text-sm text-muted-foreground">
-                      Link expires: {new Date(cma.expiresAt).toLocaleDateString()}
-                    </p>
-                  )}
                   
                   {/* Social Media Sharing */}
                   <div className="space-y-2 pt-4 border-t">
@@ -509,7 +503,7 @@ export default function CMADetailPage() {
               ) : (
                 <div className="text-center py-4">
                   <p className="text-muted-foreground mb-4">
-                    Generate a shareable link for this CMA. The link will be valid for 30 days.
+                    Generate a shareable link for this CMA. Links are permanent and can be manually revoked.
                   </p>
                   <Button 
                     onClick={() => shareMutation.mutate()}
