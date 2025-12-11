@@ -413,7 +413,7 @@ export function CMAReport({
           </Card>
         </TabsContent>
 
-        {/* Listings Tab */}
+        {/* Listings Tab - Properties sorted by price low→high */}
         <TabsContent value="listings" className="space-y-6">
           <Tabs value={activeListingTab} onValueChange={setActiveListingTab}>
             <TabsList>
@@ -425,13 +425,115 @@ export function CMAReport({
               <TabsTrigger value="active" data-testid="subtab-active">Active ({activeProperties.length})</TabsTrigger>
             </TabsList>
 
-            <div className="mt-6">
+            <div className="mt-6 space-y-4">
+              {/* Properties List - Sorted by price low→high */}
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-base">
+                    {activeListingTab === 'all' ? 'All Properties' :
+                     activeListingTab === 'sold' ? 'Sold Properties' :
+                     activeListingTab === 'under-contract' ? 'Under Contract' : 'Active Listings'} - Price Low to High
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {(() => {
+                    const filteredProps = activeListingTab === 'all' ? allProperties :
+                      activeListingTab === 'sold' ? soldProperties :
+                      activeListingTab === 'under-contract' ? underContractProperties : activeProperties;
+                    
+                    // Sort by price low→high
+                    const sortedProps = [...filteredProps].sort((a, b) => {
+                      const priceA = a.standardStatus === 'Closed' 
+                        ? (a.closePrice ? Number(a.closePrice) : Number(a.listPrice || 0))
+                        : Number(a.listPrice || 0);
+                      const priceB = b.standardStatus === 'Closed'
+                        ? (b.closePrice ? Number(b.closePrice) : Number(b.listPrice || 0))
+                        : Number(b.listPrice || 0);
+                      return priceA - priceB;
+                    });
+                    
+                    if (sortedProps.length === 0) {
+                      return (
+                        <p className="text-sm text-muted-foreground text-center py-8">
+                          No properties in this category
+                        </p>
+                      );
+                    }
+                    
+                    return (
+                      <div className="space-y-3">
+                        {sortedProps.map((property) => {
+                          const photos = (property as any).photos as string[] | undefined;
+                          const media = (property as any).media as any[] | undefined;
+                          const primaryPhoto = photos?.[0] || media?.[0]?.mediaURL || media?.[0]?.mediaUrl;
+                          const isSold = property.standardStatus === 'Closed';
+                          const price = isSold 
+                            ? (property.closePrice ? Number(property.closePrice) : (property.listPrice ? Number(property.listPrice) : 0))
+                            : (property.listPrice ? Number(property.listPrice) : 0);
+                          const pricePerSqft = property.livingArea ? price / Number(property.livingArea) : null;
+                          
+                          // Status badge styling
+                          const statusConfig = {
+                            'Active': { bg: 'bg-green-100 dark:bg-green-900/30', text: 'text-green-700 dark:text-green-400', border: 'border-green-200 dark:border-green-800' },
+                            'Under Contract': { bg: 'bg-yellow-100 dark:bg-yellow-900/30', text: 'text-yellow-700 dark:text-yellow-400', border: 'border-yellow-200 dark:border-yellow-800' },
+                            'Closed': { bg: 'bg-red-100 dark:bg-red-900/30', text: 'text-red-700 dark:text-red-400', border: 'border-red-200 dark:border-red-800' }
+                          };
+                          const status = statusConfig[property.standardStatus as keyof typeof statusConfig] || statusConfig['Active'];
+                          
+                          return (
+                            <div 
+                              key={property.id} 
+                              className={`flex gap-3 p-3 rounded-md border cursor-pointer hover-elevate transition-colors ${status.border}`}
+                              onClick={() => handlePropertyClick(property)}
+                              onKeyDown={(e) => e.key === 'Enter' && handlePropertyClick(property)}
+                              tabIndex={0}
+                              role="button"
+                              data-testid={`listing-card-${property.id}`}
+                            >
+                              {primaryPhoto ? (
+                                <img src={primaryPhoto} alt={property.unparsedAddress || ''} className="w-24 h-24 object-cover rounded-md flex-shrink-0" />
+                              ) : (
+                                <div className="w-24 h-24 bg-muted rounded-md flex flex-col items-center justify-center flex-shrink-0 p-1">
+                                  <Home className="w-6 h-6 text-muted-foreground/50 mb-1" />
+                                  <span className="text-[9px] text-muted-foreground text-center leading-tight">No photos available</span>
+                                </div>
+                              )}
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-start justify-between gap-2 flex-wrap">
+                                  <p className="font-semibold text-sm truncate max-w-[200px]">{property.unparsedAddress}</p>
+                                  <Badge variant="outline" className={`${status.bg} ${status.text} text-xs flex-shrink-0`}>
+                                    {property.standardStatus === 'Closed' ? 'Sold' : property.standardStatus}
+                                  </Badge>
+                                </div>
+                                <p className="text-xl font-bold text-primary">${price.toLocaleString()}</p>
+                                <div className="flex flex-wrap gap-x-3 text-xs text-muted-foreground mt-1">
+                                  <span>{property.bedroomsTotal || 0} beds</span>
+                                  <span>{property.bathroomsTotalInteger || 0} baths</span>
+                                  {property.livingArea && <span>{Number(property.livingArea).toLocaleString()} sqft</span>}
+                                  {pricePerSqft && <span>${pricePerSqft.toFixed(0)}/sqft</span>}
+                                </div>
+                                <div className="flex flex-wrap gap-x-3 text-xs text-muted-foreground mt-1">
+                                  {isSold && property.closeDate && <span>Sold: {new Date(property.closeDate).toLocaleDateString()}</span>}
+                                  {!isSold && property.daysOnMarket !== null && property.daysOnMarket !== undefined && <span>{property.daysOnMarket} DOM</span>}
+                                  {property.propertySubType && <span>{property.propertySubType}</span>}
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    );
+                  })()}
+                </CardContent>
+              </Card>
+              
+              {/* Price Distribution Chart */}
               <Card>
                 <CardHeader>
                   <CardTitle>Price Distribution</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <div className="h-[400px]">
+                  <div className="h-[300px]">
                     <ResponsiveContainer width="100%" height="100%">
                       <BarChart data={priceRangeData}>
                         <CartesianGrid strokeDasharray="3 3" />
