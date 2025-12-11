@@ -1,0 +1,168 @@
+You are working ONLY on the CMA RESULT page of the app (NOT IDX or public search). All data and photos come from Repliers.
+
+Fix the following items one by one:
+
+====================================================
+1) HOME AVERAGE – PROPERTY LIST AT BOTTOM
+====================================================
+Problem:
+- In the CMA Result → Home Average section, the list of properties (with thumbnails + info + floating card behavior) is NOT showing. The properties should appear at the bottom of this section.
+
+Requirements:
+- In the Home Average section:
+  - Keep the summary statistics at the top as they are now.
+  - At the **bottom** of the Home Average card/section, render a list of the properties that are used to calculate the Home Average.
+  - For each property in this list show:
+    • Thumbnail image from Repliers (or “No photos available” text if there are no photos).
+    • Address
+    • Price (and $/sqft if available)
+    • Beds, baths, sq ft, status
+    • Key dates (List date, Sold date if applicable)
+- Interaction:
+  - Clicking any property in this Home Average list must open the SAME centered CMA floating card/modal (with carousel + full details) that is used elsewhere in CMA.
+
+Testing:
+- Generate a CMA with multiple comps.
+- Confirm:
+  - Home Average shows stats at the top.
+  - A property list appears at the bottom with thumbnails/info.
+  - Clicking an item opens the standard CMA floating card.
+
+====================================================
+2) LISTINGS SECTION – MOVE PROPERTY LIST TO BOTTOM
+====================================================
+Problem:
+- In the CMA Result → Listings section, properties are not positioned at the bottom.
+
+Requirements:
+- In the Listings section:
+  - Ensure the Listings summary (counts/metrics) is shown at the top.
+  - Render the list of properties at the **bottom** of this section.
+  - Each property row must display:
+    • Thumbnail image from Repliers (or “No photos available” text if no photos).
+    • Address
+    • Price, beds, baths, sq ft, status, dates.
+  - Sort the properties from **low price to high price**.
+  - Clicking any property opens the SAME centered CMA floating card/modal.
+
+Testing:
+- Generate a CMA with multiple listing records.
+- Confirm:
+  - Listing summary is at top.
+  - Property list is at bottom.
+  - Properties are ordered low → high price.
+  - Floating card opens correctly on click.
+
+====================================================
+3) TIMELINE SECTION – ENHANCE FOR CMA ANALYSIS
+====================================================
+Problem:
+- In CMA Result → Timeline section (with description “Visual chart showing property prices over time with status indicators to identify market trends.”), the bottom of the card looks plain and not very useful.
+
+Requirements:
+- Keep the existing price-over-time chart but make the Timeline more useful for CMA analysis for Texas real estate agents.
+
+Implement the following:
+
+A) Rich tooltips:
+   - For each point on the chart, tooltip must display:
+     • Status (Active / Under Contract / Sold/Closed)
+     • List Price and (if Sold) Sold Price
+     • Relevant date (List date, Sold date, or Under Contract date depending on status)
+     • Days metric:
+       - Sold/Closed: “Days on Market: X” where X = SoldDate – ListDate (from Repliers).
+       - Active: “Days Active: X” where X = Today – ListDate.
+       - Under Contract: “Days Under Contract: X” where X = Today – UnderContractDate (or equivalent field from Repliers).
+
+B) Status filters:
+   - Add checkboxes or toggle chips beneath the chart for:
+     • Active
+     • Under Contract
+     • Sold/Closed
+   - Toggling these must filter which points/lines are shown on the chart.
+
+C) Summary insights bar (under the chart):
+   - Add a concise insights row showing metrics useful to Texas agents, calculated from the comps:
+     • Median Sold Price
+     • Average Days on Market (Sold/Closed)
+     • Average List-to-Sale Price Ratio (%) for Sold/Closed
+   - These values must update based on the current set of comps used in the CMA.
+
+D) Subject property highlight:
+   - If a Subject Property is defined and has a price/time point:
+     • Render it with a distinct marker (e.g., different shape or size).
+     • Label it as “Subject Property” on hover.
+
+Testing:
+- With a CMA containing Active, UC, and Sold comps:
+  - Verify tooltips show all required info.
+  - Toggling status filters changes the chart.
+  - Summary insights bar displays correct values.
+  - Subject property point is highlighted when applicable.
+
+====================================================
+4) PRINT PDF – ALLOW MULTIPLE PAGES, INCLUDE MARKET STATS (NO IMAGES)
+====================================================
+Problem:
+- PDF print may be restricted to a single page and/or missing Market Stats.
+
+Requirements:
+- Adjust the CMA Print → PDF so that:
+  - The PDF can span 2 or more pages as needed.
+  - The PDF **must include**:
+    • Market Stats section.
+    • CMA Market Review text from Market Stats.
+  - The PDF **must NOT include any property images**:
+    • No thumbnails or carousel photos.
+    • Only textual and numeric data for properties.
+
+Testing:
+- Generate a CMA with enough content to require 2+ pages.
+- Print to PDF:
+  - Confirm Market Stats and CMA Market Review are present.
+  - Confirm there are no property images anywhere in the PDF.
+
+====================================================
+5) SHARE CMA LINK OUTPUT – INCLUDE CMA MARKET REVIEW
+====================================================
+Problem:
+- The Share CMA link output is not including the CMA Market Review from the Market Stats section.
+
+Requirements:
+- When a user opens the shared CMA link (public CMA page):
+  - Include the Market Stats section.
+  - Include the CMA Market Review text in the same logical position as in the internal CMA view (typically at the bottom of Market Stats).
+
+Testing:
+- Generate a CMA, click Share, open the share link:
+  - Confirm CMA Market Review text is visible and matches the internal CMA content.
+
+====================================================
+6) SOCIAL SHARE – INSTAGRAM & TIKTOK BEHAVIOR
+====================================================
+Problem:
+- Share CMA → Instagram and TikTok buttons are still not directing users properly to those platforms’ landing/share pages. A “Link copied” heads-up is shown.
+
+Requirements:
+- For **Facebook** and **X**:
+  - Keep the existing behavior (proper share URL with CMA link).
+
+- For **Instagram** and **TikTok**:
+  - Update the behavior so that when the user clicks:
+    • It opens a relevant Instagram/TikTok URL suitable as a landing/share entry point in a new tab/window, and
+    • It passes or makes available the CMA link in the best way supported by those platforms (e.g., as part of the URL query or prepared text).
+  - The observable behavior to the user should be similar in intent to Facebook/X: clicking the button should clearly take them into Instagram/TikTok to share the CMA.
+
+- Remove the heads-up text:
+  - Delete the message:  
+    “Instagram and TikTok: Link copied to clipboard. Paste in your bio or story.”
+
+- You may still copy the link to clipboard silently as a convenience, but do not show that banner.
+
+Testing:
+- Click all social icons on the CMA Result page:
+  • Facebook: opens FB share dialog with CMA link.
+  • X: opens X share dialog with CMA link.
+  • Instagram: opens a meaningful Instagram web/app page for sharing, with the CMA link available.
+  • TikTok: opens a meaningful TikTok web/app page for sharing, with the CMA link available.
+  • No “Link copied…” banner appears for Instagram or TikTok.

@@ -5,7 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
-import { Loader2, AlertCircle, Home, TrendingUp, Calendar } from "lucide-react";
+import { Loader2, AlertCircle, Home, TrendingUp, Calendar, FileText } from "lucide-react";
 import type { Property, PropertyStatistics, TimelineDataPoint } from "@shared/schema";
 
 interface SharedCMAData {
@@ -73,6 +73,7 @@ export default function SharedCMAView() {
   const { cma, properties, statistics, timelineData } = data;
   const soldProperties = properties.filter(p => p.standardStatus === 'Closed');
   const activeProperties = properties.filter(p => p.standardStatus === 'Active');
+  const underContractProperties = properties.filter(p => p.standardStatus === 'Under Contract');
 
   const formatPrice = (price: number | string | null | undefined) => {
     if (!price) return 'N/A';
@@ -237,6 +238,63 @@ export default function SharedCMAView() {
             </CardContent>
           </Card>
         )}
+
+        {/* CMA Market Review Summary */}
+        <Card className="mb-6 border-primary/30 bg-primary/5">
+          <CardHeader>
+            <CardTitle className="text-lg flex items-center gap-2">
+              <FileText className="w-5 h-5" />
+              CMA Market Review
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <h4 className="font-semibold text-sm">Market Overview</h4>
+                <p className="text-sm text-muted-foreground">
+                  Based on {properties.length} comparable properties, the average price is{' '}
+                  <span className="font-semibold text-foreground">${Math.round(statistics.price.average).toLocaleString()}</span>{' '}
+                  with a median of{' '}
+                  <span className="font-semibold text-foreground">${Math.round(statistics.price.median).toLocaleString()}</span>.
+                  {' '}Prices range from ${statistics.price.range.min.toLocaleString()} to ${statistics.price.range.max.toLocaleString()}.
+                </p>
+              </div>
+              <div className="space-y-2">
+                <h4 className="font-semibold text-sm">Price Per Square Foot</h4>
+                <p className="text-sm text-muted-foreground">
+                  Average price per square foot is{' '}
+                  <span className="font-semibold text-foreground">${statistics.pricePerSqFt.average.toFixed(2)}</span>{' '}
+                  across comparable properties. This ranges from ${statistics.pricePerSqFt.range.min.toFixed(2)} to ${statistics.pricePerSqFt.range.max.toFixed(2)}/sqft.
+                </p>
+              </div>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-2">
+              <div className="space-y-1">
+                <h4 className="font-semibold text-sm">Days on Market</h4>
+                <p className="text-sm text-muted-foreground">
+                  Average: <span className="font-semibold text-foreground">{Math.round(statistics.daysOnMarket.average)} days</span>
+                </p>
+              </div>
+              <div className="space-y-1">
+                <h4 className="font-semibold text-sm">Property Size</h4>
+                <p className="text-sm text-muted-foreground">
+                  Avg: <span className="font-semibold text-foreground">{Math.round(statistics.livingArea.average).toLocaleString()} sqft</span>
+                </p>
+              </div>
+              <div className="space-y-1">
+                <h4 className="font-semibold text-sm">Bed/Bath</h4>
+                <p className="text-sm text-muted-foreground">
+                  Avg: <span className="font-semibold text-foreground">{statistics.bedrooms.average.toFixed(1)} beds / {statistics.bathrooms.average.toFixed(1)} baths</span>
+                </p>
+              </div>
+            </div>
+            <div className="pt-2 border-t">
+              <p className="text-xs text-muted-foreground italic">
+                This analysis is based on {activeProperties.length} active, {underContractProperties.length} under contract, and {soldProperties.length} sold/closed properties in your selection.
+              </p>
+            </div>
+          </CardContent>
+        </Card>
 
         <Card>
           <CardHeader>

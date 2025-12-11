@@ -471,11 +471,10 @@ export default function CMADetailPage() {
                         variant="outline"
                         size="sm"
                         onClick={() => {
-                          handleCopyLink();
-                          toast({
-                            title: "Link copied for Instagram",
-                            description: "Paste this link in your Instagram bio or story.",
-                          });
+                          // Copy link silently, then open Instagram
+                          navigator.clipboard.writeText(getShareUrl());
+                          // Open Instagram web - users can share via story/post
+                          window.open('https://www.instagram.com/', '_blank');
                         }}
                         data-testid="button-share-instagram"
                       >
@@ -486,11 +485,10 @@ export default function CMADetailPage() {
                         variant="outline"
                         size="sm"
                         onClick={() => {
-                          handleCopyLink();
-                          toast({
-                            title: "Link copied for TikTok",
-                            description: "Paste this link in your TikTok bio.",
-                          });
+                          // Copy link silently, then open TikTok
+                          navigator.clipboard.writeText(getShareUrl());
+                          // Open TikTok web - users can share via post/bio
+                          window.open('https://www.tiktok.com/', '_blank');
                         }}
                         data-testid="button-share-tiktok"
                       >
@@ -498,9 +496,6 @@ export default function CMADetailPage() {
                         TikTok
                       </Button>
                     </div>
-                    <p className="text-xs text-muted-foreground">
-                      Instagram and TikTok: Link copied to clipboard. Paste in your bio or story.
-                    </p>
                   </div>
                   
                   <div className="flex justify-between pt-4">

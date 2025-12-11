@@ -9,6 +9,7 @@ import { Save, Edit, FileText, Printer, Info, Home, Mail, ChevronLeft, ChevronRi
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Separator } from "@/components/ui/separator";
+import { Checkbox } from "@/components/ui/checkbox";
 import { cn } from "@/lib/utils";
 import type { Property, PropertyStatistics, TimelineDataPoint, Media } from "@shared/schema";
 
@@ -59,6 +60,11 @@ export function CMAReport({
   const [floatingCardProperty, setFloatingCardProperty] = useState<Property | null>(null);
   const [carouselIndex, setCarouselIndex] = useState(0);
   const autoAdvanceRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  
+  // Timeline status filters
+  const [showActiveOnTimeline, setShowActiveOnTimeline] = useState(true);
+  const [showUnderContractOnTimeline, setShowUnderContractOnTimeline] = useState(true);
+  const [showSoldOnTimeline, setShowSoldOnTimeline] = useState(true);
   
   // Helper to get photos from property
   const getPropertyPhotos = (property: Property): string[] => {
@@ -411,6 +417,82 @@ export function CMAReport({
               </Table>
             </CardContent>
           </Card>
+
+          {/* Property List at Bottom of Home Averages */}
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-base">Properties Used in Analysis ({allProperties.length})</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-3">
+                {[...allProperties].sort((a, b) => {
+                  const priceA = a.standardStatus === 'Closed' 
+                    ? (a.closePrice ? Number(a.closePrice) : Number(a.listPrice || 0))
+                    : Number(a.listPrice || 0);
+                  const priceB = b.standardStatus === 'Closed'
+                    ? (b.closePrice ? Number(b.closePrice) : Number(b.listPrice || 0))
+                    : Number(b.listPrice || 0);
+                  return priceA - priceB;
+                }).map((property) => {
+                  const photos = (property as any).photos as string[] | undefined;
+                  const media = (property as any).media as any[] | undefined;
+                  const primaryPhoto = photos?.[0] || media?.[0]?.mediaURL || media?.[0]?.mediaUrl;
+                  const isSold = property.standardStatus === 'Closed';
+                  const price = isSold 
+                    ? (property.closePrice ? Number(property.closePrice) : (property.listPrice ? Number(property.listPrice) : 0))
+                    : (property.listPrice ? Number(property.listPrice) : 0);
+                  const pricePerSqft = property.livingArea ? price / Number(property.livingArea) : null;
+                  
+                  const statusConfig = {
+                    'Active': { bg: 'bg-green-100 dark:bg-green-900/30', text: 'text-green-700 dark:text-green-400', border: 'border-green-200 dark:border-green-800' },
+                    'Under Contract': { bg: 'bg-yellow-100 dark:bg-yellow-900/30', text: 'text-yellow-700 dark:text-yellow-400', border: 'border-yellow-200 dark:border-yellow-800' },
+                    'Closed': { bg: 'bg-red-100 dark:bg-red-900/30', text: 'text-red-700 dark:text-red-400', border: 'border-red-200 dark:border-red-800' }
+                  };
+                  const status = statusConfig[property.standardStatus as keyof typeof statusConfig] || statusConfig['Active'];
+                  
+                  return (
+                    <div 
+                      key={property.id} 
+                      className={`flex gap-3 p-3 rounded-md border cursor-pointer hover-elevate transition-colors ${status.border}`}
+                      onClick={() => handlePropertyClick(property)}
+                      onKeyDown={(e) => e.key === 'Enter' && handlePropertyClick(property)}
+                      tabIndex={0}
+                      role="button"
+                      data-testid={`home-avg-card-${property.id}`}
+                    >
+                      {primaryPhoto ? (
+                        <img src={primaryPhoto} alt={property.unparsedAddress || ''} className="w-20 h-20 object-cover rounded-md flex-shrink-0" />
+                      ) : (
+                        <div className="w-20 h-20 bg-muted rounded-md flex flex-col items-center justify-center flex-shrink-0 p-1">
+                          <Home className="w-5 h-5 text-muted-foreground/50 mb-0.5" />
+                          <span className="text-[8px] text-muted-foreground text-center leading-tight">No photos available</span>
+                        </div>
+                      )}
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-start justify-between gap-2 flex-wrap">
+                          <p className="font-semibold text-sm truncate max-w-[200px]">{property.unparsedAddress}</p>
+                          <Badge variant="outline" className={`${status.bg} ${status.text} text-xs flex-shrink-0`}>
+                            {property.standardStatus === 'Closed' ? 'Sold' : property.standardStatus}
+                          </Badge>
+                        </div>
+                        <p className="text-lg font-bold text-primary">${price.toLocaleString()}</p>
+                        <div className="flex flex-wrap gap-x-3 text-xs text-muted-foreground mt-1">
+                          <span>{property.bedroomsTotal || 0} beds</span>
+                          <span>{property.bathroomsTotalInteger || 0} baths</span>
+                          {property.livingArea && <span>{Number(property.livingArea).toLocaleString()} sqft</span>}
+                          {pricePerSqft && <span>${pricePerSqft.toFixed(0)}/sqft</span>}
+                        </div>
+                        <div className="flex flex-wrap gap-x-3 text-xs text-muted-foreground mt-1">
+                          {(property as any).listDate && <span>Listed: {new Date((property as any).listDate).toLocaleDateString()}</span>}
+                          {isSold && property.closeDate && <span>Sold: {new Date(property.closeDate).toLocaleDateString()}</span>}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </CardContent>
+          </Card>
         </TabsContent>
 
         {/* Listings Tab - Properties sorted by price low→high */}
@@ -426,7 +508,77 @@ export function CMAReport({
             </TabsList>
 
             <div className="mt-6 space-y-4">
-              {/* Properties List - Sorted by price low→high */}
+              {/* Summary Stats Cards at Top */}
+              {(() => {
+                const filteredProps = activeListingTab === 'all' ? allProperties :
+                  activeListingTab === 'sold' ? soldProperties :
+                  activeListingTab === 'under-contract' ? underContractProperties : activeProperties;
+                
+                if (filteredProps.length === 0) return null;
+                
+                const prices = filteredProps.map(p => {
+                  const isSold = p.standardStatus === 'Closed';
+                  return isSold 
+                    ? (p.closePrice ? Number(p.closePrice) : (p.listPrice ? Number(p.listPrice) : 0))
+                    : (p.listPrice ? Number(p.listPrice) : 0);
+                }).filter(p => p > 0);
+                
+                const avgPrice = prices.length > 0 ? prices.reduce((a, b) => a + b, 0) / prices.length : 0;
+                const minPrice = prices.length > 0 ? Math.min(...prices) : 0;
+                const maxPrice = prices.length > 0 ? Math.max(...prices) : 0;
+                
+                return (
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                    <Card>
+                      <CardContent className="pt-4 pb-4">
+                        <div className="text-sm text-muted-foreground">Count</div>
+                        <div className="text-2xl font-bold">{filteredProps.length}</div>
+                      </CardContent>
+                    </Card>
+                    <Card>
+                      <CardContent className="pt-4 pb-4">
+                        <div className="text-sm text-muted-foreground">Avg Price</div>
+                        <div className="text-xl font-bold">${Math.round(avgPrice).toLocaleString()}</div>
+                      </CardContent>
+                    </Card>
+                    <Card>
+                      <CardContent className="pt-4 pb-4">
+                        <div className="text-sm text-muted-foreground">Min Price</div>
+                        <div className="text-xl font-bold">${minPrice.toLocaleString()}</div>
+                      </CardContent>
+                    </Card>
+                    <Card>
+                      <CardContent className="pt-4 pb-4">
+                        <div className="text-sm text-muted-foreground">Max Price</div>
+                        <div className="text-xl font-bold">${maxPrice.toLocaleString()}</div>
+                      </CardContent>
+                    </Card>
+                  </div>
+                );
+              })()}
+              
+              {/* Price Distribution Chart */}
+              <Card>
+                <CardHeader>
+                  <CardTitle>Price Distribution</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="h-[300px]">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart data={priceRangeData}>
+                        <CartesianGrid strokeDasharray="3 3" />
+                        <XAxis dataKey="name" />
+                        <YAxis />
+                        <RechartsTooltip formatter={(value) => `$${Number(value).toLocaleString()}`} />
+                        <Legend />
+                        <Bar dataKey="value" fill="hsl(var(--primary))" />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Properties List at Bottom - Sorted by price low→high */}
               <Card>
                 <CardHeader className="pb-2">
                   <CardTitle className="text-base">
@@ -526,27 +678,6 @@ export function CMAReport({
                   })()}
                 </CardContent>
               </Card>
-              
-              {/* Price Distribution Chart */}
-              <Card>
-                <CardHeader>
-                  <CardTitle>Price Distribution</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="h-[300px]">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <BarChart data={priceRangeData}>
-                        <CartesianGrid strokeDasharray="3 3" />
-                        <XAxis dataKey="name" />
-                        <YAxis />
-                        <RechartsTooltip formatter={(value) => `$${Number(value).toLocaleString()}`} />
-                        <Legend />
-                        <Bar dataKey="value" fill="hsl(var(--primary))" />
-                      </BarChart>
-                    </ResponsiveContainer>
-                  </div>
-                </CardContent>
-              </Card>
             </div>
           </Tabs>
         </TabsContent>
@@ -578,11 +709,20 @@ export function CMAReport({
               </div>
             </CardHeader>
             <CardContent>
-              {timelineData.length > 0 ? (
+              {(() => {
+                // Filter timeline data based on status filters
+                const filteredTimelineData = timelineData.filter(d => {
+                  if (d.status === 'Active' && !showActiveOnTimeline) return false;
+                  if (d.status === 'Under Contract' && !showUnderContractOnTimeline) return false;
+                  if (d.status === 'Closed' && !showSoldOnTimeline) return false;
+                  return true;
+                });
+                
+                return filteredTimelineData.length > 0 ? (
                 <div className="h-[400px]">
                   <ResponsiveContainer width="100%" height="100%">
                     <LineChart 
-                      data={timelineData
+                      data={filteredTimelineData
                         .map(d => ({ 
                           ...d, 
                           dateNum: new Date(d.date).getTime(),
@@ -698,14 +838,108 @@ export function CMAReport({
                     </LineChart>
                   </ResponsiveContainer>
                 </div>
-              ) : (
+                ) : (
                 <div className="h-[400px] flex items-center justify-center">
                   <div className="text-center text-muted-foreground">
                     <p className="text-lg font-medium mb-2">No timeline data available</p>
                     <p className="text-sm">Timeline data requires properties with listing or closing dates.</p>
                   </div>
                 </div>
-              )}
+              );
+              })()}
+              
+              {/* Status Filters */}
+              <div className="flex items-center gap-6 pt-4 border-t mt-4">
+                <span className="text-sm font-medium">Filter by Status:</span>
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <Checkbox 
+                    checked={showActiveOnTimeline} 
+                    onCheckedChange={(checked) => setShowActiveOnTimeline(checked === true)}
+                    data-testid="checkbox-filter-active"
+                  />
+                  <span className="text-sm flex items-center gap-1">
+                    <div className="w-2 h-2 rounded-full bg-green-500"></div>
+                    Active ({activeProperties.length})
+                  </span>
+                </label>
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <Checkbox 
+                    checked={showUnderContractOnTimeline} 
+                    onCheckedChange={(checked) => setShowUnderContractOnTimeline(checked === true)}
+                    data-testid="checkbox-filter-under-contract"
+                  />
+                  <span className="text-sm flex items-center gap-1">
+                    <div className="w-2 h-2 rounded-full bg-yellow-500"></div>
+                    Under Contract ({underContractProperties.length})
+                  </span>
+                </label>
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <Checkbox 
+                    checked={showSoldOnTimeline} 
+                    onCheckedChange={(checked) => setShowSoldOnTimeline(checked === true)}
+                    data-testid="checkbox-filter-sold"
+                  />
+                  <span className="text-sm flex items-center gap-1">
+                    <div className="w-2 h-2 rounded-full bg-red-500"></div>
+                    Sold/Closed ({soldProperties.length})
+                  </span>
+                </label>
+              </div>
+            </CardContent>
+          </Card>
+          
+          {/* Summary Insights Bar - Texas Agent Metrics */}
+          <Card className="bg-primary/5 border-primary/20">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-base">Market Insights</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {(() => {
+                // Calculate insights from sold properties
+                const soldPrices = soldProperties
+                  .map(p => p.closePrice ? Number(p.closePrice) : null)
+                  .filter((p): p is number => p !== null && p > 0)
+                  .sort((a, b) => a - b);
+                
+                const medianSoldPrice = soldPrices.length > 0 
+                  ? soldPrices[Math.floor(soldPrices.length / 2)] 
+                  : 0;
+                
+                const avgDOMSold = soldProperties.length > 0
+                  ? soldProperties.reduce((sum, p) => sum + (p.daysOnMarket || 0), 0) / soldProperties.length
+                  : 0;
+                
+                // Calculate list-to-sale ratio
+                const ratios = soldProperties
+                  .filter(p => p.listPrice && p.closePrice && Number(p.listPrice) > 0)
+                  .map(p => (Number(p.closePrice) / Number(p.listPrice)) * 100);
+                const avgListToSaleRatio = ratios.length > 0 
+                  ? ratios.reduce((a, b) => a + b, 0) / ratios.length 
+                  : 0;
+                
+                return (
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div className="text-center p-3 bg-background rounded-lg border">
+                      <div className="text-2xl font-bold text-primary">
+                        {medianSoldPrice > 0 ? `$${medianSoldPrice.toLocaleString()}` : 'N/A'}
+                      </div>
+                      <div className="text-sm text-muted-foreground">Median Sold Price</div>
+                    </div>
+                    <div className="text-center p-3 bg-background rounded-lg border">
+                      <div className="text-2xl font-bold">
+                        {avgDOMSold > 0 ? `${Math.round(avgDOMSold)} days` : 'N/A'}
+                      </div>
+                      <div className="text-sm text-muted-foreground">Avg Days on Market (Sold)</div>
+                    </div>
+                    <div className="text-center p-3 bg-background rounded-lg border">
+                      <div className="text-2xl font-bold">
+                        {avgListToSaleRatio > 0 ? `${avgListToSaleRatio.toFixed(1)}%` : 'N/A'}
+                      </div>
+                      <div className="text-sm text-muted-foreground">List-to-Sale Ratio</div>
+                    </div>
+                  </div>
+                );
+              })()}
             </CardContent>
           </Card>
         </TabsContent>

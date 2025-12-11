@@ -357,7 +357,15 @@
   
   /* Hide property thumbnail containers in print mode */
   .cma-print [data-testid^="listing-card-"] img,
-  .cma-print [data-testid^="card-property-"] img {
+  .cma-print [data-testid^="card-property-"] img,
+  .cma-print [data-testid^="home-avg-card-"] img {
+    display: none !important;
+  }
+  
+  /* Hide "No photos available" placeholders in print mode */
+  .cma-print [data-testid^="listing-card-"] > div:first-child:has(svg),
+  .cma-print [data-testid^="card-property-"] > div:first-child:has(svg),
+  .cma-print [data-testid^="home-avg-card-"] > div:first-child:has(svg) {
     display: none !important;
   }
   
@@ -375,5 +383,24 @@
   /* Remove shadows in CMA reports */
   .cma-print * {
     box-shadow: none !important;
+  }
+  
+  /* Allow multi-page printing - remove any page height restrictions */
+  @page {
+    size: letter;
+    margin: 0.5in;
+  }
+  
+  /* Ensure content flows across multiple pages */
+  .cma-print {
+    overflow: visible !important;
+    height: auto !important;
+    max-height: none !important;
+  }
+  
+  /* Page breaks for different sections */
+  .cma-print [data-testid="tab-market-stats"],
+  .cma-print [role="tabpanel"] > .space-y-6 > .card:nth-child(n+3) {
+    page-break-before: auto;
   }
 }
