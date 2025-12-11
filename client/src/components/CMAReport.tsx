@@ -7,7 +7,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, Legend, ResponsiveContainer, LineChart, Line, ReferenceLine } from "recharts";
 import { Save, Edit, FileText, Printer, Info, Home, Mail, ChevronLeft, ChevronRight, Bed, Bath, Maximize, MapPin, Calendar } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Separator } from "@/components/ui/separator";
 import { cn } from "@/lib/utils";
 import type { Property, PropertyStatistics, TimelineDataPoint, Media } from "@shared/schema";
@@ -827,8 +827,9 @@ export function CMAReport({
                             {primaryPhoto ? (
                               <img src={primaryPhoto} alt={property.unparsedAddress || ''} className="w-20 h-20 object-cover rounded-md flex-shrink-0" />
                             ) : (
-                              <div className="w-20 h-20 bg-muted rounded-md flex items-center justify-center flex-shrink-0">
-                                <Home className="w-6 h-6 text-muted-foreground/50" />
+                              <div className="w-20 h-20 bg-muted rounded-md flex flex-col items-center justify-center flex-shrink-0 p-1">
+                                <Home className="w-5 h-5 text-muted-foreground/50 mb-0.5" />
+                                <span className="text-[8px] text-muted-foreground text-center leading-tight">No photos available</span>
                               </div>
                             )}
                             <div className="flex-1 min-w-0">
@@ -858,14 +859,14 @@ export function CMAReport({
         </TabsContent>
       </Tabs>
       
-      {/* Floating Property Card Sheet */}
-      <Sheet open={floatingCardOpen} onOpenChange={setFloatingCardOpen}>
-        <SheetContent side="right" className="w-full sm:max-w-lg overflow-y-auto">
+      {/* Floating Property Card Modal (Centered) */}
+      <Dialog open={floatingCardOpen} onOpenChange={setFloatingCardOpen}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           {floatingCardProperty && (
             <>
-              <SheetHeader className="sr-only">
-                <SheetTitle>Property Details</SheetTitle>
-              </SheetHeader>
+              <DialogHeader className="sr-only">
+                <DialogTitle>Property Details</DialogTitle>
+              </DialogHeader>
               
               {/* Image Carousel */}
               <div className="relative aspect-[16/9] bg-muted rounded-lg overflow-hidden mb-4 -mx-6 -mt-6">
@@ -910,8 +911,9 @@ export function CMAReport({
                       </div>
                     </>
                   ) : (
-                    <div className="w-full h-full flex items-center justify-center text-muted-foreground">
-                      <Home className="w-16 h-16 opacity-50" />
+                    <div className="w-full h-full flex flex-col items-center justify-center text-muted-foreground">
+                      <Home className="w-12 h-12 opacity-50 mb-2" />
+                      <span className="text-sm">No photos available for this property</span>
                     </div>
                   );
                 })()}
@@ -1026,8 +1028,8 @@ export function CMAReport({
               </div>
             </>
           )}
-        </SheetContent>
-      </Sheet>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

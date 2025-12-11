@@ -1,0 +1,218 @@
+IMPORTANT — SCOPE IS CMA ONLY  
+You MUST apply ALL fixes ONLY inside the CMA module, including:
+
+• Create New CMA  
+• CMA Search Results  
+• CMA Floating Card (property modal)  
+• CMA Subject Property  
+• CMA Comparable Properties  
+• CMA Analysis  
+• CMA Market Stats  
+• CMA Result Page (print/share output)  
+
+You MUST NOT modify IDX pages, VOW pages, consumer property detail pages, or MLS Grid integrations.
+
+====================================================
+1) SEARCH RESULTS & IMAGE HANDLING (REPLIERS-ONLY SOURCE)
+====================================================
+
+Requirements for ALL CMA search results and property lists:
+
+1. Use ONLY Repliers as the data source for:
+   • Listing images  
+   • Status  
+   • Sold date, listing date  
+   • Beds, baths, sq ft, year built, subdivision  
+
+2. For SOLD/CLOSED listings:
+   • Images must load from Repliers correctly.  
+   • If Repliers has NO photos:  
+     - Display clear text inside image box:  
+       **“No photos available”**  
+     - Must appear both in the Search Results thumbnail AND the floating card.
+
+3. For ALL property thumbnails (Active, UC, Sold):
+   • Load primary image from Repliers.  
+   • If missing → show: **“No photos available”**
+
+4. When user clicks a property:
+   • Always open the SAME floating card modal used for Subject/Comparable selection  
+   • Do NOT open the right-side panel (must be removed completely)
+
+5. Floating card image carousel:
+   • Auto-advance every 3 seconds  
+   • Manual backward/forward navigation works  
+   • After click, autoplay resumes after ~3 sec  
+
+6. Click zones MUST work:
+   • Click LEFT half → previous image  
+   • Click RIGHT half → next image  
+
+7. Grey box MUST be removed:
+   • Inspect DOM for pagination wrapper, overlay divs, mask elements  
+   • Remove or restyle so no grey/colored overlays appear  
+
+Testing:
+- Test all statuses: Active, Under Contract, Sold  
+- Test mobile & desktop  
+- Test listings WITH and WITHOUT photos  
+
+====================================================
+2) CMA RESULT PAGE → PRINT PDF
+====================================================
+
+Requirements:
+1. Include **Market Stats** section in the CMA PDF.
+2. Include **CMA Market Review** text in the PDF.
+3. DO NOT include ANY property images in the PDF:
+   • No thumbnails  
+   • No carousel images  
+   • Only textual stats & property details  
+
+Testing:
+• Generate CMA → Print → Verify Market Stats included & no images present.
+
+====================================================
+3) SHARE LINK OUTPUT
+====================================================
+
+Requirements:
+1. Shared CMA page MUST include:
+   • Market Stats  
+   • CMA Market Review text  
+
+2. Shared link must NOT expire.
+
+Testing:
+• Open shared link → verify Market Review included.
+
+====================================================
+4) SECTION ORDERING (CMA Market Stats)
+====================================================
+
+Requirements:
+- Sort property groups by count (high → low):
+  1. Sold/Closed  
+  2. Under Contract  
+  3. Active  
+
+- Show counts e.g. “Sold/Closed (5)”.
+
+====================================================
+5) EMAIL CMA TO FRIEND — MUST DELIVER
+====================================================
+
+Requirements:
+1. Sender email:
+   • MUST use dynamic “no-reply@<current-domain>”  
+   • MUST NOT use user’s email as SMTP From  
+
+2. User’s “Your Email Address”:
+   • MUST be placed as Reply-To  
+   • Recipient’s reply goes to this address  
+
+3. Email body (HTML):
+   • CMA summary (property details, stats)  
+   • CMA link  
+   • User comments  
+   • Message states: “This CMA is sent in HTML format with a link to view online.”
+
+Testing:
+• Send to real email (e.g., daryl@spyglassrealty.com) → must be received.
+
+====================================================
+6) PRICE TIMELINE (CMA Analysis)
+====================================================
+
+Using Repliers dates:
+
+• Sold/Closed: Days on Market = CloseDate – ListDate  
+• Active: Days Active = Today – ListDate  
+• Under Contract: Days Under Contract = Today – UnderContractDate  
+
+Tooltip MUST show:
+• Status  
+• Price  
+• Date  
+• Days (above calculation)
+
+====================================================
+7) MARKET STATS → CLICK TO OPEN FLOATING CARD
+====================================================
+
+Requirements:
+• When clicking a property in Market Stats (Sold, UC, Active):
+  → Open the SAME floating card modal as in CMA Search Results  
+  → No right-side/inline card allowed  
+
+• Thumbnails must load from Repliers  
+• If no photos → show “No photos available”
+
+====================================================
+8) PRINT & SHARE MUST NOT USE PROPERTY IMAGES
+====================================================
+
+• Property images must NOT show in PDF  
+• Property images must NOT show in Share link output  
+• Only thumbnails & floating cards (within CMA UI) use images
+
+====================================================
+9) HOME AVERAGE SECTION — NEW FEATURE
+====================================================
+
+Requirements:
+1. At the BOTTOM of the **Home Average** widget:
+   • Display ALL chosen/comparable properties  
+   • Show each property with:
+     - Thumbnail image from Repliers  
+     - If missing → “No photos available”  
+     - Address, price, beds, baths, sq ft  
+     - Status  
+     - Sold date (if applicable)
+
+2. When clicking a property:
+   • Open the SAME CMA floating card modal  
+   • With image carousel, status, and full details
+
+3. This list must appear ONLY in the CMA view.
+
+====================================================
+10) LISTINGS SECTION — NEW FEATURE
+====================================================
+
+Requirements:
+1. Display properties WITH:
+   • Thumbnail image from Repliers  
+   • “No photos available” if missing  
+   • Address + key stats  
+
+2. Clicking opens SAME floating card modal.
+
+3. Group listings from **low price → high price**
+
+====================================================
+11) REMOVE RIGHT-SIDE FLOATING PANEL EVERYWHERE
+====================================================
+
+• The CMA must use ONLY the centered floating card/modal  
+• Remove all references, components, or conditions that render the sidebar panel
+
+Testing:
+- Click property anywhere in CMA: Search Results, Market Stats, Home Average, Listings → ALWAYS open the central floating modal.
+
+====================================================
+FINAL REPORT REQUIRED
+====================================================
+
+Your report must include:
+
+1. EXACT element causing grey overlay and how it was removed  
+2. EXACT implementation of left/right click zones  
+3. Confirmation that thumbnails and floating cards correctly use Repliers-only data  
+4. Confirmation that properties with no images correctly show “No photos available”  
+5. Confirmation that Market Stats, Home Average, Listings all open SAME floating modal  
+6. Verification that Print PDF contains Market Stats + Market Review, but NO images  
+7. Verification Share link includes Market Review  
+8. Verification email deliverability  
+9. Verification grouping from low → high in Listings  
+10. Confirm no modifications were made to IDX or consumer property pages  
