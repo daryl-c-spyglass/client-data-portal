@@ -1,0 +1,45 @@
+====================================================
+NEW BUG – CMA Search Results (SOLD/CLOSED) missing photos
+====================================================
+
+Scope:
+- Create New CMA → Search Results section
+- Floating card/modal that opens when clicking a SOLD/CLOSED listing
+- ONLY inside the CMA flow (do not touch IDX or public search)
+
+Problem:
+- For SOLD/CLOSED listings in CMA Search Results:
+  - Thumbnail image on the result card is blank / generic icon only.
+  - Floating card image area is also blank / generic icon only.
+  - This happens even when the data source (Repliers) has no photos.
+
+Requirements:
+
+1) Always attempt to load photos from Repliers
+   - Use Repliers photo/media fields for SOLD/CLOSED listings exactly the same as for Active/Under Contract.
+   - If Repliers returns one or more photos:
+     • Show the primary photo as the thumbnail in Search Results.
+     • Show full carousel in the floating card (with autoplay + arrows as previously specified).
+
+2) Explicit placeholder when NO photos exist
+   - If Repliers returns NO photos for the listing (empty array / null / error):
+     • Show a clear message INSIDE the image box, both:
+       - On the Search Results thumbnail
+       - On the floating card image area
+     • Text should clearly state, for example:
+       “No photos available for this property”
+     • Keep the box styling consistent (same size, background), but ensure the text is readable and centered.
+
+3) Do NOT silently fail
+   - Do not leave the box with only a generic icon and no explanation.
+   - Always show either:
+     • Real images from Repliers, OR
+     • The explicit “No photos available for this property” message.
+
+Testing (CMA ONLY):
+- Run a CMA search where at least one SOLD/CLOSED listing has photos in Repliers:
+  • Confirm Search Results thumbnail and floating card show the real photos.
+- Run a CMA search where a SOLD/CLOSED listing has NO photos in Repliers:
+  • Confirm both the thumbnail and the floating card image area show:
+    “No photos available for this property”.
+- Confirm Active and Under Contract behavior are unchanged.

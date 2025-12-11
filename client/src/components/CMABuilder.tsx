@@ -1023,8 +1023,9 @@ export function CMABuilder({ onCreateCMA, initialData }: CMABuilderProps) {
                           />
                         </div>
                       ) : (
-                        <div className="w-32 h-32 flex-shrink-0 bg-muted flex items-center justify-center">
-                          <Home className="w-8 h-8 text-muted-foreground/50" />
+                        <div className="w-32 h-32 flex-shrink-0 bg-muted flex flex-col items-center justify-center p-2">
+                          <Home className="w-6 h-6 text-muted-foreground/50 mb-1" />
+                          <span className="text-[10px] text-muted-foreground text-center leading-tight">No photos available</span>
                         </div>
                       )}
                       <CardContent className="flex-1 p-3 space-y-2">
@@ -1170,8 +1171,9 @@ export function CMABuilder({ onCreateCMA, initialData }: CMABuilderProps) {
                     )}
                   </div>
                 ) : (
-                  <div className="aspect-video bg-muted rounded-md flex items-center justify-center">
-                    <Home className="w-16 h-16 text-muted-foreground/50" />
+                  <div className="aspect-video bg-muted rounded-md flex flex-col items-center justify-center">
+                    <Home className="w-12 h-12 text-muted-foreground/50 mb-2" />
+                    <span className="text-sm text-muted-foreground">No photos available for this property</span>
                   </div>
                 )}
                 

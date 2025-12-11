@@ -596,6 +596,46 @@ export async function registerRoutes(app: Express): Promise<Server> {
           };
         }) as any[];
 
+        // Hydrate photos from Repliers for listings missing photos
+        if (isRepliersConfigured()) {
+          const repliersClient = getRepliersClient();
+          if (repliersClient) {
+            const missingPhotoListings = results.filter(p => !p.photos || p.photos.length === 0);
+            if (missingPhotoListings.length > 0) {
+              // Fetch photos from Repliers in parallel (limit to 10 concurrent requests)
+              const batchSize = 10;
+              for (let i = 0; i < missingPhotoListings.length; i += batchSize) {
+                const batch = missingPhotoListings.slice(i, i + batchSize);
+                const photoPromises = batch.map(async (listing) => {
+                  try {
+                    const repliersListing = await repliersClient.getListing(listing.id);
+                    if (repliersListing) {
+                      const rawPhotos = repliersListing.images || repliersListing.photos || [];
+                      const photos = rawPhotos.map((img: string) => 
+                        img.startsWith('http') ? img : `https://cdn.repliers.io/${img}`
+                      );
+                      return { id: listing.id, photos };
+                    }
+                  } catch (err) {
+                    // Silent fail - if Repliers doesn't have the listing, leave photos empty
+                  }
+                  return null;
+                });
+                
+                const photoResults = await Promise.all(photoPromises);
+                photoResults.forEach(result => {
+                  if (result && result.photos.length > 0) {
+                    const listing = results.find(p => p.id === result.id);
+                    if (listing) {
+                      listing.photos = result.photos;
+                    }
+                  }
+                });
+              }
+            }
+          }
+        }
+
         return results;
       };
 
