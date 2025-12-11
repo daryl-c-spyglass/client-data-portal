@@ -350,10 +350,21 @@
     text-align: left;
   }
   
-  /* CMA Images fit properly */
-  .cma-print img {
-    max-width: 100% !important;
-    height: auto !important;
+  /* Hide property images in print mode - NO images in PDF output */
+  .cma-print img:not(.print-show) {
+    display: none !important;
+  }
+  
+  /* Hide property thumbnail containers in print mode */
+  .cma-print [data-testid^="listing-card-"] img,
+  .cma-print [data-testid^="card-property-"] img {
+    display: none !important;
+  }
+  
+  /* Show charts and other non-property images */
+  .cma-print .recharts-wrapper,
+  .cma-print svg {
+    display: block !important;
   }
   
   /* CMA Charts render properly */
