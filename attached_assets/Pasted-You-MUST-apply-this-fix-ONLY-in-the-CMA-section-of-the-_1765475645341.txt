@@ -1,0 +1,120 @@
+You MUST apply this fix ONLY in the CMA section of the app.
+
+Scope:
+- Page: “Create New CMA” (screenshot shows title: “Create New CMA”)
+- Path: CMAs → Create New CMA
+- Sections on this page:
+  • CMA Information
+  • Search Properties
+  • Subject Property
+  • Comparable Properties
+  • Analysis
+  • Search Results
+
+Do NOT touch:
+- IDX search pages
+- Public listing detail pages
+- VOW or any consumer site
+- MLS Grid admin or any non-CMA modules
+
+====================================================
+BUG 1: Grey block on CMA floating card image
+====================================================
+
+Context:
+On the Create New CMA page:
+- User fills Search Properties, gets results in “Search Results”.
+- User clicks a property → a floating card/modal opens with:
+  • Property address as title
+  • Large photo at the top with slide counter (e.g. “8 / 25”)
+  • Status badge (Active / Under Contract / Sold/Closed)
+  • Price and property stats
+- In this floating card, a GREY RECTANGLE still shows on the lower-left part of the image.
+
+Requirements:
+1. Inspect ONLY the image/carousel area in the CMA floating card and find the element creating the grey block:
+   - Look at:
+     • Carousel wrappers
+     • Arrow containers
+     • Pagination bullets/containers
+     • Placeholder/mask divs
+     • Any absolutely positioned overlays
+
+2. Remove or restyle the offending element so:
+   - No grey area is visible over the image.
+   - The image area contains ONLY:
+     • The listing photo
+     • The centered slide counter (e.g. “8 / 25”)
+     • Back/forward controls
+
+3. Confirm this fix applies for ALL CMA statuses:
+   - Active listings
+   - Under Contract listings
+   - Sold/Closed listings
+
+4. Confirm on both desktop and a mobile-width viewport.
+
+====================================================
+BUG 2: Left/right image click zones not working
+====================================================
+
+Desired behavior in the CMA floating card (ONLY here):
+
+- Clicking the LEFT side/half of the image:
+  → Moves to the PREVIOUS photo.
+
+- Clicking the RIGHT side/half of the image:
+  → Moves to the NEXT photo.
+
+Current behavior: these clicks do NOT navigate.
+
+Requirements:
+1. Implement left/right click zones on the CMA floating card image:
+   - Either:
+     • Two invisible overlays (left and right halves), OR
+     • Single click handler that checks click X position vs image midpoint.
+   - Zones must:
+     • Cover full image height
+     • Cover exactly half width each
+     • Be invisible (no visible grey/colored blocks)
+
+2. Hook into the CMA carousel navigation:
+   - Left zone → call “previous slide”
+   - Right zone → call “next slide”
+
+3. Preserve existing autoplay:
+   - Images auto-advance every ~3 seconds.
+   - After manual click, autoplay pauses briefly then resumes.
+
+4. This behavior must work for all CMA listings:
+   - Active, Under Contract, Sold/Closed.
+
+====================================================
+MANDATORY TESTS (IN CMA ONLY)
+====================================================
+
+You MUST follow these tests on the “Create New CMA” page:
+
+1. Run a CMA search from the Search Properties section so Search Results are populated.
+2. Click an Active listing → floating card opens.
+   - NO grey block on image.
+   - Click left half → previous photo.
+   - Click right half → next photo.
+   - Carousel still auto-plays and resumes after clicks.
+
+3. Repeat step 2 for:
+   - An Under Contract listing.
+   - A Sold/Closed listing.
+
+4. Confirm that no IDX / public search / non-CMA page was modified.
+
+====================================================
+FINAL REPORT (REQUIRED)
+====================================================
+
+Your final output MUST include:
+
+1. The exact DOM element(s) that caused the grey overlay (component name + class/id).
+2. The exact CSS/JS changes made (file names + selectors/functions).
+3. How left/right click zones were implemented.
+4. Confirmation that all tests above passed on the Create New CMA page ONLY and that no other sections (IDX, VOW, public search) were touched.
