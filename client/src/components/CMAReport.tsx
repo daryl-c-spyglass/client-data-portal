@@ -879,26 +879,26 @@ export function CMAReport({
                         className="w-full h-full object-cover"
                         data-testid="img-floating-card-property"
                       />
-                      {/* Carousel Controls - Click zones for navigation */}
+                      {/* Carousel Controls - Click zones for navigation (full height, invisible background) */}
                       {photos.length > 1 && (
                         <>
-                          {/* Left click zone */}
+                          {/* Left click zone - covers left half */}
                           <div 
-                            className="absolute left-0 top-0 w-1/3 h-full cursor-pointer z-10 flex items-center justify-start pl-2"
-                            onClick={handlePrevImage}
+                            className="absolute left-0 top-0 w-1/2 h-full cursor-pointer z-10 group"
+                            onClick={(e) => { e.stopPropagation(); handlePrevImage(); }}
                             data-testid="zone-carousel-prev"
                           >
-                            <div className="bg-black/40 hover:bg-black/60 text-white p-2 rounded-full transition-colors">
+                            <div className="absolute left-3 top-1/2 -translate-y-1/2 bg-black/50 hover:bg-black/70 text-white p-2 rounded-full transition-all opacity-70 group-hover:opacity-100">
                               <ChevronLeft className="w-5 h-5" />
                             </div>
                           </div>
-                          {/* Right click zone */}
+                          {/* Right click zone - covers right half */}
                           <div 
-                            className="absolute right-0 top-0 w-1/3 h-full cursor-pointer z-10 flex items-center justify-end pr-2"
-                            onClick={handleNextImage}
+                            className="absolute right-0 top-0 w-1/2 h-full cursor-pointer z-10 group"
+                            onClick={(e) => { e.stopPropagation(); handleNextImage(); }}
                             data-testid="zone-carousel-next"
                           >
-                            <div className="bg-black/40 hover:bg-black/60 text-white p-2 rounded-full transition-colors">
+                            <div className="absolute right-3 top-1/2 -translate-y-1/2 bg-black/50 hover:bg-black/70 text-white p-2 rounded-full transition-all opacity-70 group-hover:opacity-100">
                               <ChevronRight className="w-5 h-5" />
                             </div>
                           </div>
@@ -1005,10 +1005,10 @@ export function CMAReport({
                     <span className="font-medium">{floatingCardProperty.yearBuilt}</span>
                   </div>
                 )}
-                {floatingCardProperty.subdivisionName && (
+                {(floatingCardProperty.subdivision || (floatingCardProperty as any).subdivisionName) && (
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Subdivision</span>
-                    <span className="font-medium">{floatingCardProperty.subdivisionName}</span>
+                    <span className="font-medium">{floatingCardProperty.subdivision || (floatingCardProperty as any).subdivisionName}</span>
                   </div>
                 )}
                 {floatingCardProperty.daysOnMarket !== null && floatingCardProperty.daysOnMarket !== undefined && (

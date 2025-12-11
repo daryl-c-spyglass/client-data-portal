@@ -1,0 +1,117 @@
+You MUST fix the image carousel behavior inside the floating property card/modal.
+
+There are TWO critical issues:
+1) A grey rectangle/overlay is still visible on the image.
+2) Clicking on the left/right side of the image does NOT navigate backward/forward.
+
+This task is HIGH PRIORITY and MUST be fully resolved.
+
+====================================================
+A. GREY OVERLAY / GREY RECTANGLE ON IMAGE
+====================================================
+
+1. Find the exact DOM element(s) causing the grey area:
+   - Inspect all children inside the image/carousel container, including:
+     • Arrow wrappers
+     • Pagination container
+     • Placeholder/mask divs
+     • Default slider overlays from the carousel library
+     • Any absolutely positioned backgrounds
+
+2. Remove or restyle the offending element(s):
+   - No visible grey block or panel may remain on top of the image.
+   - The image region should only contain:
+     • The actual photo
+     • The centered slide counter (e.g. "8 / 25")
+     • Back/forward arrows or icons
+   - No other background (especially grey) should be visible within the image area.
+
+3. Check for CSS that may be causing this:
+   - Look for any rules with:
+     • `background: gray` / `background-color: #ccc` / similar
+     • Fixed height/width overlays
+     • Absolute positioning within the image container
+   - Remove or override these so they are not visible.
+
+4. This fix MUST apply to ALL statuses:
+   - Active
+   - Under Contract
+   - Sold/Closed
+
+====================================================
+B. CLICKABLE LEFT/RIGHT IMAGE ZONES — MUST WORK
+====================================================
+
+The required behavior is:
+
+- Clicking on the LEFT half of the image:
+  → Goes to the PREVIOUS photo (backward).
+
+- Clicking on the RIGHT half of the image:
+  → Goes to the NEXT photo (forward).
+
+This is currently NOT working.
+
+1. Implement click zones:
+   - Either:
+     • Add two transparent overlays (left/right) on top of the image, OR
+     • Use the click position (e.clientX vs image midpoint) to decide direction.
+   - These zones must:
+     • Cover the full height of the image.
+     • Cover half the width (left and right halves).
+     • Not show any visible grey or colored blocks.
+
+2. Wire the zones to the carousel:
+   - Left zone click → call the carousel’s "previous" function.
+   - Right zone click → call the carousel’s "next" function.
+   - Ensure these work in addition to any explicit arrow buttons you already have.
+
+3. Keep autoplay behavior:
+   - The carousel must continue to auto-advance every ~3 seconds.
+   - When the user clicks left/right:
+     • Immediately move to the requested slide.
+     • Pause autoplay briefly, then resume after a short delay (around 3 seconds).
+
+====================================================
+C. TESTING — REQUIRED STEPS
+====================================================
+
+You MUST test all of the following:
+
+1. Open an **Active** listing floating card:
+   - No grey overlay anywhere on the image.
+   - Clicking left half moves backward.
+   - Clicking right half moves forward.
+   - Autoplay still works and resumes after clicking.
+
+2. Open an **Under Contract** listing floating card:
+   - Same tests as above — no grey overlay, left/right clicks work, autoplay OK.
+
+3. Open a **Sold/Closed** listing floating card:
+   - Same tests as above — no grey overlay, left/right clicks work, autoplay OK.
+
+4. Test on both:
+   - Desktop viewport
+   - At least one smaller/mobile-width viewport
+
+====================================================
+D. REQUIRED REPORT
+====================================================
+
+After fixing, provide a short but precise report with:
+
+1. The exact DOM element(s) that caused the grey block:
+   - Component name and class/id.
+
+2. The exact CSS/JS changes you made:
+   - Files and selectors/functions updated.
+
+3. How you implemented left/right click zones:
+   - Whether you used overlays or click-position logic.
+
+4. Confirmation that you tested:
+   - Active, Under Contract, and Sold/Closed listings.
+   - Desktop + small/mobile viewport.
+   - Results: NO grey overlay, left/right click navigation works, autoplay works.
+
+Partial fixes are NOT acceptable. Both the grey overlay AND left/right click behavior must be fully working.
