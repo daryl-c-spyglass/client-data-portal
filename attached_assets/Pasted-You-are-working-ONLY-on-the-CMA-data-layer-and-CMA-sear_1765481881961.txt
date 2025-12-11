@@ -1,0 +1,170 @@
+You are working ONLY on the CMA data layer and CMA search / result logic (NOT IDX or public search).
+
+Goal:
+Investigate and fix any status/filter mismatch between our CMA data (from Repliers/MLS feed) and the statuses that should be considered Active / Active Under Contract / Closed for the Cherry Creek subdivision.
+
+We are using the attached CMA PDF “Quick CMA 2740” as a reference snapshot.
+
+====================================================
+1) Reproduce the CMA search & confirm what we return
+====================================================
+
+Reproduce the exact CMA search the user did:
+
+- Status filter: Active (only)
+- Subdivision: Cherry Creek
+- Property type: Residential / Single Family
+- Sqft range: 1200–1800 (per PDF footer)
+- Date as-of: treat 2025-12-09 as the reference snapshot (matching the PDF timestamp).
+
+Observed by user:
+- Our CMA search (Active + Cherry Creek) returned:
+  • 6303 Bexton CIR, Subdivision: Cherry Creek
+- Zillow shows 6303 Bexton CIR as UNDER CONTRACT, not Active.
+
+From the “Quick CMA 2740” PDF snapshot (as of 12/9/2025 10:48 am) the Active/UC/Closed sets are:
+
+Active (3):
+- 2301 Brookhill Dr, Cherry Creek, List Price $575,000
+- 6502 Aldford Cir, Cherry Creek (Ph 06 Sec 01), List Price $500,000
+- 7741 Manassas Dr, Cherry Creek (Ph 07 Sec 03), List Price $639,000
+
+Active Under Contract (2):
+- 6014 London Dr, Cherry Creek (Ph 06 Sec 02 Amd), List Price $474,900
+- 5706 Cherry Creek Dr, Cherry Creek (Ph 02 Sec 03), List Price $509,900
+
+Closed (4):
+- 2714 Harleyhill Dr, Cherry Creek (Ph 04 Sec 02), Close Price $640,000
+- 7906 Swindon Ln, Cherry Creek (Ph 07 Sec 06), Close Price $575,000
+- 2803 Harleyhill Dr, Cherry Creek (Ph 04 Sec 02), Close Price $565,000
+- 7803 Seminary Ridge Dr, Cherry Creek (Ph 07 Sec 03), Close Price $558,000
+
+The user reports:
+- The 3 “Active” addresses above match Zillow as Active.
+- 6303 Bexton CIR shows as Active in our CMA search but Zillow shows it as Under Contract.
+- PDF shows 4 Closed listings that appear correct.
+
+====================================================
+2) Investigate 6303 Bexton CIR status handling
+====================================================
+
+For 6303 Bexton CIR, Cherry Creek:
+
+1) Pull the raw record(s) from our data source (Repliers or MLS feed):
+   - Include ALL status-related fields:
+     • StandardStatus
+     • Status / MlsStatus / any local status field
+     • Any “Under Contract” or “Pending” flags
+     • Status change history if available
+     • Modification/Originating modification timestamps
+
+2) Determine:
+   - What status we currently store for 6303 Bexton CIR (Active, Active Under Contract, Pending, etc.).
+   - When that status last changed in our data vs when the CMA PDF snapshot (12/09/2025 10:48 am) was generated.
+   - Whether this listing should be treated as:
+     • Active
+     • Active Under Contract
+     • Pending
+     • Or some derived “UC” status in the MLS mapping.
+
+3) Compare against our CMA search logic:
+   - Confirm whether the CMA “Active” filter is:
+     • Strictly filtering on StandardStatus == "Active"
+     • Or accidentally including “Active Under Contract” / “Pending” / “Contingent” as Active.
+   - Confirm 6303 Bexton CIR is being selected because of:
+     • Its current status in our DB, or
+     • A mapping bug where an UC/Pending status is treated as Active.
+
+4) Document whether any lag between our data and Zillow is expected or whether this is a logic/mapping bug on our side.
+
+====================================================
+3) Verify correctness of the 3 Active and 4 Closed listings in the PDF
+====================================================
+
+For each of the following properties:
+
+Active:
+- 2301 Brookhill Dr
+- 6502 Aldford Cir
+- 7741 Manassas Dr
+
+Closed:
+- 2714 Harleyhill Dr
+- 7906 Swindon Ln
+- 2803 Harleyhill Dr
+- 7803 Seminary Ridge Dr
+
+1) Pull raw data from our source:
+   - Status fields (StandardStatus and local)
+   - ListDate, CloseDate (for closed)
+   - Modification timestamps.
+
+2) Confirm that as of the CMA snapshot date/time (2025-12-09 10:48 am) our stored status agrees with:
+   - The status in the PDF (Active / Active Under Contract / Closed)
+   - Our current CMA UI classification.
+
+3) Confirm that the CMA search/result logic is:
+   - Using the same status filters that the PDF query used:
+     • Active / Active Under Contract / Pending for the “Active/UC” sets.
+     • Closed between 06/12/2025 and 12/09/2025 for the closed set (per PDF footer).
+
+====================================================
+4) Validate CMA search filters + PDF report filters are aligned
+====================================================
+
+We need to ensure that:
+
+1) The CMA interactive search (UI) and the CMA report/PDF:
+   - Use the same status filter rules for:
+     • Active
+     • Active Under Contract
+     • Pending
+     • Closed
+
+2) Subdivision filter:
+   - Confirm that the “Cherry Creek” filter in CMA:
+     • Uses the same subdivision field and “like 'Cherry Creek*'” logic as the PDF query shows.
+   - Verify 6303 Bexton CIR really matches this subdivision filter in our data.
+
+3) Time & Sqft filter:
+   - Confirm CMA filters respect:
+     • Close date range 06/12/2025 – 12/09/2025 for Closed listings.
+     • SqFt range 1200–1800 (as shown in PDF footer).
+   - If CMA UI uses a different date/size window than the PDF, document differences.
+
+====================================================
+5) Fixes & Safeguards (if a bug is confirmed)
+====================================================
+
+If you confirm that 6303 Bexton CIR should be treated as Under Contract (or not Active):
+
+1) Fix the mapping/filter logic so:
+   - CMA “Active” search does NOT include:
+     • Active Under Contract
+     • Pending
+     • Other non-true-active statuses.
+
+2) Ensure CMA “Active Under Contract” and “Closed” searches:
+   - Correctly pick up those statuses.
+
+3) Add tests:
+   - Unit or integration tests that:
+     • Given a record with status "Active Under Contract" (or equivalent field from our source), it is:
+       - NOT returned in an “Active only” CMA search.
+       - Returned in an “Active Under Contract” CMA search.
+     • For Cherry Creek, ensure 2301 Brookhill / 6502 Aldford / 7741 Manassas show under Active, and the 4 known closed addresses show under Closed.
+
+====================================================
+6) Required output / report
+====================================================
+
+In your final notes, please describe:
+
+1) What status and timestamps our data source has for 6303 Bexton CIR.
+2) Whether our CMA “Active” filter logic was incorrectly including UC/Pending statuses.
+3) Whether the 3 Active and 4 Closed listings in the PDF are correctly represented in CMA searches.
+4) Any code changes made to:
+   - Status mapping
+   - CMA search filters
+   - PDF query generation
+5) Any added tests to prevent this kind of status mismatch in the future.

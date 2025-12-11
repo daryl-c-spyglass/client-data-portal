@@ -450,13 +450,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
             addr.unitNumber ? `#${addr.unitNumber}` : null,
           ].filter(Boolean).join(' ');
 
+          // Comprehensive status mapping - handles both single-letter codes and full strings
           const statusMap: Record<string, string> = {
+            // Single-letter codes from Repliers API
             'A': 'Active',
             'U': 'Under Contract',
             'S': 'Closed',
             'P': 'Pending',
+            'X': 'Expired',
+            'W': 'Withdrawn',
+            'C': 'Cancelled',
+            'T': 'Terminated',
+            // Full status strings that Repliers may return
+            'Active': 'Active',
+            'Active Under Contract': 'Under Contract',  // CRITICAL: Map to Under Contract, NOT Active
+            'Under Contract': 'Under Contract',
+            'Pending': 'Under Contract',  // Treat Pending as Under Contract for CMA purposes
+            'Sold': 'Closed',
+            'Closed': 'Closed',
+            'Expired': 'Expired',
+            'Cancelled': 'Cancelled',
+            'Withdrawn': 'Withdrawn',
+            'Terminated': 'Terminated',
           };
-          const mappedStatus = statusMap[listing.status] || listing.status || 'Active';
+          const rawStatus = listing.status || listing.standardStatus || 'Active';
+          const mappedStatus = statusMap[rawStatus] || rawStatus;
+          
+          // Log status mapping for debugging (only when there's a potential mismatch)
+          if (rawStatus !== mappedStatus && rawStatus !== 'A' && rawStatus !== 'U' && rawStatus !== 'S' && rawStatus !== 'P') {
+            console.log(`📋 Status mapping: "${rawStatus}" → "${mappedStatus}" for ${listing.mlsNumber || 'unknown MLS#'}`);
+          }
 
           const toNumber = (val: any): number | null => {
             if (val == null) return null;
@@ -704,28 +727,52 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Fetch from each selected status source
       // Per client requirement: Use Repliers as primary data source for ALL statuses
-      const fetchPromises: Promise<NormalizedProperty[]>[] = [];
+      const fetchPromises: Promise<{ results: NormalizedProperty[]; expectedStatus: string }>[] = [];
       
       for (const statusType of statusList) {
         if (statusType === 'active') {
-          fetchPromises.push(fetchFromRepliers('A'));
+          fetchPromises.push(fetchFromRepliers('A').then(results => ({ results, expectedStatus: 'Active' })));
         } else if (statusType === 'under_contract') {
-          fetchPromises.push(fetchFromRepliers('U'));
+          fetchPromises.push(fetchFromRepliers('U').then(results => ({ results, expectedStatus: 'Under Contract' })));
         } else if (statusType === 'pending') {
-          fetchPromises.push(fetchFromRepliers('P'));
+          // Pending is treated as Under Contract
+          fetchPromises.push(fetchFromRepliers('P').then(results => ({ results, expectedStatus: 'Under Contract' })));
         } else if (statusType === 'closed' || statusType === 'sold') {
           // Repliers API only supports 'A' (Active) and 'U' (Under Contract)
           // For closed/sold listings, always fetch from database
-          fetchPromises.push(fetchFromDatabase());
+          fetchPromises.push(fetchFromDatabase().then(results => ({ results, expectedStatus: 'Closed' })));
         }
       }
 
       // Wait for all fetches to complete
       const resultsArrays = await Promise.all(fetchPromises);
       
-      // Combine and apply filters
-      for (const results of resultsArrays) {
-        allResults = allResults.concat(applyFilters(results));
+      // Combine and apply filters WITH strict status matching
+      // This ensures that when we query for 'Active', we only return truly Active listings
+      // (not 'Active Under Contract' which should be mapped to 'Under Contract')
+      for (const { results, expectedStatus } of resultsArrays) {
+        // Filter to only include listings matching the expected status after mapping
+        const statusFilteredResults = results.filter(p => {
+          const propertyStatus = (p.status || '').toLowerCase();
+          const expected = expectedStatus.toLowerCase();
+          
+          // Match status - allow some flexibility for Closed/Sold
+          if (expected === 'closed') {
+            return propertyStatus === 'closed' || propertyStatus === 'sold';
+          }
+          if (expected === 'under contract') {
+            return propertyStatus === 'under contract' || propertyStatus === 'pending';
+          }
+          return propertyStatus === expected;
+        });
+        
+        // Log if we filtered out any listings due to status mismatch
+        if (statusFilteredResults.length < results.length) {
+          const filteredOut = results.length - statusFilteredResults.length;
+          console.log(`⚠️ Status filter: Removed ${filteredOut} listings with mismatched status (expected: ${expectedStatus})`);
+        }
+        
+        allResults = allResults.concat(applyFilters(statusFilteredResults));
       }
 
       // Remove duplicates (by id) and limit
@@ -931,7 +978,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
               id: listing.mlsNumber,
               listingId: listing.mlsNumber,
               listingKey: listing.mlsNumber,
-              standardStatus: listing.status === 'A' ? 'Active' : listing.status === 'U' ? 'Under Contract' : listing.status,
+              standardStatus: (() => {
+                // Comprehensive status mapping for property detail lookup
+                const statusMap: Record<string, string> = {
+                  'A': 'Active',
+                  'U': 'Under Contract',
+                  'S': 'Closed',
+                  'P': 'Pending',
+                  'Active': 'Active',
+                  'Active Under Contract': 'Under Contract',
+                  'Under Contract': 'Under Contract',
+                  'Pending': 'Under Contract',
+                  'Sold': 'Closed',
+                  'Closed': 'Closed',
+                };
+                return statusMap[listing.status] || listing.status;
+              })(),
               listPrice: String(listing.listPrice || 0),
               closePrice: listing.soldPrice ? String(listing.soldPrice) : null,
               originalListPrice: listing.originalPrice ? String(listing.originalPrice) : null,
@@ -1574,7 +1636,16 @@ This email was sent by ${senderName} (${senderEmail}) via the MLS Grid IDX Platf
                     daysOnMarket: listing.daysOnMarket,
                     lotSizeSquareFeet: details.lotSize || listing.lotSizeSquareFeet,
                     lotSizeAcres: listing.lotSizeAcres,
-                    standardStatus: listing.status === 'A' ? 'Active' : listing.status === 'S' ? 'Closed' : listing.status,
+                    standardStatus: (() => {
+                      // Comprehensive status mapping
+                      const statusMap: Record<string, string> = {
+                        'A': 'Active', 'U': 'Under Contract', 'S': 'Closed', 'P': 'Pending',
+                        'Active': 'Active', 'Active Under Contract': 'Under Contract',
+                        'Under Contract': 'Under Contract', 'Pending': 'Under Contract',
+                        'Sold': 'Closed', 'Closed': 'Closed',
+                      };
+                      return statusMap[listing.status] || listing.status;
+                    })(),
                   };
                 }
               } catch (err) {
