@@ -536,5 +536,7 @@ export interface TimelineDataPoint {
   propertyId: string;
   address: string;
   daysOnMarket?: number | null;
+  daysActive?: number | null;
+  daysUnderContract?: number | null;
   cumulativeDaysOnMarket?: number | null;
 }

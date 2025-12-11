@@ -3003,42 +3003,33 @@ export default function BuyerSearch() {
                       className="w-full h-full object-cover"
                       data-testid="img-floating-card-property"
                     />
-                    {/* Carousel Controls */}
+                    {/* Carousel Controls - Click zones for navigation */}
                     {floatingCardProperty.media.length > 1 && (
                       <>
-                        <Button 
-                          size="icon" 
-                          variant="ghost" 
-                          className="absolute left-2 top-1/2 -translate-y-1/2 bg-black/40 hover:bg-black/60 text-white"
+                        {/* Left click zone */}
+                        <div 
+                          className="absolute left-0 top-0 w-1/3 h-full cursor-pointer z-10 flex items-center justify-start pl-2"
                           onClick={handlePrevImage}
-                          data-testid="button-carousel-prev"
+                          data-testid="zone-carousel-prev"
                         >
-                          <ChevronLeft className="w-5 h-5" />
-                        </Button>
-                        <Button 
-                          size="icon" 
-                          variant="ghost" 
-                          className="absolute right-2 top-1/2 -translate-y-1/2 bg-black/40 hover:bg-black/60 text-white"
+                          <div className="bg-black/40 hover:bg-black/60 text-white p-2 rounded-full transition-colors">
+                            <ChevronLeft className="w-5 h-5" />
+                          </div>
+                        </div>
+                        {/* Right click zone */}
+                        <div 
+                          className="absolute right-0 top-0 w-1/3 h-full cursor-pointer z-10 flex items-center justify-end pr-2"
                           onClick={handleNextImage}
-                          data-testid="button-carousel-next"
+                          data-testid="zone-carousel-next"
                         >
-                          <ChevronRight className="w-5 h-5" />
-                        </Button>
-                        <div className="absolute bottom-2 left-1/2 -translate-x-1/2 flex gap-1">
-                          {floatingCardProperty.media.map((_, idx) => (
-                            <div 
-                              key={idx} 
-                              className={cn(
-                                "w-2 h-2 rounded-full transition-colors",
-                                idx === carouselIndex ? "bg-white" : "bg-white/50"
-                              )}
-                            />
-                          ))}
+                          <div className="bg-black/40 hover:bg-black/60 text-white p-2 rounded-full transition-colors">
+                            <ChevronRight className="w-5 h-5" />
+                          </div>
                         </div>
                       </>
                     )}
-                    {/* Photo Count */}
-                    <div className="absolute top-2 right-2 bg-black/60 text-white text-xs px-2 py-1 rounded">
+                    {/* Photo Count - centered at bottom */}
+                    <div className="absolute bottom-3 left-1/2 -translate-x-1/2 bg-black/60 text-white text-sm px-3 py-1 rounded-full">
                       {carouselIndex + 1} / {floatingCardProperty.media.length}
                     </div>
                   </>
@@ -3049,7 +3040,7 @@ export default function BuyerSearch() {
                 )}
                 {/* Status Badge */}
                 {floatingCardProperty.property.standardStatus && (
-                  <div className="absolute top-2 left-2">
+                  <div className="absolute top-2 left-2 z-20">
                     <Badge 
                       className={cn(
                         floatingCardProperty.property.standardStatus === 'Active' && "bg-emerald-500 text-white",

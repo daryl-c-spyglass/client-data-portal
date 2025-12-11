@@ -1,0 +1,276 @@
+You are working on our CMA web app that uses listing data and photos exclusively from Repliers.
+
+This is a NEW QA round. Some items are refinements of previous tasks, others are new.  
+Treat ALL items below as REQUIRED and do NOT break anything that already works.
+
+Important:
+- Work through each item **one by one, in order**.
+- Use **Repliers as the ONLY data source** for listings, statuses, dates, and photos.
+- After finishing all items, produce a **detailed report** explaining:
+  - What changed for each item
+  - Files/components touched
+  - Tests performed + results
+
+====================================================
+1) Search results – SOLD listing images missing (Repliers) + floating card behavior
+====================================================
+Context:
+- In search results, **sold/closed listings** are not showing images:
+  - No thumbnail in the list.
+  - No photos in the floating card.
+- Active and Under Contract already have images, but SOLD listings do not.
+- All listing data and photos come from **Repliers**.
+
+Requirements:
+- Fix the image/source logic for SOLD/CLOSED listings using Repliers:
+  - For ALL statuses (Active, Under Contract, Sold/Closed), load listing images from Repliers.
+  - Thumbnails in the search results cards must display the primary image from Repliers.
+  - The floating card/modal must show all available photos from Repliers for that listing.
+
+- When the user clicks a property in search results:
+  - Open a floating card with:
+    - Property details (address, price, beds, baths, sq ft, year built, subdivision, status, etc.) from Repliers.
+    - Photo carousel populated from Repliers images.
+
+- Carousel behavior in floating card:
+  - Automatic carousel (autoplay) every **3 seconds**.
+  - Backward/forward navigation:
+    - Arrows must be visible and clickable.
+    - Clicking next/previous moves immediately.
+    - Autoplay resumes after a short pause (~3 seconds) following manual navigation.
+
+Testing:
+- Run a search that shows Active, Under Contract, and Sold/Closed listings.
+- Confirm for SOLD listings:
+  - Thumbnail images show in search results.
+  - Floating card displays images from Repliers.
+  - Carousel autoplay and manual navigation both work.
+
+====================================================
+2) Remove grey boxes on floating card images (Active, Under Contract, Sold) + click zones
+====================================================
+Context:
+- There is still a grey block on the lower-left area of the image in the floating card for Active and Under Contract listings.
+- The same UI must be clean for Sold/Closed as well.
+
+Requirements:
+- Inspect the floating card image/slider DOM (for all statuses) and identify the element responsible for the grey block:
+  - Old pagination container
+  - Hidden arrow wrapper
+  - Mask/overlay div with a grey background
+- Remove or restyle that element so no unwanted grey area appears.
+- The image area should only show:
+  - The image itself
+  - The centered image counter (e.g., “2 / 32”)
+  - Backward/forward controls
+
+Click behavior:
+- Add intuitive click zones for navigation:
+  - Clicking on the LEFT side of the image (or left arrow) triggers backward navigation.
+  - Clicking on the RIGHT side of the image (or right arrow) triggers forward navigation.
+  - Keep the **auto-carousel** (3s autoplay) intact and resuming after manual interaction.
+
+Testing:
+- Open Active, Under Contract, and Sold listings in the floating card.
+- Confirm:
+  - No grey rectangles visible anywhere over the image.
+  - Left/right click zones move backward/forward.
+  - Autoplay still runs and resumes correctly after clicking.
+
+====================================================
+3) Move Print icon beside Share link (yellow box/header)
+====================================================
+Context:
+- Print is still not grouped correctly with Share.
+
+Requirements:
+- In the CMA view header (yellow box area):
+  - Move the Print icon/control so it appears **next to the Share link** at the top-right.
+  - Remove Print from any other location inside the yellow box.
+- Maintain consistent styling/alignment with the Share control.
+
+Testing:
+- Open a CMA:
+  - Confirm Share link and Print icon sit side-by-side in the upper-right.
+  - Both actions still work.
+
+====================================================
+4) Thumbnails for chosen listings (Market Stats + other summaries) – Repliers
+====================================================
+Context:
+- Property thumbnail images for chosen listings are still missing in some places:
+  - Particularly in Market Stats (Sold/Closed is explicitly missing).
+- All listing images must be loaded from **Repliers**.
+
+Requirements:
+- For all listing lists based on chosen/selected properties (including Market Stats and any CMA summary sections):
+  - Ensure each property shows a thumbnail image loaded from Repliers.
+  - Sold/Closed thumbnails in Market Stats must display correctly.
+  - Reuse the same image resolution/URL logic as search results where possible.
+  - Provide a fallback image/icon when a listing has no photos in Repliers.
+
+Testing:
+- Open Market Stats and any other view that lists chosen properties:
+  - Confirm thumbnails appear for Sold/Closed, Active, and Under Contract.
+  - Confirm images are consistent with Repliers data.
+  - Confirm fallback is used when a listing truly has no photo.
+
+====================================================
+5) Section ordering by count – Sold/Closed, Under Contract, Active
+====================================================
+Context:
+- Sections for Sold/Closed, Under Contract, and Active Listings should be sorted by number of properties.
+
+Requirements:
+- Using counts derived from Repliers listing data:
+  - Compute the property count for:
+    - Sold/Closed
+    - Under Contract
+    - Active Listings
+- Display them in **descending order** of count.
+- Format with counts in the labels, for example:
+  - Sold/Closed (5)
+  - Under Contract (3)
+  - Active Listings (0)
+- Sections with 0 items should still appear but always last.
+
+Testing:
+- Use a CMA where these counts differ.
+- Confirm they are ordered highest → lowest count with counts shown.
+
+====================================================
+6) Email CMA to Friend – ensure delivery + dynamic domain configuration
+====================================================
+Context:
+- Emails are still not being received (e.g., to daryl@spyglassrealty.com).
+- Sender config must handle different domains/environments.
+
+Requirements:
+- Email sending:
+  - Use the app’s configured mail provider (SMTP/transactional service) managed via environment variables or app config.
+  - Do **NOT** use the user-entered “Your Email Address” as the SMTP From (to avoid SPF/DMARC issues).
+  - The “From” address should be something like: no-reply@<current-app-domain> or a configured sender domain.
+- Dynamic domain:
+  - Derive From address and any links from environment/app config so the feature remains valid when the domain changes.
+- “Your Email Address”:
+  - Use this as the **Reply-To** address (and optionally CC).
+  - When the recipient replies, their reply should go to that email.
+- Email body:
+  - Must be HTML and include:
+    - CMA summary (property + key stats, pulled from Repliers data)
+    - A prominent link to view the full CMA online
+    - The user’s comments
+  - Comments description or default text should mention:
+    - “The CMA will be sent in HTML format including a link to view it online.”
+
+Testing:
+- With a real configuration:
+  - Send a test CMA email to e.g. daryl@spyglassrealty.com.
+  - Confirm:
+    - Email is delivered (not hard-bounced).
+    - Reply-To is set correctly.
+    - HTML content + CMA link + comments appear as expected.
+
+====================================================
+7) Share CMA – Instagram & TikTok behavior
+====================================================
+Context:
+- Facebook and X share options work correctly.
+- Instagram and TikTok share options still do not provide a usable flow.
+
+Requirements:
+- For **Instagram**:
+  - On click:
+    - Copy the CMA link to clipboard.
+    - Optionally open Instagram’s web/app entry URL in a new tab.
+    - Show a clear message such as:
+      “Link copied! Paste this into your Instagram post, story, or DM.”
+- For **TikTok**:
+  - On click:
+    - Copy the CMA link to clipboard.
+    - Optionally open TikTok’s web/app entry URL.
+    - Show a clear message such as:
+      “Link copied! Paste this into your TikTok post or message.”
+- The buttons must:
+  - Never be no-ops.
+  - Always provide a clear, usable path to share (copy + instructions, optionally with platform open).
+
+Testing:
+- Click “Share to Instagram” and “Share to TikTok”:
+  - Confirm the CMA link is copied.
+  - Confirm a visible on-screen message explains what the user should do next.
+  - Confirm, where applicable, that a relevant Instagram/TikTok page opens.
+
+====================================================
+8) Price Timeline – days on market logic (Sold, Active, Under Contract) using Repliers dates
+====================================================
+Context:
+- The timeline is already a line chart.
+- Days-on-market calculations must now be precise using **Repliers date fields**.
+
+Requirements:
+- Use Repliers listing date fields for all calculations.
+
+- For **Sold/Closed** listings:
+  - Days on Market = Close/Sold Date – Listing Date (from Repliers).
+- For **Active** listings:
+  - Days Active = Current Date – Listing Date (from Repliers).
+- For **Under Contract** listings:
+  - Days Under Contract = Current Date – Under-Contract Date / status change date from Repliers.
+  - If Repliers does not provide a dedicated under-contract date, choose the best available field and document this in the report.
+
+Timeline UI:
+- On hover/tap over each point in the line chart, show a tooltip containing:
+  - Status (Active / Under Contract / Sold/Closed)
+  - Price
+  - Date
+  - The appropriate days label:
+    - “Days on Market: X” (Sold/Closed)
+    - “Days Active: X” (Active)
+    - “Days Under Contract: X” (Under Contract)
+
+Testing:
+- With sample data from Repliers covering all three statuses:
+  - Confirm days are computed correctly.
+  - Confirm tooltips display accurate values based on Repliers fields.
+
+====================================================
+9) Market Stats – floating card behavior for properties (Repliers-powered)
+====================================================
+Context:
+- In Market Stats, clicking a property in Sold/Closed, Active, or Under Contract should behave the same as clicking a property in search results.
+
+Requirements:
+- In Market Stats, for each property entry in:
+  - Sold/Closed
+  - Active Listings
+  - Under Contract
+- When clicked:
+  - Open a floating card/modal identical in behavior to the search results floating card:
+    - Property details from Repliers.
+    - Repliers-powered image carousel (autoplay + arrows + fixed grey-box issue).
+- Reuse the same component/logic if possible to keep behavior consistent.
+
+Testing:
+- Open Market Stats:
+  - Click a property in Sold/Closed, one in Active, and one in Under Contract.
+  - Confirm each opens the same floating card UI as search results with:
+    - Correct details from Repliers
+    - Working carousel
+    - No grey block.
+
+====================================================
+Final step – Detailed report
+====================================================
+After implementing and testing ALL items (1–9):
+
+- Produce a detailed report that includes:
+  - For each item:
+    - Summary of changes
+    - Files/components touched
+    - How Repliers data was used (fields for images, dates, statuses, etc.)
+    - Tests performed (with concrete examples: which searches, which statuses, which email address)
+    - Test results and any edge cases
+  - Any assumptions (e.g., which Repliers field used as Under Contract date) or recommended follow-ups.
+
+The report must be written clearly enough for non-technical stakeholders (client/product owner) to understand.

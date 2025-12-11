@@ -1,13 +1,16 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, Legend, ResponsiveContainer, LineChart, Line, ReferenceLine } from "recharts";
-import { Save, Edit, FileText, Printer, Info, Home, Mail } from "lucide-react";
+import { Save, Edit, FileText, Printer, Info, Home, Mail, ChevronLeft, ChevronRight, Bed, Bath, Maximize, MapPin, Calendar } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import type { Property, PropertyStatistics, TimelineDataPoint } from "@shared/schema";
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import { Separator } from "@/components/ui/separator";
+import { cn } from "@/lib/utils";
+import type { Property, PropertyStatistics, TimelineDataPoint, Media } from "@shared/schema";
 
 type StatMetricKey = 'price' | 'pricePerSqFt' | 'daysOnMarket' | 'livingArea' | 'lotSize' | 'acres' | 'bedrooms' | 'bathrooms' | 'yearBuilt';
 
@@ -50,6 +53,68 @@ export function CMAReport({
 }: CMAReportProps) {
   const [activeTab, setActiveTab] = useState("home-averages");
   const [activeListingTab, setActiveListingTab] = useState("all");
+  
+  // Floating card state
+  const [floatingCardOpen, setFloatingCardOpen] = useState(false);
+  const [floatingCardProperty, setFloatingCardProperty] = useState<Property | null>(null);
+  const [carouselIndex, setCarouselIndex] = useState(0);
+  const autoAdvanceRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  
+  // Helper to get photos from property
+  const getPropertyPhotos = (property: Property): string[] => {
+    const photos = (property as any).photos as string[] | undefined;
+    const media = (property as any).media as any[] | undefined;
+    if (photos && photos.length > 0) return photos;
+    if (media && media.length > 0) {
+      return media.map((m: any) => m.mediaURL || m.mediaUrl).filter(Boolean);
+    }
+    return [];
+  };
+  
+  // Handle property click to open floating card
+  const handlePropertyClick = (property: Property) => {
+    setFloatingCardProperty(property);
+    setCarouselIndex(0);
+    setFloatingCardOpen(true);
+  };
+  
+  // Carousel auto-advance
+  useEffect(() => {
+    if (autoAdvanceRef.current) {
+      clearInterval(autoAdvanceRef.current);
+    }
+    
+    if (floatingCardProperty && floatingCardOpen) {
+      const photos = getPropertyPhotos(floatingCardProperty);
+      if (photos.length > 1) {
+        autoAdvanceRef.current = setInterval(() => {
+          setCarouselIndex((prev) => (prev + 1) % photos.length);
+        }, 3000);
+      }
+    }
+    
+    return () => {
+      if (autoAdvanceRef.current) {
+        clearInterval(autoAdvanceRef.current);
+      }
+    };
+  }, [floatingCardProperty, floatingCardOpen]);
+  
+  const handlePrevImage = () => {
+    if (!floatingCardProperty) return;
+    const photos = getPropertyPhotos(floatingCardProperty);
+    if (photos.length > 1) {
+      setCarouselIndex((prev) => (prev - 1 + photos.length) % photos.length);
+    }
+  };
+  
+  const handleNextImage = () => {
+    if (!floatingCardProperty) return;
+    const photos = getPropertyPhotos(floatingCardProperty);
+    if (photos.length > 1) {
+      setCarouselIndex((prev) => (prev + 1) % photos.length);
+    }
+  };
 
   // Group properties by status
   const allProperties = properties;
@@ -459,14 +524,36 @@ export function CMAReport({
                                     <span>{data.status === 'Closed' ? 'Sold Date:' : 'List Date:'}</span>
                                     <span className="font-medium text-foreground">{new Date(data.date).toLocaleDateString()}</span>
                                   </p>
-                                  {data.daysOnMarket !== null && data.daysOnMarket !== undefined && (
+                                  {/* Status-specific days display */}
+                                  {data.status === 'Closed' && data.daysOnMarket != null && (
                                     <p className="flex justify-between gap-4">
                                       <span>Days on Market:</span>
                                       <span className="font-medium text-foreground">{data.daysOnMarket} days</span>
                                     </p>
                                   )}
-                                  {data.cumulativeDaysOnMarket !== null && data.cumulativeDaysOnMarket !== undefined && 
-                                   data.cumulativeDaysOnMarket !== data.daysOnMarket && (
+                                  {data.status === 'Active' && data.daysActive != null && (
+                                    <p className="flex justify-between gap-4">
+                                      <span>Days Active:</span>
+                                      <span className="font-medium text-foreground">{data.daysActive} days</span>
+                                    </p>
+                                  )}
+                                  {data.status === 'Under Contract' && (
+                                    <>
+                                      {data.daysUnderContract != null && (
+                                        <p className="flex justify-between gap-4">
+                                          <span>Days Under Contract:</span>
+                                          <span className="font-medium text-foreground">{data.daysUnderContract} days</span>
+                                        </p>
+                                      )}
+                                      {data.daysActive != null && (
+                                        <p className="flex justify-between gap-4">
+                                          <span>Total Days Active:</span>
+                                          <span className="font-medium text-foreground">{data.daysActive} days</span>
+                                        </p>
+                                      )}
+                                    </>
+                                  )}
+                                  {data.cumulativeDaysOnMarket != null && data.cumulativeDaysOnMarket !== data.daysOnMarket && (
                                     <p className="flex justify-between gap-4">
                                       <span>Cumulative DOM:</span>
                                       <span className="font-medium text-foreground">{data.cumulativeDaysOnMarket} days</span>
@@ -728,7 +815,15 @@ export function CMAReport({
                           : (property.listPrice ? Number(property.listPrice) : 0);
                         const pricePerSqft = property.livingArea ? price / Number(property.livingArea) : null;
                         return (
-                          <div key={property.id} className="flex gap-3 p-2 rounded-md border bg-card">
+                          <div 
+                            key={property.id} 
+                            className="flex gap-3 p-2 rounded-md border bg-card cursor-pointer hover-elevate transition-colors"
+                            onClick={() => handlePropertyClick(property)}
+                            onKeyDown={(e) => e.key === 'Enter' && handlePropertyClick(property)}
+                            tabIndex={0}
+                            role="button"
+                            data-testid={`card-property-${property.id}`}
+                          >
                             {primaryPhoto ? (
                               <img src={primaryPhoto} alt={property.unparsedAddress || ''} className="w-20 h-20 object-cover rounded-md flex-shrink-0" />
                             ) : (
@@ -762,6 +857,177 @@ export function CMAReport({
           })()}
         </TabsContent>
       </Tabs>
+      
+      {/* Floating Property Card Sheet */}
+      <Sheet open={floatingCardOpen} onOpenChange={setFloatingCardOpen}>
+        <SheetContent side="right" className="w-full sm:max-w-lg overflow-y-auto">
+          {floatingCardProperty && (
+            <>
+              <SheetHeader className="sr-only">
+                <SheetTitle>Property Details</SheetTitle>
+              </SheetHeader>
+              
+              {/* Image Carousel */}
+              <div className="relative aspect-[16/9] bg-muted rounded-lg overflow-hidden mb-4 -mx-6 -mt-6">
+                {(() => {
+                  const photos = getPropertyPhotos(floatingCardProperty);
+                  return photos.length > 0 ? (
+                    <>
+                      <img 
+                        src={photos[carouselIndex]} 
+                        alt={floatingCardProperty.unparsedAddress || 'Property'} 
+                        className="w-full h-full object-cover"
+                        data-testid="img-floating-card-property"
+                      />
+                      {/* Carousel Controls - Click zones for navigation */}
+                      {photos.length > 1 && (
+                        <>
+                          {/* Left click zone */}
+                          <div 
+                            className="absolute left-0 top-0 w-1/3 h-full cursor-pointer z-10 flex items-center justify-start pl-2"
+                            onClick={handlePrevImage}
+                            data-testid="zone-carousel-prev"
+                          >
+                            <div className="bg-black/40 hover:bg-black/60 text-white p-2 rounded-full transition-colors">
+                              <ChevronLeft className="w-5 h-5" />
+                            </div>
+                          </div>
+                          {/* Right click zone */}
+                          <div 
+                            className="absolute right-0 top-0 w-1/3 h-full cursor-pointer z-10 flex items-center justify-end pr-2"
+                            onClick={handleNextImage}
+                            data-testid="zone-carousel-next"
+                          >
+                            <div className="bg-black/40 hover:bg-black/60 text-white p-2 rounded-full transition-colors">
+                              <ChevronRight className="w-5 h-5" />
+                            </div>
+                          </div>
+                        </>
+                      )}
+                      {/* Photo Count - centered at bottom */}
+                      <div className="absolute bottom-3 left-1/2 -translate-x-1/2 bg-black/60 text-white text-sm px-3 py-1 rounded-full">
+                        {carouselIndex + 1} / {photos.length}
+                      </div>
+                    </>
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center text-muted-foreground">
+                      <Home className="w-16 h-16 opacity-50" />
+                    </div>
+                  );
+                })()}
+                {/* Status Badge */}
+                {floatingCardProperty.standardStatus && (
+                  <div className="absolute top-2 left-2 z-20">
+                    <Badge 
+                      className={cn(
+                        floatingCardProperty.standardStatus === 'Active' && "bg-emerald-500 text-white",
+                        floatingCardProperty.standardStatus === 'Under Contract' && "bg-amber-500 text-white",
+                        floatingCardProperty.standardStatus === 'Closed' && "bg-slate-500 text-white"
+                      )}
+                    >
+                      {floatingCardProperty.standardStatus}
+                    </Badge>
+                  </div>
+                )}
+              </div>
+
+              {/* Price */}
+              <div className="mb-4">
+                <p className="text-2xl font-bold text-primary" data-testid="text-floating-price">
+                  {floatingCardProperty.standardStatus === 'Closed' && floatingCardProperty.closePrice
+                    ? new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(Number(floatingCardProperty.closePrice))
+                    : floatingCardProperty.listPrice 
+                      ? new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(Number(floatingCardProperty.listPrice))
+                      : 'Price upon request'}
+                </p>
+                {floatingCardProperty.listPrice && floatingCardProperty.livingArea && (
+                  <p className="text-sm text-muted-foreground">
+                    ${(Number(floatingCardProperty.standardStatus === 'Closed' && floatingCardProperty.closePrice ? floatingCardProperty.closePrice : floatingCardProperty.listPrice) / Number(floatingCardProperty.livingArea)).toFixed(0)}/sqft
+                  </p>
+                )}
+              </div>
+
+              {/* Address */}
+              <div className="flex items-start gap-2 mb-4">
+                <MapPin className="w-4 h-4 mt-0.5 text-muted-foreground shrink-0" />
+                <div>
+                  <p className="font-medium" data-testid="text-floating-address">
+                    {floatingCardProperty.unparsedAddress || 'Address not available'}
+                  </p>
+                  <p className="text-sm text-muted-foreground">
+                    {[
+                      floatingCardProperty.city,
+                      floatingCardProperty.stateOrProvince,
+                      floatingCardProperty.postalCode
+                    ].filter(Boolean).join(', ')}
+                  </p>
+                </div>
+              </div>
+
+              <Separator className="my-4" />
+
+              {/* Key Stats */}
+              <div className="grid grid-cols-3 gap-4 mb-4">
+                {floatingCardProperty.bedroomsTotal !== null && (
+                  <div className="text-center">
+                    <div className="flex items-center justify-center gap-1 text-muted-foreground mb-1">
+                      <Bed className="w-4 h-4" />
+                    </div>
+                    <p className="font-semibold" data-testid="text-floating-beds">{floatingCardProperty.bedroomsTotal}</p>
+                    <p className="text-xs text-muted-foreground">Beds</p>
+                  </div>
+                )}
+                {floatingCardProperty.bathroomsTotalInteger !== null && (
+                  <div className="text-center">
+                    <div className="flex items-center justify-center gap-1 text-muted-foreground mb-1">
+                      <Bath className="w-4 h-4" />
+                    </div>
+                    <p className="font-semibold" data-testid="text-floating-baths">{floatingCardProperty.bathroomsTotalInteger}</p>
+                    <p className="text-xs text-muted-foreground">Baths</p>
+                  </div>
+                )}
+                {floatingCardProperty.livingArea && (
+                  <div className="text-center">
+                    <div className="flex items-center justify-center gap-1 text-muted-foreground mb-1">
+                      <Maximize className="w-4 h-4" />
+                    </div>
+                    <p className="font-semibold" data-testid="text-floating-sqft">{Number(floatingCardProperty.livingArea).toLocaleString()}</p>
+                    <p className="text-xs text-muted-foreground">Sq Ft</p>
+                  </div>
+                )}
+              </div>
+
+              {/* Additional Details */}
+              <div className="space-y-2 text-sm">
+                {floatingCardProperty.yearBuilt && (
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Year Built</span>
+                    <span className="font-medium">{floatingCardProperty.yearBuilt}</span>
+                  </div>
+                )}
+                {floatingCardProperty.subdivisionName && (
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Subdivision</span>
+                    <span className="font-medium">{floatingCardProperty.subdivisionName}</span>
+                  </div>
+                )}
+                {floatingCardProperty.daysOnMarket !== null && floatingCardProperty.daysOnMarket !== undefined && (
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Days on Market</span>
+                    <span className="font-medium">{floatingCardProperty.daysOnMarket}</span>
+                  </div>
+                )}
+                {floatingCardProperty.standardStatus === 'Closed' && floatingCardProperty.closeDate && (
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Sold Date</span>
+                    <span className="font-medium">{new Date(floatingCardProperty.closeDate).toLocaleDateString()}</span>
+                  </div>
+                )}
+              </div>
+            </>
+          )}
+        </SheetContent>
+      </Sheet>
     </div>
   );
 }

@@ -94,19 +94,70 @@ function calculateStatisticsFromProperties(properties: any[]): PropertyStatistic
 
 // Helper function to calculate timeline from property data directly
 function calculateTimelineFromProperties(properties: any[]): TimelineDataPoint[] {
+  const now = new Date();
+  
   return properties
     .filter(p => (p.listingContractDate || p.listDate) && (p.listPrice || p.closePrice) && (p.unparsedAddress || p.address))
-    .map(p => ({
-      date: new Date(p.listingContractDate || p.listDate),
-      price: p.standardStatus === 'Closed' && p.closePrice 
-        ? Number(p.closePrice) 
-        : Number(p.listPrice || 0),
-      status: (p.standardStatus || p.status || 'Active') as 'Active' | 'Under Contract' | 'Closed',
-      propertyId: p.id,
-      address: p.unparsedAddress || p.address || 'Unknown',
-      daysOnMarket: p.daysOnMarket ?? null,
-      cumulativeDaysOnMarket: p.cumulativeDaysOnMarket ?? p.daysOnMarket ?? null,
-    }))
+    .map(p => {
+      const rawStatusValue = p.standardStatus || p.status || 'Active';
+      // Normalize Pending to Under Contract for consistent handling
+      const status = (rawStatusValue === 'Pending' ? 'Under Contract' : rawStatusValue) as 'Active' | 'Under Contract' | 'Closed';
+      const listDate = new Date(p.listingContractDate || p.listDate);
+      const closeDate = p.closeDate ? new Date(p.closeDate) : null;
+      const underContractDate = p.underContractDate || p.pendingDate || p.statusChangeDate;
+      
+      // Calculate days based on status using Repliers date fields
+      let daysOnMarket: number | null = null;
+      let daysActive: number | null = null;
+      let daysUnderContract: number | null = null;
+      
+      if (status === 'Closed' || rawStatusValue === 'Sold') {
+        // Days on Market = Close/Sold Date - Listing Date
+        if (closeDate && listDate) {
+          daysOnMarket = Math.floor((closeDate.getTime() - listDate.getTime()) / (1000 * 60 * 60 * 24));
+        } else if (p.daysOnMarket != null) {
+          daysOnMarket = Number(p.daysOnMarket);
+        } else if (p.cumulativeDaysOnMarket != null) {
+          daysOnMarket = Number(p.cumulativeDaysOnMarket);
+        }
+      } else if (status === 'Active') {
+        // Days Active = Current Date - Listing Date
+        if (listDate) {
+          daysActive = Math.floor((now.getTime() - listDate.getTime()) / (1000 * 60 * 60 * 24));
+        }
+        // Also include any stored daysOnMarket
+        if (p.daysOnMarket != null) {
+          daysOnMarket = Number(p.daysOnMarket);
+        }
+      } else if (status === 'Under Contract') {
+        // Days Under Contract = Current Date - Under Contract Date
+        if (underContractDate) {
+          const ucDate = new Date(underContractDate);
+          daysUnderContract = Math.floor((now.getTime() - ucDate.getTime()) / (1000 * 60 * 60 * 24));
+        }
+        // Also calculate days active if we have list date
+        if (listDate) {
+          daysActive = Math.floor((now.getTime() - listDate.getTime()) / (1000 * 60 * 60 * 24));
+        }
+        if (p.daysOnMarket != null) {
+          daysOnMarket = Number(p.daysOnMarket);
+        }
+      }
+      
+      return {
+        date: listDate,
+        price: status === 'Closed' && p.closePrice 
+          ? Number(p.closePrice) 
+          : Number(p.listPrice || 0),
+        status,
+        propertyId: p.id,
+        address: p.unparsedAddress || p.address || 'Unknown',
+        daysOnMarket,
+        daysActive,
+        daysUnderContract,
+        cumulativeDaysOnMarket: p.cumulativeDaysOnMarket != null ? Number(p.cumulativeDaysOnMarket) : daysOnMarket,
+      };
+    })
     .sort((a, b) => a.date.getTime() - b.date.getTime());
 }
 
@@ -483,6 +534,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
         const dbResults = await storage.searchProperties(filters);
         
+        // Fetch media for all properties in a single batch query
+        const listingIds = dbResults.map((p: any) => p.listingId || p.id).filter(Boolean);
+        const mediaByListing = await storage.getMediaForListingIds(listingIds);
+        
         const toNum = (val: any): number | null => {
           if (val == null) return null;
           const num = Number(val);
@@ -496,8 +551,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const lotSqFt = toNum(p.lotSizeSquareFeet);
           const lotAcres = toNum(p.lotSizeAcres) || (lotSqFt ? lotSqFt / 43560 : null);
           
+          // Get photos from media table, sorted by order
+          const propertyId = p.listingId || p.id;
+          const propertyMedia = mediaByListing[propertyId] || [];
+          const photos = propertyMedia.length > 0 
+            ? propertyMedia.map(m => m.mediaURL).filter(Boolean) as string[]
+            : (p.photos || []);
+          
           return {
-            id: p.listingId || p.id,
+            id: propertyId,
             address: address,
             unparsedAddress: address,
             city: p.city || '',
@@ -516,7 +578,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             yearBuilt: toNum(p.yearBuilt),
             latitude: toNum(p.latitude),
             longitude: toNum(p.longitude),
-            photos: p.photos || [],
+            photos: photos,
             subdivision: p.subdivision || p.subdivisionName || null,
             subdivisionName: p.subdivision || p.subdivisionName || null,
             daysOnMarket: toNum(p.daysOnMarket),

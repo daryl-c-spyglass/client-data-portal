@@ -68,6 +68,7 @@ export interface IStorage {
   getMedia(id: string): Promise<Media | undefined>;
   getMediaByKey(mediaKey: string): Promise<Media | undefined>;
   getMediaByResourceKey(resourceRecordKey: string): Promise<Media[]>;
+  getMediaForListingIds(listingIds: string[]): Promise<Record<string, Media[]>>;
   createMedia(media: InsertMedia): Promise<Media>;
   updateMedia(id: string, media: Partial<Media>): Promise<Media | undefined>;
   deleteMedia(id: string): Promise<boolean>;
@@ -364,6 +365,28 @@ export class MemStorage implements IStorage {
     return Array.from(this.media.values()).filter(
       (m) => m.resourceRecordKey === resourceRecordKey
     );
+  }
+
+  async getMediaForListingIds(listingIds: string[]): Promise<Record<string, Media[]>> {
+    const result: Record<string, Media[]> = {};
+    if (listingIds.length === 0) return result;
+    
+    const allMedia = Array.from(this.media.values()).filter(
+      (m) => m.resourceRecordKey && listingIds.includes(m.resourceRecordKey)
+    );
+    
+    for (const m of allMedia) {
+      const key = m.resourceRecordKey!;
+      if (!result[key]) result[key] = [];
+      result[key].push(m);
+    }
+    
+    // Sort each array by order
+    for (const key in result) {
+      result[key].sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+    }
+    
+    return result;
   }
 
   async createMedia(insertMedia: InsertMedia): Promise<Media> {
@@ -1037,6 +1060,29 @@ export class DbStorage implements IStorage {
 
   async getMediaByResourceKey(resourceRecordKey: string): Promise<Media[]> {
     return await this.db.select().from(media).where(eq(media.resourceRecordKey, resourceRecordKey));
+  }
+
+  async getMediaForListingIds(listingIds: string[]): Promise<Record<string, Media[]>> {
+    const result: Record<string, Media[]> = {};
+    if (listingIds.length === 0) return result;
+    
+    const allMedia = await this.db
+      .select()
+      .from(media)
+      .where(inArray(media.resourceRecordKey, listingIds));
+    
+    for (const m of allMedia) {
+      const key = m.resourceRecordKey!;
+      if (!result[key]) result[key] = [];
+      result[key].push(m);
+    }
+    
+    // Sort each array by order
+    for (const key in result) {
+      result[key].sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+    }
+    
+    return result;
   }
 
   async createMedia(insertMedia: InsertMedia): Promise<Media> {
