@@ -4,8 +4,20 @@ import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, Legend, ResponsiveContainer, LineChart, Line, ReferenceLine } from "recharts";
-import { Save, Edit, FileText, Printer, Info, Home, Mail, ChevronLeft, ChevronRight, Bed, Bath, Maximize, MapPin, Calendar } from "lucide-react";
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, Legend, ResponsiveContainer, LineChart, Line, ReferenceLine, ScatterChart, Scatter, ZAxis, Cell } from "recharts";
+import { Save, Edit, FileText, Printer, Info, Home, Mail, ChevronLeft, ChevronRight, Bed, Bath, Maximize, MapPin, Calendar, Map as MapIcon } from "lucide-react";
+import { MapContainer, TileLayer, Marker, Popup, useMap } from "react-leaflet";
+import "leaflet/dist/leaflet.css";
+import L from "leaflet";
+
+// Fix for default Leaflet marker icons
+delete (L.Icon.Default.prototype as any)._getIconUrl;
+L.Icon.Default.mergeOptions({
+  iconRetinaUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon-2x.png',
+  iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon.png',
+  shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
+});
+
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Separator } from "@/components/ui/separator";
@@ -13,6 +25,42 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { cn } from "@/lib/utils";
 import type { Property, PropertyStatistics, TimelineDataPoint, Media } from "@shared/schema";
 import { isLikelyRentalProperty, filterOutRentalProperties } from "@shared/schema";
+
+// Component to fit map bounds to markers
+function FitBounds({ positions }: { positions: [number, number][] }) {
+  const map = useMap();
+  useEffect(() => {
+    if (positions.length > 0) {
+      const bounds = L.latLngBounds(positions.map(pos => L.latLng(pos[0], pos[1])));
+      map.fitBounds(bounds, { padding: [50, 50] });
+    }
+  }, [positions, map]);
+  return null;
+}
+
+// Custom marker icon for subject property
+const subjectIcon = new L.DivIcon({
+  html: '<div style="background-color:#ef4444;width:24px;height:24px;border-radius:50%;border:3px solid white;box-shadow:0 2px 4px rgba(0,0,0,0.3);"></div>',
+  className: 'custom-div-icon',
+  iconSize: [24, 24],
+  iconAnchor: [12, 12],
+});
+
+// Custom marker icon for comp properties based on status
+const getCompIcon = (status: string) => {
+  let color = '#3b82f6'; // blue for active
+  if (status === 'Closed' || status === 'Sold') {
+    color = '#6b7280'; // gray for sold
+  } else if (status === 'Under Contract' || status === 'Pending') {
+    color = '#f59e0b'; // amber for under contract
+  }
+  return new L.DivIcon({
+    html: `<div style="background-color:${color};width:16px;height:16px;border-radius:50%;border:2px solid white;box-shadow:0 2px 4px rgba(0,0,0,0.3);"></div>`,
+    className: 'custom-div-icon',
+    iconSize: [16, 16],
+    iconAnchor: [8, 8],
+  });
+};
 
 type StatMetricKey = 'price' | 'pricePerSqFt' | 'daysOnMarket' | 'livingArea' | 'lotSize' | 'acres' | 'bedrooms' | 'bathrooms' | 'yearBuilt';
 
@@ -318,7 +366,7 @@ export function CMAReport({
 
       {/* Main Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="grid w-full grid-cols-4">
+        <TabsList className="grid w-full grid-cols-5">
           <TabsTrigger value="home-averages" data-testid="tab-home-averages" className="flex items-center gap-1">
             Home Averages
             <Tooltip>
@@ -338,6 +386,18 @@ export function CMAReport({
               </TooltipTrigger>
               <TooltipContent side="bottom" sideOffset={8} className="max-w-md z-50">
                 <p>Detailed breakdown of comparable properties by status: Active, Under Contract, and Sold listings with price distribution.</p>
+              </TooltipContent>
+            </Tooltip>
+          </TabsTrigger>
+          <TabsTrigger value="map" data-testid="tab-map" className="flex items-center gap-1">
+            <MapIcon className="w-4 h-4" />
+            Map
+            <Tooltip>
+              <TooltipTrigger asChild onClick={(e) => e.stopPropagation()}>
+                <Info className="w-3 h-3 text-muted-foreground cursor-help" />
+              </TooltipTrigger>
+              <TooltipContent side="bottom" sideOffset={8} className="max-w-md z-50">
+                <p>Interactive map showing the location of all comparable properties with color-coded status markers.</p>
               </TooltipContent>
             </Tooltip>
           </TabsTrigger>
@@ -749,6 +809,108 @@ export function CMAReport({
           </Tabs>
         </TabsContent>
 
+        {/* Map Tab */}
+        <TabsContent value="map" className="space-y-6">
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-between flex-wrap gap-4">
+                <CardTitle className="flex items-center gap-2">
+                  <MapIcon className="w-5 h-5" />
+                  Property Locations
+                </CardTitle>
+                <div className="flex items-center gap-4 flex-wrap">
+                  <div className="flex items-center gap-2">
+                    <div className="w-4 h-4 rounded-full bg-blue-500 border-2 border-white shadow-sm"></div>
+                    <span className="text-sm">Active</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="w-4 h-4 rounded-full bg-amber-500 border-2 border-white shadow-sm"></div>
+                    <span className="text-sm">Under Contract</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="w-4 h-4 rounded-full bg-gray-500 border-2 border-white shadow-sm"></div>
+                    <span className="text-sm">Sold</span>
+                  </div>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent>
+              {(() => {
+                // Get properties with valid coordinates
+                const propertiesWithCoords = allProperties.filter(
+                  p => p.latitude && p.longitude && 
+                  typeof p.latitude === 'number' && typeof p.longitude === 'number' &&
+                  !isNaN(p.latitude) && !isNaN(p.longitude)
+                );
+                
+                if (propertiesWithCoords.length === 0) {
+                  return (
+                    <div className="h-[500px] flex items-center justify-center bg-muted/10 rounded-lg border border-dashed">
+                      <div className="text-center">
+                        <MapIcon className="w-12 h-12 text-muted-foreground mx-auto mb-2" />
+                        <p className="text-muted-foreground">No properties with location data available</p>
+                      </div>
+                    </div>
+                  );
+                }
+                
+                const positions: [number, number][] = propertiesWithCoords.map(
+                  p => [p.latitude as number, p.longitude as number]
+                );
+                const center: [number, number] = [
+                  positions.reduce((sum, pos) => sum + pos[0], 0) / positions.length,
+                  positions.reduce((sum, pos) => sum + pos[1], 0) / positions.length
+                ];
+                
+                return (
+                  <div className="h-[500px] rounded-lg overflow-hidden border">
+                    <MapContainer
+                      center={center}
+                      zoom={13}
+                      style={{ height: '100%', width: '100%' }}
+                      scrollWheelZoom={true}
+                    >
+                      <TileLayer
+                        attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+                        url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                      />
+                      <FitBounds positions={positions} />
+                      {propertiesWithCoords.map((property) => {
+                        const price = property.closePrice || property.listPrice || 0;
+                        const status = property.standardStatus || 'Active';
+                        const isSold = status === 'Closed' || status === 'Sold';
+                        
+                        return (
+                          <Marker
+                            key={property.listingId}
+                            position={[property.latitude as number, property.longitude as number]}
+                            icon={getCompIcon(status)}
+                          >
+                            <Popup>
+                              <div className="min-w-[200px]">
+                                <p className="font-semibold text-sm">{property.unparsedAddress}</p>
+                                <p className="text-lg font-bold text-primary">${price.toLocaleString()}</p>
+                                <Badge variant="outline" className="text-xs mt-1">
+                                  {isSold ? 'Sold' : status}
+                                </Badge>
+                                <div className="flex flex-wrap gap-2 text-xs text-muted-foreground mt-2">
+                                  <span>{property.bedroomsTotal || 0} beds</span>
+                                  <span>{property.bathroomsTotalInteger || 0} baths</span>
+                                  {property.livingArea && <span>{Number(property.livingArea).toLocaleString()} sqft</span>}
+                                </div>
+                              </div>
+                            </Popup>
+                          </Marker>
+                        );
+                      })}
+                    </MapContainer>
+                  </div>
+                );
+              })()}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
         {/* Timeline Tab */}
         <TabsContent value="timeline" className="space-y-6">
           <Card>
@@ -785,32 +947,48 @@ export function CMAReport({
                   return true;
                 });
                 
+                // Calculate timeline statistics
+                const prices = filteredTimelineData.map(d => d.price).filter(p => p > 0);
+                const sortedPrices = [...prices].sort((a, b) => a - b);
+                const timelineStats = {
+                  count: prices.length,
+                  min: sortedPrices.length > 0 ? sortedPrices[0] : 0,
+                  max: sortedPrices.length > 0 ? sortedPrices[sortedPrices.length - 1] : 0,
+                  avg: prices.length > 0 ? prices.reduce((a, b) => a + b, 0) / prices.length : 0,
+                  median: sortedPrices.length > 0 ? sortedPrices[Math.floor(sortedPrices.length / 2)] : 0,
+                };
+                
+                const getStatusColor = (status: string) => {
+                  if (status === 'Active') return '#22c55e';
+                  if (status === 'Under Contract') return '#eab308';
+                  return '#ef4444';
+                };
+                
                 return filteredTimelineData.length > 0 ? (
-                <div className="h-[400px]">
+                <>
+                <div className="h-[350px]">
                   <ResponsiveContainer width="100%" height="100%">
-                    <LineChart 
-                      data={filteredTimelineData
-                        .map(d => ({ 
-                          ...d, 
-                          dateNum: new Date(d.date).getTime(),
-                          dateLabel: new Date(d.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
-                        }))
-                        .sort((a, b) => a.dateNum - b.dateNum)
-                      }
-                    >
-                      <CartesianGrid strokeDasharray="3 3" className="stroke-muted/50" />
+                    <ScatterChart margin={{ top: 20, right: 30, bottom: 20, left: 20 }}>
+                      <CartesianGrid strokeDasharray="3 3" className="stroke-muted/30" />
                       <XAxis 
-                        dataKey="dateLabel"
+                        type="number"
+                        dataKey="dateNum"
+                        domain={['dataMin', 'dataMax']}
+                        tickFormatter={(value) => new Date(value).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
                         className="text-xs"
                         tick={{ fontSize: 11 }}
+                        name="Date"
                       />
                       <YAxis 
+                        type="number"
                         dataKey="price"
                         tickFormatter={(value) => `$${(value / 1000).toFixed(0)}k`}
                         className="text-xs"
                         tick={{ fontSize: 11 }}
                         domain={['auto', 'auto']}
+                        name="Price"
                       />
+                      <ZAxis range={[80, 80]} />
                       <RechartsTooltip 
                         content={({ active, payload }) => {
                           if (active && payload && payload.length > 0) {
@@ -833,7 +1011,6 @@ export function CMAReport({
                                     <span>{data.status === 'Closed' ? 'Sold Date:' : 'List Date:'}</span>
                                     <span className="font-medium text-foreground">{new Date(data.date).toLocaleDateString()}</span>
                                   </p>
-                                  {/* Status-specific days display */}
                                   {data.status === 'Closed' && data.daysOnMarket != null && (
                                     <p className="flex justify-between gap-4">
                                       <span>Days on Market:</span>
@@ -846,28 +1023,6 @@ export function CMAReport({
                                       <span className="font-medium text-foreground">{data.daysActive} days</span>
                                     </p>
                                   )}
-                                  {data.status === 'Under Contract' && (
-                                    <>
-                                      {data.daysUnderContract != null && (
-                                        <p className="flex justify-between gap-4">
-                                          <span>Days Under Contract:</span>
-                                          <span className="font-medium text-foreground">{data.daysUnderContract} days</span>
-                                        </p>
-                                      )}
-                                      {data.daysActive != null && (
-                                        <p className="flex justify-between gap-4">
-                                          <span>Total Days Active:</span>
-                                          <span className="font-medium text-foreground">{data.daysActive} days</span>
-                                        </p>
-                                      )}
-                                    </>
-                                  )}
-                                  {data.cumulativeDaysOnMarket != null && data.cumulativeDaysOnMarket !== data.daysOnMarket && (
-                                    <p className="flex justify-between gap-4">
-                                      <span>Cumulative DOM:</span>
-                                      <span className="font-medium text-foreground">{data.cumulativeDaysOnMarket} days</span>
-                                    </p>
-                                  )}
                                 </div>
                               </div>
                             );
@@ -876,37 +1031,73 @@ export function CMAReport({
                         }}
                       />
                       <ReferenceLine 
-                        y={statistics.price.average} 
+                        y={timelineStats.avg} 
                         stroke="#3b82f6" 
                         strokeDasharray="5 5" 
                         label={{ value: 'Avg', position: 'right', fontSize: 11, fill: '#3b82f6' }}
                       />
-                      <Line 
-                        type="monotone"
-                        dataKey="price" 
-                        stroke="hsl(var(--primary))"
-                        strokeWidth={2}
-                        dot={({ cx, cy, payload }) => {
-                          const color = payload.status === 'Active' ? '#22c55e' : 
-                                       payload.status === 'Under Contract' ? '#eab308' : '#ef4444';
+                      <ReferenceLine 
+                        y={timelineStats.median} 
+                        stroke="#8b5cf6" 
+                        strokeDasharray="3 3" 
+                        label={{ value: 'Median', position: 'left', fontSize: 11, fill: '#8b5cf6' }}
+                      />
+                      <Scatter 
+                        name="Properties"
+                        data={filteredTimelineData.map(d => ({
+                          ...d,
+                          dateNum: new Date(d.date).getTime(),
+                        }))}
+                        shape={(props: any) => {
+                          const { cx, cy, payload } = props;
+                          const color = getStatusColor(payload.status);
                           return (
                             <circle 
                               cx={cx} 
                               cy={cy} 
-                              r={6} 
+                              r={8} 
                               fill={color} 
                               stroke="white" 
                               strokeWidth={2}
+                              style={{ cursor: 'pointer' }}
                             />
                           );
                         }}
-                        activeDot={{ r: 8, stroke: 'white', strokeWidth: 2 }}
                       />
-                    </LineChart>
+                    </ScatterChart>
                   </ResponsiveContainer>
                 </div>
+                
+                {/* Statistics Summary Table */}
+                <div className="mt-4 border rounded-lg overflow-hidden">
+                  <Table>
+                    <TableHeader>
+                      <TableRow className="bg-muted/50">
+                        <TableHead className="font-semibold">Metric</TableHead>
+                        <TableHead className="text-right">Range</TableHead>
+                        <TableHead className="text-right">Average</TableHead>
+                        <TableHead className="text-right">Median</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      <TableRow>
+                        <TableCell className="font-medium">Price ({timelineStats.count} properties)</TableCell>
+                        <TableCell className="text-right">
+                          ${timelineStats.min.toLocaleString()} - ${timelineStats.max.toLocaleString()}
+                        </TableCell>
+                        <TableCell className="text-right font-semibold text-blue-600">
+                          ${Math.round(timelineStats.avg).toLocaleString()}
+                        </TableCell>
+                        <TableCell className="text-right font-semibold text-purple-600">
+                          ${Math.round(timelineStats.median).toLocaleString()}
+                        </TableCell>
+                      </TableRow>
+                    </TableBody>
+                  </Table>
+                </div>
+                </>
                 ) : (
-                <div className="h-[400px] flex items-center justify-center">
+                <div className="h-[350px] flex items-center justify-center">
                   <div className="text-center text-muted-foreground">
                     <p className="text-lg font-medium mb-2">No timeline data available</p>
                     <p className="text-sm">Timeline data requires properties with listing or closing dates.</p>
@@ -1013,6 +1204,101 @@ export function CMAReport({
 
         {/* Market Stats Tab */}
         <TabsContent value="market-stats" className="space-y-6">
+          {/* Market Health Indicator - Inventory Dial */}
+          {(() => {
+            // Calculate months of inventory based on sold rate
+            // Months of Inventory = Active Listings / (Sold properties per month)
+            const activeCount = activeProperties.length;
+            const soldCount = soldProperties.length;
+            
+            // Estimate monthly absorption: assume sold data spans ~6 months
+            const avgSoldPerMonth = soldCount > 0 ? soldCount / 6 : 0;
+            const monthsOfInventory = avgSoldPerMonth > 0 ? activeCount / avgSoldPerMonth : 0;
+            const absorptionRate = avgSoldPerMonth; // Sales per month
+            
+            // Market condition based on months of inventory
+            // < 4 months = Seller's market, 4-6 = Balanced, > 6 = Buyer's market
+            let marketCondition = 'Balanced';
+            let marketColor = 'text-blue-600';
+            let gaugeColor = 'bg-blue-500';
+            let gaugePosition = 50; // percentage (0-100)
+            
+            if (monthsOfInventory < 4) {
+              marketCondition = "Seller's Market";
+              marketColor = 'text-red-600';
+              gaugeColor = 'bg-red-500';
+              gaugePosition = Math.max(10, 25 - (4 - monthsOfInventory) * 6);
+            } else if (monthsOfInventory > 6) {
+              marketCondition = "Buyer's Market";
+              marketColor = 'text-green-600';
+              gaugeColor = 'bg-green-500';
+              gaugePosition = Math.min(90, 75 + (monthsOfInventory - 6) * 3);
+            } else {
+              gaugePosition = 25 + ((monthsOfInventory - 4) / 2) * 50;
+            }
+            
+            return (
+              <Card className="border-2 border-primary/20">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-lg">Market Health Indicator</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="flex flex-col md:flex-row gap-6 items-center">
+                    {/* Gauge visualization */}
+                    <div className="flex-1 min-w-[200px]">
+                      <div className="relative h-4 bg-gradient-to-r from-red-500 via-blue-500 to-green-500 rounded-full overflow-hidden">
+                        <div 
+                          className="absolute top-1/2 -translate-y-1/2 w-4 h-6 bg-foreground rounded-sm border-2 border-background shadow-lg transition-all duration-500"
+                          style={{ left: `calc(${gaugePosition}% - 8px)` }}
+                        />
+                      </div>
+                      <div className="flex justify-between text-xs text-muted-foreground mt-2">
+                        <span>Seller's Market</span>
+                        <span>Balanced</span>
+                        <span>Buyer's Market</span>
+                      </div>
+                    </div>
+                    
+                    {/* Market stats */}
+                    <div className="grid grid-cols-3 gap-4 text-center flex-1">
+                      <div className="p-3 bg-muted/30 rounded-lg">
+                        <div className={`text-2xl font-bold ${marketColor}`}>
+                          {monthsOfInventory > 0 ? monthsOfInventory.toFixed(1) : 'N/A'}
+                        </div>
+                        <div className="text-xs text-muted-foreground">Months of Inventory</div>
+                      </div>
+                      <div className="p-3 bg-muted/30 rounded-lg">
+                        <div className="text-2xl font-bold text-primary">
+                          {absorptionRate > 0 ? absorptionRate.toFixed(1) : 'N/A'}
+                        </div>
+                        <div className="text-xs text-muted-foreground">Sales/Month</div>
+                      </div>
+                      <div className="p-3 bg-muted/30 rounded-lg">
+                        <div className={`text-xl font-bold ${marketColor}`}>
+                          {marketCondition}
+                        </div>
+                        <div className="text-xs text-muted-foreground">Market Type</div>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <div className="mt-4 p-3 bg-primary/5 rounded-lg border border-primary/10">
+                    <p className="text-sm text-muted-foreground">
+                      <span className="font-semibold text-foreground">Analysis:</span>{' '}
+                      {monthsOfInventory < 4 ? (
+                        <>Low inventory ({monthsOfInventory.toFixed(1)} months) favors sellers. Expect competitive bidding and quick sales.</>
+                      ) : monthsOfInventory > 6 ? (
+                        <>High inventory ({monthsOfInventory.toFixed(1)} months) favors buyers. More negotiating power and time to decide.</>
+                      ) : (
+                        <>Balanced market ({monthsOfInventory.toFixed(1)} months). Neither buyers nor sellers have a strong advantage.</>
+                      )}
+                    </p>
+                  </div>
+                </CardContent>
+              </Card>
+            );
+          })()}
+          
           {/* Key Metrics Row - Prioritized: Avg Price, Median Price, Price/SqFt, Avg DOM */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
             <Card>
@@ -1153,6 +1439,192 @@ export function CMAReport({
                   This analysis is based on {activeProperties.length} active, {underContractProperties.length} under contract, and {soldProperties.length} sold/closed properties in your selection.
                 </p>
               </div>
+            </CardContent>
+          </Card>
+
+          {/* Price Trend Chart */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Calendar className="w-5 h-5" />
+                Price Trend Analysis
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {(() => {
+                // Group sold properties by month for trend analysis
+                const soldByMonth: { [key: string]: { prices: number[]; count: number } } = {};
+                
+                soldProperties.forEach(p => {
+                  const closeDate = p.closeDate ? new Date(p.closeDate) : null;
+                  const price = p.closePrice ? Number(p.closePrice) : 0;
+                  
+                  if (closeDate && price > 0) {
+                    const monthKey = `${closeDate.getFullYear()}-${String(closeDate.getMonth() + 1).padStart(2, '0')}`;
+                    if (!soldByMonth[monthKey]) {
+                      soldByMonth[monthKey] = { prices: [], count: 0 };
+                    }
+                    soldByMonth[monthKey].prices.push(price);
+                    soldByMonth[monthKey].count++;
+                  }
+                });
+                
+                const trendData = Object.entries(soldByMonth)
+                  .map(([month, data]) => ({
+                    month,
+                    monthLabel: new Date(month + '-01').toLocaleDateString('en-US', { month: 'short', year: '2-digit' }),
+                    avgPrice: data.prices.reduce((a, b) => a + b, 0) / data.prices.length,
+                    count: data.count,
+                    minPrice: Math.min(...data.prices),
+                    maxPrice: Math.max(...data.prices),
+                  }))
+                  .sort((a, b) => a.month.localeCompare(b.month));
+                
+                if (trendData.length < 2) {
+                  return (
+                    <div className="h-[250px] flex items-center justify-center bg-muted/10 rounded-lg border border-dashed">
+                      <div className="text-center text-muted-foreground">
+                        <Calendar className="w-10 h-10 mx-auto mb-2 opacity-50" />
+                        <p>Not enough sold data for trend analysis</p>
+                        <p className="text-xs">Requires at least 2 months of sales data</p>
+                      </div>
+                    </div>
+                  );
+                }
+                
+                // Calculate YoY change if we have data
+                const firstMonth = trendData[0];
+                const lastMonth = trendData[trendData.length - 1];
+                const priceChange = ((lastMonth.avgPrice - firstMonth.avgPrice) / firstMonth.avgPrice) * 100;
+                
+                return (
+                  <>
+                    <div className="h-[250px]">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <LineChart data={trendData}>
+                          <CartesianGrid strokeDasharray="3 3" className="stroke-muted/30" />
+                          <XAxis 
+                            dataKey="monthLabel" 
+                            tick={{ fontSize: 11 }}
+                          />
+                          <YAxis 
+                            tickFormatter={(value) => `$${(value / 1000).toFixed(0)}k`}
+                            tick={{ fontSize: 11 }}
+                            domain={['auto', 'auto']}
+                          />
+                          <RechartsTooltip 
+                            content={({ active, payload }) => {
+                              if (active && payload && payload.length > 0) {
+                                const data = payload[0].payload;
+                                return (
+                                  <div className="bg-popover border rounded-lg shadow-lg p-3 text-sm">
+                                    <p className="font-semibold">{data.monthLabel}</p>
+                                    <p className="text-primary">Avg: ${Math.round(data.avgPrice).toLocaleString()}</p>
+                                    <p className="text-muted-foreground text-xs">{data.count} sales</p>
+                                  </div>
+                                );
+                              }
+                              return null;
+                            }}
+                          />
+                          <Line 
+                            type="monotone" 
+                            dataKey="avgPrice" 
+                            stroke="hsl(var(--primary))" 
+                            strokeWidth={2}
+                            dot={{ fill: 'hsl(var(--primary))', strokeWidth: 2, r: 4 }}
+                          />
+                        </LineChart>
+                      </ResponsiveContainer>
+                    </div>
+                    
+                    <div className="flex items-center justify-between mt-4 p-3 bg-muted/30 rounded-lg">
+                      <div className="text-sm">
+                        <span className="text-muted-foreground">Period:</span>{' '}
+                        <span className="font-medium">{firstMonth.monthLabel} → {lastMonth.monthLabel}</span>
+                      </div>
+                      <div className={`text-lg font-bold ${priceChange >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                        {priceChange >= 0 ? '+' : ''}{priceChange.toFixed(1)}%
+                        <span className="text-xs text-muted-foreground ml-1">price change</span>
+                      </div>
+                    </div>
+                  </>
+                );
+              })()}
+            </CardContent>
+          </Card>
+
+          {/* Mini Property Map in Market Stats */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <MapIcon className="w-5 h-5" />
+                Property Locations Overview
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {(() => {
+                const propertiesWithCoords = allProperties.filter(
+                  p => p.latitude && p.longitude && 
+                  typeof p.latitude === 'number' && typeof p.longitude === 'number' &&
+                  !isNaN(p.latitude) && !isNaN(p.longitude)
+                );
+                
+                if (propertiesWithCoords.length === 0) {
+                  return (
+                    <div className="h-[300px] flex items-center justify-center bg-muted/10 rounded-lg border border-dashed">
+                      <div className="text-center text-muted-foreground">
+                        <MapIcon className="w-10 h-10 mx-auto mb-2 opacity-50" />
+                        <p>No location data available</p>
+                      </div>
+                    </div>
+                  );
+                }
+                
+                const positions: [number, number][] = propertiesWithCoords.map(
+                  p => [p.latitude as number, p.longitude as number]
+                );
+                const center: [number, number] = [
+                  positions.reduce((sum, pos) => sum + pos[0], 0) / positions.length,
+                  positions.reduce((sum, pos) => sum + pos[1], 0) / positions.length
+                ];
+                
+                return (
+                  <div className="h-[300px] rounded-lg overflow-hidden border">
+                    <MapContainer
+                      center={center}
+                      zoom={12}
+                      style={{ height: '100%', width: '100%' }}
+                      scrollWheelZoom={false}
+                    >
+                      <TileLayer
+                        attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+                        url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                      />
+                      <FitBounds positions={positions} />
+                      {propertiesWithCoords.map((property) => {
+                        const status = property.standardStatus || 'Active';
+                        return (
+                          <Marker
+                            key={property.listingId}
+                            position={[property.latitude as number, property.longitude as number]}
+                            icon={getCompIcon(status)}
+                          >
+                            <Popup>
+                              <div className="text-sm">
+                                <p className="font-semibold">{property.unparsedAddress}</p>
+                                <p className="text-primary font-bold">
+                                  ${(property.closePrice || property.listPrice || 0).toLocaleString()}
+                                </p>
+                              </div>
+                            </Popup>
+                          </Marker>
+                        );
+                      })}
+                    </MapContainer>
+                  </div>
+                );
+              })()}
             </CardContent>
           </Card>
 

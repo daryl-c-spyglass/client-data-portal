@@ -7,7 +7,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { Map as MapIcon, Search, Database, RotateCcw, List, Home, Building2, TreePine, Info } from "lucide-react";
+import { Map as MapIcon, Search, Database, RotateCcw, List, Home, Building2, TreePine, Info, Send, FileBarChart2 } from "lucide-react";
 import { SearchCriteriaForm } from "@/components/SearchCriteria";
 import { PropertyResults } from "@/components/PropertyResults";
 import { PropertyMapView } from "@/components/PropertyMapView";
@@ -312,6 +312,43 @@ export default function Properties() {
 
   const handleAddToCart = (property: Property) => {
     console.log("Add to cart:", property);
+  };
+
+  // Get selected properties data for floating actions
+  const selectedProperties = useMemo(() => {
+    return properties.filter(p => selectedIds.has(p.id));
+  }, [properties, selectedIds]);
+
+  // Handle Send Properties to Seller Updates
+  const handleSendProperties = () => {
+    if (selectedProperties.length === 0) return;
+    
+    // Store selected properties in sessionStorage for Seller Updates
+    sessionStorage.setItem('propertiesForSellerUpdate', JSON.stringify(
+      selectedProperties.map(p => ({
+        id: p.id,
+        listingId: p.listingId,
+        unparsedAddress: p.unparsedAddress,
+        city: p.city,
+        stateOrProvince: p.stateOrProvince,
+        listPrice: p.listPrice,
+        bedroomsTotal: p.bedroomsTotal,
+        bathroomsTotalInteger: p.bathroomsTotalInteger,
+        livingArea: p.livingArea,
+        standardStatus: p.standardStatus,
+        photos: (p as any).photos,
+      }))
+    ));
+    navigate('/seller-updates/new?fromProperties=true');
+  };
+
+  // Handle Quick CMA - pass properties to CMA builder
+  const handleQuickCMA = () => {
+    if (selectedProperties.length === 0) return;
+    
+    // Store selected properties in sessionStorage for CMA builder
+    sessionStorage.setItem('propertiesForCMA', JSON.stringify(selectedProperties));
+    navigate('/cmas/new?fromProperties=true');
   };
 
   return (
@@ -650,6 +687,32 @@ export default function Properties() {
           )}
         </TabsContent>
       </Tabs>
+
+      {/* Floating Action Buttons - Always visible, enabled when properties selected */}
+      <div className="fixed bottom-6 right-6 flex flex-col gap-3 z-50" data-testid="floating-actions">
+        <Button
+          size="lg"
+          variant={selectedIds.size > 0 ? "default" : "secondary"}
+          disabled={selectedIds.size === 0}
+          onClick={handleSendProperties}
+          className="shadow-lg gap-2"
+          data-testid="button-send-properties"
+        >
+          <Send className="w-4 h-4" />
+          Send Properties {selectedIds.size > 0 && `(${selectedIds.size})`}
+        </Button>
+        <Button
+          size="lg"
+          variant={selectedIds.size > 0 ? "default" : "secondary"}
+          disabled={selectedIds.size === 0}
+          onClick={handleQuickCMA}
+          className="shadow-lg gap-2"
+          data-testid="button-quick-cma"
+        >
+          <FileBarChart2 className="w-4 h-4" />
+          Quick CMA {selectedIds.size > 0 && `(${selectedIds.size})`}
+        </Button>
+      </div>
     </div>
   );
 }

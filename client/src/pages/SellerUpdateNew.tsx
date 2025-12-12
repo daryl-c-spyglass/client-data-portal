@@ -26,7 +26,9 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { insertSellerUpdateSchema } from "@shared/schema";
 import { useState, useEffect } from "react";
-import { Search } from "lucide-react";
+import { Search, ArrowLeft, X, Bed, Bath, Maximize, MapPin, Home } from "lucide-react";
+import { Link, useSearch } from "wouter";
+import { Badge } from "@/components/ui/badge";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 
@@ -34,11 +36,53 @@ const formSchema = insertSellerUpdateSchema.extend({
   userId: z.string().default("demo-user-id"), // TODO: Replace with actual user ID from auth
 });
 
+interface PreSelectedProperty {
+  id: string;
+  listingId?: string;
+  unparsedAddress?: string;
+  city?: string;
+  stateOrProvince?: string;
+  listPrice?: string | number | null;
+  bedroomsTotal?: number | null;
+  bathroomsTotalInteger?: number | null;
+  livingArea?: string | number | null;
+  standardStatus?: string;
+  photos?: string[];
+}
+
 export default function SellerUpdateNew() {
   const [, setLocation] = useLocation();
+  const search = useSearch();
   const { toast } = useToast();
   const [schoolSearch, setSchoolSearch] = useState("");
   const [schoolOpen, setSchoolOpen] = useState(false);
+  
+  // Check if coming from Properties page with pre-selected properties
+  const params = new URLSearchParams(search);
+  const fromProperties = params.get('fromProperties') === 'true';
+  
+  // State for pre-selected properties
+  const [preSelectedProperties, setPreSelectedProperties] = useState<PreSelectedProperty[]>([]);
+  
+  useEffect(() => {
+    if (fromProperties) {
+      const stored = sessionStorage.getItem('propertiesForSellerUpdate');
+      if (stored) {
+        try {
+          const properties = JSON.parse(stored);
+          setPreSelectedProperties(properties);
+          // Clear sessionStorage after reading
+          sessionStorage.removeItem('propertiesForSellerUpdate');
+        } catch (e) {
+          console.error('Failed to parse pre-selected properties:', e);
+        }
+      }
+    }
+  }, [fromProperties]);
+  
+  const removeProperty = (id: string) => {
+    setPreSelectedProperties(prev => prev.filter(p => p.id !== id));
+  };
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -103,11 +147,115 @@ export default function SellerUpdateNew() {
   return (
     <div className="max-w-2xl mx-auto space-y-6">
       <div>
-        <h1 className="text-3xl font-semibold">Create Seller Update</h1>
+        {fromProperties && (
+          <Link href="/properties">
+            <Button variant="ghost" size="sm" className="mb-4" data-testid="button-back-to-properties">
+              <ArrowLeft className="w-4 h-4 mr-2" />
+              Back to Properties
+            </Button>
+          </Link>
+        )}
+        <h1 className="text-3xl font-semibold">
+          {fromProperties && preSelectedProperties.length > 0 
+            ? 'Share Properties with Client' 
+            : 'Create Seller Update'
+          }
+        </h1>
         <p className="text-muted-foreground mt-1">
-          Set up automated market update emails for sellers in a specific area
+          {fromProperties && preSelectedProperties.length > 0 
+            ? `Send ${preSelectedProperties.length} selected properties to a client`
+            : 'Set up automated market update emails for sellers in a specific area'
+          }
         </p>
       </div>
+
+      {/* Pre-selected Properties Preview */}
+      {preSelectedProperties.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center justify-between">
+              <span>Selected Properties ({preSelectedProperties.length})</span>
+              <Badge variant="secondary">From Search</Badge>
+            </CardTitle>
+            <CardDescription>
+              These properties will be included in the update email
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-3">
+              {preSelectedProperties.map((prop) => (
+                <div 
+                  key={prop.id} 
+                  className="flex items-center gap-3 p-3 rounded-md bg-muted/50 border"
+                >
+                  {/* Property Image */}
+                  <div className="w-16 h-16 bg-muted rounded-md flex items-center justify-center overflow-hidden flex-shrink-0">
+                    {prop.photos && prop.photos.length > 0 ? (
+                      <img src={prop.photos[0]} alt="" className="w-full h-full object-cover" />
+                    ) : (
+                      <Home className="w-6 h-6 text-muted-foreground" />
+                    )}
+                  </div>
+                  
+                  {/* Property Details */}
+                  <div className="flex-1 min-w-0">
+                    <p className="font-medium truncate">
+                      {prop.unparsedAddress || 'Unknown Address'}
+                    </p>
+                    <div className="flex items-center gap-2 text-xs text-muted-foreground mt-1">
+                      {prop.city && (
+                        <span className="flex items-center gap-1">
+                          <MapPin className="w-3 h-3" />
+                          {prop.city}, {prop.stateOrProvince}
+                        </span>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-3 text-xs text-muted-foreground mt-1">
+                      {prop.listPrice && (
+                        <span className="text-primary font-medium">
+                          ${Number(prop.listPrice).toLocaleString()}
+                        </span>
+                      )}
+                      {prop.bedroomsTotal !== null && prop.bedroomsTotal !== undefined && (
+                        <span className="flex items-center gap-1">
+                          <Bed className="w-3 h-3" /> {prop.bedroomsTotal}
+                        </span>
+                      )}
+                      {prop.bathroomsTotalInteger !== null && prop.bathroomsTotalInteger !== undefined && (
+                        <span className="flex items-center gap-1">
+                          <Bath className="w-3 h-3" /> {prop.bathroomsTotalInteger}
+                        </span>
+                      )}
+                      {prop.livingArea && (
+                        <span className="flex items-center gap-1">
+                          <Maximize className="w-3 h-3" /> {Number(prop.livingArea).toLocaleString()} sqft
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  
+                  {/* Status Badge & Remove */}
+                  <div className="flex items-center gap-2">
+                    {prop.standardStatus && (
+                      <Badge variant={prop.standardStatus === 'Active' ? 'default' : 'secondary'}>
+                        {prop.standardStatus}
+                      </Badge>
+                    )}
+                    <Button 
+                      variant="ghost" 
+                      size="icon" 
+                      onClick={() => removeProperty(prop.id)}
+                      data-testid={`button-remove-property-${prop.id}`}
+                    >
+                      <X className="w-4 h-4" />
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       <Card>
         <CardHeader>

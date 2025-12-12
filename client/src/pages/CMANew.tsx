@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useLocation, useSearch } from "wouter";
 import { useMutation, useQueryClient, useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
@@ -15,9 +15,29 @@ export default function CMANew() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   
-  // Parse URL search params for "modify" mode
+  // Parse URL search params for "modify" mode or "fromProperties" mode
   const params = new URLSearchParams(search);
   const fromCmaId = params.get('from');
+  const fromProperties = params.get('fromProperties') === 'true';
+  
+  // Get pre-selected properties from Properties page (via sessionStorage)
+  const [preSelectedProperties, setPreSelectedProperties] = useState<Property[]>([]);
+  
+  useEffect(() => {
+    if (fromProperties) {
+      const stored = sessionStorage.getItem('propertiesForCMA');
+      if (stored) {
+        try {
+          const properties = JSON.parse(stored);
+          setPreSelectedProperties(properties);
+          // Clear sessionStorage after reading
+          sessionStorage.removeItem('propertiesForCMA');
+        } catch (e) {
+          console.error('Failed to parse pre-selected properties:', e);
+        }
+      }
+    }
+  }, [fromProperties]);
   
   // Fetch original CMA data if modifying
   const { data: originalCma } = useQuery({
@@ -130,28 +150,72 @@ export default function CMANew() {
   };
 
   const initialData = buildInitialData();
+  
+  // Build initial data from pre-selected properties (from Properties page)
+  const propertiesInitialData = useMemo(() => {
+    if (!fromProperties || preSelectedProperties.length === 0) return undefined;
+    
+    // Infer search criteria from selected properties
+    const firstProp = preSelectedProperties[0];
+    const statuses = new Set<string>();
+    preSelectedProperties.forEach((p: any) => {
+      if (p.standardStatus === 'Active') statuses.add('active');
+      else if (p.standardStatus === 'Under Contract' || p.standardStatus === 'Pending') statuses.add('under_contract');
+      else if (p.standardStatus === 'Closed') statuses.add('closed');
+    });
+    
+    return {
+      name: 'Quick CMA',
+      searchCriteria: {
+        city: firstProp?.city || '',
+        subdivision: (firstProp as any)?.subdivisionName || '',
+        statuses: Array.from(statuses).length > 0 ? Array.from(statuses) : ['active'],
+        minBeds: '',
+        maxPrice: '',
+        minSqft: '',
+        maxSqft: '',
+        minLotAcres: '',
+        maxLotAcres: '',
+        minYearBuilt: '',
+        maxYearBuilt: '',
+        stories: '',
+        soldDays: '',
+      },
+      comparables: preSelectedProperties,
+      subjectProperty: null,
+    };
+  }, [fromProperties, preSelectedProperties]);
+  
+  // Use properties initial data if available, otherwise use CMA modify data
+  const finalInitialData = propertiesInitialData || initialData;
+  
+  // Determine the title and description
+  const pageTitle = fromProperties ? 'Quick CMA' : (fromCmaId ? 'Modify CMA' : 'Create New CMA');
+  const pageDescription = fromProperties 
+    ? `Create a CMA with ${preSelectedProperties.length} pre-selected properties`
+    : (fromCmaId 
+        ? 'Modify your search criteria and comparables to create an updated CMA'
+        : 'Build a comprehensive comparative market analysis for your clients'
+      );
 
   return (
     <div className="space-y-6">
       <div>
-        <Link href="/cmas">
+        <Link href={fromProperties ? "/properties" : "/cmas"}>
           <Button variant="ghost" size="sm" className="mb-4" data-testid="button-back-to-cmas">
             <ArrowLeft className="w-4 h-4 mr-2" />
-            Back to CMAs
+            {fromProperties ? 'Back to Properties' : 'Back to CMAs'}
           </Button>
         </Link>
         <h1 className="text-3xl font-bold" data-testid="text-new-cma-title">
-          {fromCmaId ? 'Modify CMA' : 'Create New CMA'}
+          {pageTitle}
         </h1>
         <p className="text-muted-foreground mt-2">
-          {fromCmaId 
-            ? 'Modify your search criteria and comparables to create an updated CMA'
-            : 'Build a comprehensive comparative market analysis for your clients'
-          }
+          {pageDescription}
         </p>
       </div>
 
-      <CMABuilder onCreateCMA={handleCreate} initialData={initialData} />
+      <CMABuilder onCreateCMA={handleCreate} initialData={finalInitialData} />
     </div>
   );
 }

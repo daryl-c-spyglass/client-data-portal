@@ -1,0 +1,191 @@
+You are working ONLY on the Agent-facing modules:
+1) Properties section (agent property search/results UI)
+2) Seller Updates section
+3) CMA / Created CMA section (CMA Results UI)
+NOT IDX/public pages.
+
+Reference and align workflow to the “Quick Tutorial: Recent UI” video:
+- Fast, guided actions
+- Client-safe presentation
+- Minimal friction
+- Clear sharing and next steps
+
+All property data must come from Repliers.
+Leasing/rentals must be excluded globally from all pulls, counts, charts, and comps.
+
+====================================================
+A) PROPERTIES SECTION — FLOATING ACTION BUTTONS (LOWER RIGHT)
+====================================================
+
+Goal:
+Add persistent floating buttons at the very lower-right corner of the Properties UI to streamline the “Quick CMA” video-like workflow.
+
+Requirements:
+1) Add a floating button group fixed at bottom-right:
+   - Button 1: “Send Properties”
+   - Button 2: “Quick CMA”
+2) Visibility:
+   - Buttons are always visible on Properties page (Search Criteria, View Result, View Map).
+   - Do not cover key UI elements (respect safe margins for mobile).
+3) Enable state:
+   - Buttons are disabled until user has selected at least 1 property.
+   - Show selection count on the button (e.g., “Send Properties (3)” / “Quick CMA (3)”).
+
+Behavior:
+1) “Send Properties”
+   - Collect selected properties (IDs + basic display data) from the Properties result set.
+   - Redirect to Seller Updates section.
+   - Pre-fill Seller Updates with the selected properties (cards + links).
+   - Ensure selections persist through navigation.
+2) “Quick CMA”
+   - Collect selected properties (IDs + data) and redirect to CMA section (Create CMA).
+   - Pre-fill CMA comparable selection with those properties.
+   - Ensure user can continue to CMA Results workflow without re-searching.
+
+Technical:
+- Use route state or sessionStorage for passing selected properties (do NOT persist permanently).
+- Ensure the selected properties are fetched fresh from Repliers on destination page (avoid stale data).
+
+Testing:
+- Select 3 properties → click Send Properties → verify Seller Updates loads those 3.
+- Select 3 properties → click Quick CMA → verify CMA loads those 3 as selected comps.
+- Back navigation must not lose selection unless user clicks Reset.
+
+====================================================
+B) CMA / CREATED CMA SECTION — MAP + COMP LOCATIONS
+====================================================
+
+Goal:
+Add a map to CMA Results showing the location of selected comparable properties (and subject if available).
+
+Requirements:
+1) Add a “Map” view/section in CMA Results:
+   - Plot Subject property marker (distinct) if present.
+   - Plot all selected comps markers.
+2) Marker interaction:
+   - Clicking a marker opens the standard floating card (same behavior as comps list).
+3) Fit bounds:
+   - Default map view should fit all markers.
+
+Testing:
+- Generate CMA with 5+ comps → confirm all markers appear and clicking opens floating card.
+
+====================================================
+C) CMA RESULTS — TIMELINE: DOT PLOT + NEW STATISTICS ROW TABLE
+====================================================
+
+Goal:
+Return Timeline to a dot plot graph and add a statistics table under it for quick analysis.
+
+Requirements:
+1) Timeline chart:
+   - Use DOT PLOT again (not line graph).
+   - Dots represent comps over time with status indicator (Active/UC/Sold).
+   - Tooltip shows price, status, date, and DOM metrics.
+
+2) New Statistics row/table BELOW the chart:
+   - Rows (metrics):
+     • Price
+     • Price / SqFt
+     • Days on Market
+     • (Add Beds/Baths/SqFt if available and helpful)
+   - Columns:
+     • Range
+     • Average
+     • Median
+   - The metrics must be calculated from the selected comps dataset (post rental exclusion).
+   - Separate Sold vs Active/UC handling if needed (ex: DOM rules differ).
+
+Testing:
+- CMA Results timeline shows dot plot.
+- Statistics table displays correct Range/Avg/Median values.
+
+====================================================
+D) MARKET STATS — INVENTORY DIAL + ABSORPTION / MONTHS OF INVENTORY
+====================================================
+
+Goal:
+Add a market “temperature” dial similar to the Quick CMA video’s client-friendly feel.
+
+Requirements:
+1) Add an Inventory Dial widget:
+   - States: Hot → Neutral → Cool (visual dial/indicator)
+2) Display these supporting metrics beneath:
+   - Absorption rate: “X properties per month”
+   - Inventory: “Y months”
+   - Example format:
+     “Absorption rate: 35 properties/month”
+     “Inventory: 6.5 months (≈6)”
+3) Computation must be documented:
+   - Absorption rate based on recent sold/closed pace (choose a reasonable window, e.g., last 30/60/90 days).
+   - Months of inventory = Active inventory / monthly absorption rate.
+4) Ensure dataset excludes rentals/leasing and uses consistent status mapping.
+
+Testing:
+- Generate CMA → Market Stats shows dial + numbers.
+- Values change when different market area/comps are selected.
+
+====================================================
+E) MARKET STATS — MAP OF PROPERTIES + YOY CHARTS
+====================================================
+
+Goal:
+Add richer but still professional market analytics.
+
+Requirements:
+1) Map of properties (Market Stats):
+   - Plot relevant properties (active/uc/sold comps) on a map.
+   - Clicking opens floating card.
+2) YoY statistics section:
+   - Include Year-over-Year indicators (where possible):
+     • YoY median sold price
+     • YoY average sold price
+     • YoY days on market (optional)
+3) Add a graph:
+   - Chart showing Average & Median sold price trend over time (monthly points or quarterly).
+   - Label clearly and keep client-safe formatting.
+
+Testing:
+- Market Stats shows map + YoY metrics.
+- Graph renders with realistic values and updates based on dataset.
+
+====================================================
+FINAL REQUIREMENTS (NON-NEGOTIABLE)
+====================================================
+
+1) Repliers only
+- All property/comps/market data must come from Repliers.
+- No MLS Grid labels unless Properties module truly uses MLS Grid.
+
+2) Rental/Leasing exclusion
+- Rentals/leasing must be excluded from:
+  • comps selection
+  • timeline stats
+  • market stats
+  • maps
+  • absorption/inventory computations
+
+3) Consistency
+- The same selected comps dataset must drive:
+  • Map markers
+  • Timeline chart
+  • Statistics table
+  • Market Stats dial
+  • YoY chart
+
+====================================================
+TESTING & REPORT
+====================================================
+
+You MUST provide:
+1) Screenshots/GIFs of:
+   - Properties page floating buttons working (Send Properties → Seller Updates, Quick CMA → CMA)
+   - CMA Map with comps plotted
+   - Timeline dot plot + statistics table
+   - Market Stats inventory dial + absorption/inventory values
+   - YoY chart average vs median sold price
+
+2) A short explanation of:
+   - How absorption rate and months of inventory are calculated
+   - What time window was used (30/60/90 days)
+   - How comps dataset is filtered and rental-excluded
