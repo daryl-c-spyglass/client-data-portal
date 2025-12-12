@@ -1,19 +1,24 @@
 import { useState, useEffect, useMemo } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { useLocation, useSearch } from "wouter";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { Map as MapIcon, Search, Database, RotateCcw, List, Home, Building2, TreePine, Info, Send, FileBarChart2 } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Map as MapIcon, Search, Database, RotateCcw, List, Home, Building2, TreePine, Info, Save, Bookmark, Play, Trash2, Calendar, Filter, Loader2 } from "lucide-react";
 import { SearchCriteriaForm } from "@/components/SearchCriteria";
 import { PropertyResults } from "@/components/PropertyResults";
 import { PropertyMapView } from "@/components/PropertyMapView";
 import { unifiedSearchWithMeta, type SearchResultWithMeta } from "@/lib/api";
 import { useSelectedProperty } from "@/contexts/SelectedPropertyContext";
-import type { Property, Media, SearchCriteria } from "@shared/schema";
+import { useToast } from "@/hooks/use-toast";
+import { apiRequest, queryClient } from "@/lib/queryClient";
+import type { Property, Media, SearchCriteria, SavedSearch } from "@shared/schema";
 
 // Inventory summary interface from backend
 interface InventorySummary {
@@ -196,6 +201,7 @@ export default function Properties() {
   const searchString = useSearch();
   const [location, navigate] = useLocation();
   const { setSelectedProperty } = useSelectedProperty();
+  const { toast } = useToast();
   
   // Parse criteria from URL - reactive to URL changes (browser back/forward, shared URLs)
   const urlCriteria = useMemo(() => parseCriteriaFromUrl(searchString), [searchString]);
@@ -203,6 +209,11 @@ export default function Properties() {
   const [activeTab, setActiveTab] = useState(urlCriteria ? "results" : "search");
   const [searchCriteria, setSearchCriteria] = useState<SearchCriteria | null>(urlCriteria);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  
+  // Save Search modal state
+  const [showSaveModal, setShowSaveModal] = useState(false);
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [searchName, setSearchName] = useState("");
   
   // Sync searchCriteria with URL when URL changes (browser history navigation)
   useEffect(() => {
@@ -214,6 +225,148 @@ export default function Properties() {
       setActiveTab("search");
     }
   }, [searchString]); // Re-run when URL changes
+  
+  // Fetch saved searches
+  const { data: savedSearches = [], isLoading: savedSearchesLoading } = useQuery<SavedSearch[]>({
+    queryKey: ['/api/searches'],
+    staleTime: 30 * 1000,
+  });
+  
+  // Save search mutation
+  const saveSearchMutation = useMutation({
+    mutationFn: async (data: { name: string; criteria: SearchCriteria }) => {
+      return apiRequest('/api/searches', {
+        method: 'POST',
+        body: JSON.stringify({
+          userId: 'default-user',
+          name: data.name,
+          criteria: data.criteria,
+        }),
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/searches'] });
+      setShowSaveModal(false);
+      setSearchName("");
+      setShowSuccessModal(true);
+      toast({
+        title: "Search saved successfully",
+        description: "Your search has been saved and can be accessed anytime.",
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: "Failed to save search",
+        description: "Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+  
+  // Delete search mutation
+  const deleteSearchMutation = useMutation({
+    mutationFn: async (id: string) => {
+      return apiRequest(`/api/searches/${id}`, { method: 'DELETE' });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/searches'] });
+      toast({
+        title: "Search deleted",
+        description: "The saved search has been removed.",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Failed to delete search",
+        description: "Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+  
+  // Check if criteria has any meaningful filters set
+  const hasMeaningfulCriteria = (criteria: SearchCriteria | null): boolean => {
+    if (!criteria) return false;
+    return !!(
+      (criteria.status?.length && criteria.status.length > 0) ||
+      criteria.cities?.length ||
+      criteria.subdivisions?.length ||
+      criteria.neighborhoods?.length ||
+      criteria.postalCodes?.length ||
+      criteria.elementarySchools?.length ||
+      criteria.middleSchools?.length ||
+      criteria.highSchools?.length ||
+      criteria.listPriceMin ||
+      criteria.listPriceMax ||
+      criteria.bedroomsMin ||
+      criteria.bedroomsMax ||
+      criteria.fullBathsMin ||
+      criteria.fullBathsMax ||
+      criteria.livingAreaMin ||
+      criteria.livingAreaMax ||
+      criteria.yearBuiltMin ||
+      criteria.yearBuiltMax ||
+      criteria.lotSizeMin ||
+      criteria.lotSizeMax ||
+      (criteria.propertyTypes?.length && criteria.propertyTypes.length > 0)
+    );
+  };
+  
+  // Generate auto search name from criteria
+  const generateSearchName = (criteria: SearchCriteria): string => {
+    const parts: string[] = [];
+    if (criteria.cities?.length) parts.push(criteria.cities.slice(0, 2).join(', '));
+    if (criteria.subdivisions?.length) parts.push(criteria.subdivisions[0]);
+    if (criteria.listPriceMin || criteria.listPriceMax) {
+      const min = criteria.listPriceMin ? `$${(criteria.listPriceMin / 1000).toFixed(0)}k` : '';
+      const max = criteria.listPriceMax ? `$${(criteria.listPriceMax / 1000).toFixed(0)}k` : '';
+      parts.push(`${min}-${max}`.replace(/^-|-$/g, ''));
+    }
+    if (criteria.bedroomsMin) parts.push(`${criteria.bedroomsMin}+ beds`);
+    return parts.length > 0 ? parts.join(' | ') : `Search ${new Date().toLocaleDateString()}`;
+  };
+  
+  // Handle save search button click
+  const handleSaveSearch = () => {
+    if (!searchCriteria || !hasMeaningfulCriteria(searchCriteria)) {
+      toast({
+        title: "Cannot save empty search",
+        description: "Please add at least one filter (city, price range, bedrooms, etc.) before saving.",
+        variant: "destructive",
+      });
+      return;
+    }
+    setSearchName(generateSearchName(searchCriteria));
+    setShowSaveModal(true);
+  };
+  
+  // Confirm save search
+  const confirmSaveSearch = () => {
+    if (!searchCriteria || !searchName.trim()) return;
+    saveSearchMutation.mutate({ name: searchName.trim(), criteria: searchCriteria });
+  };
+  
+  // Run a saved search
+  const runSavedSearch = (savedSearch: SavedSearch) => {
+    const criteria = savedSearch.criteria as SearchCriteria;
+    setSearchCriteria(criteria);
+    const queryString = serializeCriteriaToUrl(criteria);
+    navigate(`/properties?${queryString}`, { replace: true });
+    setActiveTab("results");
+  };
+  
+  // Format criteria summary for display
+  const formatCriteriaSummary = (criteria: SearchCriteria): string => {
+    const parts: string[] = [];
+    if (criteria.status?.length) parts.push(`Status: ${criteria.status.join(', ')}`);
+    if (criteria.cities?.length) parts.push(`Cities: ${criteria.cities.join(', ')}`);
+    if (criteria.subdivisions?.length) parts.push(`Subdivisions: ${criteria.subdivisions.join(', ')}`);
+    if (criteria.listPriceMin) parts.push(`Min: $${criteria.listPriceMin.toLocaleString()}`);
+    if (criteria.listPriceMax) parts.push(`Max: $${criteria.listPriceMax.toLocaleString()}`);
+    if (criteria.bedroomsMin) parts.push(`${criteria.bedroomsMin}+ beds`);
+    if (criteria.fullBathsMin) parts.push(`${criteria.fullBathsMin}+ baths`);
+    return parts.length > 0 ? parts.join(' | ') : 'No filters specified';
+  };
 
 
   // Fetch inventory summary for display before search
@@ -440,14 +593,28 @@ export default function Properties() {
             <p className="text-muted-foreground">Search and browse property listings</p>
           )}
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           {searchCriteria && (
             <>
+              <Button 
+                variant="default" 
+                onClick={handleSaveSearch}
+                disabled={saveSearchMutation.isPending || !hasMeaningfulCriteria(searchCriteria)}
+                data-testid="button-save-search"
+                title={!hasMeaningfulCriteria(searchCriteria) ? "Add at least one filter to save this search" : undefined}
+              >
+                {saveSearchMutation.isPending ? (
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                ) : (
+                  <Save className="w-4 h-4 mr-2" />
+                )}
+                Save Search
+              </Button>
               <Button variant="outline" onClick={handleReset} data-testid="button-reset-search">
                 <RotateCcw className="w-4 h-4 mr-2" />
                 Reset
               </Button>
-              <Button onClick={() => setActiveTab("search")} data-testid="button-modify-search">
+              <Button variant="outline" onClick={() => setActiveTab("search")} data-testid="button-modify-search">
                 <Search className="w-4 h-4 mr-2" />
                 Modify Search
               </Button>
@@ -653,6 +820,159 @@ export default function Properties() {
           )}
         </TabsContent>
       </Tabs>
+
+      {/* Saved Searches Section */}
+      {savedSearches.length > 0 && (
+        <Card className="mt-8">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Bookmark className="w-5 h-5" />
+              Saved Searches
+            </CardTitle>
+            <CardDescription>
+              Your saved buyer search criteria. Click "Run Search" to load the filters and view results.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-3">
+              {savedSearches
+                .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+                .map((savedSearch) => (
+                  <div 
+                    key={savedSearch.id}
+                    className="flex items-center justify-between p-4 border rounded-lg hover-elevate"
+                    data-testid={`saved-search-${savedSearch.id}`}
+                  >
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-1">
+                        <h4 className="font-medium truncate" data-testid={`text-search-name-${savedSearch.id}`}>
+                          {savedSearch.name}
+                        </h4>
+                      </div>
+                      <div className="flex items-center gap-4 text-sm text-muted-foreground">
+                        <span className="flex items-center gap-1">
+                          <Filter className="w-3 h-3" />
+                          {formatCriteriaSummary(savedSearch.criteria as SearchCriteria)}
+                        </span>
+                        <span className="flex items-center gap-1">
+                          <Calendar className="w-3 h-3" />
+                          {new Date(savedSearch.createdAt).toLocaleDateString()}
+                        </span>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2 ml-4">
+                      <Button
+                        size="sm"
+                        onClick={() => runSavedSearch(savedSearch)}
+                        data-testid={`button-run-search-${savedSearch.id}`}
+                      >
+                        <Play className="w-4 h-4 mr-1" />
+                        Run Search
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => deleteSearchMutation.mutate(savedSearch.id)}
+                        disabled={deleteSearchMutation.isPending}
+                        data-testid={`button-delete-search-${savedSearch.id}`}
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Save Search Modal */}
+      <Dialog open={showSaveModal} onOpenChange={setShowSaveModal}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Save Search</DialogTitle>
+            <DialogDescription>
+              Give your search a name so you can easily find and run it later.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="search-name">Search Name</Label>
+              <Input
+                id="search-name"
+                value={searchName}
+                onChange={(e) => setSearchName(e.target.value)}
+                placeholder="e.g., Austin 3+ beds under $500k"
+                data-testid="input-search-name"
+              />
+            </div>
+            {searchCriteria && (
+              <div className="space-y-2">
+                <Label>Search Filters</Label>
+                <p className="text-sm text-muted-foreground">
+                  {formatCriteriaSummary(searchCriteria)}
+                </p>
+              </div>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowSaveModal(false)}>
+              Cancel
+            </Button>
+            <Button 
+              onClick={confirmSaveSearch}
+              disabled={!searchName.trim() || saveSearchMutation.isPending}
+              data-testid="button-confirm-save"
+            >
+              {saveSearchMutation.isPending ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Saving...
+                </>
+              ) : (
+                "Save Search"
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Success Modal */}
+      <Dialog open={showSuccessModal} onOpenChange={setShowSuccessModal}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Bookmark className="w-5 h-5 text-green-500" />
+              Search Saved Successfully
+            </DialogTitle>
+            <DialogDescription>
+              Your search has been saved. What would you like to do next?
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="flex-col sm:flex-row gap-2">
+            <Button 
+              variant="outline" 
+              onClick={() => setShowSuccessModal(false)}
+              className="w-full sm:w-auto"
+              data-testid="button-continue-browsing"
+            >
+              Continue Browsing
+            </Button>
+            <Button 
+              onClick={() => {
+                setShowSuccessModal(false);
+                // Scroll to saved searches section
+                document.querySelector('[data-testid^="saved-search-"]')?.scrollIntoView({ behavior: 'smooth' });
+              }}
+              className="w-full sm:w-auto"
+              data-testid="button-view-saved-searches"
+            >
+              <Bookmark className="w-4 h-4 mr-2" />
+              View Saved Searches
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
     </div>
   );

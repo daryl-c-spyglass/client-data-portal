@@ -1,0 +1,160 @@
+You are working ONLY on the AGENT “Buyer Search” module + Dashboard Quick Actions (agent-facing).
+Do NOT modify CMA pages, Properties module, Seller Updates, or IDX/public pages.
+
+Data source: Repliers. Rental/leasing listings must be excluded globally.
+
+Fix the Buyer Search issues ONE BY ONE and test each before moving to the next.
+
+====================================================
+1) BUYER SEARCH — “SAVE SEARCH” NOT WORKING
+====================================================
+
+Problems:
+- Save Search cannot be used.
+- User cannot select properties to be saved.
+
+Requirements:
+1) Identify why Save Search is disabled or failing:
+   - UI button state logic
+   - missing required fields
+   - backend endpoint errors
+   - auth/session issues
+2) Fix Save Search so it:
+   - Works end-to-end (UI → API → persistence → UI refresh)
+   - Shows success/error messages (no silent failures)
+
+3) Selection behavior:
+- Allow user to select properties (checkbox or “save” icon per property card).
+- Selected properties should be included in the saved search context OR saved list (define and implement clearly).
+- Ensure selection persists when switching between List and Map views during the session.
+
+Testing:
+- Perform a Buyer Search → select 3 properties → Save Search → confirm it saves successfully and persists after refresh.
+
+====================================================
+2) BUYER SEARCH — DEFINE THE FLOW AFTER “SAVE SEARCH”
+====================================================
+
+Create a clear user flow after saving:
+
+Requirements:
+After Save Search is successful:
+1) Show a confirmation toast:
+   - “Search saved successfully”
+2) Prompt user with next actions (modal or inline):
+   - “View Saved Searches”
+   - “Continue Browsing”
+   - “Create CMA from Results” (optional if already supported)
+3) Saved searches must appear in a “Saved Searches” section BELOW the search UI:
+   - Each saved search shows:
+     • Name (auto-generated if none)
+     • Key filters summary (city/subdivision/price/etc.)
+     • Created date/time
+     • “Run Search” button
+     • “Delete” button (optional if allowed)
+4) Clicking “Run Search” loads the filters back into the UI and runs it.
+
+Testing:
+- Save a search → confirm it appears in the saved list → click Run Search → filters populate and results load.
+
+====================================================
+3) BUYER SEARCH — LIST FILTER NOT WORKING
+====================================================
+
+Problem:
+- List filter (sorting/filtering on list results) is not working.
+
+Requirements:
+1) Identify which list filters exist (price, beds, baths, status, etc.)
+2) Fix the filter logic so it:
+   - Actually updates the displayed results
+   - Works together with saved searches and map view
+3) Ensure filters are applied consistently:
+   - List view and Map view show the same filtered dataset.
+
+Testing:
+- Apply list filters → confirm results change accordingly.
+- Switch to map → confirm map reflects same filtered dataset.
+
+====================================================
+4) BUYER SEARCH — MAP MUST SHOW CLICKABLE ADDRESSES + FLOATING CARD WITH IMAGES
+====================================================
+
+Problem:
+- Map needs a better interaction and must show the comparable property addresses.
+
+Requirements:
+1) On Map view:
+   - Display property markers.
+   - Each marker must have a clickable address label (or a sidebar list showing addresses).
+2) When user clicks an address (or marker):
+   - Open a floating card/modal showing:
+     • Address
+     • Price
+     • Status
+     • Beds/Baths/Sqft/Year built
+     • Subdivision + Neighborhood (separate fields if available)
+     • MLS #
+     • Property images
+3) Image behavior in floating card:
+   - Automatic carousel every 3 seconds
+   - Manual navigation:
+     - Clicking left side of image goes backward
+     - Clicking right side goes forward
+   - Do NOT show grey arrow overlays; left/right click zones only
+   - If no photos: show “No photos available”
+
+Testing:
+- Run a Buyer Search → open Map view → click 3 different properties:
+  - Floating card opens each time
+  - Images auto-rotate every 3 seconds
+  - Manual left/right click navigation works
+
+====================================================
+5) BUYER SEARCH — SAVED SEARCHES LIST BELOW
+====================================================
+
+Requirement:
+- Saved searches must appear BELOW Buyer Search results section.
+- Must include:
+  - Search name
+  - Summary of filters
+  - Run Search
+  - (Optional) Delete
+- Ensure ordering newest → oldest by default.
+
+Testing:
+- Save 2 searches → confirm they appear below and newest is first.
+
+====================================================
+6) DASHBOARD — ADD “BUYER SEARCH” BUTTON IN QUICK ACTIONS + FIX SPACING
+====================================================
+
+Problem:
+- Need a Buyer Search redirect button in Dashboard Quick Actions.
+- Buttons spacing/sizing is leaving big empty gaps.
+
+Requirements:
+1) Add a “Buyer Search” shortcut button inside Dashboard → Quick Actions block.
+2) Re-arrange quick action buttons so they are evenly sized and aligned:
+   - No oversized empty space
+   - Responsive layout (desktop and mobile)
+3) Ensure clicking “Buyer Search” routes user to Buyer Search module.
+
+Testing:
+- Load dashboard → Quick Actions shows Buyer Search button.
+- Click it → navigates correctly.
+- Confirm layout looks clean with no awkward spacing.
+
+====================================================
+FINAL REPORT REQUIRED
+====================================================
+
+Provide:
+- Root cause + fix for Save Search.
+- How property selection is implemented and persisted.
+- “After Save Search” flow screenshots.
+- Fix summary for List filter.
+- Proof map addresses are clickable and floating card carousel works.
+- Proof saved searches list appears below.
+- Dashboard Quick Actions updated layout screenshot.

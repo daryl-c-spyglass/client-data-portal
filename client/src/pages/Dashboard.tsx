@@ -1022,28 +1022,37 @@ export default function Dashboard() {
                 <CardHeader>
                   <CardTitle>Quick Actions</CardTitle>
                 </CardHeader>
-                <CardContent className="flex flex-wrap justify-end gap-4">
-                  <Link href="/properties">
-                    <Button data-testid="button-search-properties">
-                      <Search className="w-4 h-4 mr-2" />
-                      Search Properties
+                <CardContent>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                    <Link href="/properties" className="block">
+                      <Button className="w-full h-auto py-4 flex flex-col items-center gap-2" data-testid="button-buyer-search">
+                        <Search className="w-5 h-5" />
+                        <span className="text-xs font-medium">Buyer Search</span>
+                      </Button>
+                    </Link>
+                    <Link href="/cmas/new" className="block">
+                      <Button variant="outline" className="w-full h-auto py-4 flex flex-col items-center gap-2" data-testid="button-create-cma">
+                        <Plus className="w-5 h-5" />
+                        <span className="text-xs font-medium">Create CMA</span>
+                      </Button>
+                    </Link>
+                    <Link href="/cmas" className="block">
+                      <Button variant="outline" className="w-full h-auto py-4 flex flex-col items-center gap-2" data-testid="button-view-cmas">
+                        <BarChart3 className="w-5 h-5" />
+                        <span className="text-xs font-medium">View CMAs</span>
+                      </Button>
+                    </Link>
+                    <Button 
+                      variant="outline" 
+                      className="w-full h-auto py-4 flex flex-col items-center gap-2"
+                      data-testid="button-sync-data"
+                      onClick={() => syncMutation.mutate()}
+                      disabled={syncMutation.isPending}
+                    >
+                      <RefreshCw className={`w-5 h-5 ${syncMutation.isPending ? 'animate-spin' : ''}`} />
+                      <span className="text-xs font-medium">{syncMutation.isPending ? 'Syncing...' : 'Sync Data'}</span>
                     </Button>
-                  </Link>
-                  <Link href="/cmas/new">
-                    <Button variant="outline" data-testid="button-create-cma">
-                      <Plus className="w-4 h-4 mr-2" />
-                      Create CMA
-                    </Button>
-                  </Link>
-                  <Button 
-                    variant="outline" 
-                    data-testid="button-sync-data"
-                    onClick={() => syncMutation.mutate()}
-                    disabled={syncMutation.isPending}
-                  >
-                    <RefreshCw className={`w-4 h-4 mr-2 ${syncMutation.isPending ? 'animate-spin' : ''}`} />
-                    {syncMutation.isPending ? 'Syncing...' : 'Sync Repliers Data'}
-                  </Button>
+                  </div>
                 </CardContent>
               </Card>
             );

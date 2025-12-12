@@ -1,10 +1,10 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useRef, useCallback } from "react";
 import { MapContainer, TileLayer, Marker, Popup, useMap } from "react-leaflet";
 import L from "leaflet";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { MapPin, Home, Bed, Bath, Ruler, ExternalLink, AlertTriangle } from "lucide-react";
+import { MapPin, Home, Bed, Bath, Ruler, ExternalLink, AlertTriangle, Calendar, ImageOff } from "lucide-react";
 import type { Property } from "@shared/schema";
 import "leaflet/dist/leaflet.css";
 
@@ -70,6 +70,49 @@ function MapBoundsUpdater({ properties }: { properties: Property[] }) {
 }
 
 function PropertyPopup({ property, onPropertyClick }: { property: Property; onPropertyClick?: (property: Property) => void }) {
+  const [currentImageIndex, setCurrentImageIndex] = useState(0);
+  const autoPlayRef = useRef<NodeJS.Timeout | null>(null);
+  
+  // Get photos from property
+  const photos = (property as any).photos as string[] | undefined;
+  const hasPhotos = photos && photos.length > 0;
+  
+  // Auto-rotate images every 3 seconds
+  useEffect(() => {
+    if (hasPhotos && photos.length > 1) {
+      autoPlayRef.current = setInterval(() => {
+        setCurrentImageIndex(prev => (prev + 1) % photos.length);
+      }, 3000);
+    }
+    return () => {
+      if (autoPlayRef.current) clearInterval(autoPlayRef.current);
+    };
+  }, [hasPhotos, photos?.length]);
+  
+  // Handle click on left/right zones for manual navigation
+  const handleImageClick = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (!hasPhotos || photos.length <= 1) return;
+    const rect = e.currentTarget.getBoundingClientRect();
+    const clickX = e.clientX - rect.left;
+    const width = rect.width;
+    
+    // Reset auto-play timer on manual interaction
+    if (autoPlayRef.current) {
+      clearInterval(autoPlayRef.current);
+      autoPlayRef.current = setInterval(() => {
+        setCurrentImageIndex(prev => (prev + 1) % photos.length);
+      }, 3000);
+    }
+    
+    if (clickX < width / 2) {
+      // Left side - go backward
+      setCurrentImageIndex(prev => (prev - 1 + photos.length) % photos.length);
+    } else {
+      // Right side - go forward
+      setCurrentImageIndex(prev => (prev + 1) % photos.length);
+    }
+  };
+  
   const price = property.listPrice || property.closePrice;
   const formattedPrice = price 
     ? new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 }).format(Number(price))
@@ -82,51 +125,113 @@ function PropertyPopup({ property, onPropertyClick }: { property: Property; onPr
     : "bg-gray-500";
 
   return (
-    <div className="min-w-[240px] p-1">
-      <div className="flex items-start justify-between gap-2 mb-2">
-        <span className="font-bold text-lg text-foreground">{formattedPrice}</span>
-        <Badge className={`${statusColor} text-white text-xs`}>
-          {property.standardStatus || "Unknown"}
-        </Badge>
+    <div className="w-[320px]" data-testid={`popup-property-${property.id}`}>
+      {/* Image Carousel */}
+      <div 
+        className="relative aspect-[16/10] bg-muted cursor-pointer overflow-hidden rounded-t-md"
+        onClick={handleImageClick}
+      >
+        {hasPhotos ? (
+          <>
+            <img 
+              src={photos[currentImageIndex]} 
+              alt={`Property ${currentImageIndex + 1}`}
+              className="w-full h-full object-cover"
+            />
+            {/* Image counter */}
+            {photos.length > 1 && (
+              <div className="absolute bottom-2 right-2 bg-black/60 text-white text-xs px-2 py-1 rounded">
+                {currentImageIndex + 1} / {photos.length}
+              </div>
+            )}
+            {/* Click zone indicators (subtle) */}
+            {photos.length > 1 && (
+              <>
+                <div className="absolute inset-y-0 left-0 w-1/2 hover:bg-black/5 transition-colors" />
+                <div className="absolute inset-y-0 right-0 w-1/2 hover:bg-black/5 transition-colors" />
+              </>
+            )}
+          </>
+        ) : (
+          <div className="w-full h-full flex flex-col items-center justify-center text-muted-foreground">
+            <ImageOff className="w-10 h-10 mb-2" />
+            <span className="text-sm">No photos available</span>
+          </div>
+        )}
       </div>
       
-      <p className="text-sm text-muted-foreground mb-2 line-clamp-2">
-        {property.unparsedAddress || `${property.streetNumber} ${property.streetName}`}
-        {property.city && `, ${property.city}`}
-      </p>
-      
-      <div className="flex items-center gap-3 text-sm text-muted-foreground mb-3">
-        {property.bedroomsTotal && (
-          <span className="flex items-center gap-1">
-            <Bed className="w-3 h-3" />
-            {property.bedroomsTotal}
-          </span>
+      {/* Property Details */}
+      <div className="p-3">
+        <div className="flex items-start justify-between gap-2 mb-2">
+          <span className="font-bold text-lg text-foreground">{formattedPrice}</span>
+          <Badge className={`${statusColor} text-white text-xs`}>
+            {property.standardStatus || "Unknown"}
+          </Badge>
+        </div>
+        
+        <p className="text-sm font-medium mb-1" data-testid={`text-address-${property.id}`}>
+          {property.unparsedAddress || `${property.streetNumber} ${property.streetName}`}
+        </p>
+        <p className="text-xs text-muted-foreground mb-2">
+          {property.city}{property.stateOrProvince && `, ${property.stateOrProvince}`} {property.postalCode}
+        </p>
+        
+        {/* Subdivision / Neighborhood */}
+        {(property.subdivision || property.neighborhood) && (
+          <p className="text-xs text-muted-foreground mb-2">
+            {property.subdivision && <span>Subdivision: {property.subdivision}</span>}
+            {property.subdivision && property.neighborhood && <span> | </span>}
+            {property.neighborhood && <span>Neighborhood: {property.neighborhood}</span>}
+          </p>
         )}
-        {property.bathroomsTotalInteger && (
-          <span className="flex items-center gap-1">
-            <Bath className="w-3 h-3" />
-            {property.bathroomsTotalInteger}
-          </span>
+        
+        {/* Property Stats */}
+        <div className="flex items-center gap-3 text-sm text-muted-foreground mb-2 flex-wrap">
+          {property.bedroomsTotal != null && (
+            <span className="flex items-center gap-1">
+              <Bed className="w-3 h-3" />
+              {property.bedroomsTotal} beds
+            </span>
+          )}
+          {property.bathroomsTotalInteger != null && (
+            <span className="flex items-center gap-1">
+              <Bath className="w-3 h-3" />
+              {property.bathroomsTotalInteger} baths
+            </span>
+          )}
+          {property.livingArea && (
+            <span className="flex items-center gap-1">
+              <Ruler className="w-3 h-3" />
+              {Number(property.livingArea).toLocaleString()} sqft
+            </span>
+          )}
+          {property.yearBuilt && (
+            <span className="flex items-center gap-1">
+              <Calendar className="w-3 h-3" />
+              {property.yearBuilt}
+            </span>
+          )}
+        </div>
+        
+        {/* MLS # */}
+        {property.listingId && (
+          <p className="text-xs text-muted-foreground mb-3">
+            MLS #: {property.listingId}
+          </p>
         )}
-        {property.livingArea && (
-          <span className="flex items-center gap-1">
-            <Ruler className="w-3 h-3" />
-            {Number(property.livingArea).toLocaleString()} sqft
-          </span>
+        
+        {onPropertyClick && (
+          <Button 
+            size="sm" 
+            className="w-full"
+            onClick={() => onPropertyClick(property)}
+            data-testid={`button-view-property-${property.listingId || property.id}`}
+          >
+            <ExternalLink className="w-3 h-3 mr-1" />
+            View Details
+          </Button>
         )}
       </div>
-      
-      {onPropertyClick && (
-        <Button 
-          size="sm" 
-          className="w-full"
-          onClick={() => onPropertyClick(property)}
-          data-testid={`button-view-property-${property.listingId || property.id}`}
-        >
-          <ExternalLink className="w-3 h-3 mr-1" />
-          View Details
-        </Button>
-      )}
     </div>
   );
 }
