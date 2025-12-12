@@ -1,0 +1,163 @@
+You are working ONLY on:
+1) AGENT DASHBOARD (Property Inventory by Type, Recent Sold/Closed widget)
+2) AGENT PROPERTIES module (search results + property detail experience, scheduling/share)
+NOT CMA pages, NOT IDX/public pages.
+
+Data source: Repliers (single source of truth).
+Leasing/rentals must be excluded globally.
+
+Implement the following fixes ONE BY ONE, test each, and provide a detailed report at the end.
+
+====================================================
+1) DASHBOARD — PROPERTY INVENTORY BY TYPE IS INCORRECT + NOT SYNCED WITH PROPERTIES
+====================================================
+
+Problem:
+- Dashboard “Property Inventory by Type” is incorrect for these types:
+  • Single Family Residence
+  • Unimproved Land
+  • Multiple Lots (Adjacent)
+  • Ranch
+  • Manufactured Home
+  • Condominium
+- Properties module “Property Types” inventory is not synced with Dashboard.
+
+Requirements:
+1) Create ONE SHARED backend source of truth for inventory counts (used by BOTH Dashboard and Properties):
+   - countsByType/Subtype
+   - countsByStatus
+   - totalProperties
+   - dataSourceName
+   - lastUpdatedAt
+2) Ensure both pages use the same:
+   - Repliers data
+   - status mapping rules
+   - property type/subtype mapping rules
+   - rental/leasing exclusion logic
+3) Fix the mapping from Repliers “PropertyType / PropertySubType” to our UI labels.
+   - Confirm which Repliers field is used for:
+     • Single Family Residence
+     • Condominium
+     • Manufactured Home
+     • Ranch
+     • Unimproved Land
+     • Multiple Lots (Adjacent)
+   - Ensure no properties are incorrectly falling into “Other” when they belong to these types.
+4) Add debug logging temporarily:
+   - show counts by type returned for dashboard and properties
+   - confirm both match exactly
+
+Testing:
+- Load Dashboard inventory by type.
+- Load Properties inventory by type.
+- Confirm counts match exactly across both pages.
+
+====================================================
+2) DASHBOARD — RECENT SOLD/CLOSED IS BLANK + DRAG/PAGING MUST LOAD ALL
+====================================================
+
+Problem:
+- Recent Sold/Closed widget is blank.
+- User needs to be able to pull every sold/closed property when using drag/scroll option.
+
+Requirements:
+1) Fix Recent Sold/Closed data retrieval:
+   - Ensure endpoint returns sold/closed listings from Repliers (not rentals).
+   - Ensure it sorts by most recent close date first.
+2) Widget must NOT be blank:
+   - If no results, show an explicit empty state message.
+3) Implement paging/infinite-scroll or drag-based browsing:
+   - If total sold = N, user must be able to continue loading until the LAST record.
+   - Use paginated requests (limit/offset or cursor) for performance.
+4) Each item must show:
+   - Address
+   - Close price
+   - Close date
+   - Beds/Baths/Sqft (if available)
+   - Thumbnail or “No photos available”
+5) Clicking an item opens the standard floating card modal.
+
+Testing:
+- Confirm widget loads items (not blank).
+- Confirm dragging/scrolling continues loading more items until the end.
+- Confirm order is newest → oldest.
+
+====================================================
+3) PROPERTIES — SHOW SCHOOLS / ELEMENTARY (LIKE PROPERTY DETAIL EXAMPLE)
+====================================================
+
+Problem:
+- Properties section must show Schools/Elementary like the property detail example:
+  https://f58e6159-1bf8-4479-a256-c997461de361-00-1jv089vliph98.riker.replit.dev/properties/ACT6262802
+
+Requirements:
+1) Pull school fields from Repliers for property detail view:
+   - Elementary (at minimum)
+   - If available also: Middle, High, District
+2) Display “Elementary” clearly in property detail UI and (if space allows) in floating card.
+3) If school data is missing, show “N/A” (not blank).
+
+Testing:
+- Open property ACT6262802 (or similar) and verify the Elementary field displays.
+
+====================================================
+4) PROPERTIES — FIX “SCHEDULE VIEWING” (EMAIL TO BUYER)
+====================================================
+
+Problem:
+- Scheduling/share workflow needs to allow agent to email a buyer with property info.
+
+Requirements:
+1) Fix Schedule Viewing UI to match “Email listing to a friend” style:
+   - Agent Name
+   - Agent Email Address
+   - Buyer Name
+   - Buyer Email Address
+   - Comments / message box
+   - Include key property info (address, price, MLS#, link)
+2) Email behavior:
+   - Send HTML email containing:
+     • property summary card
+     • property link
+     • agent comments
+   - Use Reply-To = Agent Email so buyer replies go to the agent.
+   - Ensure deliverability (no silent failure).
+3) Provide success/failure feedback in UI.
+
+Testing:
+- Use a real email test:
+  - confirm buyer receives the email
+  - confirm Reply-To routes responses to agent email
+
+====================================================
+5) PROPERTIES — FIX PROPERTY TYPE FOR EACH LISTING
+====================================================
+
+Problem:
+- Property type shown per listing is incorrect/inconsistent.
+
+Requirements:
+1) Ensure each property card and property detail page displays correct:
+   - Property Type / Property Subtype
+2) Must use consistent mapping with the inventory widget and filters.
+3) Ensure land/ranch/manufactured/condo classification is correct.
+
+Testing:
+- Verify multiple listing types display the right type label consistently across:
+  - search results cards
+  - floating card
+  - property detail page
+  - dashboard inventory counts
+
+====================================================
+FINAL REPORT REQUIRED
+====================================================
+
+Provide:
+1) The shared backend source used for inventory counts across Dashboard + Properties.
+2) The mapping table (Repliers field values → UI property types).
+3) Proof Recent Sold/Closed loads and paginates to the last record.
+4) Proof schools/elementary fields display from Repliers.
+5) Proof Schedule Viewing email works end-to-end (test results).
+6) Confirmation rentals/leasing excluded everywhere.
+7) Confirmation CMA/IDX/public pages were not modified.

@@ -385,13 +385,16 @@ export default function Properties() {
                   </TooltipTrigger>
                   <TooltipContent className="max-w-xs">
                     <div className="space-y-1 text-xs">
-                      <p><strong>Property Type Acronyms:</strong></p>
+                      <p><strong>Property Type Definitions:</strong></p>
                       <p><strong>SFR</strong> = Single Family Residence</p>
                       <p><strong>Condo</strong> = Condominium</p>
                       <p><strong>TH</strong> = Townhouse</p>
                       <p><strong>Multi</strong> = Multi-Family (2-4 units)</p>
-                      <p><strong>Land</strong> = Land/Ranch/Lots</p>
-                      <p><strong>Other</strong> = Commercial/Industrial/Other</p>
+                      <p><strong>Mfg</strong> = Manufactured / Mobile Home</p>
+                      <p><strong>Ranch</strong> = Ranch / Farm / Acreage</p>
+                      <p><strong>Land</strong> = Unimproved Land / Lots</p>
+                      <p><strong>Lots</strong> = Multiple Lots (Adjacent)</p>
+                      <p><strong>Other</strong> = Commercial / Industrial</p>
                     </div>
                   </TooltipContent>
                 </Tooltip>
@@ -411,9 +414,18 @@ export default function Properties() {
                     <Badge variant="outline" className="text-xs" data-testid="badge-inventory-multi">
                       Multi: {(inventory.countsBySubtype['Multi-Family'] || 0).toLocaleString()}
                     </Badge>
-                    <Badge variant="outline" className="text-xs" data-testid="badge-inventory-land">
+                    <Badge variant="outline" className="text-xs" data-testid="badge-inventory-mfg">
+                      Mfg: {(inventory.countsBySubtype['Manufactured Home'] || 0).toLocaleString()}
+                    </Badge>
+                    <Badge variant="outline" className="text-xs" data-testid="badge-inventory-ranch">
                       <TreePine className="w-3 h-3 mr-1" />
-                      Land: {(inventory.countsBySubtype['Land/Ranch'] || 0).toLocaleString()}
+                      Ranch: {(inventory.countsBySubtype['Ranch'] || 0).toLocaleString()}
+                    </Badge>
+                    <Badge variant="outline" className="text-xs" data-testid="badge-inventory-land">
+                      Land: {(inventory.countsBySubtype['Unimproved Land'] || 0).toLocaleString()}
+                    </Badge>
+                    <Badge variant="outline" className="text-xs" data-testid="badge-inventory-lots">
+                      Lots: {(inventory.countsBySubtype['Multiple Lots (Adjacent)'] || 0).toLocaleString()}
                     </Badge>
                     <Badge variant="outline" className="text-xs" data-testid="badge-inventory-other">
                       Other: {(inventory.countsBySubtype['Other'] || 0).toLocaleString()}
@@ -493,13 +505,16 @@ export default function Properties() {
                     </TooltipTrigger>
                     <TooltipContent className="max-w-xs">
                       <div className="space-y-1 text-xs">
-                        <p><strong>Property Type Acronyms:</strong></p>
-                        <p><strong>Single Family</strong> = Single Family Residence (SFR)</p>
+                        <p><strong>Property Type Definitions:</strong></p>
+                        <p><strong>SFR</strong> = Single Family Residence</p>
                         <p><strong>Condo</strong> = Condominium</p>
-                        <p><strong>Townhouse</strong> = Townhouse (TH)</p>
-                        <p><strong>Multi-Family</strong> = 2-4 Unit Properties</p>
-                        <p><strong>Land/Ranch</strong> = Lots, Acreage, Farms</p>
-                        <p><strong>Other</strong> = Commercial/Industrial</p>
+                        <p><strong>TH</strong> = Townhouse</p>
+                        <p><strong>Multi</strong> = Multi-Family (2-4 units)</p>
+                        <p><strong>Mfg</strong> = Manufactured / Mobile Home</p>
+                        <p><strong>Ranch</strong> = Ranch / Farm / Acreage</p>
+                        <p><strong>Land</strong> = Unimproved Land / Lots</p>
+                        <p><strong>Lots</strong> = Multiple Lots (Adjacent)</p>
+                        <p><strong>Other</strong> = Commercial / Industrial</p>
                       </div>
                     </TooltipContent>
                   </Tooltip>
@@ -507,24 +522,33 @@ export default function Properties() {
                 <div className="flex flex-wrap gap-2 mt-2">
                   <Badge variant="outline" data-testid="badge-subtype-sfr">
                     <Home className="w-3 h-3 mr-1" />
-                    Single Family: {searchResult.inventoryBySubtype['Single Family Residence']}
+                    SFR: {searchResult.inventoryBySubtype?.['Single Family Residence'] || 0}
                   </Badge>
                   <Badge variant="outline" data-testid="badge-subtype-condo">
                     <Building2 className="w-3 h-3 mr-1" />
-                    Condo: {searchResult.inventoryBySubtype['Condominium']}
+                    Condo: {searchResult.inventoryBySubtype?.['Condominium'] || 0}
                   </Badge>
                   <Badge variant="outline" data-testid="badge-subtype-townhouse">
-                    Townhouse: {searchResult.inventoryBySubtype['Townhouse']}
+                    TH: {searchResult.inventoryBySubtype?.['Townhouse'] || 0}
                   </Badge>
                   <Badge variant="outline" data-testid="badge-subtype-multi">
-                    Multi-Family: {searchResult.inventoryBySubtype['Multi-Family']}
+                    Multi: {searchResult.inventoryBySubtype?.['Multi-Family'] || 0}
+                  </Badge>
+                  <Badge variant="outline" data-testid="badge-subtype-mfg">
+                    Mfg: {searchResult.inventoryBySubtype?.['Manufactured Home'] || 0}
+                  </Badge>
+                  <Badge variant="outline" data-testid="badge-subtype-ranch">
+                    <TreePine className="w-3 h-3 mr-1" />
+                    Ranch: {searchResult.inventoryBySubtype?.['Ranch'] || 0}
                   </Badge>
                   <Badge variant="outline" data-testid="badge-subtype-land">
-                    <TreePine className="w-3 h-3 mr-1" />
-                    Land/Ranch: {searchResult.inventoryBySubtype['Land/Ranch']}
+                    Land: {searchResult.inventoryBySubtype?.['Unimproved Land'] || 0}
+                  </Badge>
+                  <Badge variant="outline" data-testid="badge-subtype-lots">
+                    Lots: {searchResult.inventoryBySubtype?.['Multiple Lots (Adjacent)'] || 0}
                   </Badge>
                   <Badge variant="outline" data-testid="badge-subtype-other">
-                    Other: {searchResult.inventoryBySubtype['Other/Unknown']}
+                    Other: {searchResult.inventoryBySubtype?.['Other'] || 0}
                   </Badge>
                 </div>
               </div>

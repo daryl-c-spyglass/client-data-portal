@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { ShoppingCart, Bed, Bath, Maximize, MapPin, Calendar, TrendingUp, Home } from "lucide-react";
 import type { Property, Media } from "@shared/schema";
+import { formatPropertyType } from "@/lib/property-type-utils";
 
 interface PropertyCardProps {
   property: Property;
@@ -140,7 +141,7 @@ export function PropertyCard({
           {property.propertySubType && (
             <div className="flex items-center gap-1">
               <Home className="w-3 h-3" />
-              <span className="line-clamp-1">{property.propertySubType}</span>
+              <span className="line-clamp-1">{formatPropertyType(property.propertySubType)}</span>
             </div>
           )}
         </div>

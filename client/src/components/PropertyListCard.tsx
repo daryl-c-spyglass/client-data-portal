@@ -3,6 +3,7 @@ import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
 import { Bed, Bath, Maximize, MapPin, Home, Calendar, DollarSign, ShoppingCart } from "lucide-react";
+import { formatPropertyType } from "@/lib/property-type-utils";
 
 interface PropertyListCardProps {
   property: Property;
@@ -139,7 +140,7 @@ export function PropertyListCard({
           {property.propertySubType && (
             <div className="flex items-center gap-1">
               <Home className="w-3 h-3" />
-              <span>{property.propertySubType}</span>
+              <span>{formatPropertyType(property.propertySubType)}</span>
             </div>
           )}
           {property.yearBuilt && (

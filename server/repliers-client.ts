@@ -137,38 +137,75 @@ class RepliersClient {
     });
   }
   
-  // Classify a listing's property type into standardized subtype buckets
-  private classifySubtype(listing: RepliersListing): string {
+  // Property type classification mapping - used for inventory counts and display
+  // Returns granular property type for accurate counts
+  classifyPropertyType(listing: RepliersListing): string {
     const style = (listing.details?.style || '').toLowerCase();
     const propertyType = (listing.details?.propertyType || '').toLowerCase();
     const raw = listing.raw || {};
     const rawSubtype = (raw.propertySubType || raw.PropertySubType || '').toLowerCase();
+    const rawType = (raw.propertyType || raw.PropertyType || '').toLowerCase();
     
-    // Check all available fields for subtype classification
-    const combined = `${style} ${propertyType} ${rawSubtype}`;
+    // Check all available fields for classification
+    const combined = `${style} ${propertyType} ${rawSubtype} ${rawType}`;
     
-    if (combined.includes('town') || combined.includes('row')) {
+    // Manufactured Home / Mobile Home - check first (before Single Family)
+    if (combined.includes('manufactured') || combined.includes('mobile home') || 
+        combined.includes('modular') || combined.includes('prefab')) {
+      return 'Manufactured Home';
+    }
+    
+    // Condominium
+    if (combined.includes('condo')) {
+      return 'Condominium';
+    }
+    
+    // Townhouse
+    if (combined.includes('town') || combined.includes('row') || combined.includes('attached')) {
       return 'Townhouse';
     }
+    
+    // Multi-Family
     if (combined.includes('multi') || combined.includes('duplex') || 
         combined.includes('triplex') || combined.includes('fourplex') ||
         combined.includes('2-4 units') || combined.includes('apartment')) {
       return 'Multi-Family';
     }
-    if (combined.includes('condo')) {
-      return 'Condominium';
+    
+    // Multiple Lots (Adjacent) - check before general land
+    if (combined.includes('multiple lot') || combined.includes('adjacent lot')) {
+      return 'Multiple Lots (Adjacent)';
     }
-    if (combined.includes('land') || combined.includes('lot') || 
-        combined.includes('ranch') || combined.includes('farm') ||
-        combined.includes('acreage')) {
-      return 'Land/Ranch';
+    
+    // Unimproved Land (no structures)
+    if ((combined.includes('unimproved') || combined.includes('vacant')) && 
+        (combined.includes('land') || combined.includes('lot'))) {
+      return 'Unimproved Land';
     }
+    
+    // Ranch - check before general land to separate ranches from lots
+    if (combined.includes('ranch') || combined.includes('farm') || combined.includes('acreage')) {
+      return 'Ranch';
+    }
+    
+    // General Land/Lots
+    if (combined.includes('land') || combined.includes('lot')) {
+      return 'Unimproved Land';
+    }
+    
+    // Commercial/Industrial/Other
     if (combined.includes('commercial') || combined.includes('industrial') ||
         combined.includes('retail') || combined.includes('office')) {
       return 'Other';
     }
+    
     // Default to Single Family for residential
     return 'Single Family Residence';
+  }
+  
+  // Legacy classification for backward compatibility - maps to display buckets
+  private classifySubtype(listing: RepliersListing): string {
+    return this.classifyPropertyType(listing);
   }
   
   // Aggregate subtype counts by scanning all Active/UC residential listings
@@ -193,10 +230,13 @@ class RepliersClient {
     
     const counts: Record<string, number> = {
       'Single Family Residence': 0,
+      'Condominium': 0,
       'Townhouse': 0,
       'Multi-Family': 0,
-      'Condominium': 0,
-      'Land/Ranch': 0,
+      'Manufactured Home': 0,
+      'Ranch': 0,
+      'Unimproved Land': 0,
+      'Multiple Lots (Adjacent)': 0,
       'Other': 0,
     };
     
@@ -397,7 +437,10 @@ class RepliersClient {
       country: country,
       neighborhood: neighborhood,
       subdivisionName: subdivisionName,
-      elementarySchool: details.elementarySchool || listing.elementarySchool || listing.schools?.elementary,
+      elementarySchool: details.elementarySchool || listing.elementarySchool || listing.schools?.elementary || listing.raw?.ElementarySchool || null,
+      middleOrJuniorSchool: details.middleSchool || listing.middleSchool || listing.schools?.middle || listing.raw?.MiddleOrJuniorSchool || null,
+      highSchool: details.highSchool || listing.highSchool || listing.schools?.high || listing.raw?.HighSchool || null,
+      schoolDistrict: details.schoolDistrict || listing.schoolDistrict || listing.raw?.SchoolDistrict || null,
       latitude: latitude,
       longitude: longitude,
       photos: (listing.images || listing.photos || []).map((img: string) => 

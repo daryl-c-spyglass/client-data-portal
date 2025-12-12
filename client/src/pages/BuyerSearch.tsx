@@ -144,6 +144,7 @@ import { PropertyCard } from "@/components/PropertyCard";
 import { PropertyMapView } from "@/components/PropertyMapView";
 import { useSelectedProperty } from "@/contexts/SelectedPropertyContext";
 import type { Property, Media } from "@shared/schema";
+import { formatPropertyType } from "@/lib/property-type-utils";
 
 interface SearchFilters {
   // Status & Dates (independent toggles)
@@ -3129,7 +3130,7 @@ export default function BuyerSearch() {
                 {floatingCardProperty.property.propertySubType && (
                   <div className="flex justify-between text-sm">
                     <span className="text-muted-foreground">Property Type</span>
-                    <span className="font-medium">{floatingCardProperty.property.propertySubType}</span>
+                    <span className="font-medium">{formatPropertyType(floatingCardProperty.property.propertySubType)}</span>
                   </div>
                 )}
                 {(floatingCardProperty.property as any).garageSpaces && (

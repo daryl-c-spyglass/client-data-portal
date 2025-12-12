@@ -4,6 +4,12 @@
 
 This project is a professional real estate IDX (Internet Data Exchange) platform integrated with the MLS Grid API. Its primary purpose is to empower real estate agents with tools for property searching, generating Comparative Market Analyses (CMAs), and sharing market insights with clients. The platform aims to combine comprehensive property browsing (similar to Zillow or Redfin) with robust, productivity-focused workflow features to streamline real estate operations.
 
+## Recent Changes (Dec 12, 2025)
+
+- **Property Type Formatter**: Added centralized `formatPropertyType()` utility in `client/src/lib/property-type-utils.ts` for consistent property type display across all components (PropertyCard, PropertyListCard, Dashboard floating card, BuyerSearch floating card)
+- **Recent Sold Photos**: Updated `/api/dashboard/recent-sold` endpoint to fetch photos from media table using `storage.getMediaForListingIds()`
+- **Expanded Property Types**: Support for 9 property type categories: Single Family, Condo, Townhouse, Multi-Family, Manufactured Home, Ranch, Land, Multiple Lots, Commercial
+
 ## User Preferences
 
 Preferred communication style: Simple, everyday language.

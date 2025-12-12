@@ -41,6 +41,7 @@ import { Link } from "wouter";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import type { Cma, Property } from "@shared/schema";
+import { formatPropertyType } from "@/lib/property-type-utils";
 import {
   LineChart,
   Line,
@@ -414,7 +415,7 @@ function PropertyDetailModal({
             {property.propertySubType && (
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Property Type:</span>
-                <span className="font-medium">{property.propertySubType}</span>
+                <span className="font-medium">{formatPropertyType(property.propertySubType)}</span>
               </div>
             )}
           </div>
