@@ -1,0 +1,181 @@
+IMPORTANT — GLOBAL RULE (DASHBOARD + ALL PROPERTY PULLS)
+Leasing / rental listings MUST be excluded everywhere — not only from Days on Market (DOM), but from ALL property data shown to users:
+- Active properties
+- Under Contract properties
+- Sold / Closed properties
+- Carousels, lists, widgets, counts, charts, insights
+
+This rule applies to the entire Dashboard and all data feeding it.
+All data comes from Repliers.
+
+You are working ONLY on the AGENT DASHBOARD and SHARED FLOATING PROPERTY CARD
+(NOT CMA pages, IDX pages, or public property search).
+
+====================================================
+GLOBAL LEASING EXCLUSION — SINGLE SOURCE OF TRUTH
+====================================================
+
+1) Centralized exclusion logic
+- Reuse the existing shared rental detection utilities:
+  • isLikelyRentalProperty()
+  • filterOutRentalProperties()
+- Logic must correctly handle ALL statuses:
+  • Active / Under Contract → filter if listPrice is rental-like
+  • Sold / Closed → filter if closePrice is rental-like
+  • Apply price-per-sqft sanity checks
+  • Exclude land/ranch types as already defined
+
+2) Server-side enforcement (MANDATORY)
+- Apply rental filtering BEFORE data reaches the frontend for ALL dashboard endpoints:
+  • Active property carousel
+  • Under Contract widgets
+  • Sold / Closed widgets
+  • Property inventory by subtype
+  • Market Insights
+  • DOM calculations
+  • Counts and summary cards
+- Frontend must NEVER receive rental listings.
+
+3) Counts must match filtered data
+- Total Properties = Active + Under Contract + Sold/Closed (after filtering)
+- All “N found” counts must reflect filtered results.
+- DOM metrics must use the same filtered dataset.
+
+4) Logging
+- Log how many rental listings were filtered per request:
+  • Endpoint name
+  • Count filtered
+  • Sample addresses (first 3)
+
+====================================================
+DASHBOARD ENHANCEMENTS & UI FIXES
+====================================================
+
+1) PROPERTY INVENTORY BY SUBTYPE
+- Add widget showing counts by subtype:
+  • Single Family Residence
+  • Condominium
+  • Townhouse
+  • Multi-Family / Duplex
+  • Other residential subtypes
+- Exclude leasing/rentals.
+- Counts must align with CMA logic.
+
+----------------------------------------------------
+2) SYSTEM STATUS — MOVE TO BOTTOM + SYNC LOGS
+----------------------------------------------------
+- Move System Status to the VERY BOTTOM of the dashboard.
+- Display:
+  • Last data pulled from Repliers (date/time)
+  • Last successful sync
+  • Last attempted sync
+- Status must reflect real integration state.
+
+----------------------------------------------------
+3) QUICK ACTIONS — RIGHTMOST POSITION
+----------------------------------------------------
+- Move Quick Actions to the RIGHTMOST area.
+- Default order (left → right):
+  1) Search Properties (magnifying glass icon)
+  2) Create CMA
+  3) Sync Repliers Data
+
+----------------------------------------------------
+4) PROPERTY CARD — FLOATING CARD BEHAVIOR
+----------------------------------------------------
+Applies to ALL dashboard property cards.
+
+Requirements:
+- Clicking a property opens the SAME floating card/modal used across the app.
+- Image behavior:
+  • Auto-carousel every 3 seconds
+  • Manual navigation:
+    - Click left side → previous image
+    - Click right side → next image
+- No grey overlays.
+- If no images → show “No photos available”.
+- Include CTA: “View Full Details” linking to the internal property details page.
+
+----------------------------------------------------
+5) FLOATING CARD UI BUG FIX (CRITICAL)
+----------------------------------------------------
+Observed issues:
+- Floating card content is CUT OFF at the bottom.
+- Bugged toggle/control appears on the LOWER LEFT.
+
+Fix requirements:
+1) Layout & overflow
+- Correct max-height / overflow-y / padding so content is never clipped.
+- Card must scroll internally when content exceeds viewport.
+- Must work on desktop and smaller screens.
+
+2) Lower-left toggle bug
+- Identify the exact DOM element causing the stray toggle/control.
+- If unintended → remove it completely.
+- If intended → reposition so it is fully visible and does not overlap content.
+
+3) Verify no overlap with:
+- “View Full Details”
+- “Create CMA”
+- Property stats
+- Days on Market row
+
+----------------------------------------------------
+6) MARKET INSIGHTS — DAYS ON MARKET (DOM)
+----------------------------------------------------
+Enhance Market Insights with DOM analytics.
+
+Requirements:
+- Show DOM metrics for:
+  • Active
+  • Active Under Contract
+  • Sold / Closed
+
+- SOLD / CLOSED DOM FILTER RANGES (IMPORTANT):
+  • 0–30 days
+  • 0–60 days
+  • 0–90 days
+  • 0–120 days
+  • 0–150 days
+  • 0–180 days
+
+Calculations:
+- Sold / Closed DOM = CloseDate – ListDate
+- Active DOM = Today – ListDate
+- Under Contract DOM = Today – UnderContractDate
+
+Leasing / rental listings MUST be excluded from DOM AND from all underlying property pulls.
+
+----------------------------------------------------
+7) DASHBOARD CUSTOMIZATION (TEMPORARY)
+----------------------------------------------------
+- Allow users to move dashboard blocks/widgets.
+- Customization is TEMPORARY:
+  • Applies only during the current session.
+  • On refresh, logout, or return → revert to DEFAULT layout.
+- Clearly communicate this behavior in the UI.
+
+====================================================
+TESTING REQUIRED (MUST PASS)
+====================================================
+
+1) Verify NO rental pricing appears anywhere ($1,395–$2,200).
+2) Active / Under Contract / Sold pulls are rental-free.
+3) Counts and DOM metrics align with filtered data.
+4) Floating card:
+   - Not cut off
+   - No lower-left toggle bug
+   - Carousel works
+   - “View Full Details” works
+5) Dashboard customization resets as expected.
+
+====================================================
+FINAL REPORT REQUIRED
+====================================================
+
+Provide:
+- Endpoints updated for global rental exclusion.
+- Confirmation filtering applies to ALL property pulls.
+- Element/class removed or fixed for lower-left toggle bug.
+- Screenshots of corrected floating card and dashboard widgets.
+- Confirmation no CMA, IDX, or public pages were modified.

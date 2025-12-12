@@ -2772,14 +2772,25 @@ This email was sent by ${senderName} (${senderEmail}) via the MLS Grid IDX Platf
     }
   });
   
-  // Dashboard active properties carousel endpoint with personalization and fallback
+  // Helper to log rental filtering results
+  function logRentalFiltering(endpoint: string, beforeCount: number, afterCount: number, filteredProperties: any[]) {
+    const filteredCount = beforeCount - afterCount;
+    if (filteredCount > 0) {
+      const sampleAddresses = filteredProperties.slice(0, 3).map(p => p.unparsedAddress || p.address || 'Unknown').join(', ');
+      console.log(`[Rental Filter] ${endpoint}: Filtered ${filteredCount} rental listings. Samples: ${sampleAddresses}`);
+    }
+  }
+  
+  // Dashboard active properties carousel endpoint with personalization, fallback, and rental filtering
   app.get("/api/dashboard/active-properties", async (req, res) => {
     try {
       if (!repliersClient) {
-        return res.json({ properties: [], count: 0, personalized: false });
+        return res.json({ properties: [], count: 0, personalized: false, filteredRentals: 0 });
       }
       
-      const limit = parseInt(req.query.limit as string) || 15;
+      // Request extra listings to account for rental filtering
+      const requestedLimit = parseInt(req.query.limit as string) || 15;
+      const fetchLimit = requestedLimit + 20; // Fetch extra to filter
       const city = req.query.city as string | undefined;
       const minPrice = req.query.minPrice ? parseInt(req.query.minPrice as string) : undefined;
       const maxPrice = req.query.maxPrice ? parseInt(req.query.maxPrice as string) : undefined;
@@ -2790,7 +2801,7 @@ This email was sent by ${senderName} (${senderEmail}) via the MLS Grid IDX Platf
       // Build search params with optional personalization filters
       const searchParams: any = {
         status: 'A',
-        resultsPerPage: limit,
+        resultsPerPage: fetchLimit,
         sortBy: 'createdOnDesc',
       };
       
@@ -2801,32 +2812,47 @@ This email was sent by ${senderName} (${senderEmail}) via the MLS Grid IDX Platf
       
       // Fetch active listings from Repliers with personalization
       let result = await repliersClient.searchListings(searchParams);
-      let properties = result.listings.map(listing => repliersClient!.mapToStandardProperty(listing));
+      let allProperties = result.listings.map(listing => repliersClient!.mapToStandardProperty(listing));
+      
+      // GLOBAL RENTAL EXCLUSION - Filter out rental/leasing listings server-side
+      const beforeFilterCount = allProperties.length;
+      const rentalsRemoved = allProperties.filter(p => isLikelyRentalProperty(p));
+      let properties = filterOutRentalProperties(allProperties);
+      logRentalFiltering('/api/dashboard/active-properties', beforeFilterCount, properties.length, rentalsRemoved);
       
       // FALLBACK: If personalized search yields no/few results, fetch general listings
       if (hasPersonalization && properties.length < 5) {
         const fallbackParams: any = {
           status: 'A',
-          resultsPerPage: limit,
+          resultsPerPage: fetchLimit,
           sortBy: 'createdOnDesc',
         };
         const fallbackResult = await repliersClient.searchListings(fallbackParams);
-        const fallbackProperties = fallbackResult.listings.map(listing => repliersClient!.mapToStandardProperty(listing));
+        let fallbackProperties = fallbackResult.listings.map(listing => repliersClient!.mapToStandardProperty(listing));
+        
+        // Apply rental filtering to fallback results too
+        const fallbackRentals = fallbackProperties.filter(p => isLikelyRentalProperty(p));
+        fallbackProperties = filterOutRentalProperties(fallbackProperties);
+        logRentalFiltering('/api/dashboard/active-properties (fallback)', fallbackProperties.length + fallbackRentals.length, fallbackProperties.length, fallbackRentals);
         
         // Merge: personalized results first, then fill with general listings
         const seenIds = new Set(properties.map(p => p.listingId));
         for (const prop of fallbackProperties) {
-          if (!seenIds.has(prop.listingId) && properties.length < limit) {
+          if (!seenIds.has(prop.listingId) && properties.length < requestedLimit) {
             properties.push(prop);
             seenIds.add(prop.listingId);
           }
         }
       }
       
+      // Limit to requested count
+      properties = properties.slice(0, requestedLimit);
+      
       res.json({
         properties,
-        count: result.count,
-        personalized: hasPersonalization && result.count > 0
+        count: properties.length,
+        personalized: hasPersonalization && result.count > 0,
+        filteredRentals: rentalsRemoved.length
       });
     } catch (error: any) {
       console.error("Dashboard active properties error:", error.message);
@@ -2834,6 +2860,160 @@ This email was sent by ${senderName} (${senderEmail}) via the MLS Grid IDX Platf
     }
   });
 
+  // Track sync timestamps for system status (module-level for persistence)
+  const syncTimestamps = {
+    lastSyncAttempt: null as Date | null,
+    lastSuccessfulSync: null as Date | null,
+    lastDataPull: null as Date | null,
+  };
+  
+  // Property inventory by subtype endpoint (rental-filtered)
+  app.get("/api/dashboard/inventory-by-subtype", async (req, res) => {
+    try {
+      if (!repliersClient) {
+        return res.json({ subtypes: {}, total: 0 });
+      }
+      
+      // Fetch active properties with extra for filtering
+      const result = await repliersClient.searchListings({
+        status: 'A',
+        resultsPerPage: 200,
+      });
+      
+      let properties = result.listings.map(listing => repliersClient!.mapToStandardProperty(listing));
+      
+      // Apply rental filtering
+      const beforeCount = properties.length;
+      properties = filterOutRentalProperties(properties);
+      logRentalFiltering('/api/dashboard/inventory-by-subtype', beforeCount, properties.length, []);
+      
+      // Count by subtype
+      const subtypeCounts: Record<string, number> = {};
+      properties.forEach(p => {
+        const subtype = p.propertySubType || 'Other';
+        subtypeCounts[subtype] = (subtypeCounts[subtype] || 0) + 1;
+      });
+      
+      // Sort by count descending
+      const sortedSubtypes = Object.entries(subtypeCounts)
+        .sort((a, b) => b[1] - a[1])
+        .reduce((acc, [key, val]) => ({ ...acc, [key]: val }), {});
+      
+      res.json({
+        subtypes: sortedSubtypes,
+        total: properties.length
+      });
+    } catch (error: any) {
+      console.error("Inventory by subtype error:", error.message);
+      res.status(500).json({ error: "Failed to load inventory by subtype" });
+    }
+  });
+  
+  // Days on Market analytics endpoint (rental-filtered)
+  app.get("/api/dashboard/dom-analytics", async (req, res) => {
+    try {
+      const status = req.query.status as string || 'A'; // A, U, or Closed
+      const daysRange = parseInt(req.query.daysRange as string) || 0; // 0 = all, 30, 60, 90, etc.
+      
+      let properties: any[] = [];
+      
+      if (status === 'Closed' || status === 'S') {
+        // Get sold properties from database
+        const dbProps = await storage.searchProperties({ status: 'Closed', limit: 500 });
+        properties = filterOutRentalProperties(dbProps);
+        
+        // Calculate DOM for closed: CloseDate - ListDate
+        properties = properties.map(p => {
+          const listDate = p.listDate ? new Date(p.listDate) : null;
+          const closeDate = p.closeDate ? new Date(p.closeDate) : null;
+          let dom = p.daysOnMarket || 0;
+          if (listDate && closeDate) {
+            dom = Math.floor((closeDate.getTime() - listDate.getTime()) / (1000 * 60 * 60 * 24));
+          }
+          return { ...p, calculatedDom: dom };
+        });
+        
+        // Apply days range filter
+        if (daysRange > 0) {
+          properties = properties.filter(p => p.calculatedDom <= daysRange);
+        }
+      } else if (repliersClient) {
+        // Get active/under contract from Repliers
+        const result = await repliersClient.searchListings({
+          status: status,
+          resultsPerPage: 200,
+        });
+        properties = result.listings.map(listing => repliersClient!.mapToStandardProperty(listing));
+        properties = filterOutRentalProperties(properties);
+        
+        // Calculate DOM for active: Today - ListDate
+        const today = new Date();
+        properties = properties.map(p => {
+          const listDate = p.listDate ? new Date(p.listDate) : null;
+          let dom = p.daysOnMarket || 0;
+          if (listDate) {
+            dom = Math.floor((today.getTime() - listDate.getTime()) / (1000 * 60 * 60 * 24));
+          }
+          return { ...p, calculatedDom: dom };
+        });
+      }
+      
+      // Calculate DOM statistics
+      const domValues = properties.map(p => p.calculatedDom || p.daysOnMarket || 0).filter(d => d >= 0);
+      const avgDom = domValues.length > 0 ? Math.round(domValues.reduce((a, b) => a + b, 0) / domValues.length) : 0;
+      const medianDom = domValues.length > 0 ? domValues.sort((a, b) => a - b)[Math.floor(domValues.length / 2)] : 0;
+      const minDom = domValues.length > 0 ? Math.min(...domValues) : 0;
+      const maxDom = domValues.length > 0 ? Math.max(...domValues) : 0;
+      
+      // DOM distribution buckets
+      const distribution = {
+        '0-30': properties.filter(p => (p.calculatedDom || 0) <= 30).length,
+        '31-60': properties.filter(p => (p.calculatedDom || 0) > 30 && (p.calculatedDom || 0) <= 60).length,
+        '61-90': properties.filter(p => (p.calculatedDom || 0) > 60 && (p.calculatedDom || 0) <= 90).length,
+        '91-120': properties.filter(p => (p.calculatedDom || 0) > 90 && (p.calculatedDom || 0) <= 120).length,
+        '121-180': properties.filter(p => (p.calculatedDom || 0) > 120 && (p.calculatedDom || 0) <= 180).length,
+        '180+': properties.filter(p => (p.calculatedDom || 0) > 180).length,
+      };
+      
+      res.json({
+        status,
+        daysRange,
+        count: properties.length,
+        avgDom,
+        medianDom,
+        minDom,
+        maxDom,
+        distribution
+      });
+    } catch (error: any) {
+      console.error("DOM analytics error:", error.message);
+      res.status(500).json({ error: "Failed to load DOM analytics" });
+    }
+  });
+  
+  // System status with sync timestamps
+  app.get("/api/dashboard/system-status", async (req, res) => {
+    try {
+      const healthStatus = {
+        mlsGridConfigured: mlsGridClient !== null,
+        repliersConfigured: isRepliersConfigured(),
+        mapboxConfigured: isMapboxConfigured(),
+      };
+      
+      res.json({
+        ...healthStatus,
+        lastDataPull: syncTimestamps.lastDataPull?.toISOString() || null,
+        lastSuccessfulSync: syncTimestamps.lastSuccessfulSync?.toISOString() || null,
+        lastSyncAttempt: syncTimestamps.lastSyncAttempt?.toISOString() || null,
+        status: healthStatus.repliersConfigured ? 'Ready' : 'Setup Required',
+        timestamp: new Date().toISOString()
+      });
+    } catch (error: any) {
+      console.error("System status error:", error.message);
+      res.status(500).json({ error: "Failed to load system status" });
+    }
+  });
+  
   // Health check
   app.get("/api/health", (req, res) => {
     res.json({ 

@@ -210,6 +210,24 @@ function PropertyDetailModal({
 }) {
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   
+  // Reset image index when property changes
+  useEffect(() => {
+    setCurrentImageIndex(0);
+  }, [property?.id]);
+  
+  // Auto-carousel every 3 seconds
+  useEffect(() => {
+    if (!open || !property?.photos?.length || property.photos.length <= 1) return;
+    
+    const interval = setInterval(() => {
+      setCurrentImageIndex(prev => 
+        prev < (property.photos?.length || 1) - 1 ? prev + 1 : 0
+      );
+    }, 3000);
+    
+    return () => clearInterval(interval);
+  }, [open, property?.photos?.length, property?.id]);
+  
   if (!property) return null;
   
   const photos = property.photos || [];
@@ -220,11 +238,29 @@ function PropertyDetailModal({
   const pricePerSqft = property.listPrice && property.livingArea 
     ? Number(property.listPrice) / Number(property.livingArea) 
     : null;
+  
+  // Handle click on left/right side of image for navigation
+  const handleImageClick = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (photos.length <= 1) return;
+    const rect = e.currentTarget.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const isLeftSide = x < rect.width / 2;
+    
+    if (isLeftSide) {
+      setCurrentImageIndex(prev => prev > 0 ? prev - 1 : photos.length - 1);
+    } else {
+      setCurrentImageIndex(prev => prev < photos.length - 1 ? prev + 1 : 0);
+    }
+  };
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="max-w-3xl max-h-[90vh] overflow-hidden p-0">
-        <div className="relative aspect-[16/9] bg-muted">
+      <DialogContent className="max-w-3xl flex flex-col p-0" style={{ maxHeight: 'calc(100vh - 4rem)' }}>
+        {/* Image Section - Fixed Height */}
+        <div 
+          className="relative aspect-[16/9] bg-muted flex-shrink-0 cursor-pointer"
+          onClick={handleImageClick}
+        >
           {photos.length > 0 ? (
             <>
               <img 
@@ -233,32 +269,15 @@ function PropertyDetailModal({
                 className="w-full h-full object-cover"
               />
               {photos.length > 1 && (
-                <>
-                  <Button
-                    size="icon"
-                    variant="secondary"
-                    className="absolute left-2 top-1/2 -translate-y-1/2 opacity-80"
-                    onClick={() => setCurrentImageIndex(prev => prev > 0 ? prev - 1 : photos.length - 1)}
-                  >
-                    <ChevronLeft className="w-4 h-4" />
-                  </Button>
-                  <Button
-                    size="icon"
-                    variant="secondary"
-                    className="absolute right-2 top-1/2 -translate-y-1/2 opacity-80"
-                    onClick={() => setCurrentImageIndex(prev => prev < photos.length - 1 ? prev + 1 : 0)}
-                  >
-                    <ChevronRight className="w-4 h-4" />
-                  </Button>
-                  <div className="absolute bottom-2 left-1/2 -translate-x-1/2 bg-black/50 text-white text-xs px-2 py-1 rounded">
-                    {currentImageIndex + 1} / {photos.length}
-                  </div>
-                </>
+                <div className="absolute bottom-2 left-1/2 -translate-x-1/2 bg-black/50 text-white text-xs px-2 py-1 rounded">
+                  {currentImageIndex + 1} / {photos.length}
+                </div>
               )}
             </>
           ) : (
-            <div className="w-full h-full flex items-center justify-center text-muted-foreground">
-              <Home className="w-16 h-16" />
+            <div className="w-full h-full flex flex-col items-center justify-center text-muted-foreground">
+              <Home className="w-16 h-16 mb-2" />
+              <p className="text-sm">No photos available</p>
             </div>
           )}
           <div className="absolute top-4 right-4">
@@ -272,80 +291,79 @@ function PropertyDetailModal({
           </div>
         </div>
         
-        <ScrollArea className="max-h-[40vh]">
-          <div className="p-6 space-y-4">
-            <div className="flex items-start justify-between gap-4">
-              <div>
-                <h2 className="text-2xl font-bold">{address}</h2>
-                {property.city && (
-                  <p className="text-muted-foreground">
-                    {property.city}, {property.stateOrProvince || 'TX'} {property.postalCode}
-                  </p>
-                )}
-              </div>
-              <div className="text-right">
-                <p className="text-2xl font-bold text-primary">{formattedPrice}</p>
-                {pricePerSqft && (
-                  <p className="text-sm text-muted-foreground">${pricePerSqft.toFixed(0)}/sqft</p>
-                )}
-              </div>
-            </div>
-            
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              <div className="text-center p-3 bg-muted rounded-md">
-                <p className="text-2xl font-bold">{property.bedroomsTotal || 0}</p>
-                <p className="text-xs text-muted-foreground">Beds</p>
-              </div>
-              <div className="text-center p-3 bg-muted rounded-md">
-                <p className="text-2xl font-bold">{property.bathroomsTotalInteger || 0}</p>
-                <p className="text-xs text-muted-foreground">Baths</p>
-              </div>
-              <div className="text-center p-3 bg-muted rounded-md">
-                <p className="text-2xl font-bold">{property.livingArea ? Number(property.livingArea).toLocaleString() : 'N/A'}</p>
-                <p className="text-xs text-muted-foreground">Sq Ft</p>
-              </div>
-              <div className="text-center p-3 bg-muted rounded-md">
-                <p className="text-2xl font-bold">{property.yearBuilt || 'N/A'}</p>
-                <p className="text-xs text-muted-foreground">Year Built</p>
-              </div>
-            </div>
-            
-            <div className="flex flex-wrap gap-4 text-sm text-muted-foreground">
-              {property.daysOnMarket !== null && property.daysOnMarket !== undefined && (
-                <span className="flex items-center gap-1">
-                  <Calendar className="w-4 h-4" />
-                  {property.daysOnMarket} days on market
-                </span>
-              )}
-              {property.subdivisionName && (
-                <span className="flex items-center gap-1">
-                  <MapPin className="w-4 h-4" />
-                  {property.subdivisionName}
-                </span>
-              )}
-              {property.propertySubType && (
-                <span className="flex items-center gap-1">
-                  <Home className="w-4 h-4" />
-                  {property.propertySubType}
-                </span>
+        {/* Content Section - Scrollable */}
+        <div className="flex-1 overflow-y-auto p-6 space-y-4">
+          <div className="flex items-start justify-between gap-4 flex-wrap">
+            <div>
+              <h2 className="text-2xl font-bold">{address}</h2>
+              {property.city && (
+                <p className="text-muted-foreground">
+                  {property.city}, {property.stateOrProvince || 'TX'} {property.postalCode}
+                </p>
               )}
             </div>
-            
-            <div className="flex gap-2 pt-2">
-              <Link href={`/properties/${property.id}`}>
-                <Button data-testid="button-view-full-details">
-                  View Full Details
-                </Button>
-              </Link>
-              <Link href={`/cmas/new?property=${property.id}`}>
-                <Button variant="outline" data-testid="button-create-cma-from-property">
-                  <Plus className="w-4 h-4 mr-2" />
-                  Create CMA
-                </Button>
-              </Link>
+            <div className="text-right">
+              <p className="text-2xl font-bold text-primary">{formattedPrice}</p>
+              {pricePerSqft && (
+                <p className="text-sm text-muted-foreground">${pricePerSqft.toFixed(0)}/sqft</p>
+              )}
             </div>
           </div>
-        </ScrollArea>
+          
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div className="text-center p-3 bg-muted rounded-md">
+              <p className="text-2xl font-bold">{property.bedroomsTotal || 0}</p>
+              <p className="text-xs text-muted-foreground">Beds</p>
+            </div>
+            <div className="text-center p-3 bg-muted rounded-md">
+              <p className="text-2xl font-bold">{property.bathroomsTotalInteger || 0}</p>
+              <p className="text-xs text-muted-foreground">Baths</p>
+            </div>
+            <div className="text-center p-3 bg-muted rounded-md">
+              <p className="text-2xl font-bold">{property.livingArea ? Number(property.livingArea).toLocaleString() : 'N/A'}</p>
+              <p className="text-xs text-muted-foreground">Sq Ft</p>
+            </div>
+            <div className="text-center p-3 bg-muted rounded-md">
+              <p className="text-2xl font-bold">{property.yearBuilt || 'N/A'}</p>
+              <p className="text-xs text-muted-foreground">Year Built</p>
+            </div>
+          </div>
+          
+          <div className="flex flex-wrap gap-4 text-sm text-muted-foreground">
+            {property.daysOnMarket !== null && property.daysOnMarket !== undefined && (
+              <span className="flex items-center gap-1">
+                <Calendar className="w-4 h-4" />
+                {property.daysOnMarket} days on market
+              </span>
+            )}
+            {property.subdivisionName && (
+              <span className="flex items-center gap-1">
+                <MapPin className="w-4 h-4" />
+                {property.subdivisionName}
+              </span>
+            )}
+            {property.propertySubType && (
+              <span className="flex items-center gap-1">
+                <Home className="w-4 h-4" />
+                {property.propertySubType}
+              </span>
+            )}
+          </div>
+          
+          <div className="flex gap-2 pt-2 pb-4">
+            <Link href={`/properties/${property.id}`}>
+              <Button data-testid="button-view-full-details">
+                View Full Details
+              </Button>
+            </Link>
+            <Link href={`/cmas/new?property=${property.id}`}>
+              <Button variant="outline" data-testid="button-create-cma-from-property">
+                <Plus className="w-4 h-4 mr-2" />
+                Create CMA
+              </Button>
+            </Link>
+          </div>
+        </div>
       </DialogContent>
     </Dialog>
   );
@@ -358,14 +376,8 @@ export default function Dashboard() {
   const [propertyModalOpen, setPropertyModalOpen] = useState(false);
   const [configOpen, setConfigOpen] = useState(false);
   const [recentCmasOpen, setRecentCmasOpen] = useState(true);
-  const [config, setConfig] = useState<DashboardConfig>(() => {
-    const saved = localStorage.getItem('dashboard-config');
-    return saved ? JSON.parse(saved) : defaultConfig;
-  });
-  
-  useEffect(() => {
-    localStorage.setItem('dashboard-config', JSON.stringify(config));
-  }, [config]);
+  // Dashboard customization is TEMPORARY (session-only, resets on refresh)
+  const [config, setConfig] = useState<DashboardConfig>(defaultConfig);
   
   const { data: stats, isLoading: statsLoading } = useQuery<DashboardStats>({
     queryKey: ['/api/stats/dashboard'],
@@ -511,7 +523,13 @@ export default function Dashboard() {
       {configOpen && (
         <Card>
           <CardHeader className="pb-3">
-            <CardTitle className="text-lg">Dashboard Configuration</CardTitle>
+            <div className="flex items-center justify-between gap-2">
+              <CardTitle className="text-lg">Dashboard Configuration</CardTitle>
+              <Badge variant="secondary" className="text-xs">Session Only</Badge>
+            </div>
+            <p className="text-xs text-muted-foreground mt-1">
+              Customizations apply to this session only and reset on page refresh.
+            </p>
           </CardHeader>
           <CardContent>
             <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
@@ -681,9 +699,20 @@ export default function Dashboard() {
           <CardHeader>
             <CardTitle>Quick Actions</CardTitle>
           </CardHeader>
-          <CardContent className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <CardContent className="flex flex-wrap justify-end gap-4">
+            <Link href="/properties">
+              <Button data-testid="button-search-properties">
+                <Search className="w-4 h-4 mr-2" />
+                Search Properties
+              </Button>
+            </Link>
+            <Link href="/cmas/new">
+              <Button variant="outline" data-testid="button-create-cma">
+                <Plus className="w-4 h-4 mr-2" />
+                Create CMA
+              </Button>
+            </Link>
             <Button 
-              className="w-full" 
               variant="outline" 
               data-testid="button-sync-data"
               onClick={() => syncMutation.mutate()}
@@ -692,18 +721,6 @@ export default function Dashboard() {
               <RefreshCw className={`w-4 h-4 mr-2 ${syncMutation.isPending ? 'animate-spin' : ''}`} />
               {syncMutation.isPending ? 'Syncing...' : 'Sync Repliers Data'}
             </Button>
-            <Link href="/cmas/new">
-              <Button className="w-full" variant="outline" data-testid="button-create-cma">
-                <Plus className="w-4 h-4 mr-2" />
-                Create CMA
-              </Button>
-            </Link>
-            <Link href="/properties">
-              <Button className="w-full" data-testid="button-search-properties">
-                <Search className="w-4 h-4 mr-2" />
-                Search Properties
-              </Button>
-            </Link>
           </CardContent>
         </Card>
       )}
