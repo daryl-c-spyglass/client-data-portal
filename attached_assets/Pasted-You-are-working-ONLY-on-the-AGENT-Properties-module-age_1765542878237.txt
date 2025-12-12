@@ -1,0 +1,91 @@
+You are working ONLY on the AGENT “Properties” module (agent-facing property search),
+NOT CMA pages, NOT IDX/public pages.
+
+Data source for this Properties module must be clearly indicated and consistent (Repliers vs MLS Grid).
+Do not show conflicting labels or counts.
+
+====================================================
+1) FIX/REMOVE “65,649 properties available in MLS Grid” HEADER COUNT
+====================================================
+
+Problem:
+- Under the “Properties” header it currently says:
+  “65,649 properties available in MLS Grid”
+- But the UI also shows Data Source: Repliers API.
+This is confusing and may be inaccurate.
+
+Requirements:
+1) Determine what this “65,649” number represents:
+   - Is it MLS Grid inventory? Repliers inventory? Cached total? Hardcoded?
+2) Make the header count accurate and ALWAYS aligned with the active data source:
+   - If Data Source = Repliers API, header must NOT reference MLS Grid.
+   - If the count is not guaranteed accurate on refresh, remove it entirely.
+
+3) If you keep the header count, it must:
+   - Refresh dynamically when data is refreshed
+   - Match the same inventory universe used by the Properties module
+   - Show correct data source label:
+     Example:
+     “XX,XXX properties available in Repliers”
+     OR “XX,XXX properties available (Data Source: Repliers)”
+
+4) Include the inventory summaries directly under the header (or replace the MLS Grid line):
+   - Inventory by Status (counts)
+   - Inventory by Property Subtype (counts)
+   These must reflect the same dataset used for results.
+
+Testing:
+- Refresh the page / trigger data refresh.
+- Verify the header count and inventories update correctly and never mention MLS Grid if using Repliers.
+
+====================================================
+2) BARTON HILLS SUBDIVISION RESULTS STILL INACCURATE — INVESTIGATE & FIX
+====================================================
+
+Problem:
+- Searching Subdivision “Barton Hills” still returns incorrect results.
+
+Requirements:
+1) Reproduce in Properties module:
+   - Set Subdivision = “Barton Hills”
+   - Test with:
+     • Active only
+     • Under Contract only
+     • Closed only (with date range if required)
+2) Identify the exact root cause:
+   - Wrong field used for subdivision filtering (Neighborhood vs Subdivision vs Area)
+   - Incorrect matching logic (too broad partial match pulling unrelated areas)
+   - UI sending incorrect query parameter name/value
+   - Backend combining filters incorrectly
+
+3) Fix subdivision search logic:
+   - Use the correct Repliers subdivision field(s) for filtering.
+   - Support common variations without pulling unrelated records:
+     • “Barton Hills”
+     • “Barton Hills West”
+     • “Barton Hills East”
+   - If you use partial matching:
+     - Restrict match to subdivision fields only
+     - Avoid matching across neighborhood/city/area fields
+   - If exact match is required:
+     - Use normalization (case-insensitive, trim spaces) but still subdivision-only.
+
+4) Add diagnostics (server-side):
+   - Log the final request query sent to Repliers for Barton Hills
+   - Log which field is used for subdivision filtering
+   - Log result counts before and after filtering
+
+Testing:
+- Search Barton Hills and verify:
+  - Returned properties show subdivision values that truly match Barton Hills (or its intended variants).
+  - Cross-check at least 5 results by opening property detail and confirming subdivision field.
+
+====================================================
+FINAL REPORT REQUIRED
+====================================================
+
+Provide:
+1) What the “65,649 properties available in MLS Grid” value was sourced from and why it was inaccurate/confusing.
+2) Whether you removed it or replaced it, and how the new count is computed and refreshed.
+3) Root cause of Barton Hills inaccuracy and exact fix applied (fields + matching logic).
+4) Screenshots of the updated Properties header + correct Barton Hills results.

@@ -205,11 +205,6 @@ export default function Properties() {
     }
   }, [searchString]); // Re-run when URL changes
 
-  // Fetch total property count
-  const { data: countData } = useQuery<{ count: number }>({
-    queryKey: ['/api/properties/count'],
-  });
-  const totalCount = countData?.count ?? 0;
 
   // Fetch properties with search criteria if available
   // Uses unified search API: Repliers for active, HomeReview/DB for closed
@@ -295,9 +290,9 @@ export default function Properties() {
         <div>
           <h1 className="text-3xl font-bold mb-2" data-testid="text-properties-title">Properties</h1>
           <p className="text-muted-foreground">
-            {totalCount > 0 
-              ? `${totalCount.toLocaleString()} properties available in MLS Grid`
-              : 'Search and browse MLS Grid listings'
+            {searchResult 
+              ? `${searchResult.count.toLocaleString()} matching properties from ${searchResult.dataSource}`
+              : 'Search and browse property listings'
             }
           </p>
         </div>

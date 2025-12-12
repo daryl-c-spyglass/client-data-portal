@@ -748,22 +748,44 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
         if (subdivision) {
           const subdivisionLower = subdivision.toLowerCase().trim();
+          const searchTerms = subdivisionLower.split(/\s+/); // Split "Barton Hills" into ["barton", "hills"]
           const beforeCount = filtered.length;
           
-          filtered = filtered.filter(p => {
+          // Log the search query for debugging
+          console.log(`🔍 [Subdivision Filter] Searching for: "${subdivision}"`);
+          
+          filtered = filtered.filter((p: any) => {
             const propSubdiv = (p.subdivision || '').toLowerCase().trim();
-            // Match if subdivision contains the search term OR search term contains the subdivision
-            // This handles both "Barton Hills" matching "Barton Hills West" and vice versa
-            return propSubdiv.includes(subdivisionLower) || subdivisionLower.includes(propSubdiv);
+            const propSubdivName = (p.subdivisionName || '').toLowerCase().trim();
+            
+            // Stricter matching logic:
+            // 1. Exact match (case-insensitive)
+            // 2. Property subdivision STARTS WITH search term (e.g., "Barton Hills" matches "Barton Hills West")
+            // 3. All search term words appear in the subdivision (e.g., "Barton Hills" matches "Barton Hills Section 2")
+            
+            const exactMatch = propSubdiv === subdivisionLower || propSubdivName === subdivisionLower;
+            const startsWithMatch = propSubdiv.startsWith(subdivisionLower) || propSubdivName.startsWith(subdivisionLower);
+            const allWordsMatch = searchTerms.every(term => 
+              propSubdiv.includes(term) || propSubdivName.includes(term)
+            );
+            
+            // Reject partial matches that don't contain ALL search terms
+            // This prevents "Barton Creek" from matching "Barton Hills"
+            const hasAllTerms = searchTerms.length > 1 
+              ? searchTerms.every(term => propSubdiv.includes(term) || propSubdivName.includes(term))
+              : propSubdiv.includes(subdivisionLower) || propSubdivName.includes(subdivisionLower);
+            
+            return exactMatch || startsWithMatch || (allWordsMatch && hasAllTerms);
           });
           
           // Log subdivision filtering results
-          console.log(`   - Subdivision filter: "${subdivision}" removed ${beforeCount - filtered.length} properties (${beforeCount} → ${filtered.length})`);
+          console.log(`   - Subdivision filter: "${subdivision}" kept ${filtered.length} of ${beforeCount} properties`);
           
-          // Log sample of filtered results for debugging
-          if (filtered.length > 0 && filtered.length <= 5) {
-            filtered.forEach((p: any) => {
-              console.log(`     → ${p.address} - Subdivision: "${p.subdivision || 'N/A'}"`);
+          // Log sample of filtered and rejected results for debugging
+          if (beforeCount > 0) {
+            console.log(`   - Sample kept properties:`);
+            filtered.slice(0, 3).forEach((p: any) => {
+              console.log(`     ✓ ${p.address} - Subdivision: "${p.subdivision || 'N/A'}"`);
             });
           }
         }
