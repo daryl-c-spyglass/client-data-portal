@@ -384,7 +384,7 @@ export function CMAReport({
           </TabsTrigger>
           <TabsTrigger value="listings" data-testid="tab-listings" className="flex items-center gap-1">
             <MapIcon className="w-4 h-4" />
-            Listings & Map
+            Listings
             <Tooltip>
               <TooltipTrigger asChild onClick={(e) => e.stopPropagation()}>
                 <Info className="w-3 h-3 text-muted-foreground cursor-help" />
@@ -681,28 +681,7 @@ export function CMAReport({
                 );
               })()}
               
-              {/* Price Distribution Chart */}
-              <Card>
-                <CardHeader>
-                  <CardTitle>Price Distribution</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="h-[300px]">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <BarChart data={priceRangeData}>
-                        <CartesianGrid strokeDasharray="3 3" />
-                        <XAxis dataKey="name" />
-                        <YAxis />
-                        <RechartsTooltip formatter={(value) => `$${Number(value).toLocaleString()}`} />
-                        <Legend />
-                        <Bar dataKey="value" fill="hsl(var(--primary))" />
-                      </BarChart>
-                    </ResponsiveContainer>
-                  </div>
-                </CardContent>
-              </Card>
-
-              {/* Properties List at Bottom - Sorted by price low→high */}
+              {/* Properties List - Sorted by price low→high */}
               <Card>
                 <CardHeader className="pb-2">
                   <CardTitle className="text-base">
@@ -836,7 +815,12 @@ export function CMAReport({
                 </CardHeader>
                 <CardContent>
                   {(() => {
-                    const propertiesWithCoords = allProperties.filter(
+                    // Sync map with filter: use filtered properties based on activeListingTab
+                    const filteredForMap = activeListingTab === 'all' ? allProperties :
+                      activeListingTab === 'sold' ? soldProperties :
+                      activeListingTab === 'under-contract' ? underContractProperties : activeProperties;
+                    
+                    const propertiesWithCoords = filteredForMap.filter(
                       p => p.latitude && p.longitude && 
                       typeof p.latitude === 'number' && typeof p.longitude === 'number' &&
                       !isNaN(p.latitude) && !isNaN(p.longitude)
@@ -864,6 +848,7 @@ export function CMAReport({
                     return (
                       <div className="h-[400px] rounded-lg overflow-hidden border">
                         <MapContainer
+                          key={activeListingTab}
                           center={center}
                           zoom={13}
                           style={{ height: '100%', width: '100%' }}
@@ -910,6 +895,27 @@ export function CMAReport({
               </Card>
             </div>
           </div>
+          
+          {/* Price Distribution - moved below Property Locations */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Price Distribution</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="h-[300px]">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={priceRangeData}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="name" />
+                    <YAxis />
+                    <RechartsTooltip formatter={(value) => `$${Number(value).toLocaleString()}`} />
+                    <Legend />
+                    <Bar dataKey="value" fill="hsl(var(--primary))" />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            </CardContent>
+          </Card>
         </TabsContent>
 
         {/* Timeline Tab */}
@@ -1618,80 +1624,6 @@ export function CMAReport({
                       </div>
                     </div>
                   </>
-                );
-              })()}
-            </CardContent>
-          </Card>
-
-          {/* Mini Property Map in Market Stats */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <MapIcon className="w-5 h-5" />
-                Property Locations Overview
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              {(() => {
-                const propertiesWithCoords = allProperties.filter(
-                  p => p.latitude && p.longitude && 
-                  typeof p.latitude === 'number' && typeof p.longitude === 'number' &&
-                  !isNaN(p.latitude) && !isNaN(p.longitude)
-                );
-                
-                if (propertiesWithCoords.length === 0) {
-                  return (
-                    <div className="h-[300px] flex items-center justify-center bg-muted/10 rounded-lg border border-dashed">
-                      <div className="text-center text-muted-foreground">
-                        <MapIcon className="w-10 h-10 mx-auto mb-2 opacity-50" />
-                        <p>No location data available</p>
-                      </div>
-                    </div>
-                  );
-                }
-                
-                const positions: [number, number][] = propertiesWithCoords.map(
-                  p => [p.latitude as number, p.longitude as number]
-                );
-                const center: [number, number] = [
-                  positions.reduce((sum, pos) => sum + pos[0], 0) / positions.length,
-                  positions.reduce((sum, pos) => sum + pos[1], 0) / positions.length
-                ];
-                
-                return (
-                  <div className="h-[300px] rounded-lg overflow-hidden border">
-                    <MapContainer
-                      center={center}
-                      zoom={12}
-                      style={{ height: '100%', width: '100%' }}
-                      scrollWheelZoom={false}
-                    >
-                      <TileLayer
-                        attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-                        url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-                      />
-                      <FitBounds positions={positions} />
-                      {propertiesWithCoords.map((property) => {
-                        const status = property.standardStatus || 'Active';
-                        return (
-                          <Marker
-                            key={property.listingId}
-                            position={[property.latitude as number, property.longitude as number]}
-                            icon={getCompIcon(status)}
-                          >
-                            <Popup>
-                              <div className="text-sm">
-                                <p className="font-semibold">{property.unparsedAddress}</p>
-                                <p className="text-primary font-bold">
-                                  ${(property.closePrice || property.listPrice || 0).toLocaleString()}
-                                </p>
-                              </div>
-                            </Popup>
-                          </Marker>
-                        );
-                      })}
-                    </MapContainer>
-                  </div>
                 );
               })()}
             </CardContent>

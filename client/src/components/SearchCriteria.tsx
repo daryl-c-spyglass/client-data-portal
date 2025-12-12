@@ -6,7 +6,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Switch } from "@/components/ui/switch";
-import { CalendarIcon, Search, X, Send, FileBarChart2 } from "lucide-react";
+import { CalendarIcon, Search, X } from "lucide-react";
 import { format } from "date-fns";
 import type { SearchCriteria } from "@shared/schema";
 
@@ -147,12 +147,9 @@ function AutocompleteInput({ id, placeholder, values, onChange, apiEndpoint, tes
 interface SearchCriteriaProps {
   onSearch: (criteria: SearchCriteria) => void;
   initialCriteria?: Partial<SearchCriteria>;
-  selectedCount?: number;
-  onSendProperties?: () => void;
-  onQuickCMA?: () => void;
 }
 
-export function SearchCriteriaForm({ onSearch, initialCriteria = {}, selectedCount = 0, onSendProperties, onQuickCMA }: SearchCriteriaProps) {
+export function SearchCriteriaForm({ onSearch, initialCriteria = {} }: SearchCriteriaProps) {
   const [criteria, setCriteria] = useState<Partial<SearchCriteria>>(initialCriteria);
   
   const updateCriteria = (key: string, value: any) => {
@@ -501,30 +498,6 @@ export function SearchCriteriaForm({ onSearch, initialCriteria = {}, selectedCou
           <Search className="w-4 h-4 mr-2" />
           Search Properties
         </Button>
-        {onSendProperties && (
-          <Button 
-            type="button"
-            disabled={selectedCount === 0}
-            onClick={onSendProperties}
-            className="bg-orange-500 text-white hover:bg-orange-600 disabled:opacity-50"
-            data-testid="button-send-properties"
-          >
-            <Send className="w-4 h-4 mr-2" />
-            Send Properties {selectedCount > 0 && `(${selectedCount})`}
-          </Button>
-        )}
-        {onQuickCMA && (
-          <Button 
-            type="button"
-            disabled={selectedCount === 0}
-            onClick={onQuickCMA}
-            className="bg-orange-500 text-white hover:bg-orange-600 disabled:opacity-50"
-            data-testid="button-quick-cma"
-          >
-            <FileBarChart2 className="w-4 h-4 mr-2" />
-            Quick CMA {selectedCount > 0 && `(${selectedCount})`}
-          </Button>
-        )}
       </div>
     </form>
   );

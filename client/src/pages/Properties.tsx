@@ -314,43 +314,6 @@ export default function Properties() {
     console.log("Add to cart:", property);
   };
 
-  // Get selected properties data for floating actions
-  const selectedProperties = useMemo(() => {
-    return properties.filter(p => selectedIds.has(p.id));
-  }, [properties, selectedIds]);
-
-  // Handle Send Properties to Seller Updates
-  const handleSendProperties = () => {
-    if (selectedProperties.length === 0) return;
-    
-    // Store selected properties in sessionStorage for Seller Updates
-    sessionStorage.setItem('propertiesForSellerUpdate', JSON.stringify(
-      selectedProperties.map(p => ({
-        id: p.id,
-        listingId: p.listingId,
-        unparsedAddress: p.unparsedAddress,
-        city: p.city,
-        stateOrProvince: p.stateOrProvince,
-        listPrice: p.listPrice,
-        bedroomsTotal: p.bedroomsTotal,
-        bathroomsTotalInteger: p.bathroomsTotalInteger,
-        livingArea: p.livingArea,
-        standardStatus: p.standardStatus,
-        photos: (p as any).photos,
-      }))
-    ));
-    navigate('/seller-updates/new?fromProperties=true');
-  };
-
-  // Handle Quick CMA - pass properties to CMA builder
-  const handleQuickCMA = () => {
-    if (selectedProperties.length === 0) return;
-    
-    // Store selected properties in sessionStorage for CMA builder
-    sessionStorage.setItem('propertiesForCMA', JSON.stringify(selectedProperties));
-    navigate('/cmas/new?fromProperties=true');
-  };
-
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between flex-wrap gap-2">
@@ -614,9 +577,6 @@ export default function Properties() {
           <SearchCriteriaForm 
             onSearch={handleSearch} 
             initialCriteria={searchCriteria || {}} 
-            selectedCount={selectedIds.size}
-            onSendProperties={handleSendProperties}
-            onQuickCMA={handleQuickCMA}
           />
         </TabsContent>
 

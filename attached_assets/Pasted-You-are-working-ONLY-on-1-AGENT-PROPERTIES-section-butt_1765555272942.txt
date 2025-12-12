@@ -1,0 +1,150 @@
+You are working ONLY on:
+1) AGENT PROPERTIES section (button removal)
+2) CMA RESULTS section (Listings, Map sync, layout)
+3) MARKET STATS section (remove specific block)
+4) PRINT PDF rendering/layout (make it document-like, not screenshot-like)
+NOT IDX/public pages.
+
+Data source: Repliers. Leasing/rentals excluded globally.
+Implement changes one-by-one and test each.
+
+====================================================
+A) PROPERTIES SECTION — REMOVE BUTTONS
+====================================================
+
+Requirement:
+- Remove the “Send Properties” button.
+- Remove the “Quick CMA” button.
+- Ensure layout spacing remains clean (no empty gaps or misalignment).
+
+Testing:
+- Load Properties page and confirm both buttons are gone and UI looks clean.
+
+====================================================
+B) CMA RESULTS — “LISTINGS” ONLY (NO “LISTINGS & MAP” TAB TITLE)
+====================================================
+
+Requirement:
+- In CMA Results navigation, remove/rename “Listings & Map”.
+- Keep only a single tab/section named: “Listings”.
+- Inside “Listings”, still show:
+  - Listings list
+  - Property Location map (embedded in the Listings page)
+But DO NOT label the tab as “Listings & Map”.
+
+Testing:
+- Open CMA Results and confirm tab label is “Listings” only.
+
+====================================================
+C) LISTINGS FILTER MUST SYNC WITH PROPERTY LOCATION MAP
+====================================================
+
+Problem:
+- Filter pills/tabs: All, Sold, Under Contract, Active.
+Map must reflect the same filtered subset.
+
+Requirements:
+1) When user changes the filter:
+   - All (N) → map shows all N properties
+   - Sold (N) → map shows only sold properties
+   - Under Contract (N) → map shows only UC properties
+   - Active (N) → map shows only active properties
+2) This must sync in real-time with NO stale markers.
+3) Counts (N) must reflect the same filtered dataset.
+4) Map should refit bounds to the filtered markers automatically.
+
+Testing:
+- Use a CMA with mixed statuses:
+  - Click All → confirm all markers show
+  - Click Sold → confirm only sold markers show
+  - Click Under Contract → confirm only UC markers show
+  - Click Active → confirm only active markers show
+
+====================================================
+D) PROPERTY LOCATION MARKERS — MATCH MARKET STATS EMOJI COLORS
+====================================================
+
+Requirement:
+- On Listings → Property Location map:
+  - Copy the SAME emoji marker styling/colors already used in Market Stats.
+  - Use the same house emoji + the same color variation per status.
+- Ensure consistency between:
+  - Listings Property Location map
+  - Market Stats map markers (existing behavior)
+
+Testing:
+- Compare Listings map vs Market Stats map:
+  - Status colors match exactly.
+
+====================================================
+E) MOVE “PRICE DISTRIBUTION” BELOW “PROPERTY LOCATION”
+====================================================
+
+Requirement:
+- In the Listings section, reorder the blocks so:
+  1) Listings list + Property Location map (top)
+  2) Price Distribution (below Property Location)
+
+Testing:
+- Open Listings section and confirm Price Distribution appears below map.
+
+====================================================
+F) MARKET STATS — REMOVE “PROPERTY LOCATIONS OVERVIEW” BELOW PRICE TREND ANALYSIS
+====================================================
+
+Requirement:
+- In Market Stats section:
+  - Remove the “Property Locations Overview” block that appears below “Price Trend Analysis”.
+- Do NOT remove any other Market Stats features.
+
+Testing:
+- Open Market Stats and confirm that block is removed and layout remains clean.
+
+====================================================
+G) PRINT PDF — FIX CUT-OFF + REMOVE GREY LINE + MAKE IT DOCUMENT-LIKE
+====================================================
+
+Problems:
+- PDF content is cut off.
+- A grey vertical line appears on the right (looks like a cursor/scrollbar).
+- PDF looks like a screenshot instead of a document.
+
+Requirements:
+1) Fix PDF layout so it renders like a proper document:
+   - Use print CSS (page size, margins, font rendering).
+   - Avoid screenshot-style capture artifacts.
+   - Ensure consistent spacing and readable typography.
+2) Remove any scrollbars/cursor lines from the PDF output:
+   - Ensure overflow/scroll containers do not render scrollbars.
+   - Remove any “fake cursor” or right-side overlay in print mode.
+3) Fix cut-off:
+   - Ensure all sections flow across pages naturally.
+   - Add page breaks where needed.
+   - No clipped panels, no hidden content.
+4) Validate the PDF output on:
+   - Chrome print
+   - any server-side PDF generator used (if applicable)
+
+Testing:
+- Generate PDF for a CMA with multiple sections.
+- Confirm:
+  - No cut-off content
+  - No grey right-side line
+  - Looks like a formatted document (not a screenshot)
+  - Multi-page layout works correctly
+
+====================================================
+FINAL REPORT REQUIRED
+====================================================
+
+Provide screenshots/proof for:
+1) Properties page without Send Properties / Quick CMA buttons
+2) CMA Results “Listings” only tab label
+3) Filter syncing with map markers (All vs Sold vs UC vs Active)
+4) Property Location marker colors matching Market Stats
+5) Price Distribution moved below Property Location
+6) Market Stats: Property Locations Overview removed
+7) PDF before/after showing:
+   - grey line removed
+   - no cut-off
+   - document-like formatting

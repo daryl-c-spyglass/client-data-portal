@@ -287,17 +287,68 @@
   }
 }
 
-/* Print Styles for CMA Reports - Scoped to .cma-print wrapper */
+/* Print Styles for CMA Reports - Document-like PDF output */
 @media print {
-  /* Hide sidebar and navigation globally when printing */
-  [data-sidebar],
-  [data-testid="button-sidebar-toggle"] {
-    display: none !important;
+  /* Page setup for document-like output */
+  @page {
+    size: letter;
+    margin: 0.75in 0.5in;
   }
   
-  /* CMA Report-specific print styles */
+  /* Reset entire page for print - force document mode */
+  html, body {
+    background: white !important;
+    color: black !important;
+    font-size: 11pt !important;
+    line-height: 1.4 !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+    width: 100% !important;
+    height: auto !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    overflow: visible !important;
+  }
+  
+  /* REMOVE GREY VERTICAL LINE - Hide all scrollbars and overflow artifacts */
+  *::-webkit-scrollbar {
+    display: none !important;
+    width: 0 !important;
+    height: 0 !important;
+  }
+  
+  * {
+    scrollbar-width: none !important;
+    -ms-overflow-style: none !important;
+  }
+  
+  /* Hide sidebar and ALL navigation elements */
+  [data-sidebar],
+  [data-testid="button-sidebar-toggle"],
+  header,
+  nav,
+  aside {
+    display: none !important;
+    visibility: hidden !important;
+    width: 0 !important;
+    height: 0 !important;
+    overflow: hidden !important;
+  }
+  
+  /* CMA Report container - full width document layout */
   .cma-print {
-    /* Show all tab content */
+    width: 100% !important;
+    max-width: 100% !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    overflow: visible !important;
+    height: auto !important;
+    max-height: none !important;
+    position: relative !important;
+    left: 0 !important;
+    right: 0 !important;
+    
+    /* Show all tab content as document sections */
     [role="tablist"] {
       display: none !important;
     }
@@ -309,127 +360,174 @@
       visibility: visible !important;
       height: auto !important;
       overflow: visible !important;
-      margin-bottom: 2rem !important;
+      margin-bottom: 1.5rem !important;
+      page-break-inside: auto;
     }
   }
   
-  /* Hide CMA action buttons and banners when printing */
+  /* Hide action buttons in print mode */
   .cma-print [data-testid="button-save-send"],
   .cma-print [data-testid="button-public-link"],
   .cma-print [data-testid="button-print"],
   .cma-print [data-testid="button-modify-search"],
   .cma-print [data-testid="button-modify-stats"],
   .cma-print [data-testid="button-notes"],
-  .cma-print .print\\:hidden {
+  .cma-print .print\\:hidden,
+  .print\\:hidden {
     display: none !important;
   }
   
-  /* Force white background for print */
-  body {
-    background: white !important;
-  }
-  
-  /* CMA Cards print-friendly */
-  .cma-print .card {
+  /* Cards - Document-style with proper page breaks */
+  .cma-print .card,
+  .cma-print [class*="Card"] {
     break-inside: avoid;
     page-break-inside: avoid;
-    border: 1px solid #e5e7eb !important;
-    margin-bottom: 1rem !important;
+    border: 1px solid #d1d5db !important;
+    margin-bottom: 0.75rem !important;
+    box-shadow: none !important;
+    background: white !important;
+    overflow: visible !important;
   }
   
-  /* CMA Tables print-friendly */
+  /* Tables - Clean document formatting */
   .cma-print table {
     border-collapse: collapse;
     width: 100%;
+    font-size: 10pt;
+    page-break-inside: auto;
+  }
+  
+  .cma-print tr {
+    page-break-inside: avoid;
+    break-inside: avoid;
   }
   
   .cma-print th,
   .cma-print td {
-    border: 1px solid #e5e7eb !important;
-    padding: 0.5rem !important;
+    border: 1px solid #d1d5db !important;
+    padding: 0.4rem 0.5rem !important;
     text-align: left;
   }
   
-  /* Hide ALL property images in print mode - NO images in PDF output */
-  .cma-print img {
+  .cma-print th {
+    background-color: #f3f4f6 !important;
+    font-weight: 600;
+  }
+  
+  /* Hide property images but show charts */
+  .cma-print img:not(.recharts-surface):not([class*="chart"]) {
     display: none !important;
     visibility: hidden !important;
   }
   
-  /* Hide all image containers in property cards */
-  .cma-print [data-testid^="listing-card-"] img,
-  .cma-print [data-testid^="card-property-"] img,
-  .cma-print [data-testid^="home-avg-card-"] img,
-  .cma-print [data-testid^="market-stats-card-"] img {
-    display: none !important;
-    visibility: hidden !important;
-  }
-  
-  /* Hide image wrapper divs that contain property photos */
-  .cma-print .property-image,
-  .cma-print .property-thumbnail,
-  .cma-print [class*="property-image"],
-  .cma-print [class*="thumbnail"] {
-    display: none !important;
-  }
-  
-  /* Hide "No photos available" placeholders in print mode */
-  .cma-print [data-testid^="listing-card-"] > div:first-child:has(svg),
-  .cma-print [data-testid^="card-property-"] > div:first-child:has(svg),
-  .cma-print [data-testid^="home-avg-card-"] > div:first-child:has(svg) {
-    display: none !important;
-  }
-  
-  /* Show charts and other non-property images */
+  /* Ensure charts and SVGs render properly */
   .cma-print .recharts-wrapper,
-  .cma-print svg {
+  .cma-print svg:not(.lucide) {
     display: block !important;
-  }
-  
-  /* CMA Charts render properly */
-  .cma-print .recharts-wrapper {
+    overflow: visible !important;
     page-break-inside: avoid;
+    break-inside: avoid;
   }
   
-  /* Remove shadows in CMA reports */
+  /* Hide Leaflet maps in print - they don't render well */
+  .cma-print .leaflet-container,
+  .cma-print [class*="MapContainer"] {
+    display: none !important;
+  }
+  
+  /* Remove all shadows and effects */
   .cma-print * {
     box-shadow: none !important;
+    text-shadow: none !important;
   }
   
-  /* Allow multi-page printing - remove any page height restrictions */
-  @page {
-    size: letter;
-    margin: 0.5in;
+  /* Grid layouts should stack vertically in print */
+  .cma-print .lg\\:grid-cols-2,
+  .cma-print .grid-cols-2 {
+    grid-template-columns: 1fr !important;
   }
   
-  /* Ensure content flows across multiple pages */
-  .cma-print {
+  /* Fix content cut-off - ensure all containers are visible */
+  .cma-print > *,
+  .cma-print [class*="Content"],
+  .cma-print [class*="container"] {
     overflow: visible !important;
     height: auto !important;
     max-height: none !important;
   }
   
-  /* Page breaks for different sections */
-  .cma-print [data-testid="tab-market-stats"],
-  .cma-print [role="tabpanel"] > .space-y-6 > .card:nth-child(n+3) {
-    page-break-before: auto;
+  /* Sticky elements should be static in print */
+  .cma-print .sticky,
+  .cma-print [class*="sticky"] {
+    position: static !important;
   }
   
-  /* CMA Market Review in print - ensure it's fully visible and doesn't break */
+  /* Typography for document look */
+  .cma-print h1, .cma-print h2, .cma-print h3, .cma-print h4, .cma-print h5 {
+    page-break-after: avoid;
+    break-after: avoid;
+    color: #111827 !important;
+  }
+  
+  .cma-print p, .cma-print span {
+    orphans: 3;
+    widows: 3;
+  }
+  
+  /* Section headers with proper spacing */
+  .cma-print [role="tabpanel"]:not(:first-child)::before {
+    content: "";
+    display: block;
+    page-break-before: auto;
+    margin-top: 1rem;
+  }
+  
+  /* Property list items - compact document format */
+  .cma-print [data-testid^="listing-card-"],
+  .cma-print [data-testid^="card-property-"] {
+    page-break-inside: avoid;
+    break-inside: avoid;
+    border: 1px solid #e5e7eb !important;
+    padding: 0.5rem !important;
+    margin-bottom: 0.5rem !important;
+  }
+  
+  /* Hide image placeholders */
+  .cma-print [data-testid^="listing-card-"] > div:first-child,
+  .cma-print [data-testid^="card-property-"] > div:first-child {
+    display: none !important;
+  }
+  
+  /* Ensure proper widths - no overflow */
+  .cma-print,
+  .cma-print * {
+    max-width: 100% !important;
+  }
+  
+  /* CMA Market Review section */
   .cma-print .print-cma-market-review {
     display: block !important;
     page-break-inside: avoid;
     break-inside: avoid;
-    margin-top: 1rem !important;
-    border: 1px solid #e5e7eb !important;
+    margin-top: 0.75rem !important;
+    border: 1px solid #d1d5db !important;
+    background: #fafafa !important;
   }
   
-  /* Ensure the CMA Market Review content renders with proper colors in print */
+  /* Color adjustment for backgrounds */
   .cma-print .print-cma-market-review h4,
   .cma-print .print-cma-market-review p,
-  .cma-print .print-cma-market-review span {
+  .cma-print .print-cma-market-review span,
+  .cma-print [class*="bg-"] {
     -webkit-print-color-adjust: exact !important;
     print-color-adjust: exact !important;
     color-adjust: exact !important;
+  }
+  
+  /* Main content wrapper - remove any flex/grid constraints */
+  .cma-print .flex-1,
+  .cma-print .flex {
+    display: block !important;
+    width: 100% !important;
   }
 }
