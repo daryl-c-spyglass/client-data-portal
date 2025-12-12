@@ -6,8 +6,15 @@ This project is a professional real estate IDX (Internet Data Exchange) platform
 
 ## Recent Changes (Dec 12, 2025)
 
-- **Property Type Formatter**: Added centralized `formatPropertyType()` utility in `client/src/lib/property-type-utils.ts` for consistent property type display across all components (PropertyCard, PropertyListCard, Dashboard floating card, BuyerSearch floating card)
-- **Recent Sold Photos**: Updated `/api/dashboard/recent-sold` endpoint to fetch photos from media table using `storage.getMediaForListingIds()`
+- **CMA Report UI Refinements**:
+  - Renamed "Listings & Map" tab to "Listings" in CMA results
+  - Synced listing filter pills (All/Sold/Active/Under Contract) with Property Location map markers
+  - Restructured Listings tab: stats cards + property list (left) | map (right, sticky) | Price Distribution (full width below)
+  - Removed duplicate "Property Locations Overview" from Market Stats tab
+- **Print/PDF Improvements**: Comprehensive print CSS for document-like PDF output with proper page breaks, hidden navigation, white backgrounds, single-column stacking for grids, and scrollbar artifact removal
+- **Properties Page Cleanup**: Removed unused "Send Properties" and "Quick CMA" buttons from search form
+- **Property Type Formatter**: Added centralized `formatPropertyType()` utility in `client/src/lib/property-type-utils.ts` for consistent property type display across all components
+- **Recent Sold Photos**: Updated `/api/dashboard/recent-sold` endpoint to fetch photos from media table
 - **Expanded Property Types**: Support for 9 property type categories: Single Family, Condo, Townhouse, Multi-Family, Manufactured Home, Ranch, Land, Multiple Lots, Commercial
 
 ## User Preferences
