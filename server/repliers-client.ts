@@ -222,7 +222,9 @@ class RepliersClient {
     const state = address.state || listing.stateOrProvince;
     const zip = address.zip || listing.postalCode;
     const country = address.country || listing.country;
-    const neighborhood = address.neighborhood || listing.subdivisionName;
+    // Neighborhood and Subdivision are SEPARATE fields - do not combine
+    const neighborhood = address.neighborhood || listing.neighborhood;
+    const subdivisionName = address.subdivisionName || listing.subdivisionName || details.subdivision;
     
     const latitude = map.latitude ?? listing.latitude;
     const longitude = map.longitude ?? listing.longitude;
@@ -263,7 +265,9 @@ class RepliersClient {
       stateOrProvince: state,
       postalCode: zip,
       country: country,
-      subdivisionName: neighborhood,
+      neighborhood: neighborhood,
+      subdivisionName: subdivisionName,
+      elementarySchool: details.elementarySchool || listing.elementarySchool || listing.schools?.elementary,
       latitude: latitude,
       longitude: longitude,
       photos: (listing.images || listing.photos || []).map((img: string) => 

@@ -1,0 +1,72 @@
+UPDATE / CLARIFICATION — PROPERTY LOCATION FIELDS
+
+IMPORTANT:
+Neighborhood and Subdivision are TWO SEPARATE fields and must NOT be combined.
+
+====================================================
+ACTIVE PROPERTY FLOATING CARD – LOCATION FIELDS UPDATE
+====================================================
+
+When displaying property details in the floating card (Dashboard):
+
+You MUST show BOTH of the following as separate fields, if available from Repliers:
+
+- Neighborhood  
+  • Use the dedicated Neighborhood field from Repliers  
+  • Example: “Neighborhood: Cherry Creek East”
+
+- Subdivision  
+  • Use the Subdivision / SubdivisionName field from Repliers  
+  • Example: “Subdivision: Cherry Creek Ph 06 Sec 02”
+
+Do NOT:
+- Merge Neighborhood and Subdivision into one label
+- Replace one with the other
+- Fallback incorrectly unless one is truly missing
+
+If one field is missing:
+- Show the available one
+- Do NOT duplicate values
+
+====================================================
+UPDATED REQUIRED FIELDS IN FLOATING CARD
+====================================================
+
+Ensure the floating card displays ALL of the following (Repliers-driven):
+
+- Beds
+- Baths
+- Sq Ft
+- Year Built
+- Pool: Yes / No
+- Garage: numeric value (example: “Garage: 2”)
+- Elementary School
+- Neighborhood (separate field)
+- Subdivision (separate field)
+- MLS # (Listing ID)
+
+Layout:
+- Group location-related fields logically
+- Ensure no clipping or overflow
+- Works for Active, Under Contract, and Sold/Closed properties
+
+====================================================
+TESTING REQUIRED
+====================================================
+
+1. Click an Active property on Dashboard:
+   - Verify Neighborhood and Subdivision both appear separately.
+2. Click an Under Contract property:
+   - Same verification.
+3. Click a Sold/Closed property (if shown on Dashboard):
+   - Same verification.
+4. Confirm no layout overlap or truncation.
+
+====================================================
+FINAL REPORT UPDATE
+====================================================
+
+In the final report, explicitly confirm:
+- Which Repliers fields are mapped to “Neighborhood”
+- Which Repliers fields are mapped to “Subdivision”
+- Confirmation they are displayed separately in the floating card

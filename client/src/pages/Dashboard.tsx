@@ -30,7 +30,9 @@ import {
   Calendar,
   GripVertical,
   Eye,
-  EyeOff
+  EyeOff,
+  Activity,
+  Building2
 } from "lucide-react";
 import { Link } from "wouter";
 import { useToast } from "@/hooks/use-toast";
@@ -72,6 +74,33 @@ interface DashboardStats {
   mlsGridConfigured: boolean;
 }
 
+interface SystemStatus {
+  repliersConfigured: boolean;
+  mlsGridConfigured: boolean;
+  mapboxConfigured: boolean;
+  lastDataPull: string | null;
+  lastSuccessfulSync: string | null;
+  lastSyncAttempt: string | null;
+  status: string;
+  timestamp: string;
+}
+
+interface InventoryBySubtype {
+  subtypes: Record<string, number>;
+  total: number;
+}
+
+interface DomAnalytics {
+  status: string;
+  daysRange: number;
+  count: number;
+  avgDom: number;
+  medianDom: number;
+  minDom: number;
+  maxDom: number;
+  distribution: Record<string, number>;
+}
+
 interface DashboardProperty {
   id: string;
   listingId?: string;
@@ -92,6 +121,10 @@ interface DashboardProperty {
   longitude?: number;
   propertySubType?: string;
   subdivisionName?: string;
+  neighborhood?: string;
+  poolFeatures?: string | string[] | null;
+  garageSpaces?: number | null;
+  elementarySchool?: string;
 }
 
 interface DashboardConfig {
@@ -329,26 +362,65 @@ function PropertyDetailModal({
             </div>
           </div>
           
-          <div className="flex flex-wrap gap-4 text-sm text-muted-foreground">
-            {property.daysOnMarket !== null && property.daysOnMarket !== undefined && (
-              <span className="flex items-center gap-1">
-                <Calendar className="w-4 h-4" />
-                {property.daysOnMarket} days on market
-              </span>
+          {/* Property Details Grid */}
+          <div className="grid grid-cols-2 gap-x-6 gap-y-2 text-sm">
+            {property.poolFeatures && (
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Pool:</span>
+                <span className="font-medium">{Array.isArray(property.poolFeatures) ? (property.poolFeatures.length > 0 ? 'Yes' : 'No') : (property.poolFeatures ? 'Yes' : 'No')}</span>
+              </div>
             )}
-            {property.subdivisionName && (
-              <span className="flex items-center gap-1">
-                <MapPin className="w-4 h-4" />
-                {property.subdivisionName}
-              </span>
+            {property.garageSpaces !== null && property.garageSpaces !== undefined && (
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Garage:</span>
+                <span className="font-medium">{property.garageSpaces}</span>
+              </div>
+            )}
+            {property.daysOnMarket !== null && property.daysOnMarket !== undefined && (
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Days on Market:</span>
+                <span className="font-medium">{property.daysOnMarket}</span>
+              </div>
             )}
             {property.propertySubType && (
-              <span className="flex items-center gap-1">
-                <Home className="w-4 h-4" />
-                {property.propertySubType}
-              </span>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Property Type:</span>
+                <span className="font-medium">{property.propertySubType}</span>
+              </div>
             )}
           </div>
+          
+          {/* Location & School Information */}
+          <div className="space-y-2 text-sm border-t pt-4">
+            <h4 className="font-medium text-muted-foreground">Location Details</h4>
+            <div className="grid grid-cols-1 gap-2">
+              {property.neighborhood && (
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Neighborhood:</span>
+                  <span className="font-medium">{property.neighborhood}</span>
+                </div>
+              )}
+              {property.subdivisionName && (
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Subdivision:</span>
+                  <span className="font-medium">{property.subdivisionName}</span>
+                </div>
+              )}
+              {property.elementarySchool && (
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Elementary School:</span>
+                  <span className="font-medium">{property.elementarySchool}</span>
+                </div>
+              )}
+            </div>
+          </div>
+          
+          {/* MLS Number */}
+          {property.listingId && (
+            <div className="text-xs text-muted-foreground border-t pt-3">
+              MLS #: {property.listingId}
+            </div>
+          )}
           
           <div className="flex gap-2 pt-2 pb-4">
             <Link href={`/properties/${property.id}`}>
@@ -454,6 +526,21 @@ export default function Dashboard() {
   
   const { data: activePropertiesData, isLoading: activePropertiesLoading } = useQuery<{ properties: DashboardProperty[], count: number, personalized?: boolean }>({
     queryKey: [activePropertiesQueryKey],
+    staleTime: 5 * 60 * 1000,
+  });
+
+  const { data: systemStatus, isLoading: systemStatusLoading } = useQuery<SystemStatus>({
+    queryKey: ['/api/dashboard/system-status'],
+    staleTime: 60 * 1000,
+  });
+
+  const { data: inventoryData, isLoading: inventoryLoading } = useQuery<InventoryBySubtype>({
+    queryKey: ['/api/dashboard/inventory-by-subtype'],
+    staleTime: 5 * 60 * 1000,
+  });
+
+  const { data: domAnalytics, isLoading: domLoading } = useQuery<DomAnalytics[]>({
+    queryKey: ['/api/dashboard/dom-analytics'],
     staleTime: 5 * 60 * 1000,
   });
 
@@ -895,6 +982,116 @@ export default function Dashboard() {
               </CardContent>
             </Card>
           </div>
+          
+          {/* Property Inventory by Subtype and DOM Analytics */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
+            {/* Property Inventory by Subtype */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-lg flex items-center gap-2">
+                  <Building2 className="w-5 h-5" />
+                  Property Inventory by Type
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {inventoryLoading ? (
+                  <Skeleton className="h-48 w-full" />
+                ) : inventoryData && Object.keys(inventoryData.subtypes || {}).length > 0 ? (
+                  <div className="space-y-3">
+                    {Object.entries(inventoryData.subtypes)
+                      .sort((a, b) => b[1] - a[1])
+                      .slice(0, 8)
+                      .map(([subtype, count]) => (
+                        <div key={subtype} className="flex items-center justify-between">
+                          <span className="text-sm">{subtype || 'Unknown'}</span>
+                          <div className="flex items-center gap-2">
+                            <div className="w-24 h-2 bg-muted rounded-full overflow-hidden">
+                              <div 
+                                className="h-full bg-primary rounded-full" 
+                                style={{ width: `${(count / inventoryData.total) * 100}%` }}
+                              />
+                            </div>
+                            <span className="text-sm font-medium w-10 text-right">{count.toLocaleString()}</span>
+                          </div>
+                        </div>
+                      ))}
+                    <div className="pt-2 border-t text-sm text-muted-foreground">
+                      Total Active: {inventoryData.total.toLocaleString()}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="h-48 flex items-center justify-center text-muted-foreground">
+                    No inventory data available
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Days on Market Analytics */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-lg flex items-center gap-2">
+                  <Clock className="w-5 h-5" />
+                  Days on Market Analytics
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {domLoading ? (
+                  <Skeleton className="h-48 w-full" />
+                ) : domAnalytics && domAnalytics.length > 0 ? (
+                  <div className="space-y-4">
+                    {domAnalytics.map((data: DomAnalytics) => (
+                      <div key={data.status} className="space-y-2">
+                        <div className="flex items-center justify-between">
+                          <Badge variant={data.status === 'Active' ? 'default' : 'secondary'}>
+                            {data.status}
+                          </Badge>
+                          <span className="text-sm text-muted-foreground">
+                            {data.count.toLocaleString()} properties
+                          </span>
+                        </div>
+                        <div className="grid grid-cols-3 gap-4 text-center">
+                          <div>
+                            <p className="text-2xl font-bold">{Math.round(data.avgDom)}</p>
+                            <p className="text-xs text-muted-foreground">Avg DOM</p>
+                          </div>
+                          <div>
+                            <p className="text-2xl font-bold">{Math.round(data.medianDom)}</p>
+                            <p className="text-xs text-muted-foreground">Median DOM</p>
+                          </div>
+                          <div>
+                            <p className="text-2xl font-bold">{data.maxDom}</p>
+                            <p className="text-xs text-muted-foreground">Max DOM</p>
+                          </div>
+                        </div>
+                        {data.distribution && (
+                          <div className="flex gap-1 h-8">
+                            {Object.entries(data.distribution).map(([range, count]) => (
+                              <Tooltip key={range}>
+                                <TooltipTrigger asChild>
+                                  <div 
+                                    className="bg-primary/20 hover:bg-primary/40 transition-colors rounded-sm flex-1 cursor-help"
+                                    style={{ opacity: Math.max(0.3, count / Math.max(...Object.values(data.distribution))) }}
+                                  />
+                                </TooltipTrigger>
+                                <TooltipContent>
+                                  <p>{range}: {count} properties</p>
+                                </TooltipContent>
+                              </Tooltip>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="h-48 flex items-center justify-center text-muted-foreground">
+                    No DOM data available
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </div>
         </div>
       )}
 
@@ -957,6 +1154,57 @@ export default function Dashboard() {
           </Collapsible>
         </Card>
       )}
+      
+      {/* System Status at Bottom */}
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-lg flex items-center gap-2">
+            <Activity className="w-5 h-5" />
+            System Status
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          {systemStatusLoading ? (
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              {[1, 2, 3, 4].map(i => <Skeleton key={i} className="h-16" />)}
+            </div>
+          ) : systemStatus ? (
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div className="flex items-center gap-3">
+                <div className={`w-3 h-3 rounded-full ${systemStatus.repliersConfigured ? 'bg-green-500' : 'bg-red-500'}`} />
+                <div>
+                  <p className="text-sm font-medium">Repliers API</p>
+                  <p className="text-xs text-muted-foreground">{systemStatus.repliersConfigured ? 'Connected' : 'Not Configured'}</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-3">
+                <div className={`w-3 h-3 rounded-full ${systemStatus.mlsGridConfigured ? 'bg-green-500' : 'bg-yellow-500'}`} />
+                <div>
+                  <p className="text-sm font-medium">MLS Grid</p>
+                  <p className="text-xs text-muted-foreground">{systemStatus.mlsGridConfigured ? 'Connected' : 'Optional'}</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-3">
+                <div className={`w-3 h-3 rounded-full ${systemStatus.mapboxConfigured ? 'bg-green-500' : 'bg-yellow-500'}`} />
+                <div>
+                  <p className="text-sm font-medium">Mapbox</p>
+                  <p className="text-xs text-muted-foreground">{systemStatus.mapboxConfigured ? 'Connected' : 'Optional'}</p>
+                </div>
+              </div>
+              <div>
+                <p className="text-sm font-medium">Last Data Sync</p>
+                <p className="text-xs text-muted-foreground">
+                  {systemStatus.lastSuccessfulSync 
+                    ? new Date(systemStatus.lastSuccessfulSync).toLocaleString()
+                    : 'Never'}
+                </p>
+              </div>
+            </div>
+          ) : (
+            <p className="text-muted-foreground text-sm">Unable to load system status</p>
+          )}
+        </CardContent>
+      </Card>
       
       <PropertyDetailModal
         property={selectedProperty}
