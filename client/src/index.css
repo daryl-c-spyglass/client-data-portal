@@ -292,7 +292,7 @@
   /* Page setup for document-like output */
   @page {
     size: letter;
-    margin: 0.75in 0.5in;
+    margin: 0.5in 0.5in 0.75in 0.5in;
   }
   
   /* Reset entire page for print - force document mode */
@@ -334,6 +334,23 @@
     visibility: hidden !important;
     width: 0 !important;
     height: 0 !important;
+    overflow: hidden !important;
+  }
+  
+  /* HIDE YELLOW ACTION BAR AND ALL PREVIEW/ACTION ELEMENTS */
+  .cma-preview-banner,
+  [data-testid="cma-preview-banner"],
+  [data-testid="button-save-cma"],
+  [data-testid="button-share-cma-email"],
+  [data-testid="button-modify-search"],
+  [data-testid="button-modify-stats"],
+  [data-testid="button-notes"] {
+    display: none !important;
+    visibility: hidden !important;
+    height: 0 !important;
+    width: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
     overflow: hidden !important;
   }
   
@@ -387,6 +404,9 @@
   .cma-print .print\\:hidden,
   .print\\:hidden {
     display: none !important;
+    visibility: hidden !important;
+    height: 0 !important;
+    overflow: hidden !important;
   }
   
   /* Cards - Document-style with proper page breaks (shadcn uses rounded-lg.border) */

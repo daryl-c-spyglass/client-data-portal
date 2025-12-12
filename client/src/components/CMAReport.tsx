@@ -48,15 +48,26 @@ const subjectIcon = new L.DivIcon({
 
 // Custom marker icon for comp properties based on status
 const getCompIcon = (status: string) => {
+  const statusLower = (status || '').toLowerCase();
   let borderColor = '#22c55e'; // green for active
   let bgColor = 'rgba(34, 197, 94, 0.15)'; // light green background
-  if (status === 'Closed' || status === 'Sold') {
+  
+  // Check for sold/closed status
+  if (statusLower === 'closed' || statusLower === 'sold') {
     borderColor = '#6b7280'; // gray for sold
     bgColor = 'rgba(107, 114, 128, 0.15)';
-  } else if (status === 'Under Contract' || status === 'Pending') {
-    borderColor = '#f59e0b'; // orange for under contract
+  } 
+  // Check for pending/under contract status (including variants like "Active Under Contract - Showing")
+  else if (
+    statusLower.includes('under contract') || 
+    statusLower.includes('pending') || 
+    statusLower.includes('in contract') ||
+    statusLower.includes('contingent')
+  ) {
+    borderColor = '#f59e0b'; // orange for under contract/pending
     bgColor = 'rgba(245, 158, 11, 0.15)';
   }
+  
   return new L.DivIcon({
     html: `<div style="display:flex;align-items:center;justify-content:center;width:32px;height:32px;background-color:${bgColor};border:3px solid ${borderColor};border-radius:8px;box-shadow:0 2px 6px rgba(0,0,0,0.3);font-size:18px;">🏠</div>`,
     className: 'custom-house-icon',
@@ -218,7 +229,7 @@ export function CMAReport({
     <div className="space-y-6 cma-print">
       {/* Preview Banner - hidden in print/PDF */}
       {isPreview && expiresAt && (
-        <div className="bg-yellow-100 dark:bg-yellow-900/20 border border-yellow-400 dark:border-yellow-600 rounded-md p-4 flex items-center justify-between gap-4 flex-wrap print:hidden">
+        <div className="bg-yellow-100 dark:bg-yellow-900/20 border border-yellow-400 dark:border-yellow-600 rounded-md p-4 flex items-center justify-between gap-4 flex-wrap print:hidden cma-preview-banner" data-testid="cma-preview-banner">
           <p className="text-sm">
             You are seeing a preview of the report.
           </p>
@@ -936,6 +947,10 @@ export function CMAReport({
                   ? soldPrices[Math.floor(soldPrices.length / 2)] 
                   : 0;
                 
+                const avgSoldPrice = soldPrices.length > 0
+                  ? soldPrices.reduce((a, b) => a + b, 0) / soldPrices.length
+                  : 0;
+                
                 const avgDOMSold = soldProperties.length > 0
                   ? soldProperties.reduce((sum, p) => sum + (p.daysOnMarket || 0), 0) / soldProperties.length
                   : 0;
@@ -947,25 +962,119 @@ export function CMAReport({
                   ? ratios.reduce((a, b) => a + b, 0) / ratios.length 
                   : 0;
                 
+                const now = new Date();
+                const oneYearAgo = new Date(now.getFullYear() - 1, now.getMonth(), now.getDate());
+                const twoYearsAgo = new Date(now.getFullYear() - 2, now.getMonth(), now.getDate());
+                
+                const currentYearSold = soldProperties.filter(p => {
+                  if (!p.closeDate) return false;
+                  const closeDate = new Date(p.closeDate);
+                  return closeDate >= oneYearAgo && closeDate <= now;
+                });
+                
+                const priorYearSold = soldProperties.filter(p => {
+                  if (!p.closeDate) return false;
+                  const closeDate = new Date(p.closeDate);
+                  return closeDate >= twoYearsAgo && closeDate < oneYearAgo;
+                });
+                
+                const currentYearPrices = currentYearSold
+                  .map(p => p.closePrice ? Number(p.closePrice) : 0)
+                  .filter(p => p > 0)
+                  .sort((a, b) => a - b);
+                
+                const priorYearPrices = priorYearSold
+                  .map(p => p.closePrice ? Number(p.closePrice) : 0)
+                  .filter(p => p > 0)
+                  .sort((a, b) => a - b);
+                
+                const currentYearAvg = currentYearPrices.length > 0
+                  ? currentYearPrices.reduce((a, b) => a + b, 0) / currentYearPrices.length
+                  : 0;
+                const priorYearAvg = priorYearPrices.length > 0
+                  ? priorYearPrices.reduce((a, b) => a + b, 0) / priorYearPrices.length
+                  : 0;
+                
+                const currentYearMedian = currentYearPrices.length > 0
+                  ? currentYearPrices[Math.floor(currentYearPrices.length / 2)]
+                  : 0;
+                const priorYearMedian = priorYearPrices.length > 0
+                  ? priorYearPrices[Math.floor(priorYearPrices.length / 2)]
+                  : 0;
+                
+                const yoyAvgChange = (priorYearAvg > 0 && currentYearAvg > 0)
+                  ? ((currentYearAvg - priorYearAvg) / priorYearAvg) * 100
+                  : null;
+                
+                const yoyMedianChange = (priorYearMedian > 0 && currentYearMedian > 0)
+                  ? ((currentYearMedian - priorYearMedian) / priorYearMedian) * 100
+                  : null;
+                
                 return (
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <div className="text-center p-3 bg-background rounded-lg border">
-                      <div className="text-2xl font-bold text-primary">
-                        {medianSoldPrice > 0 ? `$${medianSoldPrice.toLocaleString()}` : 'N/A'}
+                  <div className="space-y-4">
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      <div className="text-center p-3 bg-background rounded-lg border">
+                        <div className="text-2xl font-bold text-primary">
+                          {medianSoldPrice > 0 ? `$${medianSoldPrice.toLocaleString()}` : 'N/A'}
+                        </div>
+                        <div className="text-sm text-muted-foreground">Median Sold Price</div>
                       </div>
-                      <div className="text-sm text-muted-foreground">Median Sold Price</div>
+                      <div className="text-center p-3 bg-background rounded-lg border">
+                        <div className="text-2xl font-bold">
+                          {avgDOMSold > 0 ? `${Math.round(avgDOMSold)} days` : 'N/A'}
+                        </div>
+                        <div className="text-sm text-muted-foreground">Avg Days on Market (Sold)</div>
+                      </div>
+                      <div className="text-center p-3 bg-background rounded-lg border">
+                        <div className="text-2xl font-bold">
+                          {avgListToSaleRatio > 0 ? `${avgListToSaleRatio.toFixed(1)}%` : 'N/A'}
+                        </div>
+                        <div className="text-sm text-muted-foreground">List-to-Sale Ratio</div>
+                      </div>
                     </div>
-                    <div className="text-center p-3 bg-background rounded-lg border">
-                      <div className="text-2xl font-bold">
-                        {avgDOMSold > 0 ? `${Math.round(avgDOMSold)} days` : 'N/A'}
+                    
+                    <div className="border-t pt-4">
+                      <h4 className="text-sm font-semibold mb-3 text-muted-foreground">Year-over-Year (YoY) Comparison</h4>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="flex items-center justify-between p-3 bg-background rounded-lg border">
+                          <div>
+                            <div className="text-sm text-muted-foreground">YoY Avg Sold Price</div>
+                            <div className="text-xs text-muted-foreground/70">vs prior 12 months</div>
+                          </div>
+                          <div className={`text-xl font-bold flex items-center gap-1 ${
+                            yoyAvgChange === null ? 'text-muted-foreground' :
+                            yoyAvgChange >= 0 ? 'text-green-600' : 'text-red-600'
+                          }`}>
+                            {yoyAvgChange === null ? (
+                              'N/A'
+                            ) : (
+                              <>
+                                {yoyAvgChange >= 0 ? '↑' : '↓'}
+                                {Math.abs(yoyAvgChange).toFixed(1)}%
+                              </>
+                            )}
+                          </div>
+                        </div>
+                        <div className="flex items-center justify-between p-3 bg-background rounded-lg border">
+                          <div>
+                            <div className="text-sm text-muted-foreground">YoY Median Sold Price</div>
+                            <div className="text-xs text-muted-foreground/70">vs prior 12 months</div>
+                          </div>
+                          <div className={`text-xl font-bold flex items-center gap-1 ${
+                            yoyMedianChange === null ? 'text-muted-foreground' :
+                            yoyMedianChange >= 0 ? 'text-green-600' : 'text-red-600'
+                          }`}>
+                            {yoyMedianChange === null ? (
+                              'N/A'
+                            ) : (
+                              <>
+                                {yoyMedianChange >= 0 ? '↑' : '↓'}
+                                {Math.abs(yoyMedianChange).toFixed(1)}%
+                              </>
+                            )}
+                          </div>
+                        </div>
                       </div>
-                      <div className="text-sm text-muted-foreground">Avg Days on Market (Sold)</div>
-                    </div>
-                    <div className="text-center p-3 bg-background rounded-lg border">
-                      <div className="text-2xl font-bold">
-                        {avgListToSaleRatio > 0 ? `${avgListToSaleRatio.toFixed(1)}%` : 'N/A'}
-                      </div>
-                      <div className="text-sm text-muted-foreground">List-to-Sale Ratio</div>
                     </div>
                   </div>
                 );
@@ -1454,22 +1563,6 @@ export function CMAReport({
                     const bounds = propertiesWithCoords.map(p => [p.latitude as number, p.longitude as number] as [number, number]);
                     const centerLat = bounds.reduce((sum, [lat]) => sum + lat, 0) / bounds.length;
                     const centerLng = bounds.reduce((sum, [, lng]) => sum + lng, 0) / bounds.length;
-                    
-                    const getCompIcon = (status: string) => {
-                      let filter = 'grayscale(100%) brightness(0.6)';
-                      if (status === 'Active') {
-                        filter = 'sepia(100%) hue-rotate(80deg) saturate(200%)';
-                      } else if (status === 'Active Under Contract' || status === 'Pending' || status === 'Under Contract') {
-                        filter = 'sepia(100%) saturate(200%) hue-rotate(0deg)';
-                      }
-                      
-                      return L.divIcon({
-                        className: 'custom-house-marker',
-                        html: `<span style="font-size: 24px; filter: ${filter};">🏠</span>`,
-                        iconSize: [30, 30],
-                        iconAnchor: [15, 15],
-                      });
-                    };
                     
                     return (
                       <div className="h-[300px] rounded-lg overflow-hidden border">

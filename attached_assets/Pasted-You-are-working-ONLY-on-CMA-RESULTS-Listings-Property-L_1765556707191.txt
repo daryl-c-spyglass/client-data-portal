@@ -1,0 +1,111 @@
+You are working ONLY on CMA RESULTS (Listings → Property Locations map, Timeline → Market Insights, and Print PDF).
+Do NOT modify Dashboard, Properties search, Seller Updates, or IDX/public pages.
+
+Data source: Repliers. Leasing/rentals excluded globally.
+
+Implement the fixes below ONE BY ONE and test each before moving on.
+The user will attach the same screenshots in Replit for reference.
+
+====================================================
+1) LISTINGS → PROPERTY LOCATIONS MAP: EMOJI COLORS MUST MATCH MARKET STATS
+====================================================
+
+Problem:
+- Property Locations emoji markers in Listings are NOT using the same color variations as Market Stats.
+- Screenshot #1 (Listings) vs Screenshot #2 (Market Stats) show inconsistent marker styling.
+
+Requirements:
+1) Make Listings → Property Locations map use the EXACT SAME marker styling system as Market Stats:
+   - Same emoji marker type (house emoji)
+   - Same color variation per status
+   - Same legend colors and labels
+2) Centralize marker style logic:
+   - Create one shared function/component for map markers and reuse it in BOTH:
+     a) Listings Property Locations map
+     b) Market Stats Property Locations map
+   - Do NOT duplicate marker styling in two places.
+3) Status mapping must be consistent:
+   - Active → Active styling
+   - Under Contract / Pending → Pending styling
+   - Sold/Closed → Sold styling
+4) Ensure the legend matches the marker colors.
+
+Testing (required):
+- Open the same CMA and compare Listings map vs Market Stats map:
+  - Marker colors match exactly.
+  - Legend colors match exactly.
+- Change Listings filter (All/Sold/Pending/Active):
+  - Marker count changes and colors remain correct.
+
+====================================================
+2) TIMELINE → MARKET INSIGHTS: ADD YoY
+====================================================
+
+Requirement:
+- In Timeline → Market Insights block, include a Year-over-Year (YoY) section.
+
+YoY must include (at minimum):
+- YoY Average Sold Price (%, up/down)
+- YoY Median Sold Price (%, up/down)
+
+Rules:
+1) Use Repliers sold/closed dataset only (exclude rentals).
+2) Define the YoY window consistently:
+   - Compare last 12 months vs prior 12 months (preferred), OR
+   - Compare same month vs same month last year (if your dataset is monthly).
+3) Display format:
+   - Clear label: “YoY”
+   - Show % change with up/down indicator
+   - If insufficient data, show “YoY: N/A” (not blank)
+
+Testing:
+- Load CMA Timeline:
+  - YoY values display and are not blank.
+  - Values change when different CMA dataset/area is used (if applicable).
+
+====================================================
+3) PRINT PDF: REMOVE YELLOW BOX + FIX BOTTOM CUT-OFF
+====================================================
+
+Problems:
+- PDF still includes the yellow action bar/toolbar section (Save / Share CMA / Modify Search / etc.).
+- PDF is still cut off at the bottom (content clipped).
+
+Requirements:
+1) Remove the yellow box from print output:
+   - The entire action panel/toolbars/buttons must be hidden in print mode.
+   - Use print-only CSS (e.g., @media print) to hide:
+     - yellow toolbar/action row
+     - any sticky UI bars
+     - any “floating UI” elements
+2) Fix bottom cut-off:
+   - Ensure content flows across pages naturally.
+   - Add proper page breaks for sections/cards.
+   - Avoid fixed-height containers that clip content in print.
+   - Remove/disable overflow scroll containers for print.
+3) Make PDF look like a document (not a screenshot):
+   - Correct margins/padding
+   - No scrollbars/cursor artifacts
+   - Consistent typography and spacing
+4) Validate:
+   - Ensure the “Statistics” section and any following blocks are fully visible (no truncation).
+
+Testing (required):
+- Print preview a CMA with multiple sections:
+  - Yellow bar is NOT visible.
+  - No bottom clipping.
+  - Multi-page output works.
+  - No scrollbars/cursor lines appear.
+
+====================================================
+FINAL REPORT REQUIRED
+====================================================
+
+Provide:
+1) Confirmation marker styling is now shared and reused between Listings + Market Stats.
+2) Screenshot proof that emoji colors match across both maps.
+3) Screenshot proof of Timeline Market Insights showing YoY.
+4) PDF before/after proof:
+   - Yellow box removed
+   - Bottom cut-off fixed
+   - Document-like formatting achieved
