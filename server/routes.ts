@@ -1059,43 +1059,45 @@ export async function registerRoutes(app: Express): Promise<Server> {
               closedCount;
 
             // Get subtype counts from multiple sources:
-            // 1. Repliers API Active + Under Contract by class (condo, land, commercial)
+            // 1. Repliers API Active + Under Contract by class (condo, commercial - note: 'land' is not supported)
             // 2. Repliers API Active + Under Contract residential with full scan for accurate subtype breakdown
             // 3. Database for Closed/Sold (with accurate subtype breakdown)
             const subtypePromises = [
-              // Get condo, land, commercial counts via class filter (accurate)
+              // Get condo, commercial counts via class filter (accurate)
+              // Note: Repliers API only supports 'commercial', 'condo', 'residential' classes (not 'land')
               repliersClient.searchListings({ status: 'A', class: 'condo', resultsPerPage: 1 }),
-              repliersClient.searchListings({ status: 'A', class: 'land', resultsPerPage: 1 }),
               repliersClient.searchListings({ status: 'A', class: 'commercial', resultsPerPage: 1 }),
               repliersClient.searchListings({ status: 'U', class: 'condo', resultsPerPage: 1 }),
-              repliersClient.searchListings({ status: 'U', class: 'land', resultsPerPage: 1 }),
               repliersClient.searchListings({ status: 'U', class: 'commercial', resultsPerPage: 1 }),
-              // Get detailed residential subtype breakdown by scanning listings
+              // Get detailed residential subtype breakdown by scanning listings (includes Land/Ranch)
               repliersClient.aggregateResidentialSubtypeCounts(),
               // Get closed subtype counts from database
               storage.getClosedPropertyCountsBySubtype(),
             ];
 
             try {
-              const [
-                activeCondo, activeLand, activeComm,
-                ucCondo, ucLand, ucComm,
-                residentialSubtypes, closedSubtypeCounts
-              ] = await Promise.all(subtypePromises);
+              const subtypeResults = await Promise.all(subtypePromises);
+              const activeCondo = subtypeResults[0] as { count: number };
+              const activeComm = subtypeResults[1] as { count: number };
+              const ucCondo = subtypeResults[2] as { count: number };
+              const ucComm = subtypeResults[3] as { count: number };
+              const residentialSubtypes = subtypeResults[4] as Record<string, number>;
+              const closedSubtypeCounts = subtypeResults[5] as Record<string, number>;
               
-              // Residential subtypes from full scan (SFR, Townhouse, Multi-Family)
+              // Residential subtypes from full scan (SFR, Townhouse, Multi-Family, Land/Ranch)
               inventoryData.countsBySubtype['Single Family Residence'] = 
                 (residentialSubtypes['Single Family Residence'] || 0) + (closedSubtypeCounts['Single Family Residence'] || 0);
               inventoryData.countsBySubtype['Townhouse'] = 
                 (residentialSubtypes['Townhouse'] || 0) + (closedSubtypeCounts['Townhouse'] || 0);
               inventoryData.countsBySubtype['Multi-Family'] = 
                 (residentialSubtypes['Multi-Family'] || 0) + (closedSubtypeCounts['Multi-Family'] || 0);
+              // Land/Ranch from residential subtypes scan (not from class filter as 'land' is unsupported)
+              inventoryData.countsBySubtype['Land/Ranch'] = 
+                (residentialSubtypes['Land/Ranch'] || 0) + (closedSubtypeCounts['Land/Ranch'] || 0);
               
-              // Condo, Land, Commercial from class filters
+              // Condo, Commercial from class filters
               inventoryData.countsBySubtype['Condominium'] = 
                 (activeCondo.count || 0) + (ucCondo.count || 0) + (closedSubtypeCounts['Condominium'] || 0);
-              inventoryData.countsBySubtype['Land/Ranch'] = 
-                (activeLand.count || 0) + (ucLand.count || 0) + (closedSubtypeCounts['Land/Ranch'] || 0);
               inventoryData.countsBySubtype['Other'] = 
                 (activeComm.count || 0) + (ucComm.count || 0) + (closedSubtypeCounts['Other'] || 0);
             } catch (subtypeError) {
@@ -2957,42 +2959,80 @@ This email was sent by ${senderName} (${senderEmail}) via the MLS Grid IDX Platf
         return res.json(dashboardStatsCache.data);
       }
       
-      // Parallelize ALL async operations
+      // Use unified inventory endpoint data for consistency
       const healthStatus = { mlsGridConfigured: mlsGridClient !== null, repliersConfigured: isRepliersConfigured() };
       
-      // Build promises array for parallel execution
-      const promises: Promise<any>[] = [
-        storage.getAllCmas(),
-        storage.getActiveSellerUpdates(),
-        storage.getClosedPropertyCount(),
-      ];
-      
-      // Add Repliers API calls if configured
-      if (repliersClient) {
-        promises.push(
-          repliersClient.searchListings({ status: 'A', resultsPerPage: 1 }).catch(() => ({ count: 0 })),
-          repliersClient.searchListings({ status: 'U', resultsPerPage: 1 }).catch(() => ({ count: 0 }))
-        );
-      }
-      
-      const results = await Promise.all(promises);
-      
-      const [allCmas, activeSellerUpdates, closedCount] = results;
+      // Fetch unified inventory data (same source as Properties page)
       let activeListingCount = 0;
       let underContractCount = 0;
+      let closedCount = 0;
+      let countsBySubtype: Record<string, number> = {};
       
-      if (repliersClient && results.length >= 5) {
-        activeListingCount = results[3]?.count || 0;
-        underContractCount = results[4]?.count || 0;
+      if (repliersClient) {
+        try {
+          // Get counts from Repliers (same as /api/properties/inventory)
+          const [activeResponse, ucResponse, dbClosedCount] = await Promise.all([
+            repliersClient.searchListings({ status: 'A', resultsPerPage: 1 }).catch(() => ({ count: 0 })),
+            repliersClient.searchListings({ status: 'U', resultsPerPage: 1 }).catch(() => ({ count: 0 })),
+            storage.getClosedPropertyCount(),
+          ]);
+          
+          activeListingCount = activeResponse.count || 0;
+          underContractCount = ucResponse.count || 0;
+          closedCount = dbClosedCount || 0;
+          
+          // Get subtype counts (same logic as inventory endpoint)
+          // Note: Repliers API only supports 'commercial', 'condo', 'residential' classes (not 'land')
+          const subtypePromises = [
+            repliersClient.searchListings({ status: 'A', class: 'condo', resultsPerPage: 1 }).catch(() => ({ count: 0 })),
+            repliersClient.searchListings({ status: 'A', class: 'commercial', resultsPerPage: 1 }).catch(() => ({ count: 0 })),
+            repliersClient.searchListings({ status: 'U', class: 'condo', resultsPerPage: 1 }).catch(() => ({ count: 0 })),
+            repliersClient.searchListings({ status: 'U', class: 'commercial', resultsPerPage: 1 }).catch(() => ({ count: 0 })),
+            repliersClient.aggregateResidentialSubtypeCounts().catch(() => ({})),
+            storage.getClosedPropertyCountsBySubtype().catch(() => ({})),
+          ];
+          
+          const subtypeResults = await Promise.all(subtypePromises);
+          const activeCondo = subtypeResults[0] as { count: number };
+          const activeComm = subtypeResults[1] as { count: number };
+          const ucCondo = subtypeResults[2] as { count: number };
+          const ucComm = subtypeResults[3] as { count: number };
+          const residentialSubtypes = subtypeResults[4] as Record<string, number>;
+          const closedSubtypeCounts = subtypeResults[5] as Record<string, number>;
+          
+          countsBySubtype = {
+            'Single Family Residence': (residentialSubtypes['Single Family Residence'] || 0) + (closedSubtypeCounts['Single Family Residence'] || 0),
+            'Townhouse': (residentialSubtypes['Townhouse'] || 0) + (closedSubtypeCounts['Townhouse'] || 0),
+            'Multi-Family': (residentialSubtypes['Multi-Family'] || 0) + (closedSubtypeCounts['Multi-Family'] || 0),
+            'Land/Ranch': (residentialSubtypes['Land/Ranch'] || 0) + (closedSubtypeCounts['Land/Ranch'] || 0),
+            'Condominium': (activeCondo.count || 0) + (ucCondo.count || 0) + (closedSubtypeCounts['Condominium'] || 0),
+            'Other': (activeComm.count || 0) + (ucComm.count || 0) + (closedSubtypeCounts['Other'] || 0),
+          };
+        } catch (apiError) {
+          console.error('Dashboard: Repliers API error, falling back to DB:', apiError);
+          closedCount = await storage.getClosedPropertyCount();
+        }
+      } else {
+        closedCount = await storage.getClosedPropertyCount();
       }
       
-      const totalProperties = activeListingCount + underContractCount + (closedCount || 0);
+      // Get CMA and seller update counts in parallel
+      const [allCmas, activeSellerUpdates] = await Promise.all([
+        storage.getAllCmas(),
+        storage.getActiveSellerUpdates(),
+      ]);
+      
+      const totalProperties = activeListingCount + underContractCount + closedCount;
+      
+      // Log for debugging data consistency
+      console.log(`[Dashboard Stats] Total: ${totalProperties} (Active: ${activeListingCount}, UC: ${underContractCount}, Closed: ${closedCount})`);
       
       const responseData = {
         totalActiveProperties: activeListingCount,
         totalUnderContractProperties: underContractCount,
-        totalClosedProperties: closedCount || 0,
+        totalClosedProperties: closedCount,
         totalProperties: totalProperties,
+        countsBySubtype: countsBySubtype,
         activeCmas: allCmas.length,
         sellerUpdates: activeSellerUpdates.length,
         systemStatus: healthStatus.repliersConfigured || healthStatus.mlsGridConfigured ? 'Ready' : 'Setup',
@@ -3245,23 +3285,30 @@ This email was sent by ${senderName} (${senderEmail}) via the MLS Grid IDX Platf
     }
   });
   
-  // Recent Sold/Closed properties endpoint (fallback when DOM data unavailable)
+  // Recent Sold/Closed properties endpoint with pagination
   app.get("/api/dashboard/recent-sold", async (req, res) => {
     try {
-      const limit = parseInt(req.query.limit as string) || 10;
+      const page = Math.max(1, parseInt(req.query.page as string) || 1);
+      const limit = Math.min(50, Math.max(1, parseInt(req.query.limit as string) || 20));
+      const offset = (page - 1) * limit;
       
-      // Get recent sold properties from database (filtered for rentals)
-      let dbProps = await storage.searchProperties({ status: 'Closed', limit: 100 });
-      dbProps = filterOutRentalProperties(dbProps);
+      // Get ALL sold properties from database (up to reasonable limit for pagination)
+      let allDbProps = await storage.searchProperties({ status: 'Closed', limit: 1000 });
+      allDbProps = filterOutRentalProperties(allDbProps);
       
-      // Sort by close date descending and take requested limit
-      const sortedProps = dbProps
-        .sort((a, b) => {
-          const dateA = a.closeDate ? new Date(a.closeDate).getTime() : 0;
-          const dateB = b.closeDate ? new Date(b.closeDate).getTime() : 0;
-          return dateB - dateA;
-        })
-        .slice(0, limit)
+      // Sort by close date descending (most recent first)
+      const sortedAll = allDbProps.sort((a, b) => {
+        const dateA = a.closeDate ? new Date(a.closeDate).getTime() : 0;
+        const dateB = b.closeDate ? new Date(b.closeDate).getTime() : 0;
+        return dateB - dateA;
+      });
+      
+      const totalCount = sortedAll.length;
+      const totalPages = Math.ceil(totalCount / limit);
+      
+      // Get paginated slice
+      const paginatedProps = sortedAll
+        .slice(offset, offset + limit)
         .map(p => ({
           id: p.id || p.listingId,
           listingId: p.listingId || p.id,
@@ -3279,9 +3326,13 @@ This email was sent by ${senderName} (${senderEmail}) via the MLS Grid IDX Platf
         }));
       
       res.json({
-        properties: sortedProps,
-        count: sortedProps.length,
-        total: dbProps.length
+        properties: paginatedProps,
+        count: paginatedProps.length,
+        total: totalCount,
+        page: page,
+        limit: limit,
+        totalPages: totalPages,
+        hasMore: page < totalPages
       });
     } catch (error: any) {
       console.error("Recent sold error:", error.message);

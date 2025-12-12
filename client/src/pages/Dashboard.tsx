@@ -34,7 +34,8 @@ import {
   EyeOff,
   Activity,
   Building2,
-  RotateCcw
+  RotateCcw,
+  Loader2
 } from "lucide-react";
 import { Link } from "wouter";
 import { useToast } from "@/hooks/use-toast";
@@ -123,6 +124,10 @@ interface RecentSoldResponse {
   properties: RecentSoldProperty[];
   count: number;
   total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+  hasMore: boolean;
 }
 
 interface DashboardProperty {
@@ -483,6 +488,11 @@ export default function Dashboard() {
   const manualInteractionTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const autoScrollIntervalRef = useRef<NodeJS.Timeout | null>(null);
   
+  // Recent Sold pagination state
+  const [recentSoldPage, setRecentSoldPage] = useState(1);
+  const [allRecentSoldProps, setAllRecentSoldProps] = useState<RecentSoldProperty[]>([]);
+  const recentSoldScrollRef = useRef<HTMLDivElement>(null);
+  
   const { data: stats, isLoading: statsLoading } = useQuery<DashboardStats>({
     queryKey: ['/api/stats/dashboard'],
   });
@@ -576,10 +586,34 @@ export default function Dashboard() {
     staleTime: 5 * 60 * 1000,
   });
 
-  const { data: recentSoldData, isLoading: recentSoldLoading } = useQuery<RecentSoldResponse>({
-    queryKey: ['/api/dashboard/recent-sold'],
+  const { data: recentSoldData, isLoading: recentSoldLoading, isFetching: recentSoldFetching } = useQuery<RecentSoldResponse>({
+    queryKey: ['/api/dashboard/recent-sold', recentSoldPage],
     staleTime: 5 * 60 * 1000,
   });
+  
+  // Accumulate paginated sold properties
+  useEffect(() => {
+    if (recentSoldData?.properties) {
+      if (recentSoldPage === 1) {
+        setAllRecentSoldProps(recentSoldData.properties);
+      } else {
+        setAllRecentSoldProps(prev => {
+          const existingIds = new Set(prev.map(p => p.id));
+          const newProps = recentSoldData.properties.filter(p => !existingIds.has(p.id));
+          return [...prev, ...newProps];
+        });
+      }
+    }
+  }, [recentSoldData, recentSoldPage]);
+  
+  // Infinite scroll handler for recent sold
+  const handleRecentSoldScroll = (e: React.UIEvent<HTMLDivElement>) => {
+    const target = e.target as HTMLDivElement;
+    const nearBottom = target.scrollHeight - target.scrollTop - target.clientHeight < 50;
+    if (nearBottom && recentSoldData?.hasMore && !recentSoldFetching) {
+      setRecentSoldPage(prev => prev + 1);
+    }
+  };
 
   const syncMutation = useMutation({
     mutationFn: async () => {
@@ -1291,9 +1325,14 @@ export default function Dashboard() {
                             </div>
                           ))}
                         </div>
-                      ) : recentSoldData && recentSoldData.properties.length > 0 ? (
-                        <div className="space-y-3 max-h-64 overflow-y-auto">
-                          {recentSoldData.properties.slice(0, 8).map((prop) => (
+                      ) : allRecentSoldProps.length > 0 ? (
+                        <div 
+                          ref={recentSoldScrollRef}
+                          className="space-y-3 max-h-80 overflow-y-auto"
+                          onScroll={handleRecentSoldScroll}
+                          data-testid="recent-sold-scroll-container"
+                        >
+                          {allRecentSoldProps.map((prop) => (
                             <div 
                               key={prop.id} 
                               className="flex items-center gap-3 p-2 rounded-md hover-elevate active-elevate-2 cursor-pointer"
@@ -1325,8 +1364,14 @@ export default function Dashboard() {
                               </div>
                             </div>
                           ))}
+                          {recentSoldFetching && (
+                            <div className="flex justify-center py-2">
+                              <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
+                            </div>
+                          )}
                           <p className="text-xs text-muted-foreground text-center pt-2">
-                            {recentSoldData.total} total sold properties
+                            Showing {allRecentSoldProps.length} of {recentSoldData?.total || 0} sold properties
+                            {recentSoldData?.hasMore && " (scroll for more)"}
                           </p>
                         </div>
                       ) : (

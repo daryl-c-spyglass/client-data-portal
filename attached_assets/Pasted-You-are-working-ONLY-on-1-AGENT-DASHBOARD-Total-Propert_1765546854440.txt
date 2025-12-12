@@ -1,0 +1,119 @@
+You are working ONLY on:
+1) AGENT DASHBOARD (Total Properties, Inventory by Type/Subtype, Recent Sold/Closed widget)
+2) AGENT PROPERTIES module (inventory header, property subtype acronyms, search/view results)
+NOT CMA pages, NOT IDX/public pages.
+
+All property data must come from Repliers. Leasing/rentals must be excluded globally.
+Goal: Make data counts consistent across Dashboard + Properties, fix Recent Sold/Closed behavior, add acronym tooltips, and fix multi-status Cherry Creek error.
+
+====================================================
+1) DATA CONSISTENCY — TOTAL PROPERTIES + INVENTORIES MUST MATCH EVERYWHERE
+====================================================
+
+Problem:
+- Dashboard “Total Properties” and “Property Inventory by Type” do not match the Properties page totals/inventories.
+- Data source and inventory must be consistent across all sections.
+
+Requirements:
+1) Create a SINGLE SOURCE OF TRUTH for:
+   - Total Properties (Active + Under Contract + Sold/Closed, after rental exclusion)
+   - Inventory by Status
+   - Inventory by Property Type/Subtype
+2) Both Dashboard and Properties pages MUST use the same backend endpoint / shared service to retrieve these counts.
+3) Ensure both pages:
+   - Use the same filters (especially rental exclusion)
+   - Use the same status mapping rules
+   - Use the same subtype mapping rules
+4) Add server-side logs (temporary debug) verifying:
+   - total counts returned for dashboard vs properties use the same method
+   - any differences are eliminated
+
+Testing:
+- Load Dashboard counts.
+- Load Properties counts.
+- Confirm totals and inventory breakdowns match exactly for the same scope.
+
+====================================================
+2) DASHBOARD — RECENT SOLD/CLOSED LIST (MOST RECENT ONLY + FULL SCROLL)
+====================================================
+
+Problems:
+- Recent Sold/Closed should show ONLY the most recent records.
+- If it displays “100 total sold”, user must be able to scroll/page through ALL the way to the last record.
+
+Requirements:
+1) “Recent Sold/Closed” must be strictly sorted by newest close date first.
+2) Show only the most recent items initially (e.g., first 10–20 in the UI).
+3) Enable pagination/infinite scroll so user can continue until the final sold record:
+   - If total sold = 100, the UI must allow browsing all 100.
+4) Ensure performance:
+   - Use paginated API calls (limit/offset or cursor-based).
+   - Do NOT fetch all 100+ records in one request.
+5) Clicking an item still opens the floating property card.
+
+Testing:
+- Confirm order is newest → oldest.
+- Confirm scrolling/paging reaches the last record without breaking.
+- Confirm total count displayed matches the number of available records.
+
+====================================================
+3) PROPERTIES SECTION — ACRONYM TOOLTIP FOR PROPERTY TYPES
+====================================================
+
+Problem:
+- Property types are shown as acronyms and users need clarity.
+
+Requirements:
+1) Add an info icon (ⓘ) beside the property type acronyms section.
+2) On hover (desktop) show a tooltip listing:
+   - Each acronym
+   - Full meaning (example: “SFR = Single Family Residence”)
+3) On mobile/touch:
+   - Tap icon to open/close the tooltip.
+4) Keep tooltip concise and readable.
+
+Testing:
+- Hover shows tooltip on desktop.
+- Tap works on mobile emulation.
+
+====================================================
+4) PROPERTIES SECTION — CHERRY CREEK + ALL STATUSES ERROR
+====================================================
+
+Problem:
+- When Subdivision = Cherry Creek and ALL statuses are enabled (Active + Under Contract + Closed),
+  View Result shows: “Error loading properties. Please try again or modify your search criteria”.
+
+Requirements:
+1) Reproduce the issue exactly:
+   - Subdivision: Cherry Creek
+   - Status: Active ON, Under Contract ON, Closed ON
+2) Identify root cause:
+   - Backend query building invalid status filter
+   - Status filter incorrectly uses AND instead of OR
+   - UI sends empty/invalid status array
+   - Backend mapping filtering out everything post-fetch
+   - Repliers API constraints (request too large / rate limit / validation error)
+3) Fix logic so multi-status = UNION (OR):
+   - Selecting multiple statuses should return results for ANY of the selected statuses.
+   - “All statuses” must work reliably.
+4) Improve error handling:
+   - Log the exact Repliers request and response error code/message.
+   - Return a clearer UI error if it’s a Repliers-side validation issue.
+5) Ensure results load for Cherry Creek with all statuses ON without error.
+
+Testing:
+- Run the same Cherry Creek search with all statuses ON:
+  - Confirm results load successfully.
+- Confirm Active-only, UC-only, Closed-only searches also work.
+
+====================================================
+FINAL REPORT REQUIRED
+====================================================
+
+Provide:
+1) The single backend method/endpoint used to unify counts across Dashboard + Properties.
+2) Proof totals/inventories match across both pages.
+3) Recent Sold/Closed pagination design (limit/cursor) and confirmation it reaches last record.
+4) Tooltip mapping for property type acronyms.
+5) Root cause + fix for Cherry Creek multi-status error with logs/screenshots.

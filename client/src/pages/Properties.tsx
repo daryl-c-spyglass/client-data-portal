@@ -374,9 +374,27 @@ export default function Properties() {
                   Closed: {(inventory.countsByStatus['Closed'] || 0).toLocaleString()}
                 </Badge>
               </div>
-              {/* Subtype counts - show all required categories */}
+              {/* Subtype counts - show all required categories with acronym tooltip */}
               <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
                 <span>Property Types:</span>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button variant="ghost" size="sm" className="h-5 w-5 p-0 cursor-help" data-testid="button-acronym-info">
+                      <Info className="w-3 h-3 text-muted-foreground" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent className="max-w-xs">
+                    <div className="space-y-1 text-xs">
+                      <p><strong>Property Type Acronyms:</strong></p>
+                      <p><strong>SFR</strong> = Single Family Residence</p>
+                      <p><strong>Condo</strong> = Condominium</p>
+                      <p><strong>TH</strong> = Townhouse</p>
+                      <p><strong>Multi</strong> = Multi-Family (2-4 units)</p>
+                      <p><strong>Land</strong> = Land/Ranch/Lots</p>
+                      <p><strong>Other</strong> = Commercial/Industrial/Other</p>
+                    </div>
+                  </TooltipContent>
+                </Tooltip>
                 {inventory.countsBySubtype ? (
                   <>
                     <Badge variant="outline" className="text-xs" data-testid="badge-inventory-sfr">
@@ -465,7 +483,27 @@ export default function Properties() {
               
               {/* Inventory by Subtype */}
               <div>
-                <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">By Property Type</span>
+                <div className="flex items-center gap-1">
+                  <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">By Property Type</span>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button variant="ghost" size="sm" className="h-4 w-4 p-0 cursor-help" data-testid="button-acronym-info-results">
+                        <Info className="w-3 h-3 text-muted-foreground" />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent className="max-w-xs">
+                      <div className="space-y-1 text-xs">
+                        <p><strong>Property Type Acronyms:</strong></p>
+                        <p><strong>Single Family</strong> = Single Family Residence (SFR)</p>
+                        <p><strong>Condo</strong> = Condominium</p>
+                        <p><strong>Townhouse</strong> = Townhouse (TH)</p>
+                        <p><strong>Multi-Family</strong> = 2-4 Unit Properties</p>
+                        <p><strong>Land/Ranch</strong> = Lots, Acreage, Farms</p>
+                        <p><strong>Other</strong> = Commercial/Industrial</p>
+                      </div>
+                    </TooltipContent>
+                  </Tooltip>
+                </div>
                 <div className="flex flex-wrap gap-2 mt-2">
                   <Badge variant="outline" data-testid="badge-subtype-sfr">
                     <Home className="w-3 h-3 mr-1" />
