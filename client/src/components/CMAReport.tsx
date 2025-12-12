@@ -48,17 +48,21 @@ const subjectIcon = new L.DivIcon({
 
 // Custom marker icon for comp properties based on status
 const getCompIcon = (status: string) => {
-  let color = '#3b82f6'; // blue for active
+  let borderColor = '#22c55e'; // green for active
+  let bgColor = 'rgba(34, 197, 94, 0.15)'; // light green background
   if (status === 'Closed' || status === 'Sold') {
-    color = '#6b7280'; // gray for sold
+    borderColor = '#6b7280'; // gray for sold
+    bgColor = 'rgba(107, 114, 128, 0.15)';
   } else if (status === 'Under Contract' || status === 'Pending') {
-    color = '#f59e0b'; // amber for under contract
+    borderColor = '#f59e0b'; // orange for under contract
+    bgColor = 'rgba(245, 158, 11, 0.15)';
   }
   return new L.DivIcon({
-    html: `<div style="background-color:${color};width:16px;height:16px;border-radius:50%;border:2px solid white;box-shadow:0 2px 4px rgba(0,0,0,0.3);"></div>`,
-    className: 'custom-div-icon',
-    iconSize: [16, 16],
-    iconAnchor: [8, 8],
+    html: `<div style="display:flex;align-items:center;justify-content:center;width:32px;height:32px;background-color:${bgColor};border:3px solid ${borderColor};border-radius:8px;box-shadow:0 2px 6px rgba(0,0,0,0.3);font-size:18px;">🏠</div>`,
+    className: 'custom-house-icon',
+    iconSize: [32, 32],
+    iconAnchor: [16, 32],
+    popupAnchor: [0, -32],
   });
 };
 
@@ -366,7 +370,7 @@ export function CMAReport({
 
       {/* Main Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="grid w-full grid-cols-5">
+        <TabsList className="grid w-full grid-cols-4">
           <TabsTrigger value="home-averages" data-testid="tab-home-averages" className="flex items-center gap-1">
             Home Averages
             <Tooltip>
@@ -379,25 +383,14 @@ export function CMAReport({
             </Tooltip>
           </TabsTrigger>
           <TabsTrigger value="listings" data-testid="tab-listings" className="flex items-center gap-1">
-            Listings
-            <Tooltip>
-              <TooltipTrigger asChild onClick={(e) => e.stopPropagation()}>
-                <Info className="w-3 h-3 text-muted-foreground cursor-help" />
-              </TooltipTrigger>
-              <TooltipContent side="bottom" sideOffset={8} className="max-w-md z-50">
-                <p>Detailed breakdown of comparable properties by status: Active, Under Contract, and Sold listings with price distribution.</p>
-              </TooltipContent>
-            </Tooltip>
-          </TabsTrigger>
-          <TabsTrigger value="map" data-testid="tab-map" className="flex items-center gap-1">
             <MapIcon className="w-4 h-4" />
-            Map
+            Listings & Map
             <Tooltip>
               <TooltipTrigger asChild onClick={(e) => e.stopPropagation()}>
                 <Info className="w-3 h-3 text-muted-foreground cursor-help" />
               </TooltipTrigger>
               <TooltipContent side="bottom" sideOffset={8} className="max-w-md z-50">
-                <p>Interactive map showing the location of all comparable properties with color-coded status markers.</p>
+                <p>Detailed breakdown of comparable properties with interactive map showing locations.</p>
               </TooltipContent>
             </Tooltip>
           </TabsTrigger>
@@ -622,19 +615,23 @@ export function CMAReport({
           </Card>
         </TabsContent>
 
-        {/* Listings Tab - Properties sorted by price low→high */}
+        {/* Listings Tab - Properties sorted by price low→high with Map */}
         <TabsContent value="listings" className="space-y-6">
-          <Tabs value={activeListingTab} onValueChange={setActiveListingTab}>
-            <TabsList>
-              <TabsTrigger value="all" data-testid="subtab-all">All ({allProperties.length})</TabsTrigger>
-              <TabsTrigger value="sold" data-testid="subtab-sold">Sold ({soldProperties.length})</TabsTrigger>
-              <TabsTrigger value="under-contract" data-testid="subtab-under-contract">
-                Under Contract ({underContractProperties.length})
-              </TabsTrigger>
-              <TabsTrigger value="active" data-testid="subtab-active">Active ({activeProperties.length})</TabsTrigger>
-            </TabsList>
+          {/* Side-by-side layout: List on left, Map on right */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* Left Column: Property List */}
+            <div className="space-y-4">
+              <Tabs value={activeListingTab} onValueChange={setActiveListingTab}>
+                <TabsList>
+                  <TabsTrigger value="all" data-testid="subtab-all">All ({allProperties.length})</TabsTrigger>
+                  <TabsTrigger value="sold" data-testid="subtab-sold">Sold ({soldProperties.length})</TabsTrigger>
+                  <TabsTrigger value="under-contract" data-testid="subtab-under-contract">
+                    Under Contract ({underContractProperties.length})
+                  </TabsTrigger>
+                  <TabsTrigger value="active" data-testid="subtab-active">Active ({activeProperties.length})</TabsTrigger>
+                </TabsList>
 
-            <div className="mt-6 space-y-4">
+                <div className="mt-4 space-y-4">
               {/* Summary Stats Cards at Top */}
               {(() => {
                 const filteredProps = activeListingTab === 'all' ? allProperties :
@@ -807,112 +804,170 @@ export function CMAReport({
               </Card>
             </div>
           </Tabs>
+        </div>
+
+        {/* Right Column: Property Map */}
+            <div className="lg:sticky lg:top-4 lg:self-start">
+              <Card>
+                <CardHeader className="pb-3">
+                  <div className="flex items-center justify-between flex-wrap gap-2">
+                    <CardTitle className="flex items-center gap-2 text-base">
+                      <MapIcon className="w-4 h-4" />
+                      Property Locations
+                    </CardTitle>
+                    <div className="flex items-center gap-3 text-xs">
+                      <div className="flex items-center gap-1">
+                        <span className="text-lg">🏠</span>
+                        <div className="w-2 h-2 rounded-sm bg-green-500"></div>
+                        <span>Active</span>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <span className="text-lg">🏠</span>
+                        <div className="w-2 h-2 rounded-sm bg-orange-500"></div>
+                        <span>Pending</span>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <span className="text-lg">🏠</span>
+                        <div className="w-2 h-2 rounded-sm bg-gray-500"></div>
+                        <span>Sold</span>
+                      </div>
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  {(() => {
+                    const propertiesWithCoords = allProperties.filter(
+                      p => p.latitude && p.longitude && 
+                      typeof p.latitude === 'number' && typeof p.longitude === 'number' &&
+                      !isNaN(p.latitude) && !isNaN(p.longitude)
+                    );
+                    
+                    if (propertiesWithCoords.length === 0) {
+                      return (
+                        <div className="h-[400px] flex items-center justify-center bg-muted/10 rounded-lg border border-dashed">
+                          <div className="text-center">
+                            <MapIcon className="w-12 h-12 text-muted-foreground mx-auto mb-2" />
+                            <p className="text-muted-foreground">No location data available</p>
+                          </div>
+                        </div>
+                      );
+                    }
+                    
+                    const positions: [number, number][] = propertiesWithCoords.map(
+                      p => [p.latitude as number, p.longitude as number]
+                    );
+                    const center: [number, number] = [
+                      positions.reduce((sum, pos) => sum + pos[0], 0) / positions.length,
+                      positions.reduce((sum, pos) => sum + pos[1], 0) / positions.length
+                    ];
+                    
+                    return (
+                      <div className="h-[400px] rounded-lg overflow-hidden border">
+                        <MapContainer
+                          center={center}
+                          zoom={13}
+                          style={{ height: '100%', width: '100%' }}
+                          scrollWheelZoom={true}
+                        >
+                          <TileLayer
+                            attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+                            url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                          />
+                          <FitBounds positions={positions} />
+                          {propertiesWithCoords.map((property) => {
+                            const price = property.closePrice || property.listPrice || 0;
+                            const status = property.standardStatus || 'Active';
+                            const isSold = status === 'Closed' || status === 'Sold';
+                            
+                            return (
+                              <Marker
+                                key={property.listingId}
+                                position={[property.latitude as number, property.longitude as number]}
+                                icon={getCompIcon(status)}
+                              >
+                                <Popup>
+                                  <div className="min-w-[200px]">
+                                    <p className="font-semibold text-sm">{property.unparsedAddress}</p>
+                                    <p className="text-lg font-bold text-primary">${Number(price).toLocaleString()}</p>
+                                    <Badge variant="outline" className="text-xs mt-1">
+                                      {isSold ? 'Sold' : status}
+                                    </Badge>
+                                    <div className="flex flex-wrap gap-2 text-xs text-muted-foreground mt-2">
+                                      <span>{property.bedroomsTotal || 0} beds</span>
+                                      <span>{property.bathroomsTotalInteger || 0} baths</span>
+                                      {property.livingArea && <span>{Number(property.livingArea).toLocaleString()} sqft</span>}
+                                    </div>
+                                  </div>
+                                </Popup>
+                              </Marker>
+                            );
+                          })}
+                        </MapContainer>
+                      </div>
+                    );
+                  })()}
+                </CardContent>
+              </Card>
+            </div>
+          </div>
         </TabsContent>
 
-        {/* Map Tab */}
-        <TabsContent value="map" className="space-y-6">
-          <Card>
-            <CardHeader>
-              <div className="flex items-center justify-between flex-wrap gap-4">
-                <CardTitle className="flex items-center gap-2">
-                  <MapIcon className="w-5 h-5" />
-                  Property Locations
-                </CardTitle>
-                <div className="flex items-center gap-4 flex-wrap">
-                  <div className="flex items-center gap-2">
-                    <div className="w-4 h-4 rounded-full bg-blue-500 border-2 border-white shadow-sm"></div>
-                    <span className="text-sm">Active</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <div className="w-4 h-4 rounded-full bg-amber-500 border-2 border-white shadow-sm"></div>
-                    <span className="text-sm">Under Contract</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <div className="w-4 h-4 rounded-full bg-gray-500 border-2 border-white shadow-sm"></div>
-                    <span className="text-sm">Sold</span>
-                  </div>
-                </div>
-              </div>
+        {/* Timeline Tab */}
+        <TabsContent value="timeline" className="space-y-6">
+          {/* Market Insights - Texas Agent Metrics */}
+          <Card className="bg-primary/5 border-primary/20">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-base">Market Insights</CardTitle>
             </CardHeader>
             <CardContent>
               {(() => {
-                // Get properties with valid coordinates
-                const propertiesWithCoords = allProperties.filter(
-                  p => p.latitude && p.longitude && 
-                  typeof p.latitude === 'number' && typeof p.longitude === 'number' &&
-                  !isNaN(p.latitude) && !isNaN(p.longitude)
-                );
+                const soldPrices = soldProperties
+                  .map(p => p.closePrice ? Number(p.closePrice) : null)
+                  .filter((p): p is number => p !== null && p > 0)
+                  .sort((a, b) => a - b);
                 
-                if (propertiesWithCoords.length === 0) {
-                  return (
-                    <div className="h-[500px] flex items-center justify-center bg-muted/10 rounded-lg border border-dashed">
-                      <div className="text-center">
-                        <MapIcon className="w-12 h-12 text-muted-foreground mx-auto mb-2" />
-                        <p className="text-muted-foreground">No properties with location data available</p>
-                      </div>
-                    </div>
-                  );
-                }
+                const medianSoldPrice = soldPrices.length > 0 
+                  ? soldPrices[Math.floor(soldPrices.length / 2)] 
+                  : 0;
                 
-                const positions: [number, number][] = propertiesWithCoords.map(
-                  p => [p.latitude as number, p.longitude as number]
-                );
-                const center: [number, number] = [
-                  positions.reduce((sum, pos) => sum + pos[0], 0) / positions.length,
-                  positions.reduce((sum, pos) => sum + pos[1], 0) / positions.length
-                ];
+                const avgDOMSold = soldProperties.length > 0
+                  ? soldProperties.reduce((sum, p) => sum + (p.daysOnMarket || 0), 0) / soldProperties.length
+                  : 0;
+                
+                const ratios = soldProperties
+                  .filter(p => p.listPrice && p.closePrice && Number(p.listPrice) > 0)
+                  .map(p => (Number(p.closePrice) / Number(p.listPrice)) * 100);
+                const avgListToSaleRatio = ratios.length > 0 
+                  ? ratios.reduce((a, b) => a + b, 0) / ratios.length 
+                  : 0;
                 
                 return (
-                  <div className="h-[500px] rounded-lg overflow-hidden border">
-                    <MapContainer
-                      center={center}
-                      zoom={13}
-                      style={{ height: '100%', width: '100%' }}
-                      scrollWheelZoom={true}
-                    >
-                      <TileLayer
-                        attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-                        url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-                      />
-                      <FitBounds positions={positions} />
-                      {propertiesWithCoords.map((property) => {
-                        const price = property.closePrice || property.listPrice || 0;
-                        const status = property.standardStatus || 'Active';
-                        const isSold = status === 'Closed' || status === 'Sold';
-                        
-                        return (
-                          <Marker
-                            key={property.listingId}
-                            position={[property.latitude as number, property.longitude as number]}
-                            icon={getCompIcon(status)}
-                          >
-                            <Popup>
-                              <div className="min-w-[200px]">
-                                <p className="font-semibold text-sm">{property.unparsedAddress}</p>
-                                <p className="text-lg font-bold text-primary">${price.toLocaleString()}</p>
-                                <Badge variant="outline" className="text-xs mt-1">
-                                  {isSold ? 'Sold' : status}
-                                </Badge>
-                                <div className="flex flex-wrap gap-2 text-xs text-muted-foreground mt-2">
-                                  <span>{property.bedroomsTotal || 0} beds</span>
-                                  <span>{property.bathroomsTotalInteger || 0} baths</span>
-                                  {property.livingArea && <span>{Number(property.livingArea).toLocaleString()} sqft</span>}
-                                </div>
-                              </div>
-                            </Popup>
-                          </Marker>
-                        );
-                      })}
-                    </MapContainer>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div className="text-center p-3 bg-background rounded-lg border">
+                      <div className="text-2xl font-bold text-primary">
+                        {medianSoldPrice > 0 ? `$${medianSoldPrice.toLocaleString()}` : 'N/A'}
+                      </div>
+                      <div className="text-sm text-muted-foreground">Median Sold Price</div>
+                    </div>
+                    <div className="text-center p-3 bg-background rounded-lg border">
+                      <div className="text-2xl font-bold">
+                        {avgDOMSold > 0 ? `${Math.round(avgDOMSold)} days` : 'N/A'}
+                      </div>
+                      <div className="text-sm text-muted-foreground">Avg Days on Market (Sold)</div>
+                    </div>
+                    <div className="text-center p-3 bg-background rounded-lg border">
+                      <div className="text-2xl font-bold">
+                        {avgListToSaleRatio > 0 ? `${avgListToSaleRatio.toFixed(1)}%` : 'N/A'}
+                      </div>
+                      <div className="text-sm text-muted-foreground">List-to-Sale Ratio</div>
+                    </div>
                   </div>
                 );
               })()}
             </CardContent>
           </Card>
-        </TabsContent>
 
-        {/* Timeline Tab */}
-        <TabsContent value="timeline" className="space-y-6">
+          {/* Price Timeline */}
           <Card>
             <CardHeader>
               <div className="flex items-center justify-between flex-wrap gap-4">
@@ -1033,14 +1088,14 @@ export function CMAReport({
                       <ReferenceLine 
                         y={timelineStats.avg} 
                         stroke="#3b82f6" 
-                        strokeDasharray="5 5" 
+                        strokeWidth={2}
                         label={{ value: 'Avg', position: 'right', fontSize: 11, fill: '#3b82f6' }}
                       />
                       <ReferenceLine 
                         y={timelineStats.median} 
-                        stroke="#8b5cf6" 
-                        strokeDasharray="3 3" 
-                        label={{ value: 'Median', position: 'left', fontSize: 11, fill: '#8b5cf6' }}
+                        stroke="#a855f7" 
+                        strokeWidth={2}
+                        label={{ value: 'Median', position: 'left', fontSize: 11, fill: '#a855f7' }}
                       />
                       <Scatter 
                         name="Properties"
@@ -1081,14 +1136,14 @@ export function CMAReport({
                     </TableHeader>
                     <TableBody>
                       <TableRow>
-                        <TableCell className="font-medium">Price ({timelineStats.count} properties)</TableCell>
+                        <TableCell className="font-medium">Price</TableCell>
                         <TableCell className="text-right">
                           ${timelineStats.min.toLocaleString()} - ${timelineStats.max.toLocaleString()}
                         </TableCell>
                         <TableCell className="text-right font-semibold text-blue-600">
                           ${Math.round(timelineStats.avg).toLocaleString()}
                         </TableCell>
-                        <TableCell className="text-right font-semibold text-purple-600">
+                        <TableCell className="text-right font-semibold text-purple-500">
                           ${Math.round(timelineStats.median).toLocaleString()}
                         </TableCell>
                       </TableRow>
@@ -1106,199 +1161,12 @@ export function CMAReport({
               );
               })()}
               
-              {/* Status Filters */}
-              <div className="flex items-center gap-6 pt-4 border-t mt-4">
-                <span className="text-sm font-medium">Filter by Status:</span>
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <Checkbox 
-                    checked={showActiveOnTimeline} 
-                    onCheckedChange={(checked) => setShowActiveOnTimeline(checked === true)}
-                    data-testid="checkbox-filter-active"
-                  />
-                  <span className="text-sm flex items-center gap-1">
-                    <div className="w-2 h-2 rounded-full bg-green-500"></div>
-                    Active ({activeProperties.length})
-                  </span>
-                </label>
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <Checkbox 
-                    checked={showUnderContractOnTimeline} 
-                    onCheckedChange={(checked) => setShowUnderContractOnTimeline(checked === true)}
-                    data-testid="checkbox-filter-under-contract"
-                  />
-                  <span className="text-sm flex items-center gap-1">
-                    <div className="w-2 h-2 rounded-full bg-yellow-500"></div>
-                    Under Contract ({underContractProperties.length})
-                  </span>
-                </label>
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <Checkbox 
-                    checked={showSoldOnTimeline} 
-                    onCheckedChange={(checked) => setShowSoldOnTimeline(checked === true)}
-                    data-testid="checkbox-filter-sold"
-                  />
-                  <span className="text-sm flex items-center gap-1">
-                    <div className="w-2 h-2 rounded-full bg-red-500"></div>
-                    Sold/Closed ({soldProperties.length})
-                  </span>
-                </label>
-              </div>
-            </CardContent>
-          </Card>
-          
-          {/* Summary Insights Bar - Texas Agent Metrics */}
-          <Card className="bg-primary/5 border-primary/20">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-base">Market Insights</CardTitle>
-            </CardHeader>
-            <CardContent>
-              {(() => {
-                // Calculate insights from sold properties
-                const soldPrices = soldProperties
-                  .map(p => p.closePrice ? Number(p.closePrice) : null)
-                  .filter((p): p is number => p !== null && p > 0)
-                  .sort((a, b) => a - b);
-                
-                const medianSoldPrice = soldPrices.length > 0 
-                  ? soldPrices[Math.floor(soldPrices.length / 2)] 
-                  : 0;
-                
-                const avgDOMSold = soldProperties.length > 0
-                  ? soldProperties.reduce((sum, p) => sum + (p.daysOnMarket || 0), 0) / soldProperties.length
-                  : 0;
-                
-                // Calculate list-to-sale ratio
-                const ratios = soldProperties
-                  .filter(p => p.listPrice && p.closePrice && Number(p.listPrice) > 0)
-                  .map(p => (Number(p.closePrice) / Number(p.listPrice)) * 100);
-                const avgListToSaleRatio = ratios.length > 0 
-                  ? ratios.reduce((a, b) => a + b, 0) / ratios.length 
-                  : 0;
-                
-                return (
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <div className="text-center p-3 bg-background rounded-lg border">
-                      <div className="text-2xl font-bold text-primary">
-                        {medianSoldPrice > 0 ? `$${medianSoldPrice.toLocaleString()}` : 'N/A'}
-                      </div>
-                      <div className="text-sm text-muted-foreground">Median Sold Price</div>
-                    </div>
-                    <div className="text-center p-3 bg-background rounded-lg border">
-                      <div className="text-2xl font-bold">
-                        {avgDOMSold > 0 ? `${Math.round(avgDOMSold)} days` : 'N/A'}
-                      </div>
-                      <div className="text-sm text-muted-foreground">Avg Days on Market (Sold)</div>
-                    </div>
-                    <div className="text-center p-3 bg-background rounded-lg border">
-                      <div className="text-2xl font-bold">
-                        {avgListToSaleRatio > 0 ? `${avgListToSaleRatio.toFixed(1)}%` : 'N/A'}
-                      </div>
-                      <div className="text-sm text-muted-foreground">List-to-Sale Ratio</div>
-                    </div>
-                  </div>
-                );
-              })()}
             </CardContent>
           </Card>
         </TabsContent>
 
         {/* Market Stats Tab */}
         <TabsContent value="market-stats" className="space-y-6">
-          {/* Market Health Indicator - Inventory Dial */}
-          {(() => {
-            // Calculate months of inventory based on sold rate
-            // Months of Inventory = Active Listings / (Sold properties per month)
-            const activeCount = activeProperties.length;
-            const soldCount = soldProperties.length;
-            
-            // Estimate monthly absorption: assume sold data spans ~6 months
-            const avgSoldPerMonth = soldCount > 0 ? soldCount / 6 : 0;
-            const monthsOfInventory = avgSoldPerMonth > 0 ? activeCount / avgSoldPerMonth : 0;
-            const absorptionRate = avgSoldPerMonth; // Sales per month
-            
-            // Market condition based on months of inventory
-            // < 4 months = Seller's market, 4-6 = Balanced, > 6 = Buyer's market
-            let marketCondition = 'Balanced';
-            let marketColor = 'text-blue-600';
-            let gaugeColor = 'bg-blue-500';
-            let gaugePosition = 50; // percentage (0-100)
-            
-            if (monthsOfInventory < 4) {
-              marketCondition = "Seller's Market";
-              marketColor = 'text-red-600';
-              gaugeColor = 'bg-red-500';
-              gaugePosition = Math.max(10, 25 - (4 - monthsOfInventory) * 6);
-            } else if (monthsOfInventory > 6) {
-              marketCondition = "Buyer's Market";
-              marketColor = 'text-green-600';
-              gaugeColor = 'bg-green-500';
-              gaugePosition = Math.min(90, 75 + (monthsOfInventory - 6) * 3);
-            } else {
-              gaugePosition = 25 + ((monthsOfInventory - 4) / 2) * 50;
-            }
-            
-            return (
-              <Card className="border-2 border-primary/20">
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-lg">Market Health Indicator</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="flex flex-col md:flex-row gap-6 items-center">
-                    {/* Gauge visualization */}
-                    <div className="flex-1 min-w-[200px]">
-                      <div className="relative h-4 bg-gradient-to-r from-red-500 via-blue-500 to-green-500 rounded-full overflow-hidden">
-                        <div 
-                          className="absolute top-1/2 -translate-y-1/2 w-4 h-6 bg-foreground rounded-sm border-2 border-background shadow-lg transition-all duration-500"
-                          style={{ left: `calc(${gaugePosition}% - 8px)` }}
-                        />
-                      </div>
-                      <div className="flex justify-between text-xs text-muted-foreground mt-2">
-                        <span>Seller's Market</span>
-                        <span>Balanced</span>
-                        <span>Buyer's Market</span>
-                      </div>
-                    </div>
-                    
-                    {/* Market stats */}
-                    <div className="grid grid-cols-3 gap-4 text-center flex-1">
-                      <div className="p-3 bg-muted/30 rounded-lg">
-                        <div className={`text-2xl font-bold ${marketColor}`}>
-                          {monthsOfInventory > 0 ? monthsOfInventory.toFixed(1) : 'N/A'}
-                        </div>
-                        <div className="text-xs text-muted-foreground">Months of Inventory</div>
-                      </div>
-                      <div className="p-3 bg-muted/30 rounded-lg">
-                        <div className="text-2xl font-bold text-primary">
-                          {absorptionRate > 0 ? absorptionRate.toFixed(1) : 'N/A'}
-                        </div>
-                        <div className="text-xs text-muted-foreground">Sales/Month</div>
-                      </div>
-                      <div className="p-3 bg-muted/30 rounded-lg">
-                        <div className={`text-xl font-bold ${marketColor}`}>
-                          {marketCondition}
-                        </div>
-                        <div className="text-xs text-muted-foreground">Market Type</div>
-                      </div>
-                    </div>
-                  </div>
-                  
-                  <div className="mt-4 p-3 bg-primary/5 rounded-lg border border-primary/10">
-                    <p className="text-sm text-muted-foreground">
-                      <span className="font-semibold text-foreground">Analysis:</span>{' '}
-                      {monthsOfInventory < 4 ? (
-                        <>Low inventory ({monthsOfInventory.toFixed(1)} months) favors sellers. Expect competitive bidding and quick sales.</>
-                      ) : monthsOfInventory > 6 ? (
-                        <>High inventory ({monthsOfInventory.toFixed(1)} months) favors buyers. More negotiating power and time to decide.</>
-                      ) : (
-                        <>Balanced market ({monthsOfInventory.toFixed(1)} months). Neither buyers nor sellers have a strong advantage.</>
-                      )}
-                    </p>
-                  </div>
-                </CardContent>
-              </Card>
-            );
-          })()}
-          
           {/* Key Metrics Row - Prioritized: Avg Price, Median Price, Price/SqFt, Avg DOM */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
             <Card>
@@ -1441,6 +1309,207 @@ export function CMAReport({
               </div>
             </CardContent>
           </Card>
+
+          {/* Side-by-Side: Inventory Dial + Property Map */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* Left: Market Health Indicator - Inventory Dial */}
+            <div>
+              {(() => {
+                const activeCount = activeProperties.length;
+                const soldCount = soldProperties.length;
+                const avgSoldPerMonth = soldCount > 0 ? soldCount / 6 : 0;
+                const monthsOfInventory = avgSoldPerMonth > 0 ? activeCount / avgSoldPerMonth : 0;
+                const absorptionRate = avgSoldPerMonth;
+                
+                let marketCondition = 'Balanced';
+                let marketColor = 'text-blue-600';
+                let gaugePosition = 50;
+                
+                if (monthsOfInventory < 4) {
+                  marketCondition = "Seller's Market";
+                  marketColor = 'text-red-600';
+                  gaugePosition = Math.max(10, 25 - (4 - monthsOfInventory) * 6);
+                } else if (monthsOfInventory > 6) {
+                  marketCondition = "Buyer's Market";
+                  marketColor = 'text-green-600';
+                  gaugePosition = Math.min(90, 75 + (monthsOfInventory - 6) * 3);
+                } else {
+                  gaugePosition = 25 + ((monthsOfInventory - 4) / 2) * 50;
+                }
+                
+                return (
+                  <Card className="border-2 border-primary/20 h-full">
+                    <CardHeader className="pb-2">
+                      <CardTitle className="text-lg">Market Health Indicator</CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      <div className="space-y-4">
+                        <div className="min-w-[200px]">
+                          <div className="relative h-4 bg-gradient-to-r from-red-500 via-blue-500 to-green-500 rounded-full overflow-hidden">
+                            <div 
+                              className="absolute top-1/2 -translate-y-1/2 w-4 h-6 bg-foreground rounded-sm border-2 border-background shadow-lg transition-all duration-500"
+                              style={{ left: `calc(${gaugePosition}% - 8px)` }}
+                            />
+                          </div>
+                          <div className="flex justify-between text-xs text-muted-foreground mt-2">
+                            <span>Seller's Market</span>
+                            <span>Balanced</span>
+                            <span>Buyer's Market</span>
+                          </div>
+                        </div>
+                        
+                        <div className="grid grid-cols-3 gap-3 text-center">
+                          <div className="p-3 bg-muted/30 rounded-lg">
+                            <div className={`text-xl font-bold ${marketColor}`}>
+                              {monthsOfInventory > 0 ? monthsOfInventory.toFixed(1) : 'N/A'}
+                            </div>
+                            <div className="text-xs text-muted-foreground">Months Inventory</div>
+                          </div>
+                          <div className="p-3 bg-muted/30 rounded-lg">
+                            <div className="text-xl font-bold text-primary">
+                              {absorptionRate > 0 ? absorptionRate.toFixed(1) : 'N/A'}
+                            </div>
+                            <div className="text-xs text-muted-foreground">Sales/Month</div>
+                          </div>
+                          <div className="p-3 bg-muted/30 rounded-lg">
+                            <div className={`text-lg font-bold ${marketColor}`}>
+                              {marketCondition}
+                            </div>
+                            <div className="text-xs text-muted-foreground">Market Type</div>
+                          </div>
+                        </div>
+                      </div>
+                      
+                      <div className="p-3 bg-primary/5 rounded-lg border border-primary/10">
+                        <p className="text-sm text-muted-foreground">
+                          <span className="font-semibold text-foreground">Analysis:</span>{' '}
+                          {monthsOfInventory < 4 ? (
+                            <>Low inventory ({monthsOfInventory.toFixed(1)} mo) favors sellers.</>
+                          ) : monthsOfInventory > 6 ? (
+                            <>High inventory ({monthsOfInventory.toFixed(1)} mo) favors buyers.</>
+                          ) : (
+                            <>Balanced market ({monthsOfInventory.toFixed(1)} mo).</>
+                          )}
+                        </p>
+                      </div>
+                    </CardContent>
+                  </Card>
+                );
+              })()}
+            </div>
+
+            {/* Right: Property Map */}
+            <div>
+              <Card className="h-full">
+                <CardHeader className="pb-3">
+                  <div className="flex items-center justify-between flex-wrap gap-2">
+                    <CardTitle className="flex items-center gap-2 text-base">
+                      <MapIcon className="w-4 h-4" />
+                      Property Locations
+                    </CardTitle>
+                    <div className="flex items-center gap-3 text-xs">
+                      <div className="flex items-center gap-1">
+                        <span className="text-lg">🏠</span>
+                        <div className="w-2 h-2 rounded-sm bg-green-500"></div>
+                        <span>Active</span>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <span className="text-lg">🏠</span>
+                        <div className="w-2 h-2 rounded-sm bg-orange-500"></div>
+                        <span>Pending</span>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <span className="text-lg">🏠</span>
+                        <div className="w-2 h-2 rounded-sm bg-gray-500"></div>
+                        <span>Sold</span>
+                      </div>
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  {(() => {
+                    const propertiesWithCoords = allProperties.filter(
+                      p => p.latitude && p.longitude && 
+                      typeof p.latitude === 'number' && typeof p.longitude === 'number' &&
+                      !isNaN(p.latitude) && !isNaN(p.longitude)
+                    );
+                    
+                    if (propertiesWithCoords.length === 0) {
+                      return (
+                        <div className="h-[300px] flex items-center justify-center bg-muted/10 rounded-lg border border-dashed">
+                          <div className="text-center">
+                            <MapIcon className="w-12 h-12 text-muted-foreground mx-auto mb-2" />
+                            <p className="text-muted-foreground">No location data available</p>
+                          </div>
+                        </div>
+                      );
+                    }
+                    
+                    const bounds = propertiesWithCoords.map(p => [p.latitude as number, p.longitude as number] as [number, number]);
+                    const centerLat = bounds.reduce((sum, [lat]) => sum + lat, 0) / bounds.length;
+                    const centerLng = bounds.reduce((sum, [, lng]) => sum + lng, 0) / bounds.length;
+                    
+                    const getCompIcon = (status: string) => {
+                      let filter = 'grayscale(100%) brightness(0.6)';
+                      if (status === 'Active') {
+                        filter = 'sepia(100%) hue-rotate(80deg) saturate(200%)';
+                      } else if (status === 'Active Under Contract' || status === 'Pending' || status === 'Under Contract') {
+                        filter = 'sepia(100%) saturate(200%) hue-rotate(0deg)';
+                      }
+                      
+                      return L.divIcon({
+                        className: 'custom-house-marker',
+                        html: `<span style="font-size: 24px; filter: ${filter};">🏠</span>`,
+                        iconSize: [30, 30],
+                        iconAnchor: [15, 15],
+                      });
+                    };
+                    
+                    return (
+                      <div className="h-[300px] rounded-lg overflow-hidden border">
+                        <MapContainer
+                          center={[centerLat, centerLng]}
+                          zoom={12}
+                          style={{ height: '100%', width: '100%' }}
+                          scrollWheelZoom={false}
+                        >
+                          <TileLayer
+                            attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+                            url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                          />
+                          {propertiesWithCoords.map((property) => {
+                            const status = property.standardStatus || 'Active';
+                            const isSold = status === 'Closed' || status === 'Sold';
+                            const price = isSold 
+                              ? (property.closePrice ? Number(property.closePrice) : (property.listPrice ? Number(property.listPrice) : 0))
+                              : (property.listPrice ? Number(property.listPrice) : 0);
+                            
+                            return (
+                              <Marker
+                                key={property.listingId}
+                                position={[property.latitude as number, property.longitude as number]}
+                                icon={getCompIcon(status)}
+                              >
+                                <Popup>
+                                  <div className="min-w-[180px]">
+                                    <p className="font-semibold text-sm">{property.unparsedAddress}</p>
+                                    <p className="text-lg font-bold text-primary">${Number(price).toLocaleString()}</p>
+                                    <Badge variant="outline" className="text-xs mt-1">
+                                      {isSold ? 'Sold' : status}
+                                    </Badge>
+                                  </div>
+                                </Popup>
+                              </Marker>
+                            );
+                          })}
+                        </MapContainer>
+                      </div>
+                    );
+                  })()}
+                </CardContent>
+              </Card>
+            </div>
+          </div>
 
           {/* Price Trend Chart */}
           <Card>

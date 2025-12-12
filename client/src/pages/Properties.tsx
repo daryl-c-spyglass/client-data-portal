@@ -611,7 +611,13 @@ export default function Properties() {
         </TabsList>
 
         <TabsContent value="search">
-          <SearchCriteriaForm onSearch={handleSearch} initialCriteria={searchCriteria || {}} />
+          <SearchCriteriaForm 
+            onSearch={handleSearch} 
+            initialCriteria={searchCriteria || {}} 
+            selectedCount={selectedIds.size}
+            onSendProperties={handleSendProperties}
+            onQuickCMA={handleQuickCMA}
+          />
         </TabsContent>
 
         <TabsContent value="map">
@@ -688,31 +694,6 @@ export default function Properties() {
         </TabsContent>
       </Tabs>
 
-      {/* Floating Action Buttons - Always visible, enabled when properties selected */}
-      <div className="fixed bottom-6 right-6 flex flex-col gap-3 z-50" data-testid="floating-actions">
-        <Button
-          size="lg"
-          variant={selectedIds.size > 0 ? "default" : "secondary"}
-          disabled={selectedIds.size === 0}
-          onClick={handleSendProperties}
-          className="shadow-lg gap-2"
-          data-testid="button-send-properties"
-        >
-          <Send className="w-4 h-4" />
-          Send Properties {selectedIds.size > 0 && `(${selectedIds.size})`}
-        </Button>
-        <Button
-          size="lg"
-          variant={selectedIds.size > 0 ? "default" : "secondary"}
-          disabled={selectedIds.size === 0}
-          onClick={handleQuickCMA}
-          className="shadow-lg gap-2"
-          data-testid="button-quick-cma"
-        >
-          <FileBarChart2 className="w-4 h-4" />
-          Quick CMA {selectedIds.size > 0 && `(${selectedIds.size})`}
-        </Button>
-      </div>
     </div>
   );
 }

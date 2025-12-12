@@ -6,7 +6,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Switch } from "@/components/ui/switch";
-import { CalendarIcon, Search, X } from "lucide-react";
+import { CalendarIcon, Search, X, Send, FileBarChart2 } from "lucide-react";
 import { format } from "date-fns";
 import type { SearchCriteria } from "@shared/schema";
 
@@ -147,9 +147,12 @@ function AutocompleteInput({ id, placeholder, values, onChange, apiEndpoint, tes
 interface SearchCriteriaProps {
   onSearch: (criteria: SearchCriteria) => void;
   initialCriteria?: Partial<SearchCriteria>;
+  selectedCount?: number;
+  onSendProperties?: () => void;
+  onQuickCMA?: () => void;
 }
 
-export function SearchCriteriaForm({ onSearch, initialCriteria = {} }: SearchCriteriaProps) {
+export function SearchCriteriaForm({ onSearch, initialCriteria = {}, selectedCount = 0, onSendProperties, onQuickCMA }: SearchCriteriaProps) {
   const [criteria, setCriteria] = useState<Partial<SearchCriteria>>(initialCriteria);
   
   const updateCriteria = (key: string, value: any) => {
@@ -484,15 +487,44 @@ export function SearchCriteriaForm({ onSearch, initialCriteria = {} }: SearchCri
         </div>
       </div>
 
-      {/* Submit Button */}
-      <div className="flex justify-end gap-4">
+      {/* Submit Button Row */}
+      <div className="flex justify-end items-center gap-3 flex-wrap">
         <Button type="button" variant="outline" onClick={() => setCriteria({})} data-testid="button-reset">
           Reset
         </Button>
-        <Button type="submit" data-testid="button-search">
+        <Button 
+          type="submit" 
+          variant="outline"
+          className="border-orange-500 text-orange-500 bg-white hover:bg-orange-50 dark:bg-background dark:hover:bg-orange-950/20"
+          data-testid="button-search"
+        >
           <Search className="w-4 h-4 mr-2" />
           Search Properties
         </Button>
+        {onSendProperties && (
+          <Button 
+            type="button"
+            disabled={selectedCount === 0}
+            onClick={onSendProperties}
+            className="bg-orange-500 text-white hover:bg-orange-600 disabled:opacity-50"
+            data-testid="button-send-properties"
+          >
+            <Send className="w-4 h-4 mr-2" />
+            Send Properties {selectedCount > 0 && `(${selectedCount})`}
+          </Button>
+        )}
+        {onQuickCMA && (
+          <Button 
+            type="button"
+            disabled={selectedCount === 0}
+            onClick={onQuickCMA}
+            className="bg-orange-500 text-white hover:bg-orange-600 disabled:opacity-50"
+            data-testid="button-quick-cma"
+          >
+            <FileBarChart2 className="w-4 h-4 mr-2" />
+            Quick CMA {selectedCount > 0 && `(${selectedCount})`}
+          </Button>
+        )}
       </div>
     </form>
   );

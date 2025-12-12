@@ -1,0 +1,168 @@
+You are working ONLY on:
+1) AGENT PROPERTIES section (button alignment + styling)
+2) CMA RESULTS / CREATED CMA section (Listings map layout, Timeline, Market Stats layout + markers)
+NOT IDX/public pages.
+
+Data source: Repliers. Leasing/rentals excluded globally.
+Implement changes one-by-one and test each.
+
+====================================================
+A) PROPERTIES SECTION — ALIGN + RESTYLE BUTTONS (SEND PROPERTIES / QUICK CMA)
+====================================================
+
+Current issue:
+- “Send Properties” and “Quick CMA” buttons are floating and not aligned with Reset / Search Properties.
+- Styling does not match Spyglass palette and needs consistency.
+
+Requirements:
+1) Layout alignment:
+- Place buttons in the SAME row and aligned with:
+  - Reset
+  - Search Properties
+- The order must be:
+  [Reset]  [Search Properties]  [Send Properties]  [Quick CMA]
+- All buttons must be vertically aligned and consistent height/padding.
+- Remove floating placement for these actions (no bottom-right floating for this screen).
+
+2) Styling:
+- Search Properties button:
+  - background: WHITE
+  - border: Spyglass palette ORANGE outline
+  - text: ORANGE
+- Send Properties & Quick CMA buttons:
+  - background: Spyglass palette ORANGE
+  - text: WHITE
+  - hover: slightly darker orange
+
+3) Functionality:
+- Ensure BOTH buttons are working end-to-end:
+  - Send Properties → redirects to Seller Updates and pre-fills selected properties.
+  - Quick CMA → redirects to CMA create flow and pre-fills comps.
+- Buttons should be disabled if there are 0 selected properties, enabled otherwise.
+- Add selection count in label:
+  - “Send Properties (N)”
+  - “Quick CMA (N)”
+
+Testing (required):
+- Select 3 properties → confirm Send Properties works and data is passed.
+- Select 3 properties → confirm Quick CMA works and data is passed.
+- Confirm visual alignment and colors match requirements.
+
+====================================================
+B) CREATED CMA — MOVE MAP INTO LISTINGS (SIDE-BY-SIDE)
+====================================================
+
+Goal:
+- In CMA Results, put the Map inside the “Listings” section and display it side-by-side with the list.
+
+Requirements:
+1) In the Listings tab/section:
+- Layout should be a 2-column view:
+  - Left: List of properties (subject + comps)
+  - Right: Map
+- Make both panes scroll-friendly:
+  - List scrolls independently
+  - Map stays visible (sticky is OK)
+
+2) Map markers:
+- Replace dot markers with a HOUSE EMOJI marker (🏠).
+- House emoji markers must be used across ALL maps in CMA (Listings map + Market Stats map, etc.).
+- Add status color variation:
+  - Active: green tint/outline
+  - Under Contract: orange/yellow tint/outline
+  - Sold/Closed: gray/red tint/outline
+(Do not change the emoji itself; change the marker container/pin styling behind it.)
+
+3) Map interactions:
+- Clicking a marker opens the same floating property card used elsewhere.
+- Fit bounds to show all properties by default.
+
+Testing:
+- Generate a CMA with 5+ comps → confirm side-by-side layout works and markers show as 🏠 with status styling.
+- Click markers → floating card opens.
+
+====================================================
+C) TIMELINE — CHART & UI CLEANUP + BLOCK ORDER
+====================================================
+
+Requirements:
+1) Price Timeline chart:
+- Change the broken/dashed line to a STRAIGHT SOLID line.
+- Ensure Median is NOT the same color as Average:
+  - Average line color must differ from Median line color.
+- Remove the label “Metric: Price (5 properties)”.
+- Retain the statistics columns:
+  - Range
+  - Average
+  - Median
+
+2) Remove filter controls:
+- Remove “Filter by Status” from Timeline.
+
+3) Reorder blocks:
+- Move “Market Insights” block ABOVE the “Price Timeline” block.
+
+Testing:
+- Open CMA Results → Timeline section:
+  - Solid line is visible
+  - Average and Median are visually distinct
+  - Status filter removed
+  - Market Insights appears above Price Timeline
+  - Range/Average/Median remain visible
+
+====================================================
+D) MARKET STATS — INVENTORY DIAL + MAP SIDE-BY-SIDE (BELOW CMA MARKET REVIEW)
+====================================================
+
+Goal:
+- Market Stats should show the Inventory Dial beside the Map and place them below CMA Market Review.
+
+Requirements:
+1) Layout:
+- In Market Stats section:
+  - Keep “CMA Market Review” at the top.
+  - Directly BELOW it, add a 2-column layout:
+    - Left: Inventory Dial widget
+    - Right: Map
+- Ensure spacing and sizing are balanced for a professional look.
+
+2) Inventory Dial content:
+- Show what is already used:
+  - Absorption Rate: “X properties per month”
+  - Inventory: “Y month(s)”
+- Ensure values are derived from Repliers data and rental-excluded dataset.
+
+3) Market Stats map markers:
+- Use HOUSE EMOJI markers (🏠) instead of dots.
+- Apply the same status color variations as Listings map.
+- Apply house emoji markers consistently “across section for property location”.
+
+Testing:
+- Open Market Stats:
+  - CMA Market Review visible
+  - Inventory Dial and Map appear side-by-side below it
+  - House emoji markers are used and color-coded by status
+  - Clicking marker opens floating property card
+
+====================================================
+FINAL REQUIREMENTS
+====================================================
+
+1) Consistency:
+- House emoji markers (🏠) must be used across CMA maps (Listings + Market Stats + any other CMA map).
+- Status color variation must be consistent everywhere.
+
+2) No regressions:
+- Do not break existing carousel, floating cards, or selection flows.
+
+====================================================
+FINAL REPORT REQUIRED
+====================================================
+
+Provide:
+- Screenshots showing:
+  1) Properties button row alignment + new colors
+  2) Listings side-by-side layout with 🏠 markers
+  3) Timeline chart with solid line + distinct avg/median + removed controls
+  4) Market Stats CMA Market Review + Inventory Dial beside Map with 🏠 markers
+- Confirmation testing steps were performed and passed.
