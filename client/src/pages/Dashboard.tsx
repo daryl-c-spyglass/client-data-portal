@@ -477,6 +477,12 @@ export default function Dashboard() {
   // CMA sorting state (session-only)
   const [cmaSortBy, setCmaSortBy] = useState<'date' | 'name' | 'comps'>('date');
   
+  // Auto-carousel state
+  const [carouselPaused, setCarouselPaused] = useState(false);
+  const [carouselHovered, setCarouselHovered] = useState(false);
+  const manualInteractionTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const autoScrollIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  
   const { data: stats, isLoading: statsLoading } = useQuery<DashboardStats>({
     queryKey: ['/api/stats/dashboard'],
   });
@@ -597,15 +603,77 @@ export default function Dashboard() {
 
   const isLoading = statsLoading || cmasLoading;
   
-  const scrollCarousel = (direction: 'left' | 'right') => {
+  // Check for reduced motion preference
+  const prefersReducedMotion = typeof window !== 'undefined' 
+    && window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches;
+  
+  const scrollCarousel = (direction: 'left' | 'right', isManual = false) => {
     if (carouselRef.current) {
       const scrollAmount = 300;
       carouselRef.current.scrollBy({
         left: direction === 'left' ? -scrollAmount : scrollAmount,
         behavior: 'smooth'
       });
+      
+      // Pause auto-scroll on manual interaction
+      if (isManual) {
+        setCarouselPaused(true);
+        
+        // Clear any existing timeout
+        if (manualInteractionTimeoutRef.current) {
+          clearTimeout(manualInteractionTimeoutRef.current);
+        }
+        
+        // Resume auto-scroll after 5 seconds of inactivity
+        manualInteractionTimeoutRef.current = setTimeout(() => {
+          setCarouselPaused(false);
+        }, 5000);
+      }
     }
   };
+  
+  // Auto-scroll carousel every 3 seconds
+  useEffect(() => {
+    // Skip if reduced motion is preferred
+    if (prefersReducedMotion) return;
+    
+    // Clear existing interval
+    if (autoScrollIntervalRef.current) {
+      clearInterval(autoScrollIntervalRef.current);
+    }
+    
+    // Only auto-scroll if not paused and not hovered
+    if (!carouselPaused && !carouselHovered && activePropertiesData?.properties?.length) {
+      autoScrollIntervalRef.current = setInterval(() => {
+        if (carouselRef.current) {
+          const container = carouselRef.current;
+          const maxScroll = container.scrollWidth - container.clientWidth;
+          
+          // If at the end, loop back to start
+          if (container.scrollLeft >= maxScroll - 10) {
+            container.scrollTo({ left: 0, behavior: 'smooth' });
+          } else {
+            container.scrollBy({ left: 300, behavior: 'smooth' });
+          }
+        }
+      }, 3000);
+    }
+    
+    return () => {
+      if (autoScrollIntervalRef.current) {
+        clearInterval(autoScrollIntervalRef.current);
+      }
+    };
+  }, [carouselPaused, carouselHovered, activePropertiesData?.properties?.length, prefersReducedMotion]);
+  
+  // Cleanup timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (manualInteractionTimeoutRef.current) {
+        clearTimeout(manualInteractionTimeoutRef.current);
+      }
+    };
+  }, []);
   
   const handlePropertyClick = (property: DashboardProperty) => {
     setSelectedProperty(property);
@@ -967,7 +1035,7 @@ export default function Dashboard() {
                     <Button 
                       size="icon" 
                       variant="outline"
-                      onClick={() => scrollCarousel('left')}
+                      onClick={() => scrollCarousel('left', true)}
                       data-testid="button-carousel-left"
                     >
                       <ChevronLeft className="w-4 h-4" />
@@ -975,7 +1043,7 @@ export default function Dashboard() {
                     <Button 
                       size="icon" 
                       variant="outline"
-                      onClick={() => scrollCarousel('right')}
+                      onClick={() => scrollCarousel('right', true)}
                       data-testid="button-carousel-right"
                     >
                       <ChevronRight className="w-4 h-4" />
@@ -994,6 +1062,8 @@ export default function Dashboard() {
                       ref={carouselRef}
                       className="flex gap-4 overflow-x-auto pb-2 scrollbar-hide"
                       style={{ scrollSnapType: 'x mandatory' }}
+                      onMouseEnter={() => setCarouselHovered(true)}
+                      onMouseLeave={() => setCarouselHovered(false)}
                     >
                       {activePropertiesData.properties.map(property => (
                         <PropertyCarouselCard

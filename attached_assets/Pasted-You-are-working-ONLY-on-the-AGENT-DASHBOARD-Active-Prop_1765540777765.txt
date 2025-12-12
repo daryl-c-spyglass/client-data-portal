@@ -1,0 +1,64 @@
+You are working ONLY on the AGENT DASHBOARD → “Active Properties” section.
+Do NOT modify CMA pages, IDX/public search, or property detail pages.
+
+Data source: Repliers
+Rental/leasing listings must already be excluded (do not reintroduce them).
+
+====================================================
+ACTIVE PROPERTIES — AUTO-CAROUSEL CARD MOVEMENT
+====================================================
+
+Goal:
+- The Active Properties cards should automatically slide like a carousel every 3 seconds,
+  in addition to existing manual navigation.
+
+Current behavior:
+- Cards are static unless user clicks arrows or scrolls.
+
+Required behavior:
+1) Enable automatic carousel movement:
+   - Cards auto-advance every 3 seconds.
+   - Movement should be smooth (no jump / jitter).
+   - Loop back to the first card after the last card.
+
+2) Manual control must still work:
+   - Left / Right arrow buttons remain functional.
+   - Manual interaction should temporarily pause auto-rotation, then resume after inactivity.
+
+3) Do NOT cap the number of properties:
+   - All eligible Active properties (post-filtering) should be part of the carousel.
+
+4) Maintain current card content:
+   - Image
+   - Price
+   - Status badge
+   - Beds / Baths / Sq Ft
+   - Address
+   - City / State
+   - Clicking a card still opens the floating property modal.
+
+5) Accessibility & UX:
+   - Auto-carousel must pause on hover.
+   - Keyboard navigation (arrow keys) should continue to work if already implemented.
+   - Respect reduced-motion preferences if present.
+
+====================================================
+TESTING REQUIRED
+====================================================
+
+You MUST verify:
+1) Carousel auto-moves every ~3 seconds.
+2) Manual navigation still works and does not break auto-play.
+3) Auto-play resumes after manual interaction.
+4) Carousel loops correctly after the last property.
+5) No layout shift, flicker, or content clipping occurs.
+6) Floating card modal still opens correctly when clicking a property.
+
+====================================================
+FINAL REPORT REQUIRED
+====================================================
+
+Provide:
+- Which component/file was updated for the Active Properties carousel.
+- How auto-rotation timing is implemented (interval/animation).
+- Confirmation no other dashboard sections were affected.
