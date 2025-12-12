@@ -63,6 +63,7 @@ export interface IStorage {
   deleteProperty(id: string): Promise<boolean>;
   getAllProperties(): Promise<Property[]>;
   getPropertyCount(): Promise<number>;
+  getClosedPropertyCount(): Promise<number>;
   
   // Media operations
   getMedia(id: string): Promise<Media | undefined>;
@@ -300,6 +301,12 @@ export class MemStorage implements IStorage {
 
   async getPropertyCount(): Promise<number> {
     return Array.from(this.properties.values()).filter(p => p.mlgCanView).length;
+  }
+
+  async getClosedPropertyCount(): Promise<number> {
+    return Array.from(this.properties.values()).filter(p => 
+      p.mlgCanView && (p.standardStatus === 'Closed' || p.standardStatus === 'Sold')
+    ).length;
   }
 
   async searchProperties(filters: {
@@ -990,6 +997,20 @@ export class DbStorage implements IStorage {
       .select({ count: drizzleSql<number>`count(*)::int` })
       .from(properties)
       .where(eq(properties.mlgCanView, true));
+    return result[0]?.count || 0;
+  }
+
+  async getClosedPropertyCount(): Promise<number> {
+    const result = await this.db
+      .select({ count: drizzleSql<number>`count(*)::int` })
+      .from(properties)
+      .where(and(
+        eq(properties.mlgCanView, true),
+        or(
+          eq(properties.standardStatus, 'Closed'),
+          eq(properties.standardStatus, 'Sold')
+        )
+      ));
     return result[0]?.count || 0;
   }
 

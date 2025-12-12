@@ -2708,36 +2708,129 @@ This email was sent by ${senderName} (${senderEmail}) via the MLS Grid IDX Platf
     }
   });
 
+  // Cache for dashboard stats to avoid repeated Repliers API calls
+  let dashboardStatsCache: { data: any; timestamp: number } | null = null;
+  const DASHBOARD_CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+  
   app.get("/api/stats/dashboard", async (req, res) => {
     try {
-      const [allCmas, allSellerUpdates, healthStatus] = await Promise.all([
+      // Check cache first
+      if (dashboardStatsCache && (Date.now() - dashboardStatsCache.timestamp < DASHBOARD_CACHE_TTL)) {
+        return res.json(dashboardStatsCache.data);
+      }
+      
+      // Parallelize ALL async operations
+      const healthStatus = { mlsGridConfigured: mlsGridClient !== null, repliersConfigured: isRepliersConfigured() };
+      
+      // Build promises array for parallel execution
+      const promises: Promise<any>[] = [
         storage.getAllCmas(),
-        storage.getAllSellerUpdates(),
-        Promise.resolve({ mlsGridConfigured: mlsGridClient !== null, repliersConfigured: isRepliersConfigured() })
-      ]);
+        storage.getActiveSellerUpdates(),
+        storage.getClosedPropertyCount(),
+      ];
       
-      // Get property counts from database
-      const allProperties = await storage.getAllProperties();
-      const activeProperties = allProperties.filter(p => 
-        p.standardStatus === 'Active' || p.standardStatus === 'Under Contract' || p.standardStatus === 'Active Under Contract'
-      );
-      const closedProperties = allProperties.filter(p => 
-        p.standardStatus === 'Closed' || p.standardStatus === 'Sold'
-      );
+      // Add Repliers API calls if configured
+      if (repliersClient) {
+        promises.push(
+          repliersClient.searchListings({ status: 'A', resultsPerPage: 1 }).catch(() => ({ count: 0 })),
+          repliersClient.searchListings({ status: 'U', resultsPerPage: 1 }).catch(() => ({ count: 0 }))
+        );
+      }
       
-      res.json({
-        totalActiveProperties: activeProperties.length,
-        totalClosedProperties: closedProperties.length,
-        totalProperties: allProperties.length,
+      const results = await Promise.all(promises);
+      
+      const [allCmas, activeSellerUpdates, closedCount] = results;
+      let activeListingCount = 0;
+      let underContractCount = 0;
+      
+      if (repliersClient && results.length >= 5) {
+        activeListingCount = results[3]?.count || 0;
+        underContractCount = results[4]?.count || 0;
+      }
+      
+      const totalProperties = activeListingCount + underContractCount + (closedCount || 0);
+      
+      const responseData = {
+        totalActiveProperties: activeListingCount,
+        totalUnderContractProperties: underContractCount,
+        totalClosedProperties: closedCount || 0,
+        totalProperties: totalProperties,
         activeCmas: allCmas.length,
-        sellerUpdates: allSellerUpdates.length,
+        sellerUpdates: activeSellerUpdates.length,
         systemStatus: healthStatus.repliersConfigured || healthStatus.mlsGridConfigured ? 'Ready' : 'Setup',
         repliersConfigured: healthStatus.repliersConfigured,
         mlsGridConfigured: healthStatus.mlsGridConfigured
-      });
+      };
+      
+      // Cache the response
+      dashboardStatsCache = { data: responseData, timestamp: Date.now() };
+      
+      res.json(responseData);
     } catch (error: any) {
       console.error("Dashboard stats error:", error.message);
       res.status(500).json({ error: "Failed to load dashboard stats" });
+    }
+  });
+  
+  // Dashboard active properties carousel endpoint with personalization and fallback
+  app.get("/api/dashboard/active-properties", async (req, res) => {
+    try {
+      if (!repliersClient) {
+        return res.json({ properties: [], count: 0, personalized: false });
+      }
+      
+      const limit = parseInt(req.query.limit as string) || 15;
+      const city = req.query.city as string | undefined;
+      const minPrice = req.query.minPrice ? parseInt(req.query.minPrice as string) : undefined;
+      const maxPrice = req.query.maxPrice ? parseInt(req.query.maxPrice as string) : undefined;
+      const propertyType = req.query.propertyType as string | undefined;
+      
+      const hasPersonalization = !!(city || minPrice || maxPrice || propertyType);
+      
+      // Build search params with optional personalization filters
+      const searchParams: any = {
+        status: 'A',
+        resultsPerPage: limit,
+        sortBy: 'createdOnDesc',
+      };
+      
+      if (city) searchParams.city = city;
+      if (minPrice) searchParams.minPrice = minPrice;
+      if (maxPrice) searchParams.maxPrice = maxPrice;
+      if (propertyType) searchParams.type = propertyType;
+      
+      // Fetch active listings from Repliers with personalization
+      let result = await repliersClient.searchListings(searchParams);
+      let properties = result.listings.map(listing => repliersClient!.mapToStandardProperty(listing));
+      
+      // FALLBACK: If personalized search yields no/few results, fetch general listings
+      if (hasPersonalization && properties.length < 5) {
+        const fallbackParams: any = {
+          status: 'A',
+          resultsPerPage: limit,
+          sortBy: 'createdOnDesc',
+        };
+        const fallbackResult = await repliersClient.searchListings(fallbackParams);
+        const fallbackProperties = fallbackResult.listings.map(listing => repliersClient!.mapToStandardProperty(listing));
+        
+        // Merge: personalized results first, then fill with general listings
+        const seenIds = new Set(properties.map(p => p.listingId));
+        for (const prop of fallbackProperties) {
+          if (!seenIds.has(prop.listingId) && properties.length < limit) {
+            properties.push(prop);
+            seenIds.add(prop.listingId);
+          }
+        }
+      }
+      
+      res.json({
+        properties,
+        count: result.count,
+        personalized: hasPersonalization && result.count > 0
+      });
+    } catch (error: any) {
+      console.error("Dashboard active properties error:", error.message);
+      res.status(500).json({ error: "Failed to load active properties" });
     }
   });
 

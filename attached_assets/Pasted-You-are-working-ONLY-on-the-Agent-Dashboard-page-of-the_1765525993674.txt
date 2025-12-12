@@ -1,0 +1,135 @@
+You are working ONLY on the Agent Dashboard page of the application (NOT CMA pages, IDX pages, or public search).
+
+Scope:
+- Dashboard landing page UI and data
+- Metrics cards
+- Quick Actions
+- Recent CMA list
+- Market / property widgets
+- Dashboard personalization settings
+
+Data source:
+- All property and status data must come from Repliers.
+
+====================================================
+1) FIX DASHBOARD LANDING METRICS
+====================================================
+
+Problem:
+- “Total Properties” count looks unrealistic.
+- Status breakdown below it is incorrect.
+- Under Contract is not included.
+
+Requirements:
+1. Recalculate “Total Properties” using Repliers data:
+   - Total Properties = Active + Under Contract + Sold/Closed
+2. Display a clear breakdown:
+   - Active
+   - Under Contract
+   - Sold/Closed
+3. Ensure numbers match the same logic used in CMA search and filters.
+4. Add tooltips to explain what each count represents.
+
+====================================================
+2) QUICK ACTIONS – LAYOUT & LABEL FIXES
+====================================================
+
+Problem:
+- Quick Actions layout is unbalanced and icons are unclear.
+
+Requirements:
+1. Move **Create CMA** button to the RIGHT side of Quick Actions.
+2. Change “Search Properties” icon to a **magnifying glass**.
+3. Move “Search Properties” to the RIGHT side as well.
+4. Rename “Sync MLS Data” to **“Sync Repliers Data”**.
+5. Ensure consistent button size, spacing, and visual hierarchy.
+
+====================================================
+3) RECENT CMAs – MOVE TO BOTTOM
+====================================================
+
+Problem:
+- Recent CMAs list dominates the top of the dashboard.
+
+Requirements:
+1. Move **Recent CMAs** section to the **bottom** of the dashboard.
+2. Keep it collapsible if space is limited.
+3. Ensure newest CMA appears at the top of the list.
+
+====================================================
+4) REMOVE CMA ACTIVITY GRAPH
+====================================================
+
+Problem:
+- CMA Activity graph provides limited value.
+
+Requirements:
+- Remove the **CMA Activity (Last 12 Months)** graph entirely.
+- Reclaim the space for more actionable content.
+
+====================================================
+5) ADD ACTIVE PROPERTIES CAROUSEL (CLICKABLE)
+====================================================
+
+Requirements:
+1. Add a **carousel of Active properties** to the dashboard.
+2. Each carousel card must show:
+   - Property image (from Repliers)
+   - Address
+   - Price
+   - Beds / Baths / Sq Ft
+   - Status badge
+3. Clicking a property:
+   - Opens the SAME floating card/modal used in CMA and Search Results.
+4. Carousel behavior:
+   - Auto-slide every few seconds
+   - Manual navigation allowed
+
+====================================================
+6) PERSONALIZED PROPERTIES FOR REPEAT USERS
+====================================================
+
+Requirements:
+1. For returning users:
+   - Populate the Active Properties carousel dynamically based on:
+     • Recent CMA searches
+     • Recent buyer searches
+2. If no recent activity exists:
+   - Fall back to:
+     • Recently active listings
+     • Or system-wide featured listings
+
+====================================================
+7) DASHBOARD CONFIGURATION (USER-CONTROLLED)
+====================================================
+
+Requirements:
+1. Add a **“Customize Dashboard”** option.
+2. Allow users/agents to:
+   - Show / hide dashboard widgets
+   - Reorder sections (drag & drop or up/down controls)
+3. Save preferences per user.
+4. Default layout should apply to new users.
+
+====================================================
+8) FINAL TESTING & VALIDATION
+====================================================
+
+You MUST test:
+1. Metrics match Repliers data and CMA logic.
+2. Quick Actions layout and icons are correct.
+3. Active Properties carousel:
+   - Loads data
+   - Opens floating cards correctly
+4. Returning user sees personalized properties.
+5. Dashboard customization persists after refresh/logout.
+
+====================================================
+FINAL REPORT REQUIRED
+====================================================
+
+Provide:
+1. Before/after screenshots.
+2. Exact data logic used for Total Properties.
+3. List of dashboard widgets and which are configurable.
+4. Confirmation no CMA, IDX, or public pages were affected.
