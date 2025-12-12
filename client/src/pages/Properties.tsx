@@ -6,13 +6,23 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
-import { Map as MapIcon, Search, Database, RotateCcw, List, Home, Building2, TreePine, HelpCircle } from "lucide-react";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { Map as MapIcon, Search, Database, RotateCcw, List, Home, Building2, TreePine, Info } from "lucide-react";
 import { SearchCriteriaForm } from "@/components/SearchCriteria";
 import { PropertyResults } from "@/components/PropertyResults";
 import { PropertyMapView } from "@/components/PropertyMapView";
 import { unifiedSearchWithMeta, type SearchResultWithMeta } from "@/lib/api";
 import { useSelectedProperty } from "@/contexts/SelectedPropertyContext";
 import type { Property, Media, SearchCriteria } from "@shared/schema";
+
+// Inventory summary interface from backend
+interface InventorySummary {
+  dataSource: string;
+  totalCount: number;
+  countsByStatus: Record<string, number>;
+  countsBySubtype: Record<string, number>;
+  lastUpdatedAt: string;
+}
 
 // Safe number parser that returns undefined for invalid values
 function safeParseInt(value: string | null): number | undefined {
@@ -206,6 +216,13 @@ export default function Properties() {
   }, [searchString]); // Re-run when URL changes
 
 
+  // Fetch inventory summary for display before search
+  // Shows total counts, status counts, subtype counts from the active data source
+  const { data: inventory, isLoading: inventoryLoading } = useQuery<InventorySummary>({
+    queryKey: ['/api/properties/inventory'],
+    staleTime: 5 * 60 * 1000, // Cache for 5 minutes
+  });
+
   // Fetch properties with search criteria if available
   // Uses unified search API: Repliers for active, HomeReview/DB for closed
   // Use serialized criteria string as queryKey to prevent cache collisions
@@ -218,6 +235,19 @@ export default function Properties() {
   });
   
   const properties = searchResult?.properties ?? [];
+
+  // Format timestamp for tooltip display
+  const formatLastUpdated = (isoString: string) => {
+    const date = new Date(isoString);
+    return date.toLocaleString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric',
+      hour: 'numeric',
+      minute: '2-digit',
+      hour12: true,
+    });
+  };
 
   const handleSearch = (criteria: SearchCriteria) => {
     setSearchCriteria(criteria);
@@ -288,13 +318,97 @@ export default function Properties() {
     <div className="space-y-6">
       <div className="flex items-center justify-between flex-wrap gap-2">
         <div>
-          <h1 className="text-3xl font-bold mb-2" data-testid="text-properties-title">Properties</h1>
-          <p className="text-muted-foreground">
-            {searchResult 
-              ? `${searchResult.count.toLocaleString()} matching properties from ${searchResult.dataSource}`
-              : 'Search and browse property listings'
-            }
-          </p>
+          <div className="flex items-center gap-2 mb-2">
+            <h1 className="text-3xl font-bold" data-testid="text-properties-title">Properties</h1>
+            {/* Info Icon with Hover Tooltip */}
+            {(inventory || searchResult) && (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button 
+                    className="text-muted-foreground hover:text-foreground transition-colors p-1" 
+                    data-testid="button-info-tooltip"
+                    aria-label="Data source information"
+                  >
+                    <Info className="w-5 h-5" />
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent side="right" className="max-w-xs">
+                  <div className="space-y-1 text-sm">
+                    <p className="font-medium">
+                      Data Source: {searchResult?.dataSource || inventory?.dataSource || 'Unknown'}
+                    </p>
+                    <p className="text-muted-foreground">
+                      Data pulled from {searchResult?.dataSource || inventory?.dataSource || 'the configured API'}
+                    </p>
+                    {inventory?.lastUpdatedAt && (
+                      <p className="text-muted-foreground">
+                        Last updated: {formatLastUpdated(inventory.lastUpdatedAt)}
+                      </p>
+                    )}
+                  </div>
+                </TooltipContent>
+              </Tooltip>
+            )}
+          </div>
+          {/* Dynamic Inventory Summary */}
+          {searchResult ? (
+            <p className="text-muted-foreground" data-testid="text-search-summary">
+              {searchResult.count.toLocaleString()} matching properties from {searchResult.dataSource}
+            </p>
+          ) : inventoryLoading ? (
+            <Skeleton className="h-5 w-64" />
+          ) : inventory ? (
+            <div className="space-y-2">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-muted-foreground" data-testid="text-total-inventory">
+                  {inventory.totalCount.toLocaleString()} properties in {inventory.dataSource}
+                </span>
+                <span className="text-muted-foreground">•</span>
+                <Badge variant="outline" className="bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200 text-xs" data-testid="badge-inventory-active">
+                  Active: {(inventory.countsByStatus['Active'] || 0).toLocaleString()}
+                </Badge>
+                <Badge variant="outline" className="bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200 text-xs" data-testid="badge-inventory-uc">
+                  UC: {(inventory.countsByStatus['Under Contract'] || 0).toLocaleString()}
+                </Badge>
+                <Badge variant="outline" className="bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 text-xs" data-testid="badge-inventory-closed">
+                  Closed: {(inventory.countsByStatus['Closed'] || 0).toLocaleString()}
+                </Badge>
+              </div>
+              {/* Subtype counts - show all required categories */}
+              <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                <span>Property Types:</span>
+                {inventory.countsBySubtype ? (
+                  <>
+                    <Badge variant="outline" className="text-xs" data-testid="badge-inventory-sfr">
+                      <Home className="w-3 h-3 mr-1" />
+                      SFR: {(inventory.countsBySubtype['Single Family Residence'] || 0).toLocaleString()}
+                    </Badge>
+                    <Badge variant="outline" className="text-xs" data-testid="badge-inventory-condo">
+                      <Building2 className="w-3 h-3 mr-1" />
+                      Condo: {(inventory.countsBySubtype['Condominium'] || 0).toLocaleString()}
+                    </Badge>
+                    <Badge variant="outline" className="text-xs" data-testid="badge-inventory-townhouse">
+                      TH: {(inventory.countsBySubtype['Townhouse'] || 0).toLocaleString()}
+                    </Badge>
+                    <Badge variant="outline" className="text-xs" data-testid="badge-inventory-multi">
+                      Multi: {(inventory.countsBySubtype['Multi-Family'] || 0).toLocaleString()}
+                    </Badge>
+                    <Badge variant="outline" className="text-xs" data-testid="badge-inventory-land">
+                      <TreePine className="w-3 h-3 mr-1" />
+                      Land: {(inventory.countsBySubtype['Land/Ranch'] || 0).toLocaleString()}
+                    </Badge>
+                    <Badge variant="outline" className="text-xs" data-testid="badge-inventory-other">
+                      Other: {(inventory.countsBySubtype['Other'] || 0).toLocaleString()}
+                    </Badge>
+                  </>
+                ) : (
+                  <span className="italic">Loading property types...</span>
+                )}
+              </div>
+            </div>
+          ) : (
+            <p className="text-muted-foreground">Search and browse property listings</p>
+          )}
         </div>
         <div className="flex items-center gap-2">
           {searchCriteria && (
@@ -372,7 +486,6 @@ export default function Properties() {
                     Land/Ranch: {searchResult.inventoryBySubtype['Land/Ranch']}
                   </Badge>
                   <Badge variant="outline" data-testid="badge-subtype-other">
-                    <HelpCircle className="w-3 h-3 mr-1" />
                     Other: {searchResult.inventoryBySubtype['Other/Unknown']}
                   </Badge>
                 </div>

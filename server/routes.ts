@@ -990,6 +990,145 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Inventory summary endpoint - returns total counts from ACTIVE data source (Repliers)
+  // Used to show inventory summary in Properties header before any search
+  let inventoryCache: {
+    data: any;
+    timestamp: number;
+  } | null = null;
+  const INVENTORY_CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+
+  app.get("/api/properties/inventory", async (req, res) => {
+    try {
+      // Check cache first
+      if (inventoryCache && (Date.now() - inventoryCache.timestamp) < INVENTORY_CACHE_TTL) {
+        res.set('Cache-Control', 'public, max-age=300'); // 5 minutes
+        return res.json(inventoryCache.data);
+      }
+
+      // Determine data source
+      const dataSource = isRepliersConfigured() ? 'Repliers API' : 'Database';
+      
+      let inventoryData = {
+        dataSource,
+        totalCount: 0,
+        countsByStatus: {
+          'Active': 0,
+          'Under Contract': 0,
+          'Closed': 0,
+        } as Record<string, number>,
+        countsBySubtype: {
+          'Single Family Residence': 0,
+          'Condominium': 0,
+          'Townhouse': 0,
+          'Multi-Family': 0,
+          'Land/Ranch': 0,
+          'Other': 0,
+        } as Record<string, number>,
+        lastUpdatedAt: new Date().toISOString(),
+      };
+
+      if (isRepliersConfigured()) {
+        const repliersClient = getRepliersClient();
+        if (repliersClient) {
+          // Fetch sample counts from Repliers for each status
+          // Note: Repliers returns count in response header
+          try {
+            // Get Active count
+            const activeResponse = await repliersClient.searchListings({
+              status: 'A',
+              resultsPerPage: 1,
+            });
+            inventoryData.countsByStatus['Active'] = activeResponse.count || 0;
+
+            // Get Under Contract count  
+            const ucResponse = await repliersClient.searchListings({
+              status: 'U',
+              resultsPerPage: 1,
+            });
+            inventoryData.countsByStatus['Under Contract'] = ucResponse.count || 0;
+
+            // Get closed count from database
+            const closedCount = await storage.getClosedPropertyCount();
+            inventoryData.countsByStatus['Closed'] = closedCount;
+            
+            // Total count = Active + Under Contract + Closed (all statuses in scope)
+            inventoryData.totalCount = 
+              inventoryData.countsByStatus['Active'] + 
+              inventoryData.countsByStatus['Under Contract'] + 
+              closedCount;
+
+            // Get subtype counts from multiple sources:
+            // 1. Repliers API Active + Under Contract by class (condo, land, commercial)
+            // 2. Repliers API Active + Under Contract residential with full scan for accurate subtype breakdown
+            // 3. Database for Closed/Sold (with accurate subtype breakdown)
+            const subtypePromises = [
+              // Get condo, land, commercial counts via class filter (accurate)
+              repliersClient.searchListings({ status: 'A', class: 'condo', resultsPerPage: 1 }),
+              repliersClient.searchListings({ status: 'A', class: 'land', resultsPerPage: 1 }),
+              repliersClient.searchListings({ status: 'A', class: 'commercial', resultsPerPage: 1 }),
+              repliersClient.searchListings({ status: 'U', class: 'condo', resultsPerPage: 1 }),
+              repliersClient.searchListings({ status: 'U', class: 'land', resultsPerPage: 1 }),
+              repliersClient.searchListings({ status: 'U', class: 'commercial', resultsPerPage: 1 }),
+              // Get detailed residential subtype breakdown by scanning listings
+              repliersClient.aggregateResidentialSubtypeCounts(),
+              // Get closed subtype counts from database
+              storage.getClosedPropertyCountsBySubtype(),
+            ];
+
+            try {
+              const [
+                activeCondo, activeLand, activeComm,
+                ucCondo, ucLand, ucComm,
+                residentialSubtypes, closedSubtypeCounts
+              ] = await Promise.all(subtypePromises);
+              
+              // Residential subtypes from full scan (SFR, Townhouse, Multi-Family)
+              inventoryData.countsBySubtype['Single Family Residence'] = 
+                (residentialSubtypes['Single Family Residence'] || 0) + (closedSubtypeCounts['Single Family Residence'] || 0);
+              inventoryData.countsBySubtype['Townhouse'] = 
+                (residentialSubtypes['Townhouse'] || 0) + (closedSubtypeCounts['Townhouse'] || 0);
+              inventoryData.countsBySubtype['Multi-Family'] = 
+                (residentialSubtypes['Multi-Family'] || 0) + (closedSubtypeCounts['Multi-Family'] || 0);
+              
+              // Condo, Land, Commercial from class filters
+              inventoryData.countsBySubtype['Condominium'] = 
+                (activeCondo.count || 0) + (ucCondo.count || 0) + (closedSubtypeCounts['Condominium'] || 0);
+              inventoryData.countsBySubtype['Land/Ranch'] = 
+                (activeLand.count || 0) + (ucLand.count || 0) + (closedSubtypeCounts['Land/Ranch'] || 0);
+              inventoryData.countsBySubtype['Other'] = 
+                (activeComm.count || 0) + (ucComm.count || 0) + (closedSubtypeCounts['Other'] || 0);
+            } catch (subtypeError) {
+              console.error('Error fetching subtype counts:', subtypeError);
+              // Leave subtype counts at 0 if this fails
+            }
+          } catch (apiError) {
+            console.error('Error fetching Repliers inventory:', apiError);
+            // Fall back to database counts
+            inventoryData.dataSource = 'Database';
+            inventoryData.totalCount = await storage.getPropertyCount();
+          }
+        }
+      } else {
+        // Use database counts
+        inventoryData.totalCount = await storage.getPropertyCount();
+        inventoryData.countsByStatus['Closed'] = await storage.getClosedPropertyCount();
+      }
+
+      // Cache the result
+      inventoryCache = {
+        data: inventoryData,
+        timestamp: Date.now(),
+      };
+
+      res.set('Cache-Control', 'public, max-age=300');
+      res.json(inventoryData);
+    } catch (error) {
+      console.error("Failed to fetch inventory summary:", error);
+      res.status(500).json({ error: "Failed to fetch inventory summary" });
+    }
+  });
+
   // Property types for dropdowns (must be before /:id route)
   app.get("/api/properties/types", async (req, res) => {
     try {

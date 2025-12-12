@@ -1,0 +1,114 @@
+You are working ONLY on the AGENT “Properties” module header area (NOT CMA, NOT IDX/public pages).
+
+Goal:
+Replace the subtitle text under the “Properties” header (“Search and browse property listings”) with a dynamic, accurate summary from the ACTIVE data source, including:
+- Total properties available in the current data source
+- Inventory counts by Status
+- Inventory counts by Property Subtype
+- A hover-only info icon explaining data source + last updated timestamp
+
+Data source:
+Use the SAME data source currently powering Properties results (ex: Repliers API). Do NOT show MLS Grid if Properties is using Repliers.
+
+====================================================
+1) REPLACE SUBTITLE WITH DYNAMIC INVENTORY SUMMARY
+====================================================
+
+Current:
+- Under “Properties” header → “Search and browse property listings”
+
+Replace with:
+A compact summary line + chips/badges that are dynamically computed and refreshed.
+
+Requirements:
+1) Show total property count from the ACTIVE data source:
+   - Example: “Total properties in Repliers: 65,649”
+   - If the active source changes in the future, text must automatically adapt (no hardcoded “Repliers”).
+2) Total count must update whenever the integration refreshes or data is re-synced.
+3) Under/next to the total count, show inventory breakdowns:
+
+A) Inventory by Status (counts):
+- Active (N)
+- Under Contract (N)
+- Closed/Sold (N)
+
+B) Inventory by Property Subtype (counts):
+- Single Family Residence (N)
+- Condominium (N)
+- Townhouse (N)
+- Multi-Family (N)
+- Land/Ranch (N)
+- Other/Unknown (N)
+
+4) These counts must be computed from the SAME dataset universe used by Properties search results (post server-side filtering rules such as rental/leasing exclusion if applicable).
+
+====================================================
+2) INFO ICON WITH HOVER TOOLTIP (HOVER-ONLY)
+====================================================
+
+Add an information icon (ⓘ) next to the new subtitle/summary.
+
+Requirements:
+- Tooltip ONLY appears on hover (mouse over), not always visible.
+- Tooltip content must include:
+  1) Data Source name (dynamic)
+  2) A short explanation: “Data pulled from <source>”
+  3) “Last updated: <timestamp>”
+     - This timestamp must be real and sourced from the backend integration logs (not static).
+- On mobile/touch devices:
+  - If hover isn’t possible, allow tap to toggle the tooltip.
+
+====================================================
+3) BACKEND SUPPORT (IF NEEDED)
+====================================================
+
+If the frontend currently does not have:
+- total count
+- status counts
+- subtype counts
+- last updated timestamp
+
+Then:
+1) Add a backend endpoint or extend the existing Properties search metadata response to include:
+   - totalAvailable
+   - countsByStatus
+   - countsBySubtype
+   - dataSourceName
+   - lastUpdatedAt
+
+2) Ensure these values are:
+   - fast to load (cached is okay)
+   - accurate for the active integration
+   - updated after sync/refresh jobs
+
+====================================================
+4) UI / UX REQUIREMENTS
+====================================================
+
+- Must look professional and clean for real estate agents.
+- Keep it compact (one summary line + small chips).
+- If counts are not available, display a clear fallback:
+  - “Inventory unavailable” and still show the info icon with last updated if possible.
+- Do NOT show conflicting wording like “MLS Grid” if data source is Repliers.
+
+====================================================
+TESTING REQUIRED
+====================================================
+
+1) Load Properties page:
+   - Confirm subtitle is replaced with total count + inventory chips.
+2) Hover info icon:
+   - Tooltip shows data source + last updated timestamp.
+3) Trigger a data refresh/sync:
+   - Confirm “Last updated” changes appropriately.
+   - Confirm total count and inventory chips remain consistent.
+
+====================================================
+FINAL REPORT REQUIRED
+====================================================
+
+Provide:
+- Which component(s) were updated in the Properties header.
+- Where the counts and lastUpdated timestamp are sourced from.
+- Proof tooltip is hover-only and works on desktop + mobile.
+- Confirmation no CMA/IDX/public pages were modified.

@@ -64,6 +64,7 @@ export interface IStorage {
   getAllProperties(): Promise<Property[]>;
   getPropertyCount(): Promise<number>;
   getClosedPropertyCount(): Promise<number>;
+  getClosedPropertyCountsBySubtype(): Promise<Record<string, number>>;
   
   // Media operations
   getMedia(id: string): Promise<Media | undefined>;
@@ -307,6 +308,40 @@ export class MemStorage implements IStorage {
     return Array.from(this.properties.values()).filter(p => 
       p.mlgCanView && (p.standardStatus === 'Closed' || p.standardStatus === 'Sold')
     ).length;
+  }
+
+  async getClosedPropertyCountsBySubtype(): Promise<Record<string, number>> {
+    const counts: Record<string, number> = {
+      'Single Family Residence': 0,
+      'Condominium': 0,
+      'Townhouse': 0,
+      'Multi-Family': 0,
+      'Land/Ranch': 0,
+      'Other': 0,
+    };
+    
+    const closedProperties = Array.from(this.properties.values()).filter(p => 
+      p.mlgCanView && (p.standardStatus === 'Closed' || p.standardStatus === 'Sold')
+    );
+    
+    closedProperties.forEach(p => {
+      const subtype = (p.propertySubType || p.propertyType || '').toLowerCase();
+      if (subtype.includes('single') || subtype.includes('detached') || subtype.includes('residential')) {
+        counts['Single Family Residence']++;
+      } else if (subtype.includes('condo')) {
+        counts['Condominium']++;
+      } else if (subtype.includes('town')) {
+        counts['Townhouse']++;
+      } else if (subtype.includes('multi') || subtype.includes('duplex') || subtype.includes('triplex')) {
+        counts['Multi-Family']++;
+      } else if (subtype.includes('land') || subtype.includes('ranch') || subtype.includes('lot') || subtype.includes('farm')) {
+        counts['Land/Ranch']++;
+      } else {
+        counts['Other']++;
+      }
+    });
+    
+    return counts;
   }
 
   async searchProperties(filters: {
@@ -1012,6 +1047,51 @@ export class DbStorage implements IStorage {
         )
       ));
     return result[0]?.count || 0;
+  }
+
+  async getClosedPropertyCountsBySubtype(): Promise<Record<string, number>> {
+    // Get all closed properties with their subtypes
+    const closedProperties = await this.db
+      .select({ 
+        propertySubType: properties.propertySubType,
+        propertyType: properties.propertyType,
+      })
+      .from(properties)
+      .where(and(
+        eq(properties.mlgCanView, true),
+        or(
+          eq(properties.standardStatus, 'Closed'),
+          eq(properties.standardStatus, 'Sold')
+        )
+      ));
+    
+    const counts: Record<string, number> = {
+      'Single Family Residence': 0,
+      'Condominium': 0,
+      'Townhouse': 0,
+      'Multi-Family': 0,
+      'Land/Ranch': 0,
+      'Other': 0,
+    };
+    
+    closedProperties.forEach(p => {
+      const subtype = (p.propertySubType || p.propertyType || '').toLowerCase();
+      if (subtype.includes('single') || subtype.includes('detached') || subtype.includes('residential')) {
+        counts['Single Family Residence']++;
+      } else if (subtype.includes('condo')) {
+        counts['Condominium']++;
+      } else if (subtype.includes('town')) {
+        counts['Townhouse']++;
+      } else if (subtype.includes('multi') || subtype.includes('duplex') || subtype.includes('triplex')) {
+        counts['Multi-Family']++;
+      } else if (subtype.includes('land') || subtype.includes('ranch') || subtype.includes('lot') || subtype.includes('farm')) {
+        counts['Land/Ranch']++;
+      } else {
+        counts['Other']++;
+      }
+    });
+    
+    return counts;
   }
 
   async searchProperties(filters: {

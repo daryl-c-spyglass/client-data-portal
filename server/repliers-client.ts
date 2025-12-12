@@ -17,6 +17,8 @@ interface ListingsSearchParams {
   minSqft?: number;
   maxSqft?: number;
   propertyType?: string;
+  propertySubType?: string;
+  style?: string;
   city?: string;
   postalCode?: string;
   neighborhood?: string;
@@ -109,6 +111,16 @@ interface NLPResponse {
   summary?: string;
 }
 
+// Cached subtype counts for Active/UC residential listings
+interface SubtypeCache {
+  counts: Record<string, number>;
+  timestamp: number;
+  isRefreshing: boolean;
+}
+
+let subtypeCache: SubtypeCache | null = null;
+const SUBTYPE_CACHE_TTL_MS = 30 * 60 * 1000; // 30 minutes
+
 class RepliersClient {
   private client: AxiosInstance;
   private apiKey: string;
@@ -123,6 +135,122 @@ class RepliersClient {
       },
       timeout: 30000,
     });
+  }
+  
+  // Classify a listing's property type into standardized subtype buckets
+  private classifySubtype(listing: RepliersListing): string {
+    const style = (listing.details?.style || '').toLowerCase();
+    const propertyType = (listing.details?.propertyType || '').toLowerCase();
+    const raw = listing.raw || {};
+    const rawSubtype = (raw.propertySubType || raw.PropertySubType || '').toLowerCase();
+    
+    // Check all available fields for subtype classification
+    const combined = `${style} ${propertyType} ${rawSubtype}`;
+    
+    if (combined.includes('town') || combined.includes('row')) {
+      return 'Townhouse';
+    }
+    if (combined.includes('multi') || combined.includes('duplex') || 
+        combined.includes('triplex') || combined.includes('fourplex') ||
+        combined.includes('2-4 units') || combined.includes('apartment')) {
+      return 'Multi-Family';
+    }
+    if (combined.includes('condo')) {
+      return 'Condominium';
+    }
+    if (combined.includes('land') || combined.includes('lot') || 
+        combined.includes('ranch') || combined.includes('farm') ||
+        combined.includes('acreage')) {
+      return 'Land/Ranch';
+    }
+    if (combined.includes('commercial') || combined.includes('industrial') ||
+        combined.includes('retail') || combined.includes('office')) {
+      return 'Other';
+    }
+    // Default to Single Family for residential
+    return 'Single Family Residence';
+  }
+  
+  // Aggregate subtype counts by scanning all Active/UC residential listings
+  async aggregateResidentialSubtypeCounts(): Promise<Record<string, number>> {
+    // Return cached data if still valid
+    if (subtypeCache && 
+        (Date.now() - subtypeCache.timestamp) < SUBTYPE_CACHE_TTL_MS) {
+      return subtypeCache.counts;
+    }
+    
+    // Prevent concurrent refreshes
+    if (subtypeCache?.isRefreshing) {
+      return subtypeCache.counts;
+    }
+    
+    if (subtypeCache) {
+      subtypeCache.isRefreshing = true;
+    }
+    
+    console.log('🔄 Aggregating residential subtype counts from Repliers...');
+    const startTime = Date.now();
+    
+    const counts: Record<string, number> = {
+      'Single Family Residence': 0,
+      'Townhouse': 0,
+      'Multi-Family': 0,
+      'Condominium': 0,
+      'Land/Ranch': 0,
+      'Other': 0,
+    };
+    
+    try {
+      // Scan both Active and Under Contract residential listings
+      for (const status of ['A', 'U']) {
+        let pageNum = 1;
+        let hasMore = true;
+        
+        while (hasMore) {
+          const response = await this.searchListings({
+            status,
+            class: 'residential',
+            resultsPerPage: 100,
+            pageNum,
+            fields: 'mlsNumber,details.style,details.propertyType,raw',
+          });
+          
+          // Classify each listing
+          for (const listing of response.listings || []) {
+            const subtype = this.classifySubtype(listing);
+            counts[subtype] = (counts[subtype] || 0) + 1;
+          }
+          
+          // Check if there are more pages
+          if (pageNum >= response.numPages || response.listings.length < 100) {
+            hasMore = false;
+          } else {
+            pageNum++;
+            // Rate limit: max 2 req/sec per API limits
+            await new Promise(resolve => setTimeout(resolve, 500));
+          }
+        }
+      }
+      
+      // Cache the results
+      subtypeCache = {
+        counts,
+        timestamp: Date.now(),
+        isRefreshing: false,
+      };
+      
+      const duration = Date.now() - startTime;
+      console.log(`✅ Subtype aggregation complete in ${duration}ms:`, counts);
+      
+      return counts;
+    } catch (error) {
+      console.error('Error aggregating subtype counts:', error);
+      if (subtypeCache) {
+        subtypeCache.isRefreshing = false;
+      }
+      // Return empty counts on error
+      return counts;
+    }
   }
 
   async searchListings(params: ListingsSearchParams = {}): Promise<ListingsResponse> {
