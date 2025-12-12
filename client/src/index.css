@@ -322,17 +322,29 @@
     -ms-overflow-style: none !important;
   }
   
-  /* Hide sidebar and ALL navigation elements */
+  /* Hide sidebar and app shell navigation elements - NOT content headers */
   [data-sidebar],
   [data-testid="button-sidebar-toggle"],
-  header,
-  nav,
-  aside {
+  body > div > header,
+  body > div > nav,
+  body > div > aside,
+  .app-shell > header,
+  .app-shell > nav {
     display: none !important;
     visibility: hidden !important;
     width: 0 !important;
     height: 0 !important;
     overflow: hidden !important;
+  }
+  
+  /* Preserve headers INSIDE .cma-print content */
+  .cma-print header,
+  .cma-print h1,
+  .cma-print h2,
+  .cma-print h3,
+  .cma-print h4 {
+    display: block !important;
+    visibility: visible !important;
   }
   
   /* CMA Report container - full width document layout */
@@ -377,9 +389,13 @@
     display: none !important;
   }
   
-  /* Cards - Document-style with proper page breaks */
+  /* Cards - Document-style with proper page breaks (shadcn uses rounded-lg.border) */
   .cma-print .card,
-  .cma-print [class*="Card"] {
+  .cma-print [class*="Card"],
+  .cma-print .rounded-lg.border,
+  .cma-print .rounded-xl.border,
+  .cma-print [data-testid^="card-"],
+  .cma-print [data-testid^="section-"] {
     break-inside: avoid;
     page-break-inside: avoid;
     border: 1px solid #d1d5db !important;
@@ -441,10 +457,33 @@
     text-shadow: none !important;
   }
   
-  /* Grid layouts should stack vertically in print */
+  /* Grid layouts should stack vertically in print - cover all responsive variants */
+  .cma-print .grid-cols-2,
+  .cma-print .grid-cols-3,
+  .cma-print .grid-cols-4,
+  .cma-print .sm\\:grid-cols-2,
+  .cma-print .md\\:grid-cols-2,
+  .cma-print .md\\:grid-cols-3,
   .cma-print .lg\\:grid-cols-2,
-  .cma-print .grid-cols-2 {
+  .cma-print .lg\\:grid-cols-3,
+  .cma-print .lg\\:grid-cols-4,
+  .cma-print .xl\\:grid-cols-2,
+  .cma-print .xl\\:grid-cols-3,
+  .cma-print .xl\\:grid-cols-4 {
     grid-template-columns: 1fr !important;
+  }
+  
+  /* Flex layouts should wrap and stack in print */
+  .cma-print .flex-row,
+  .cma-print .md\\:flex-row,
+  .cma-print .lg\\:flex-row {
+    flex-direction: column !important;
+  }
+  
+  .cma-print .gap-4,
+  .cma-print .gap-6,
+  .cma-print .gap-8 {
+    gap: 0.5rem !important;
   }
   
   /* Fix content cut-off - ensure all containers are visible */
