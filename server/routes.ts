@@ -450,11 +450,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const needsServerSideFiltering = minLotAcres || maxLotAcres || stories || minYearBuilt || maxYearBuilt;
         const effectiveLimit = (subdivision || needsServerSideFiltering) ? Math.min(parsedLimit * 10, 200) : parsedLimit;
         
+        // Diagnostic logging for subdivision searches
+        if (subdivision) {
+          console.log(`🔍 [Subdivision Search] Query: "${subdivision}"`);
+          console.log(`   - Status: ${repliersStatus}`);
+          console.log(`   - City: ${city || 'any'}`);
+          console.log(`   - Field used: neighborhood (Repliers API field)`);
+        }
+        
         const response = await repliersClient.searchListings({
           status: repliersStatus,
           postalCode: postalCode,
           city: city,
-          neighborhood: subdivision,
+          neighborhood: subdivision,  // Maps to Repliers "neighborhood" field
           minPrice: minPrice ? parseInt(minPrice, 10) : undefined,
           maxPrice: maxPrice ? parseInt(maxPrice, 10) : undefined,
           minBeds: bedsMin ? parseInt(bedsMin, 10) : undefined,
@@ -463,6 +471,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
           maxSqft: maxSqft ? parseInt(maxSqft, 10) : undefined,
           resultsPerPage: effectiveLimit,
         });
+        
+        // Log subdivision search results
+        if (subdivision) {
+          console.log(`   - Results before filter: ${(response.listings || []).length}`);
+        }
 
         return (response.listings || []).map((listing: any) => {
           const addr = listing.address || {};
@@ -734,10 +747,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
           });
         }
         if (subdivision) {
-          const subdivisionLower = subdivision.toLowerCase();
-          filtered = filtered.filter(p => 
-            p.subdivision?.toLowerCase().includes(subdivisionLower)
-          );
+          const subdivisionLower = subdivision.toLowerCase().trim();
+          const beforeCount = filtered.length;
+          
+          filtered = filtered.filter(p => {
+            const propSubdiv = (p.subdivision || '').toLowerCase().trim();
+            // Match if subdivision contains the search term OR search term contains the subdivision
+            // This handles both "Barton Hills" matching "Barton Hills West" and vice versa
+            return propSubdiv.includes(subdivisionLower) || subdivisionLower.includes(propSubdiv);
+          });
+          
+          // Log subdivision filtering results
+          console.log(`   - Subdivision filter: "${subdivision}" removed ${beforeCount - filtered.length} properties (${beforeCount} → ${filtered.length})`);
+          
+          // Log sample of filtered results for debugging
+          if (filtered.length > 0 && filtered.length <= 5) {
+            filtered.forEach((p: any) => {
+              console.log(`     → ${p.address} - Subdivision: "${p.subdivision || 'N/A'}"`);
+            });
+          }
         }
         if (minSqft) {
           const min = parseInt(minSqft, 10);

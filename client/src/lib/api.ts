@@ -31,7 +31,9 @@ export interface NormalizedProperty {
 interface UnifiedSearchResponse {
   properties: NormalizedProperty[];
   count: number;
-  status: string;
+  status?: string;
+  statuses?: string[];
+  dataSource?: string;
 }
 
 // Map status to MLS-standard values
@@ -167,49 +169,91 @@ export function mapNormalizedToProperty(normalized: NormalizedProperty): Propert
   } as unknown as Property;
 }
 
-// New unified search that routes to Repliers (active) or HomeReview (closed)
-export async function unifiedSearch(criteria: SearchCriteria): Promise<Property[]> {
+// Helper to build search params from criteria
+function buildSearchParams(criteria: SearchCriteria): URLSearchParams {
   const params = new URLSearchParams();
   
-  // Determine status for API
+  // Determine status for API - always use "statuses" param for consistency
   if (criteria.status && criteria.status.length > 0) {
-    // Map status values to API format
-    const statusVal = criteria.status[0];
-    if (statusVal === 'Active') {
-      params.append('status', 'active');
-    } else if (statusVal === 'Under Contract') {
-      params.append('status', 'under_contract');
-    } else if (statusVal === 'Closed') {
-      params.append('status', 'closed');
-    }
+    const mappedStatuses = criteria.status.map(statusVal => {
+      if (statusVal === 'Active') return 'active';
+      if (statusVal === 'Under Contract') return 'under_contract';
+      if (statusVal === 'Closed') return 'closed';
+      return statusVal.toLowerCase().replace(/ /g, '_');
+    });
+    params.append('statuses', mappedStatuses.join(','));
   } else {
-    params.append('status', 'active'); // Default to active
+    params.append('statuses', 'active'); // Default to active
   }
 
-  // Map criteria to unified search params
+  // Array filters - send all values as comma-separated
   if (criteria.zipCodes && criteria.zipCodes.length > 0) {
-    params.append('postalCode', criteria.zipCodes[0]);
+    params.append('postalCode', criteria.zipCodes.join(','));
   }
   if (criteria.subdivisions && criteria.subdivisions.length > 0) {
-    params.append('subdivision', criteria.subdivisions[0]);
+    params.append('subdivision', criteria.subdivisions.join(','));
   }
   if (criteria.cities && criteria.cities.length > 0) {
-    params.append('city', criteria.cities[0]);
+    params.append('city', criteria.cities.join(','));
   }
-  if (criteria.listPriceMin !== undefined) {
+  if (criteria.neighborhood && criteria.neighborhood.length > 0) {
+    params.append('neighborhood', criteria.neighborhood.join(','));
+  }
+  
+  // Numeric filters - handle zero as valid value
+  if (criteria.listPriceMin !== undefined && criteria.listPriceMin !== null) {
     params.append('minPrice', String(criteria.listPriceMin));
   }
-  if (criteria.listPriceMax !== undefined) {
+  if (criteria.listPriceMax !== undefined && criteria.listPriceMax !== null) {
     params.append('maxPrice', String(criteria.listPriceMax));
   }
-  if (criteria.bedroomsMin !== undefined) {
+  if (criteria.bedroomsMin !== undefined && criteria.bedroomsMin !== null) {
     params.append('bedsMin', String(criteria.bedroomsMin));
   }
-  if (criteria.fullBathsMin !== undefined) {
+  if (criteria.fullBathsMin !== undefined && criteria.fullBathsMin !== null) {
     params.append('bathsMin', String(criteria.fullBathsMin));
   }
   
-  params.append('limit', '100');
+  // String filters
+  if (criteria.propertySubType) {
+    params.append('propertySubType', criteria.propertySubType);
+  }
+  
+  // Additional numeric filters
+  const anyC = criteria as any;
+  if (anyC.soldDays !== undefined && anyC.soldDays !== null) {
+    params.append('soldDays', String(anyC.soldDays));
+  }
+  if (anyC.stories !== undefined && anyC.stories !== null) {
+    params.append('stories', String(anyC.stories));
+  }
+  if (anyC.minLotAcres !== undefined && anyC.minLotAcres !== null) {
+    params.append('minLotAcres', String(anyC.minLotAcres));
+  }
+  if (anyC.maxLotAcres !== undefined && anyC.maxLotAcres !== null) {
+    params.append('maxLotAcres', String(anyC.maxLotAcres));
+  }
+  if (anyC.minYearBuilt !== undefined && anyC.minYearBuilt !== null) {
+    params.append('minYearBuilt', String(anyC.minYearBuilt));
+  }
+  if (anyC.maxYearBuilt !== undefined && anyC.maxYearBuilt !== null) {
+    params.append('maxYearBuilt', String(anyC.maxYearBuilt));
+  }
+  if (anyC.minSqft !== undefined && anyC.minSqft !== null) {
+    params.append('minSqft', String(anyC.minSqft));
+  }
+  if (anyC.maxSqft !== undefined && anyC.maxSqft !== null) {
+    params.append('maxSqft', String(anyC.maxSqft));
+  }
+  
+  params.append('limit', '200');
+  
+  return params;
+}
+
+// New unified search that routes to Repliers (active) or HomeReview (closed)
+export async function unifiedSearch(criteria: SearchCriteria): Promise<Property[]> {
+  const params = buildSearchParams(criteria);
 
   const response = await fetch(`/api/search?${params.toString()}`);
   if (!response.ok) {
@@ -219,6 +263,82 @@ export async function unifiedSearch(criteria: SearchCriteria): Promise<Property[
   
   // Map normalized properties to full Property type for UI compatibility
   return data.properties.map(mapNormalizedToProperty);
+}
+
+// Extended search that returns metadata (for inventory summary)
+export interface SearchResultWithMeta {
+  properties: Property[];
+  count: number;
+  dataSource: string;
+  statuses: string[];
+  inventoryByStatus: Record<string, number>;
+  inventoryBySubtype: Record<string, number>;
+}
+
+export async function unifiedSearchWithMeta(criteria: SearchCriteria): Promise<SearchResultWithMeta> {
+  const params = buildSearchParams(criteria);
+
+  const response = await fetch(`/api/search?${params.toString()}`);
+  if (!response.ok) {
+    throw new Error('Failed to search properties');
+  }
+  const data: UnifiedSearchResponse = await response.json();
+  
+  // Map normalized properties to full Property type
+  const properties = data.properties.map(mapNormalizedToProperty);
+  
+  // Compute inventory counts from results
+  const inventoryByStatus: Record<string, number> = {
+    'Active': 0,
+    'Under Contract': 0,
+    'Closed': 0,
+  };
+  
+  const inventoryBySubtype: Record<string, number> = {
+    'Single Family Residence': 0,
+    'Condominium': 0,
+    'Townhouse': 0,
+    'Multi-Family': 0,
+    'Land/Ranch': 0,
+    'Other/Unknown': 0,
+  };
+  
+  properties.forEach(p => {
+    // Count by status
+    const status = p.standardStatus || 'Active';
+    if (status === 'Active') inventoryByStatus['Active']++;
+    else if (status === 'Under Contract' || status === 'Pending') inventoryByStatus['Under Contract']++;
+    else if (status === 'Closed' || status === 'Sold') inventoryByStatus['Closed']++;
+    
+    // Count by subtype
+    const subtype = (p.propertySubType || '').toLowerCase();
+    if (subtype.includes('single family') || subtype.includes('detached')) {
+      inventoryBySubtype['Single Family Residence']++;
+    } else if (subtype.includes('condo')) {
+      inventoryBySubtype['Condominium']++;
+    } else if (subtype.includes('townhouse') || subtype.includes('townhome')) {
+      inventoryBySubtype['Townhouse']++;
+    } else if (subtype.includes('multi') || subtype.includes('duplex') || subtype.includes('triplex')) {
+      inventoryBySubtype['Multi-Family']++;
+    } else if (subtype.includes('land') || subtype.includes('ranch') || subtype.includes('lot')) {
+      inventoryBySubtype['Land/Ranch']++;
+    } else {
+      inventoryBySubtype['Other/Unknown']++;
+    }
+  });
+  
+  // Determine data source based on statuses
+  const hasClosedOnly = data.statuses?.every(s => s === 'closed' || s === 'sold');
+  const dataSource = hasClosedOnly ? 'Database (Sold Records)' : 'Repliers API';
+  
+  return {
+    properties,
+    count: properties.length,
+    dataSource,
+    statuses: data.statuses || ['active'],
+    inventoryByStatus,
+    inventoryBySubtype,
+  };
 }
 
 export async function searchProperties(criteria: SearchCriteria): Promise<Property[]> {

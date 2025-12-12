@@ -1,0 +1,158 @@
+You are working ONLY on the “Properties” module (the agent-facing Properties search experience),
+NOT CMA pages, NOT IDX/public pages.
+
+Data source: Repliers (and/or whatever the Properties module is configured to use).
+You MUST clearly expose which data source is being used and ensure results are accurate and consistent.
+
+====================================================
+1) SHOW DATA SOURCE + INVENTORY SUMMARY (STATUS + SUBTYPE)
+====================================================
+
+Problem:
+- The Properties page shows a number of properties but it’s unclear which data source it came from.
+- We also need a quick inventory summary by status and property subtype.
+
+Requirements:
+1) Add a clear label near the total results count:
+   - Example: “Data Source: Repliers”
+   - If multiple sources are possible, show the active one explicitly.
+
+2) Add an inventory summary panel (or compact chips) that updates with every search:
+   - Inventory by Status (counts):
+     • Active
+     • Under Contract
+     • Sold/Closed
+     • Any other supported statuses
+   - Inventory by Property Subtype (counts):
+     • Single Family Residence
+     • Condominium
+     • Townhouse
+     • Multi-Family / Duplex
+     • Land / Ranch (if applicable)
+     • Other/Unknown
+
+3) These counts must reflect the same dataset as the results list (post-filtering).
+4) If there are 0 results, inventory summary must show zeros (not blank / not missing).
+
+Testing:
+- Run a search that returns results → verify counts match list totals.
+- Run a search that returns 0 results → verify inventory still renders.
+
+====================================================
+2) REORDER THE VIEW FLOW: Search Criteria → View Result → View Map
+====================================================
+
+Problem:
+- The order of sections/tabs is not aligned with desired workflow.
+
+Requirements:
+- Reorder the UI so the default left-to-right (or top-to-bottom) flow is:
+  1) Search Criteria
+  2) View Result
+  3) View Map
+- Ensure this order is consistent on desktop and mobile.
+- Ensure the selected tab persists while navigating within Properties.
+
+Testing:
+- Load Properties page → confirm Search Criteria is first, View Result second, View Map last.
+
+====================================================
+3) PRESERVE FILTERS WHEN USING BACK/UNDO (DO NOT RESET)
+====================================================
+
+Problem:
+- After performing a search and landing in View Result, using browser back/undo can clear filters/selections unintentionally.
+
+Requirements:
+1) Persist the user’s search criteria and selections when:
+   - user clicks Back
+   - user switches between View Result and Search Criteria
+   - user navigates within Properties and returns
+
+2) Filters MUST NOT be cleared unless the user explicitly clicks:
+   - Reset button (the ONLY action that clears filters)
+
+Implementation guidance:
+- Use URL query params and/or route state to restore filters reliably.
+- Ensure pagination/sort state is preserved too if applicable.
+
+Testing:
+- Set multiple filters → run search → go to View Result
+- Click Back or return to Search Criteria
+- Confirm filters remain exactly the same until user presses Reset.
+
+====================================================
+4) BUG INVESTIGATION: Subdivision “Barton Hills” RESULTS INCORRECT
+====================================================
+
+Problem:
+- Searching Subdivision = “Barton Hills” returns incorrect results.
+
+Requirements:
+1) Reproduce:
+   - Search Criteria: Subdivision “Barton Hills” (and any other required defaults)
+2) Validate:
+   - Which field is being queried for subdivision (SubdivisionName? Neighborhood? Area? MLSSubdivision?)
+   - Whether matching is exact vs partial vs normalized (case/spacing)
+3) Fix subdivision matching:
+   - Must use the correct Repliers field(s) for subdivision.
+   - Must handle common variations:
+     • “Barton Hills”
+     • “Barton Hills West”
+     • “Barton Hills East”
+   - If you use partial matching, ensure it does not pull unrelated neighborhoods.
+
+4) Add diagnostic logging (server-side) for this search:
+   - the final query sent to Repliers
+   - the field used for subdivision filtering
+   - result count before/after filters
+
+Testing:
+- Search “Barton Hills” → confirm returned properties are truly in that subdivision.
+- Cross-check at least 3 returned records show the correct subdivision value in the property details.
+
+====================================================
+5) BUG INVESTIGATION: City “Austin” + ALL STATUSES → BLANK RESULTS
+====================================================
+
+Problem:
+- Turning ON all statuses for City = Austin returns blank/no results.
+
+Requirements:
+1) Reproduce:
+   - City = Austin
+   - Status = “All” (or all status toggles selected)
+2) Identify whether the issue is:
+   - Status filter building an invalid query
+   - Status filter using AND instead of OR
+   - Repliers API status values mismatch with our UI values
+   - UI incorrectly sending empty statuses array
+   - Backend mapping filtering out everything post-fetch
+
+3) Fix the logic so:
+   - Selecting multiple statuses returns the union (OR), not intersection (AND).
+   - “All statuses” truly means no status restriction OR an OR across all statuses.
+   - Results are not filtered to zero due to mapping issues.
+
+4) Ensure “N found” and inventory summary reflect actual results.
+
+Testing:
+- City = Austin + All statuses:
+  - Confirm results appear (non-empty).
+- City = Austin + Active only:
+  - Confirm results are a subset of the “All statuses” results.
+- City = Austin + Under Contract only:
+  - Confirm results appear (if any) and are not blocked by the multi-status logic.
+
+====================================================
+FINAL REPORT REQUIRED
+====================================================
+
+Provide:
+1) Where “Data Source” label was added and how it is determined.
+2) How status + subtype inventory counts are computed and verified.
+3) How filter persistence was implemented (URL/state) and how Reset works.
+4) Root cause + fix for:
+   - Barton Hills subdivision incorrect results
+   - Austin + All statuses blank results
+5) Confirmation no CMA/IDX/public pages were modified.
