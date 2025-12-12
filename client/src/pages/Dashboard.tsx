@@ -21,6 +21,7 @@ import {
   ChevronLeft,
   ChevronRight,
   ChevronDown,
+  ChevronUp,
   Settings,
   Info,
   Bed,
@@ -32,7 +33,8 @@ import {
   Eye,
   EyeOff,
   Activity,
-  Building2
+  Building2,
+  RotateCcw
 } from "lucide-react";
 import { Link } from "wouter";
 import { useToast } from "@/hooks/use-toast";
@@ -99,6 +101,28 @@ interface DomAnalytics {
   minDom: number;
   maxDom: number;
   distribution: Record<string, number>;
+}
+
+interface RecentSoldProperty {
+  id: string;
+  listingId?: string;
+  unparsedAddress?: string;
+  city?: string;
+  stateOrProvince?: string;
+  closePrice?: number;
+  closeDate?: string;
+  bedroomsTotal?: number;
+  bathroomsTotalInteger?: number;
+  livingArea?: number;
+  photos?: string[];
+  standardStatus?: string;
+  propertySubType?: string;
+}
+
+interface RecentSoldResponse {
+  properties: RecentSoldProperty[];
+  count: number;
+  total: number;
 }
 
 interface DashboardProperty {
@@ -345,15 +369,15 @@ function PropertyDetailModal({
           
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <div className="text-center p-3 bg-muted rounded-md">
-              <p className="text-2xl font-bold">{property.bedroomsTotal || 0}</p>
+              <p className="text-2xl font-bold">{property.bedroomsTotal !== null && property.bedroomsTotal !== undefined ? property.bedroomsTotal : '—'}</p>
               <p className="text-xs text-muted-foreground">Beds</p>
             </div>
             <div className="text-center p-3 bg-muted rounded-md">
-              <p className="text-2xl font-bold">{property.bathroomsTotalInteger || 0}</p>
+              <p className="text-2xl font-bold">{property.bathroomsTotalInteger !== null && property.bathroomsTotalInteger !== undefined ? property.bathroomsTotalInteger : '—'}</p>
               <p className="text-xs text-muted-foreground">Baths</p>
             </div>
             <div className="text-center p-3 bg-muted rounded-md">
-              <p className="text-2xl font-bold">{property.livingArea ? Number(property.livingArea).toLocaleString() : 'N/A'}</p>
+              <p className="text-2xl font-bold">{property.livingArea ? Number(property.livingArea).toLocaleString() : '—'}</p>
               <p className="text-xs text-muted-foreground">Sq Ft</p>
             </div>
             <div className="text-center p-3 bg-muted rounded-md">
@@ -450,6 +474,8 @@ export default function Dashboard() {
   const [recentCmasOpen, setRecentCmasOpen] = useState(true);
   // Dashboard customization is TEMPORARY (session-only, resets on refresh)
   const [config, setConfig] = useState<DashboardConfig>(defaultConfig);
+  // CMA sorting state (session-only)
+  const [cmaSortBy, setCmaSortBy] = useState<'date' | 'name' | 'comps'>('date');
   
   const { data: stats, isLoading: statsLoading } = useQuery<DashboardStats>({
     queryKey: ['/api/stats/dashboard'],
@@ -544,6 +570,11 @@ export default function Dashboard() {
     staleTime: 5 * 60 * 1000,
   });
 
+  const { data: recentSoldData, isLoading: recentSoldLoading } = useQuery<RecentSoldResponse>({
+    queryKey: ['/api/dashboard/recent-sold'],
+    staleTime: 5 * 60 * 1000,
+  });
+
   const syncMutation = useMutation({
     mutationFn: async () => {
       return apiRequest('/api/sync', 'POST');
@@ -585,9 +616,46 @@ export default function Dashboard() {
     setConfig(prev => ({ ...prev, [key]: !prev[key] }));
   };
   
-  const sortedCmas = [...cmas].sort((a, b) => 
-    new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-  );
+  const moveWidget = (widgetKey: string, direction: 'up' | 'down') => {
+    setConfig(prev => {
+      const order = [...prev.widgetOrder];
+      const index = order.indexOf(widgetKey);
+      if (index === -1) return prev;
+      
+      const newIndex = direction === 'up' ? index - 1 : index + 1;
+      if (newIndex < 0 || newIndex >= order.length) return prev;
+      
+      // Swap positions
+      [order[index], order[newIndex]] = [order[newIndex], order[index]];
+      return { ...prev, widgetOrder: order };
+    });
+  };
+  
+  const resetDashboard = () => {
+    setConfig(defaultConfig);
+    setCmaSortBy('date');
+  };
+  
+  const sortedCmas = [...cmas].sort((a, b) => {
+    switch (cmaSortBy) {
+      case 'name':
+        return a.name.localeCompare(b.name);
+      case 'comps':
+        return b.comparablePropertyIds.length - a.comparablePropertyIds.length;
+      case 'date':
+      default:
+        return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+    }
+  });
+  
+  // Widget visibility mapping
+  const widgetVisibility: Record<string, boolean> = {
+    metrics: config.showMetrics,
+    quickActions: config.showQuickActions,
+    activeCarousel: config.showActiveCarousel,
+    marketInsights: config.showMarketInsights,
+    recentCmas: config.showRecentCmas,
+  };
 
   return (
     <div className="space-y-6">
@@ -610,39 +678,97 @@ export default function Dashboard() {
       {configOpen && (
         <Card>
           <CardHeader className="pb-3">
-            <div className="flex items-center justify-between gap-2">
-              <CardTitle className="text-lg">Dashboard Configuration</CardTitle>
-              <Badge variant="secondary" className="text-xs">Session Only</Badge>
+            <div className="flex items-center justify-between gap-2 flex-wrap">
+              <div className="flex items-center gap-2">
+                <CardTitle className="text-lg">Dashboard Configuration</CardTitle>
+                <Badge variant="secondary" className="text-xs">Session Only</Badge>
+              </div>
+              <Button 
+                variant="outline" 
+                size="sm"
+                onClick={resetDashboard}
+                data-testid="button-reset-dashboard"
+              >
+                <RotateCcw className="w-4 h-4 mr-2" />
+                Reset
+              </Button>
             </div>
             <p className="text-xs text-muted-foreground mt-1">
               Customizations apply to this session only and reset on page refresh.
             </p>
           </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-              {[
-                { key: 'showMetrics', label: 'Metrics Cards' },
-                { key: 'showQuickActions', label: 'Quick Actions' },
-                { key: 'showActiveCarousel', label: 'Active Properties' },
-                { key: 'showMarketInsights', label: 'Market Insights' },
-                { key: 'showRecentCmas', label: 'Recent CMAs' },
-              ].map(({ key, label }) => (
-                <Button
-                  key={key}
-                  variant={config[key as keyof DashboardConfig] ? "default" : "outline"}
-                  size="sm"
-                  onClick={() => toggleWidget(key as keyof DashboardConfig)}
-                  className="justify-start gap-2"
-                  data-testid={`toggle-${key}`}
-                >
-                  {config[key as keyof DashboardConfig] ? (
-                    <Eye className="w-4 h-4" />
-                  ) : (
-                    <EyeOff className="w-4 h-4" />
-                  )}
-                  {label}
-                </Button>
-              ))}
+          <CardContent className="space-y-4">
+            <div>
+              <p className="text-sm font-medium mb-2">Toggle Visibility</p>
+              <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+                {[
+                  { key: 'showMetrics', label: 'Metrics Cards' },
+                  { key: 'showQuickActions', label: 'Quick Actions' },
+                  { key: 'showActiveCarousel', label: 'Active Properties' },
+                  { key: 'showMarketInsights', label: 'Market Insights' },
+                  { key: 'showRecentCmas', label: 'Recent CMAs' },
+                ].map(({ key, label }) => (
+                  <Button
+                    key={key}
+                    variant={config[key as keyof DashboardConfig] ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => toggleWidget(key as keyof DashboardConfig)}
+                    className="justify-start gap-2"
+                    data-testid={`toggle-${key}`}
+                  >
+                    {config[key as keyof DashboardConfig] ? (
+                      <Eye className="w-4 h-4" />
+                    ) : (
+                      <EyeOff className="w-4 h-4" />
+                    )}
+                    {label}
+                  </Button>
+                ))}
+              </div>
+            </div>
+            
+            <div>
+              <p className="text-sm font-medium mb-2">Widget Order (drag to reorder)</p>
+              <div className="flex flex-col gap-2">
+                {config.widgetOrder.map((widgetKey, index) => {
+                  const widgetLabels: Record<string, string> = {
+                    metrics: 'Metrics Cards',
+                    quickActions: 'Quick Actions',
+                    activeCarousel: 'Active Properties',
+                    marketInsights: 'Market Insights',
+                    recentCmas: 'Recent CMAs',
+                  };
+                  return (
+                    <div 
+                      key={widgetKey}
+                      className="flex items-center gap-2 p-2 border rounded-md bg-muted/30"
+                    >
+                      <span className="text-sm text-muted-foreground w-5">{index + 1}.</span>
+                      <span className="flex-1 text-sm">{widgetLabels[widgetKey] || widgetKey}</span>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-6 w-6 p-0"
+                        onClick={() => moveWidget(widgetKey, 'up')}
+                        disabled={index === 0}
+                        data-testid={`button-move-up-${widgetKey}`}
+                      >
+                        <ChevronUp className="w-4 h-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-6 w-6 p-0"
+                        onClick={() => moveWidget(widgetKey, 'down')}
+                        disabled={index === config.widgetOrder.length - 1}
+                        data-testid={`button-move-down-${widgetKey}`}
+                      >
+                        <ChevronDown className="w-4 h-4" />
+                      </Button>
+                    </div>
+                  );
+                })}
+              </div>
             </div>
           </CardContent>
         </Card>
@@ -666,494 +792,572 @@ export default function Dashboard() {
         </Card>
       )}
 
-      {config.showMetrics && (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 gap-1">
-              <CardTitle className="text-sm font-medium">Total Properties</CardTitle>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Info className="w-4 h-4 text-muted-foreground cursor-help" />
-                </TooltipTrigger>
-                <TooltipContent>
-                  <p>Active + Under Contract (from Repliers) + Sold (from database)</p>
-                </TooltipContent>
-              </Tooltip>
-            </CardHeader>
-            <CardContent>
-              {isLoading ? (
-                <Skeleton className="h-8 w-20" />
-              ) : (
-                <>
-                  <div className="text-2xl font-bold" data-testid="text-total-properties">
-                    {stats?.totalProperties?.toLocaleString() || 0}
-                  </div>
-                  <div className="text-xs text-muted-foreground space-y-0.5 mt-1">
-                    <p className="flex items-center gap-1">
-                      <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
-                      {stats?.totalActiveProperties?.toLocaleString() || 0} Active
-                    </p>
-                    <p className="flex items-center gap-1">
-                      <span className="w-2 h-2 rounded-full bg-amber-500"></span>
-                      {stats?.totalUnderContractProperties?.toLocaleString() || 0} Under Contract
-                    </p>
-                    <p className="flex items-center gap-1">
-                      <span className="w-2 h-2 rounded-full bg-slate-500"></span>
-                      {stats?.totalClosedProperties?.toLocaleString() || 0} Sold
-                    </p>
-                  </div>
-                </>
-              )}
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 gap-1">
-              <CardTitle className="text-sm font-medium">Active CMAs</CardTitle>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Info className="w-4 h-4 text-muted-foreground cursor-help" />
-                </TooltipTrigger>
-                <TooltipContent>
-                  <p>Total Comparative Market Analyses created</p>
-                </TooltipContent>
-              </Tooltip>
-            </CardHeader>
-            <CardContent>
-              {isLoading ? (
-                <Skeleton className="h-8 w-20" />
-              ) : (
-                <>
-                  <div className="text-2xl font-bold" data-testid="text-active-cmas">
-                    {stats?.activeCmas || 0}
-                  </div>
-                  <p className="text-xs text-muted-foreground">Total created</p>
-                </>
-              )}
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 gap-1">
-              <CardTitle className="text-sm font-medium">Seller Updates</CardTitle>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Info className="w-4 h-4 text-muted-foreground cursor-help" />
-                </TooltipTrigger>
-                <TooltipContent>
-                  <p>Active market monitoring alerts for sellers</p>
-                </TooltipContent>
-              </Tooltip>
-            </CardHeader>
-            <CardContent>
-              {isLoading ? (
-                <Skeleton className="h-8 w-20" />
-              ) : (
-                <>
-                  <div className="text-2xl font-bold" data-testid="text-saved-searches">
-                    {stats?.sellerUpdates || 0}
-                  </div>
-                  <p className="text-xs text-muted-foreground">Monitoring market</p>
-                </>
-              )}
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 gap-1">
-              <CardTitle className="text-sm font-medium">System Status</CardTitle>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Info className="w-4 h-4 text-muted-foreground cursor-help" />
-                </TooltipTrigger>
-                <TooltipContent>
-                  <p>Platform and API connection status</p>
-                </TooltipContent>
-              </Tooltip>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold" data-testid="text-system-status">
-                {stats?.systemStatus || 'Loading...'}
-              </div>
-              <p className="text-xs text-muted-foreground">Platform status</p>
-            </CardContent>
-          </Card>
-        </div>
-      )}
-
-      {config.showQuickActions && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Quick Actions</CardTitle>
-          </CardHeader>
-          <CardContent className="flex flex-wrap justify-end gap-4">
-            <Link href="/properties">
-              <Button data-testid="button-search-properties">
-                <Search className="w-4 h-4 mr-2" />
-                Search Properties
-              </Button>
-            </Link>
-            <Link href="/cmas/new">
-              <Button variant="outline" data-testid="button-create-cma">
-                <Plus className="w-4 h-4 mr-2" />
-                Create CMA
-              </Button>
-            </Link>
-            <Button 
-              variant="outline" 
-              data-testid="button-sync-data"
-              onClick={() => syncMutation.mutate()}
-              disabled={syncMutation.isPending}
-            >
-              <RefreshCw className={`w-4 h-4 mr-2 ${syncMutation.isPending ? 'animate-spin' : ''}`} />
-              {syncMutation.isPending ? 'Syncing...' : 'Sync Repliers Data'}
-            </Button>
-          </CardContent>
-        </Card>
-      )}
-      
-      {config.showActiveCarousel && (
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between gap-2">
-            <div>
-              <CardTitle className="flex items-center gap-2">
-                Active Properties
-                {activePropertiesData?.personalized && (
-                  <Badge variant="secondary" className="text-xs">Personalized</Badge>
-                )}
-              </CardTitle>
-              <p className="text-sm text-muted-foreground mt-1">
-                {activePropertiesData?.personalized 
-                  ? `Properties matching your recent activity${personalizationParams.city ? ` in ${personalizationParams.city}` : ''}`
-                  : 'Recently listed properties from Repliers'
-                }
-              </p>
-            </div>
-            <div className="flex items-center gap-2">
-              <Button 
-                size="icon" 
-                variant="outline"
-                onClick={() => scrollCarousel('left')}
-                data-testid="button-carousel-left"
-              >
-                <ChevronLeft className="w-4 h-4" />
-              </Button>
-              <Button 
-                size="icon" 
-                variant="outline"
-                onClick={() => scrollCarousel('right')}
-                data-testid="button-carousel-right"
-              >
-                <ChevronRight className="w-4 h-4" />
-              </Button>
-            </div>
-          </CardHeader>
-          <CardContent>
-            {activePropertiesLoading ? (
-              <div className="flex gap-4 overflow-hidden">
-                {[1, 2, 3, 4].map(i => (
-                  <Skeleton key={i} className="flex-shrink-0 w-72 h-64 rounded-lg" />
-                ))}
-              </div>
-            ) : activePropertiesData?.properties && activePropertiesData.properties.length > 0 ? (
-              <div 
-                ref={carouselRef}
-                className="flex gap-4 overflow-x-auto pb-2 scrollbar-hide"
-                style={{ scrollSnapType: 'x mandatory' }}
-              >
-                {activePropertiesData.properties.map(property => (
-                  <PropertyCarouselCard
-                    key={property.id}
-                    property={property}
-                    onClick={() => handlePropertyClick(property)}
-                  />
-                ))}
-              </div>
-            ) : (
-              <div className="text-center py-8 text-muted-foreground">
-                <Home className="w-12 h-12 mx-auto mb-4 opacity-50" />
-                <p>No active properties available</p>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      )}
-
-      {config.showMarketInsights && (
-        <div className="space-y-6">
-          <div className="flex items-center gap-2">
-            <BarChart3 className="w-6 h-6 text-primary" />
-            <h2 className="text-2xl font-bold">Market Insights</h2>
-          </div>
-
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-lg">Market Activity (Last 12 Months)</CardTitle>
-              </CardHeader>
-              <CardContent>
-                {listingsLoading ? (
-                  <Skeleton className="h-64 w-full" />
-                ) : listingsByMonth.length > 0 ? (
-                  <ResponsiveContainer width="100%" height={280}>
-                    <LineChart data={listingsByMonth.map(item => ({
-                      ...item,
-                      monthLabel: new Date(item.month + '-01').toLocaleDateString('en-US', { month: 'short', year: '2-digit' })
-                    }))}>
-                      <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-                      <XAxis 
-                        dataKey="monthLabel" 
-                        tick={{ fontSize: 12 }}
-                        className="text-muted-foreground"
-                      />
-                      <YAxis tick={{ fontSize: 12 }} className="text-muted-foreground" />
-                      <RechartsTooltip 
-                        contentStyle={{ 
-                          backgroundColor: 'hsl(var(--card))', 
-                          border: '1px solid hsl(var(--border))',
-                          borderRadius: '8px'
-                        }} 
-                      />
-                      <Legend />
-                      <Line 
-                        type="monotone" 
-                        dataKey="active" 
-                        stroke="hsl(var(--primary))" 
-                        strokeWidth={2}
-                        name="New Listings"
-                        dot={{ fill: 'hsl(var(--primary))' }}
-                      />
-                      <Line 
-                        type="monotone" 
-                        dataKey="closed" 
-                        stroke="hsl(142, 76%, 36%)" 
-                        strokeWidth={2}
-                        name="Closed Sales"
-                        dot={{ fill: 'hsl(142, 76%, 36%)' }}
-                      />
-                    </LineChart>
-                  </ResponsiveContainer>
-                ) : (
-                  <div className="h-64 flex items-center justify-center text-muted-foreground">
-                    No data available
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-lg">Price Distribution (Active Listings)</CardTitle>
-              </CardHeader>
-              <CardContent>
-                {priceLoading ? (
-                  <Skeleton className="h-64 w-full" />
-                ) : priceDistribution.length > 0 ? (
-                  <ResponsiveContainer width="100%" height={280}>
-                    <BarChart data={priceDistribution}>
-                      <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-                      <XAxis 
-                        dataKey="range" 
-                        tick={{ fontSize: 11 }}
-                        className="text-muted-foreground"
-                      />
-                      <YAxis tick={{ fontSize: 12 }} className="text-muted-foreground" />
-                      <RechartsTooltip 
-                        contentStyle={{ 
-                          backgroundColor: 'hsl(var(--card))', 
-                          border: '1px solid hsl(var(--border))',
-                          borderRadius: '8px'
-                        }}
-                        formatter={(value: number) => [value.toLocaleString(), 'Properties']}
-                      />
-                      <Bar 
-                        dataKey="count" 
-                        fill="hsl(var(--primary))" 
-                        radius={[4, 4, 0, 0]}
-                        name="Properties"
-                      />
-                    </BarChart>
-                  </ResponsiveContainer>
-                ) : (
-                  <div className="h-64 flex items-center justify-center text-muted-foreground">
-                    No data available
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          </div>
-          
-          {/* Property Inventory by Subtype and DOM Analytics */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
-            {/* Property Inventory by Subtype */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-lg flex items-center gap-2">
-                  <Building2 className="w-5 h-5" />
-                  Property Inventory by Type
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                {inventoryLoading ? (
-                  <Skeleton className="h-48 w-full" />
-                ) : inventoryData && Object.keys(inventoryData.subtypes || {}).length > 0 ? (
-                  <div className="space-y-3">
-                    {Object.entries(inventoryData.subtypes)
-                      .sort((a, b) => b[1] - a[1])
-                      .slice(0, 8)
-                      .map(([subtype, count]) => (
-                        <div key={subtype} className="flex items-center justify-between">
-                          <span className="text-sm">{subtype || 'Unknown'}</span>
-                          <div className="flex items-center gap-2">
-                            <div className="w-24 h-2 bg-muted rounded-full overflow-hidden">
-                              <div 
-                                className="h-full bg-primary rounded-full" 
-                                style={{ width: `${(count / inventoryData.total) * 100}%` }}
-                              />
-                            </div>
-                            <span className="text-sm font-medium w-10 text-right">{count.toLocaleString()}</span>
-                          </div>
+      {/* Render widgets in user-specified order */}
+      {config.widgetOrder.map((widgetKey) => {
+        if (!widgetVisibility[widgetKey]) return null;
+        
+        switch (widgetKey) {
+          case 'metrics':
+            return (
+              <div key="metrics" className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                <Card>
+                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 gap-1">
+                    <CardTitle className="text-sm font-medium">Total Properties</CardTitle>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Info className="w-4 h-4 text-muted-foreground cursor-help" />
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p>Active + Under Contract (from Repliers) + Sold (from database)</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </CardHeader>
+                  <CardContent>
+                    {isLoading ? (
+                      <Skeleton className="h-8 w-20" />
+                    ) : (
+                      <>
+                        <div className="text-2xl font-bold" data-testid="text-total-properties">
+                          {stats?.totalProperties?.toLocaleString() || 0}
                         </div>
-                      ))}
-                    <div className="pt-2 border-t text-sm text-muted-foreground">
-                      Total Active: {inventoryData.total.toLocaleString()}
+                        <div className="text-xs text-muted-foreground space-y-0.5 mt-1">
+                          <p className="flex items-center gap-1">
+                            <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
+                            {stats?.totalActiveProperties?.toLocaleString() || 0} Active
+                          </p>
+                          <p className="flex items-center gap-1">
+                            <span className="w-2 h-2 rounded-full bg-amber-500"></span>
+                            {stats?.totalUnderContractProperties?.toLocaleString() || 0} Under Contract
+                          </p>
+                          <p className="flex items-center gap-1">
+                            <span className="w-2 h-2 rounded-full bg-slate-500"></span>
+                            {stats?.totalClosedProperties?.toLocaleString() || 0} Sold
+                          </p>
+                        </div>
+                      </>
+                    )}
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 gap-1">
+                    <CardTitle className="text-sm font-medium">Active CMAs</CardTitle>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Info className="w-4 h-4 text-muted-foreground cursor-help" />
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p>Total Comparative Market Analyses created</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </CardHeader>
+                  <CardContent>
+                    {isLoading ? (
+                      <Skeleton className="h-8 w-20" />
+                    ) : (
+                      <>
+                        <div className="text-2xl font-bold" data-testid="text-active-cmas">
+                          {stats?.activeCmas || 0}
+                        </div>
+                        <p className="text-xs text-muted-foreground">Total created</p>
+                      </>
+                    )}
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 gap-1">
+                    <CardTitle className="text-sm font-medium">Seller Updates</CardTitle>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Info className="w-4 h-4 text-muted-foreground cursor-help" />
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p>Active market monitoring alerts for sellers</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </CardHeader>
+                  <CardContent>
+                    {isLoading ? (
+                      <Skeleton className="h-8 w-20" />
+                    ) : (
+                      <>
+                        <div className="text-2xl font-bold" data-testid="text-saved-searches">
+                          {stats?.sellerUpdates || 0}
+                        </div>
+                        <p className="text-xs text-muted-foreground">Monitoring market</p>
+                      </>
+                    )}
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 gap-1">
+                    <CardTitle className="text-sm font-medium">System Status</CardTitle>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Info className="w-4 h-4 text-muted-foreground cursor-help" />
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p>Platform and API connection status</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-bold" data-testid="text-system-status">
+                      {stats?.systemStatus || 'Loading...'}
                     </div>
+                    <p className="text-xs text-muted-foreground">Platform status</p>
+                  </CardContent>
+                </Card>
+              </div>
+            );
+          
+          case 'quickActions':
+            return (
+              <Card key="quickActions">
+                <CardHeader>
+                  <CardTitle>Quick Actions</CardTitle>
+                </CardHeader>
+                <CardContent className="flex flex-wrap justify-end gap-4">
+                  <Link href="/properties">
+                    <Button data-testid="button-search-properties">
+                      <Search className="w-4 h-4 mr-2" />
+                      Search Properties
+                    </Button>
+                  </Link>
+                  <Link href="/cmas/new">
+                    <Button variant="outline" data-testid="button-create-cma">
+                      <Plus className="w-4 h-4 mr-2" />
+                      Create CMA
+                    </Button>
+                  </Link>
+                  <Button 
+                    variant="outline" 
+                    data-testid="button-sync-data"
+                    onClick={() => syncMutation.mutate()}
+                    disabled={syncMutation.isPending}
+                  >
+                    <RefreshCw className={`w-4 h-4 mr-2 ${syncMutation.isPending ? 'animate-spin' : ''}`} />
+                    {syncMutation.isPending ? 'Syncing...' : 'Sync Repliers Data'}
+                  </Button>
+                </CardContent>
+              </Card>
+            );
+          
+          case 'activeCarousel':
+            return (
+              <Card key="activeCarousel">
+                <CardHeader className="flex flex-row items-center justify-between gap-2">
+                  <div>
+                    <CardTitle className="flex items-center gap-2">
+                      Active Properties
+                      {activePropertiesData?.personalized && (
+                        <Badge variant="secondary" className="text-xs">Personalized</Badge>
+                      )}
+                    </CardTitle>
+                    <p className="text-sm text-muted-foreground mt-1">
+                      {activePropertiesData?.personalized 
+                        ? `Properties matching your recent activity${personalizationParams.city ? ` in ${personalizationParams.city}` : ''}`
+                        : 'Recently listed properties from Repliers'
+                      }
+                    </p>
                   </div>
-                ) : (
-                  <div className="h-48 flex items-center justify-center text-muted-foreground">
-                    No inventory data available
+                  <div className="flex items-center gap-2">
+                    <Button 
+                      size="icon" 
+                      variant="outline"
+                      onClick={() => scrollCarousel('left')}
+                      data-testid="button-carousel-left"
+                    >
+                      <ChevronLeft className="w-4 h-4" />
+                    </Button>
+                    <Button 
+                      size="icon" 
+                      variant="outline"
+                      onClick={() => scrollCarousel('right')}
+                      data-testid="button-carousel-right"
+                    >
+                      <ChevronRight className="w-4 h-4" />
+                    </Button>
                   </div>
-                )}
-              </CardContent>
-            </Card>
+                </CardHeader>
+                <CardContent>
+                  {activePropertiesLoading ? (
+                    <div className="flex gap-4 overflow-hidden">
+                      {[1, 2, 3, 4].map(i => (
+                        <Skeleton key={i} className="flex-shrink-0 w-72 h-64 rounded-lg" />
+                      ))}
+                    </div>
+                  ) : activePropertiesData?.properties && activePropertiesData.properties.length > 0 ? (
+                    <div 
+                      ref={carouselRef}
+                      className="flex gap-4 overflow-x-auto pb-2 scrollbar-hide"
+                      style={{ scrollSnapType: 'x mandatory' }}
+                    >
+                      {activePropertiesData.properties.map(property => (
+                        <PropertyCarouselCard
+                          key={property.id}
+                          property={property}
+                          onClick={() => handlePropertyClick(property)}
+                        />
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="text-center py-8 text-muted-foreground">
+                      <Home className="w-12 h-12 mx-auto mb-4 opacity-50" />
+                      <p>No active properties available</p>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            );
+          
+          case 'marketInsights':
+            return (
+              <div key="marketInsights" className="space-y-6">
+                <div className="flex items-center gap-2">
+                  <BarChart3 className="w-6 h-6 text-primary" />
+                  <h2 className="text-2xl font-bold">Market Insights</h2>
+                </div>
 
-            {/* Days on Market Analytics */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-lg flex items-center gap-2">
-                  <Clock className="w-5 h-5" />
-                  Days on Market Analytics
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                {domLoading ? (
-                  <Skeleton className="h-48 w-full" />
-                ) : domAnalytics && domAnalytics.length > 0 ? (
-                  <div className="space-y-4">
-                    {domAnalytics.map((data: DomAnalytics) => (
-                      <div key={data.status} className="space-y-2">
-                        <div className="flex items-center justify-between">
-                          <Badge variant={data.status === 'Active' ? 'default' : 'secondary'}>
-                            {data.status}
-                          </Badge>
-                          <span className="text-sm text-muted-foreground">
-                            {data.count.toLocaleString()} properties
-                          </span>
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="text-lg">Market Activity (Last 12 Months)</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      {listingsLoading ? (
+                        <Skeleton className="h-64 w-full" />
+                      ) : listingsByMonth.length > 0 ? (
+                        <ResponsiveContainer width="100%" height={280}>
+                          <LineChart data={listingsByMonth.map(item => ({
+                            ...item,
+                            monthLabel: new Date(item.month + '-01').toLocaleDateString('en-US', { month: 'short', year: '2-digit' })
+                          }))}>
+                            <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                            <XAxis 
+                              dataKey="monthLabel" 
+                              tick={{ fontSize: 12 }}
+                              className="text-muted-foreground"
+                            />
+                            <YAxis tick={{ fontSize: 12 }} className="text-muted-foreground" />
+                            <RechartsTooltip 
+                              contentStyle={{ 
+                                backgroundColor: 'hsl(var(--card))', 
+                                border: '1px solid hsl(var(--border))',
+                                borderRadius: '8px'
+                              }} 
+                            />
+                            <Legend />
+                            <Line 
+                              type="monotone" 
+                              dataKey="active" 
+                              stroke="hsl(var(--primary))" 
+                              strokeWidth={2}
+                              name="New Listings"
+                              dot={{ fill: 'hsl(var(--primary))' }}
+                            />
+                            <Line 
+                              type="monotone" 
+                              dataKey="closed" 
+                              stroke="hsl(142, 76%, 36%)" 
+                              strokeWidth={2}
+                              name="Closed Sales"
+                              dot={{ fill: 'hsl(142, 76%, 36%)' }}
+                            />
+                          </LineChart>
+                        </ResponsiveContainer>
+                      ) : (
+                        <div className="h-64 flex items-center justify-center text-muted-foreground">
+                          No data available
                         </div>
-                        <div className="grid grid-cols-3 gap-4 text-center">
-                          <div>
-                            <p className="text-2xl font-bold">{Math.round(data.avgDom)}</p>
-                            <p className="text-xs text-muted-foreground">Avg DOM</p>
-                          </div>
-                          <div>
-                            <p className="text-2xl font-bold">{Math.round(data.medianDom)}</p>
-                            <p className="text-xs text-muted-foreground">Median DOM</p>
-                          </div>
-                          <div>
-                            <p className="text-2xl font-bold">{data.maxDom}</p>
-                            <p className="text-xs text-muted-foreground">Max DOM</p>
-                          </div>
+                      )}
+                    </CardContent>
+                  </Card>
+
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="text-lg">Price Distribution (Active Listings)</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      {priceLoading ? (
+                        <Skeleton className="h-64 w-full" />
+                      ) : priceDistribution.length > 0 ? (
+                        <ResponsiveContainer width="100%" height={280}>
+                          <BarChart data={priceDistribution}>
+                            <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                            <XAxis 
+                              dataKey="range" 
+                              tick={{ fontSize: 11 }}
+                              className="text-muted-foreground"
+                            />
+                            <YAxis tick={{ fontSize: 12 }} className="text-muted-foreground" />
+                            <RechartsTooltip 
+                              contentStyle={{ 
+                                backgroundColor: 'hsl(var(--card))', 
+                                border: '1px solid hsl(var(--border))',
+                                borderRadius: '8px'
+                              }}
+                              formatter={(value: number) => [value.toLocaleString(), 'Properties']}
+                            />
+                            <Bar 
+                              dataKey="count" 
+                              fill="hsl(var(--primary))" 
+                              radius={[4, 4, 0, 0]}
+                              name="Properties"
+                            />
+                          </BarChart>
+                        </ResponsiveContainer>
+                      ) : (
+                        <div className="h-64 flex items-center justify-center text-muted-foreground">
+                          No data available
                         </div>
-                        {data.distribution && (
-                          <div className="flex gap-1 h-8">
-                            {Object.entries(data.distribution).map(([range, count]) => (
-                              <Tooltip key={range}>
-                                <TooltipTrigger asChild>
-                                  <div 
-                                    className="bg-primary/20 hover:bg-primary/40 transition-colors rounded-sm flex-1 cursor-help"
-                                    style={{ opacity: Math.max(0.3, count / Math.max(...Object.values(data.distribution))) }}
-                                  />
-                                </TooltipTrigger>
-                                <TooltipContent>
-                                  <p>{range}: {count} properties</p>
-                                </TooltipContent>
-                              </Tooltip>
+                      )}
+                    </CardContent>
+                  </Card>
+                </div>
+                
+                {/* Property Inventory by Subtype and DOM Analytics */}
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
+                  {/* Property Inventory by Subtype */}
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="text-lg flex items-center gap-2">
+                        <Building2 className="w-5 h-5" />
+                        Property Inventory by Type
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      {inventoryLoading ? (
+                        <Skeleton className="h-48 w-full" />
+                      ) : inventoryData && Object.keys(inventoryData.subtypes || {}).length > 0 ? (
+                        <div className="space-y-3">
+                          {Object.entries(inventoryData.subtypes)
+                            .sort((a, b) => b[1] - a[1])
+                            .slice(0, 8)
+                            .map(([subtype, count]) => (
+                              <div key={subtype} className="flex items-center justify-between">
+                                <span className="text-sm">{subtype || 'Unknown'}</span>
+                                <div className="flex items-center gap-2">
+                                  <div className="w-24 h-2 bg-muted rounded-full overflow-hidden">
+                                    <div 
+                                      className="h-full bg-primary rounded-full" 
+                                      style={{ width: `${(count / inventoryData.total) * 100}%` }}
+                                    />
+                                  </div>
+                                  <span className="text-sm font-medium w-10 text-right">{count.toLocaleString()}</span>
+                                </div>
+                              </div>
                             ))}
+                          <div className="pt-2 border-t text-sm text-muted-foreground">
+                            Total Active: {inventoryData.total.toLocaleString()}
                           </div>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="h-48 flex items-center justify-center text-muted-foreground">
-                    No DOM data available
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          </div>
-        </div>
-      )}
+                        </div>
+                      ) : (
+                        <div className="h-48 flex items-center justify-center text-muted-foreground">
+                          No inventory data available
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
 
-      {config.showRecentCmas && (
-        <Card>
-          <Collapsible open={recentCmasOpen} onOpenChange={setRecentCmasOpen}>
-            <CardHeader className="flex flex-row items-center justify-between gap-2">
-              <CardTitle>Recent CMAs</CardTitle>
-              <CollapsibleTrigger asChild>
-                <Button variant="ghost" size="sm" data-testid="button-toggle-recent-cmas">
-                  <ChevronDown className={`w-4 h-4 transition-transform ${recentCmasOpen ? '' : '-rotate-90'}`} />
-                </Button>
-              </CollapsibleTrigger>
-            </CardHeader>
-            <CollapsibleContent>
-              <CardContent>
-                {cmasLoading ? (
-                  <div className="space-y-4">
-                    {[1, 2, 3].map((i) => (
-                      <div key={i} className="flex items-center gap-4">
-                        <Skeleton className="h-12 w-12 rounded" />
-                        <div className="flex-1 space-y-2">
-                          <Skeleton className="h-4 w-3/4" />
-                          <Skeleton className="h-3 w-1/2" />
+                  {/* Days on Market Analytics OR Recent Sold Fallback */}
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="text-lg flex items-center gap-2">
+                        <Clock className="w-5 h-5" />
+                        {domAnalytics && domAnalytics.length > 0 && domAnalytics[0].count > 0 
+                          ? 'Days on Market Analytics' 
+                          : 'Recent Sold/Closed'}
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      {domLoading || recentSoldLoading ? (
+                        <Skeleton className="h-48 w-full" />
+                      ) : domAnalytics && domAnalytics.length > 0 && domAnalytics[0].count > 0 ? (
+                        <div className="space-y-4">
+                          {domAnalytics.map((data: DomAnalytics) => (
+                            <div key={data.status} className="space-y-2">
+                              <div className="flex items-center justify-between">
+                                <Badge variant={data.status === 'Active' ? 'default' : 'secondary'}>
+                                  {data.status}
+                                </Badge>
+                                <span className="text-sm text-muted-foreground">
+                                  {data.count.toLocaleString()} properties
+                                </span>
+                              </div>
+                              <div className="grid grid-cols-3 gap-4 text-center">
+                                <div>
+                                  <p className="text-2xl font-bold">{Math.round(data.avgDom)}</p>
+                                  <p className="text-xs text-muted-foreground">Avg DOM</p>
+                                </div>
+                                <div>
+                                  <p className="text-2xl font-bold">{Math.round(data.medianDom)}</p>
+                                  <p className="text-xs text-muted-foreground">Median DOM</p>
+                                </div>
+                                <div>
+                                  <p className="text-2xl font-bold">{data.maxDom}</p>
+                                  <p className="text-xs text-muted-foreground">Max DOM</p>
+                                </div>
+                              </div>
+                              {data.distribution && (
+                                <div className="flex gap-1 h-8">
+                                  {Object.entries(data.distribution).map(([range, count]) => (
+                                    <Tooltip key={range}>
+                                      <TooltipTrigger asChild>
+                                        <div 
+                                          className="bg-primary/20 hover:bg-primary/40 transition-colors rounded-sm flex-1 cursor-help"
+                                          style={{ opacity: Math.max(0.3, count / Math.max(...Object.values(data.distribution))) }}
+                                        />
+                                      </TooltipTrigger>
+                                      <TooltipContent>
+                                        <p>{range}: {count} properties</p>
+                                      </TooltipContent>
+                                    </Tooltip>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      ) : recentSoldData && recentSoldData.properties.length > 0 ? (
+                        <div className="space-y-3 max-h-64 overflow-y-auto">
+                          {recentSoldData.properties.slice(0, 8).map((prop) => (
+                            <div 
+                              key={prop.id} 
+                              className="flex items-center gap-3 p-2 rounded-md hover-elevate active-elevate-2 cursor-pointer"
+                              onClick={() => handlePropertyClick(prop as DashboardProperty)}
+                              data-testid={`recent-sold-${prop.id}`}
+                            >
+                              <div className="w-12 h-12 bg-muted rounded-md flex items-center justify-center overflow-hidden flex-shrink-0">
+                                {prop.photos && prop.photos.length > 0 ? (
+                                  <img src={prop.photos[0]} alt="" className="w-full h-full object-cover" />
+                                ) : (
+                                  <Home className="w-6 h-6 text-muted-foreground" />
+                                )}
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <p className="text-sm font-medium truncate">{prop.unparsedAddress || 'Unknown Address'}</p>
+                                <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                                  <span className="text-primary font-medium">
+                                    {prop.closePrice ? `$${prop.closePrice.toLocaleString()}` : 'N/A'}
+                                  </span>
+                                  {prop.closeDate && (
+                                    <span>Closed {new Date(prop.closeDate).toLocaleDateString()}</span>
+                                  )}
+                                </div>
+                                <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                                  {prop.bedroomsTotal !== null && prop.bedroomsTotal !== undefined && <span>{prop.bedroomsTotal} bd</span>}
+                                  {prop.bathroomsTotalInteger !== null && prop.bathroomsTotalInteger !== undefined && <span>{prop.bathroomsTotalInteger} ba</span>}
+                                  {prop.livingArea && <span>{Number(prop.livingArea).toLocaleString()} sqft</span>}
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                          <p className="text-xs text-muted-foreground text-center pt-2">
+                            {recentSoldData.total} total sold properties
+                          </p>
+                        </div>
+                      ) : (
+                        <div className="h-48 flex items-center justify-center text-muted-foreground">
+                          No data available
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+                </div>
+              </div>
+            );
+          
+          case 'recentCmas':
+            return (
+              <Card key="recentCmas">
+                <Collapsible open={recentCmasOpen} onOpenChange={setRecentCmasOpen}>
+                  <CardHeader className="flex flex-row items-center justify-between gap-2">
+                    <div className="flex items-center gap-4 flex-wrap">
+                      <CardTitle>Recent CMAs</CardTitle>
+                      <div className="flex items-center gap-1">
+                        <span className="text-xs text-muted-foreground">Sort:</span>
+                        <div className="flex gap-1">
+                          {[
+                            { value: 'date', label: 'Date' },
+                            { value: 'name', label: 'Name' },
+                            { value: 'comps', label: 'Comps' },
+                          ].map((option) => (
+                            <Button
+                              key={option.value}
+                              variant={cmaSortBy === option.value ? 'default' : 'ghost'}
+                              size="sm"
+                              className="h-6 px-2 text-xs"
+                              onClick={() => setCmaSortBy(option.value as 'date' | 'name' | 'comps')}
+                              data-testid={`button-sort-cmas-${option.value}`}
+                            >
+                              {option.label}
+                            </Button>
+                          ))}
                         </div>
                       </div>
-                    ))}
-                  </div>
-                ) : sortedCmas.length > 0 ? (
-                  <div className="space-y-4">
-                    {sortedCmas.slice(0, 5).map((cma) => (
-                      <Link key={cma.id} href={`/cmas/${cma.id}`}>
-                        <div className="flex items-center gap-4 p-4 rounded-md hover-elevate active-elevate-2 cursor-pointer">
-                          <div className="w-12 h-12 bg-primary/10 rounded-md flex items-center justify-center">
-                            <FileText className="w-6 h-6 text-primary" />
-                          </div>
-                          <div className="flex-1">
-                            <h4 className="font-semibold">{cma.name}</h4>
-                            <p className="text-sm text-muted-foreground">
-                              {cma.comparablePropertyIds.length} properties • Created {new Date(cma.createdAt).toLocaleDateString()}
-                            </p>
-                          </div>
-                        </div>
-                      </Link>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="text-center py-8 text-muted-foreground">
-                    <FileText className="w-12 h-12 mx-auto mb-4 opacity-50" />
-                    <p>No CMAs yet. Create your first comparative market analysis.</p>
-                    <Link href="/cmas/new">
-                      <Button className="mt-4" variant="outline">
-                        Get Started
+                    </div>
+                    <CollapsibleTrigger asChild>
+                      <Button variant="ghost" size="sm" data-testid="button-toggle-recent-cmas">
+                        <ChevronDown className={`w-4 h-4 transition-transform ${recentCmasOpen ? '' : '-rotate-90'}`} />
                       </Button>
-                    </Link>
-                  </div>
-                )}
-              </CardContent>
-            </CollapsibleContent>
-          </Collapsible>
-        </Card>
-      )}
+                    </CollapsibleTrigger>
+                  </CardHeader>
+                  <CollapsibleContent>
+                    <CardContent>
+                      {cmasLoading ? (
+                        <div className="space-y-4">
+                          {[1, 2, 3].map((i) => (
+                            <div key={i} className="flex items-center gap-4">
+                              <Skeleton className="h-12 w-12 rounded" />
+                              <div className="flex-1 space-y-2">
+                                <Skeleton className="h-4 w-3/4" />
+                                <Skeleton className="h-3 w-1/2" />
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      ) : sortedCmas.length > 0 ? (
+                        <div className="space-y-4">
+                          {sortedCmas.slice(0, 5).map((cma) => (
+                            <Link key={cma.id} href={`/cmas/${cma.id}`}>
+                              <div className="flex items-center gap-4 p-4 rounded-md hover-elevate active-elevate-2 cursor-pointer">
+                                <div className="w-12 h-12 bg-primary/10 rounded-md flex items-center justify-center">
+                                  <FileText className="w-6 h-6 text-primary" />
+                                </div>
+                                <div className="flex-1">
+                                  <h4 className="font-semibold">{cma.name}</h4>
+                                  <p className="text-sm text-muted-foreground">
+                                    {cma.comparablePropertyIds.length} properties {'\u2022'} Created {new Date(cma.createdAt).toLocaleDateString()}
+                                  </p>
+                                </div>
+                              </div>
+                            </Link>
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="text-center py-8 text-muted-foreground">
+                          <FileText className="w-12 h-12 mx-auto mb-4 opacity-50" />
+                          <p>No CMAs yet. Create your first comparative market analysis.</p>
+                          <Link href="/cmas/new">
+                            <Button className="mt-4" variant="outline">
+                              Get Started
+                            </Button>
+                          </Link>
+                        </div>
+                      )}
+                    </CardContent>
+                  </CollapsibleContent>
+                </Collapsible>
+              </Card>
+            );
+          
+          default:
+            return null;
+        }
+      })}
       
       {/* System Status at Bottom */}
       <Card>

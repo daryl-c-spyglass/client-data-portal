@@ -229,8 +229,10 @@ class RepliersClient {
     const latitude = map.latitude ?? listing.latitude;
     const longitude = map.longitude ?? listing.longitude;
     
-    const bedrooms = details.bedrooms ?? listing.bedroomsTotal ?? listing.beds;
-    const bathrooms = details.bathrooms ?? listing.bathroomsTotalInteger ?? listing.baths;
+    // Try multiple field names for beds/baths - Repliers uses various field names
+    const bedrooms = details.bedrooms ?? details.numBedrooms ?? listing.bedroomsTotal ?? listing.beds ?? listing.bedrooms ?? null;
+    const bathrooms = details.bathrooms ?? details.numBathrooms ?? listing.bathroomsTotalInteger ?? listing.baths ?? listing.bathrooms ?? null;
+    // Don't default to 0 - preserve null for missing values
     const sqft = details.sqft || listing.livingArea || listing.sqft;
     const lotSize = details.lotSize || listing.lotSizeSquareFeet;
     const yearBuilt = details.yearBuilt || listing.yearBuilt;

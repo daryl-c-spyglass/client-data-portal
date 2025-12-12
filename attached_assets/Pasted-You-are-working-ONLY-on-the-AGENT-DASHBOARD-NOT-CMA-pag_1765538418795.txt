@@ -1,0 +1,204 @@
+You are working ONLY on the AGENT DASHBOARD (NOT CMA pages, IDX pages, or public listing pages).
+All dashboard data must come from Repliers.
+Leasing/rental listings must be excluded globally from ALL dashboard pulls, counts, carousels, metrics, and insights.
+
+Redo and fully fix the following items ONE BY ONE. After each item, TEST it and confirm it works before moving to the next.
+
+====================================================
+GLOBAL RULE — EXCLUDE LEASING / RENTALS (NON-NEGOTIABLE)
+====================================================
+Leasing/rental listings must be excluded from:
+- Active properties (including carousel)
+- Under Contract properties
+- Sold/Closed properties
+- Inventory by type/subtype
+- Market Insights
+- Days on Market calculations
+- Any dashboard counts/charts/widgets
+
+Use the existing shared rental detection helpers (e.g., isLikelyRentalProperty(), filterOutRentalProperties()).
+Filtering must be enforced SERVER-SIDE before returning data to the Dashboard UI.
+
+====================================================
+1) ACTIVE PROPERTIES FLOATING CARD — BEDS/BATHS SHOWING “0”
+====================================================
+Problem:
+- Dashboard → Active Properties → floating card still displays “0 beds” and “0 baths” for properties that should have values.
+
+Requirements:
+1. Fix the field mapping from Repliers for Beds and Baths.
+2. Stop defaulting missing/null values to 0.
+3. Display rules:
+   - If value exists → show value
+   - If truly missing → show “—” or “N/A” (NOT 0)
+4. Apply to all dashboard property types/statuses shown in floating card.
+
+Testing (required):
+- Click at least 5 known properties that should have beds/baths.
+- Confirm beds/baths are correct and never incorrectly show 0.
+
+====================================================
+2) ACTIVE PROPERTIES — AUTOMATIC CAROUSEL + PRIORITY ORDER + NO CAP
+====================================================
+Requirements:
+1. Enable an automatic carousel for Active Properties:
+   - Auto-advance every 3 seconds.
+   - Manual navigation still works.
+
+2. Sort/priority BEFORE rendering the carousel using this order:
+   1) Single Family Residence
+   2) Condominium
+   3) Multiple Lots (Adjacent)
+   4) Unimproved Land
+   5) Ranch
+   6) All other remaining types
+
+3. Do NOT cap the number of properties:
+   - Include ALL eligible Active properties from Repliers after rental filtering.
+
+Testing (required):
+- Confirm carousel auto-slides every 3 seconds.
+- Confirm ordering matches the priority list.
+- Confirm all eligible Active properties are included (no artificial cap).
+
+====================================================
+3) PROPERTY INVENTORY BY TYPE/SUBTYPE — INACCURATE
+====================================================
+Problem:
+- Inventory by type/subtype is inaccurate.
+
+Requirements:
+1. Rebuild the inventory counts using Repliers as the ONLY source.
+2. Use the correct Repliers subtype field(s).
+3. Exclude rentals/leasing from counts.
+4. Put missing/blank subtype records into “Other/Unknown” (do not drop them).
+5. Ensure the widget actually renders (not blank).
+
+Testing (required):
+- Refresh multiple times; counts should remain consistent and realistic.
+- Total counts should align with the same filtered universe used by dashboard property pulls.
+
+====================================================
+4) MARKET INSIGHTS — DOM BLANK → REPLACE WITH RECENT SOLD/CLOSED LIST
+====================================================
+Problem:
+- Days on Market (DOM) is blank when data is missing.
+
+Requirements:
+1. DOM calculations (if possible):
+   - Sold/Closed DOM = CloseDate – ListDate
+   - Active DOM = Today – ListDate
+   - Under Contract DOM = Today – UnderContractDate
+2. If DOM cannot be computed (missing required fields):
+   - DO NOT show blank.
+   - Replace the DOM widget with a dynamic “Recent Sold/Closed” list.
+3. Recent Sold/Closed list must:
+   - Refresh dynamically whenever Repliers data refreshes
+   - Show:
+     • Address
+     • Close price
+     • Close date
+     • Beds/Baths/Sqft (if available)
+     • Thumbnail (or “No photos available”)
+   - Clicking an item opens the standard floating card modal.
+
+Testing (required):
+- Confirm DOM widget never appears blank.
+- Confirm fallback list appears when DOM cannot be computed.
+- Trigger refresh/sync and confirm the list updates.
+
+====================================================
+5) SYNC REPLIERS DATA — STILL FAILING (“SYNC FAILED”)
+====================================================
+Problem:
+- Sync Repliers Data still fails even though live feed exists.
+
+Requirements:
+1. Identify the real failure cause:
+   - Auth headers not applied server-side
+   - Env vars/API key not loaded
+   - Wrong endpoint/method
+   - Job timeout/silent error
+2. Fix so Sync:
+   - Completes successfully
+   - Returns clear success message to UI
+   - Updates System Status timestamp:
+     “Last data pulled from Repliers: <date/time>”
+3. Add server logs:
+   - Sync start
+   - Sync success end
+   - Sync failure reason (status + message)
+
+Testing (required):
+- Click Sync Repliers Data:
+  • No error
+  • Timestamp updates
+  • Logs show success
+
+====================================================
+6) RECENT CMAs ON DASHBOARD — NOT SYNCED + FILTERS MISSING
+====================================================
+Problems:
+- Dashboard Recent CMAs list does not match the CMAs section list.
+- Requested sorting/filter options are missing.
+
+Requirements:
+1. Use the SAME data source/query as CMAs section:
+   - Same CMA records
+   - Same created/modified timestamps
+2. Default sorting:
+   - Newest → Oldest (matching CMAs section)
+3. Add sorting options:
+   - Newest → Oldest
+   - Oldest → Newest
+   - Alphabetical A–Z
+   - Alphabetical Z–A
+4. Update immediately after CMA create/modify.
+
+Testing (required):
+- Create/modify a CMA in CMAs section → return to dashboard → confirm it appears and matches ordering.
+- Test all sorting options.
+
+====================================================
+7) CUSTOMIZE DASHBOARD — INTERCHANGEABLE BLOCKS + RESET ON BROWSER CLOSE
+====================================================
+Requirements:
+1. Allow blocks/widgets to be fully interchangeable based on user preference:
+   - Users can move/swap blocks between sections and positions (not just reorder within one column).
+   - Drag-and-drop preferred.
+2. TEMPORARY behavior:
+   - Layout persists only during current browser session.
+   - If browser/tab is CLOSED → next visit must revert to DEFAULT layout.
+   - Do NOT save to database.
+   - Use session-only storage (sessionStorage OK; no persistent storage across browser close).
+3. Provide:
+   - “Customize Dashboard” toggle
+   - “Reset to Default” button
+
+Testing (required):
+- Move/swap at least 3 blocks across different sections.
+- Refresh → layout may persist (same session OK).
+- Close browser/tab completely → reopen → layout must reset to default.
+
+====================================================
+FINAL VALIDATION (MUST PASS)
+====================================================
+Confirm:
+- Rentals/leasing excluded everywhere on Dashboard.
+- Active Properties carousel auto-advances every 3 seconds and is ordered by subtype priority.
+- No artificial cap on Active properties.
+- Floating card never shows incorrect “0” beds/baths.
+- Inventory by type/subtype is accurate and Repliers-based.
+- DOM widget never blank; fallback list works and updates after refresh.
+- Sync Repliers Data succeeds and updates timestamps.
+- Recent CMAs matches CMAs section + sorting options exist.
+- Dashboard customization works and resets on browser close.
+
+====================================================
+FINAL REPORT REQUIRED
+====================================================
+Provide:
+- Root cause + fix summary per item.
+- Endpoints/components updated.
+- Proof of testing per requirement.
+- Confirmation CMA/IDX/public pages were NOT modified.

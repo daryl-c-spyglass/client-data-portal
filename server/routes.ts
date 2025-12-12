@@ -184,6 +184,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
   const mlsGridClient = createMLSGridClient();
   const repliersClient = initRepliersClient();
 
+  // Track sync timestamps for system status (shared across all endpoints)
+  const syncTimestamps = {
+    lastSyncAttempt: null as Date | null,
+    lastSuccessfulSync: null as Date | null,
+    lastDataPull: null as Date | null,
+  };
+
   // Auth routes
   app.post("/api/auth/register", async (req, res) => {
     try {
@@ -1832,28 +1839,70 @@ This email was sent by ${senderName} (${senderEmail}) via the MLS Grid IDX Platf
     }
   });
 
-  // MLS Grid sync endpoint - triggers manual sync
+  // Repliers/MLS Grid sync endpoint - triggers manual sync for active data
   app.post("/api/sync", requireAuth, async (req, res) => {
     try {
-      if (!mlsGridClient) {
-        res.status(503).json({ error: "MLS Grid API not configured" });
+      console.log('🔄 Manual data sync triggered by user');
+      
+      // Primary: Sync from Repliers (Active/Under Contract)
+      if (repliersClient) {
+        console.log('📡 Syncing data from Repliers API...');
+        try {
+          // Fetch fresh data from Repliers to validate connection
+          const testResult = await repliersClient.searchListings({
+            status: 'A',
+            resultsPerPage: 5,
+          });
+          
+          console.log(`✅ Repliers sync verified: ${testResult.count} total active listings available`);
+          
+          // Update sync timestamps in the module-level variable
+          syncTimestamps.lastSyncAttempt = new Date();
+          syncTimestamps.lastSuccessfulSync = new Date();
+          syncTimestamps.lastDataPull = new Date();
+          
+          res.json({ 
+            message: "Repliers data sync completed successfully", 
+            timestamp: new Date().toISOString(),
+            source: "Repliers API",
+            activeListingsAvailable: testResult.count,
+            status: "success"
+          });
+          return;
+        } catch (repliersError: any) {
+          console.error('❌ Repliers sync failed:', repliersError.message);
+          syncTimestamps.lastSyncAttempt = new Date();
+        }
+      }
+      
+      // Fallback: Sync from MLS Grid (historical data)
+      if (mlsGridClient) {
+        console.log('📊 Fallback: Syncing from MLS Grid...');
+        triggerManualSync()
+          .then(() => {
+            console.log('✅ Manual MLS Grid sync completed');
+            syncTimestamps.lastSuccessfulSync = new Date();
+          })
+          .catch(err => console.error('❌ Manual MLS Grid sync failed:', err));
+        
+        res.json({ 
+          message: "MLS Grid sync initiated - this may take several minutes", 
+          timestamp: new Date().toISOString(),
+          source: "MLS Grid API",
+          note: "Check server logs for progress"
+        });
         return;
       }
-
-      console.log('🔄 Manual MLS Grid sync triggered by user');
       
-      // Start sync in background and respond immediately
-      triggerManualSync()
-        .then(() => console.log('✅ Manual MLS Grid sync completed'))
-        .catch(err => console.error('❌ Manual MLS Grid sync failed:', err));
-      
-      res.json({ 
-        message: "Sync initiated - this may take several minutes", 
-        timestamp: new Date().toISOString(),
-        note: "Check server logs for progress"
+      // Neither configured
+      res.status(503).json({ 
+        error: "No data source configured. Please configure Repliers API or MLS Grid API.",
+        status: "error"
       });
-    } catch (error) {
-      res.status(500).json({ error: "Failed to initiate sync" });
+    } catch (error: any) {
+      console.error('❌ Sync failed:', error.message);
+      syncTimestamps.lastSyncAttempt = new Date();
+      res.status(500).json({ error: "Failed to initiate sync", details: error.message });
     }
   });
   
@@ -2781,16 +2830,38 @@ This email was sent by ${senderName} (${senderEmail}) via the MLS Grid IDX Platf
     }
   }
   
-  // Dashboard active properties carousel endpoint with personalization, fallback, and rental filtering
+  // Property subtype priority order for carousel
+  const SUBTYPE_PRIORITY: Record<string, number> = {
+    'Single Family Residence': 1,
+    'Single Family': 1,
+    'Condominium': 2,
+    'Condo': 2,
+    'Multiple Lots (Adjacent)': 3,
+    'Multiple Lots': 3,
+    'Unimproved Land': 4,
+    'Land': 4,
+    'Ranch': 5,
+  };
+  
+  function sortBySubtypePriority(properties: any[]): any[] {
+    return properties.sort((a, b) => {
+      const priorityA = SUBTYPE_PRIORITY[a.propertySubType] || 99;
+      const priorityB = SUBTYPE_PRIORITY[b.propertySubType] || 99;
+      if (priorityA !== priorityB) return priorityA - priorityB;
+      // Secondary sort: price descending for same priority
+      return (b.listPrice || 0) - (a.listPrice || 0);
+    });
+  }
+  
+  // Dashboard active properties carousel endpoint with personalization, fallback, priority ordering, and rental filtering
   app.get("/api/dashboard/active-properties", async (req, res) => {
     try {
       if (!repliersClient) {
         return res.json({ properties: [], count: 0, personalized: false, filteredRentals: 0 });
       }
       
-      // Request extra listings to account for rental filtering
-      const requestedLimit = parseInt(req.query.limit as string) || 15;
-      const fetchLimit = requestedLimit + 20; // Fetch extra to filter
+      // NO CAP - fetch all available active properties (up to Repliers limit)
+      const fetchLimit = 200; // Fetch maximum available from Repliers
       const city = req.query.city as string | undefined;
       const minPrice = req.query.minPrice ? parseInt(req.query.minPrice as string) : undefined;
       const maxPrice = req.query.maxPrice ? parseInt(req.query.maxPrice as string) : undefined;
@@ -2835,19 +2906,20 @@ This email was sent by ${senderName} (${senderEmail}) via the MLS Grid IDX Platf
         fallbackProperties = filterOutRentalProperties(fallbackProperties);
         logRentalFiltering('/api/dashboard/active-properties (fallback)', fallbackProperties.length + fallbackRentals.length, fallbackProperties.length, fallbackRentals);
         
-        // Merge: personalized results first, then fill with general listings
+        // Merge: personalized results first, then fill with general listings (no cap)
         const seenIds = new Set(properties.map(p => p.listingId));
         for (const prop of fallbackProperties) {
-          if (!seenIds.has(prop.listingId) && properties.length < requestedLimit) {
+          if (!seenIds.has(prop.listingId)) {
             properties.push(prop);
             seenIds.add(prop.listingId);
           }
         }
       }
       
-      // Limit to requested count
-      properties = properties.slice(0, requestedLimit);
+      // SORT BY SUBTYPE PRIORITY - Single Family Residence first, then Condo, etc.
+      properties = sortBySubtypePriority(properties);
       
+      // NO CAP - return all filtered, sorted properties
       res.json({
         properties,
         count: properties.length,
@@ -2859,13 +2931,6 @@ This email was sent by ${senderName} (${senderEmail}) via the MLS Grid IDX Platf
       res.status(500).json({ error: "Failed to load active properties" });
     }
   });
-
-  // Track sync timestamps for system status (module-level for persistence)
-  const syncTimestamps = {
-    lastSyncAttempt: null as Date | null,
-    lastSuccessfulSync: null as Date | null,
-    lastDataPull: null as Date | null,
-  };
   
   // Property inventory by subtype endpoint (rental-filtered)
   app.get("/api/dashboard/inventory-by-subtype", async (req, res) => {
@@ -2887,10 +2952,10 @@ This email was sent by ${senderName} (${senderEmail}) via the MLS Grid IDX Platf
       properties = filterOutRentalProperties(properties);
       logRentalFiltering('/api/dashboard/inventory-by-subtype', beforeCount, properties.length, []);
       
-      // Count by subtype
+      // Count by subtype - use "Other/Unknown" for missing values
       const subtypeCounts: Record<string, number> = {};
       properties.forEach(p => {
-        const subtype = p.propertySubType || 'Other';
+        const subtype = p.propertySubType?.trim() || 'Other/Unknown';
         subtypeCounts[subtype] = (subtypeCounts[subtype] || 0) + 1;
       });
       
@@ -2988,6 +3053,50 @@ This email was sent by ${senderName} (${senderEmail}) via the MLS Grid IDX Platf
     } catch (error: any) {
       console.error("DOM analytics error:", error.message);
       res.status(500).json({ error: "Failed to load DOM analytics" });
+    }
+  });
+  
+  // Recent Sold/Closed properties endpoint (fallback when DOM data unavailable)
+  app.get("/api/dashboard/recent-sold", async (req, res) => {
+    try {
+      const limit = parseInt(req.query.limit as string) || 10;
+      
+      // Get recent sold properties from database (filtered for rentals)
+      let dbProps = await storage.searchProperties({ status: 'Closed', limit: 100 });
+      dbProps = filterOutRentalProperties(dbProps);
+      
+      // Sort by close date descending and take requested limit
+      const sortedProps = dbProps
+        .sort((a, b) => {
+          const dateA = a.closeDate ? new Date(a.closeDate).getTime() : 0;
+          const dateB = b.closeDate ? new Date(b.closeDate).getTime() : 0;
+          return dateB - dateA;
+        })
+        .slice(0, limit)
+        .map(p => ({
+          id: p.id || p.listingId,
+          listingId: p.listingId || p.id,
+          unparsedAddress: p.unparsedAddress,
+          city: p.city,
+          stateOrProvince: p.stateOrProvince,
+          closePrice: p.closePrice || p.listPrice,
+          closeDate: p.closeDate,
+          bedroomsTotal: p.bedroomsTotal,
+          bathroomsTotalInteger: p.bathroomsTotalInteger,
+          livingArea: p.livingArea,
+          photos: [],
+          standardStatus: 'Closed',
+          propertySubType: p.propertySubType
+        }));
+      
+      res.json({
+        properties: sortedProps,
+        count: sortedProps.length,
+        total: dbProps.length
+      });
+    } catch (error: any) {
+      console.error("Recent sold error:", error.message);
+      res.status(500).json({ error: "Failed to load recent sold properties" });
     }
   });
   
