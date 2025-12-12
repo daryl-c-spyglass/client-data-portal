@@ -6,15 +6,14 @@ This project is a professional real estate IDX (Internet Data Exchange) platform
 
 ## Recent Changes (Dec 12, 2025)
 
+- **CMA Map Marker Consistency**: Unified map marker styling between Listings and Market Stats tabs using shared `getCompIcon` function with case-insensitive status detection. Handles all status variants: "Under Contract", "Pending", "Active Under Contract - Showing", "Contingent", etc.
+- **YoY Timeline Metrics**: Added Year-over-Year price comparison to Timeline Market Insights showing average and median sold price changes (last 12 months vs prior 12 months)
+- **Print/PDF Improvements**: Enhanced print CSS to hide yellow preview/action banner, fix PDF content cut-off with proper overflow handling, page breaks, white backgrounds, and scrollbar artifact removal
 - **CMA Report UI Refinements**:
   - Renamed "Listings & Map" tab to "Listings" in CMA results
   - Synced listing filter pills (All/Sold/Active/Under Contract) with Property Location map markers
   - Restructured Listings tab: stats cards + property list (left) | map (right, sticky) | Price Distribution (full width below)
-  - Removed duplicate "Property Locations Overview" from Market Stats tab
-- **Print/PDF Improvements**: Comprehensive print CSS for document-like PDF output with proper page breaks, hidden navigation, white backgrounds, single-column stacking for grids, and scrollbar artifact removal
-- **Properties Page Cleanup**: Removed unused "Send Properties" and "Quick CMA" buttons from search form
 - **Property Type Formatter**: Added centralized `formatPropertyType()` utility in `client/src/lib/property-type-utils.ts` for consistent property type display across all components
-- **Recent Sold Photos**: Updated `/api/dashboard/recent-sold` endpoint to fetch photos from media table
 - **Expanded Property Types**: Support for 9 property type categories: Single Family, Condo, Townhouse, Multi-Family, Manufactured Home, Ranch, Land, Multiple Lots, Commercial
 
 ## User Preferences
