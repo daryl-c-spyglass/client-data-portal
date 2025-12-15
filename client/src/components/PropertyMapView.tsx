@@ -176,12 +176,11 @@ function PropertyPopup({ property, onPropertyClick }: { property: Property; onPr
           {property.city}{property.stateOrProvince && `, ${property.stateOrProvince}`} {property.postalCode}
         </p>
         
-        {/* Subdivision / Neighborhood */}
-        {(property.subdivision || property.neighborhood) && (
+        {/* Subdivision (tract/community label from listing) */}
+        {/* Note: Neighborhood is only available via boundary resolution on Property Detail page */}
+        {property.subdivision && (
           <p className="text-xs text-muted-foreground mb-2">
-            {property.subdivision && <span>Subdivision: {property.subdivision}</span>}
-            {property.subdivision && property.neighborhood && <span> | </span>}
-            {property.neighborhood && <span>Neighborhood: {property.neighborhood}</span>}
+            Subdivision: {property.subdivision}
           </p>
         )}
         

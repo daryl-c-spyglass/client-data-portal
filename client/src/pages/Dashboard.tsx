@@ -185,8 +185,8 @@ interface DashboardProperty {
   latitude?: number;
   longitude?: number;
   propertySubType?: string;
+  subdivision?: string;
   subdivisionName?: string;
-  neighborhood?: string;
   poolFeatures?: string | string[] | null;
   garageSpaces?: number | null;
   elementarySchool?: string;
@@ -456,19 +456,14 @@ function PropertyDetailModal({
           </div>
           
           {/* Location & School Information */}
+          {/* Note: Neighborhood is only available via boundary resolution on Property Detail page */}
           <div className="space-y-2 text-sm border-t pt-4">
             <h4 className="font-medium text-muted-foreground">Location Details</h4>
             <div className="grid grid-cols-1 gap-2">
-              {property.neighborhood && (
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Neighborhood:</span>
-                  <span className="font-medium">{property.neighborhood}</span>
-                </div>
-              )}
-              {property.subdivisionName && (
+              {(property.subdivision || property.subdivisionName) && (
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Subdivision:</span>
-                  <span className="font-medium">{property.subdivisionName}</span>
+                  <span className="font-medium">{property.subdivision || property.subdivisionName}</span>
                 </div>
               )}
               {property.elementarySchool && (

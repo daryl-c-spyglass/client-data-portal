@@ -1986,12 +1986,8 @@ export function CMAReport({
                     <span className="font-medium">{floatingCardProperty.yearBuilt}</span>
                   </div>
                 )}
-                {(floatingCardProperty as any).neighborhood && (
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Neighborhood</span>
-                    <span className="font-medium">{(floatingCardProperty as any).neighborhood}</span>
-                  </div>
-                )}
+                {/* Subdivision (tract/community label from listing) */}
+                {/* Note: Neighborhood is only available via boundary resolution on Property Detail page */}
                 {(floatingCardProperty.subdivision || (floatingCardProperty as any).subdivisionName) && (
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Subdivision</span>
