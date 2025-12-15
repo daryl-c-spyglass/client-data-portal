@@ -6,6 +6,11 @@ This project is a professional real estate IDX (Internet Data Exchange) platform
 
 ## Recent Changes (Dec 15, 2025)
 
+- **Data Synchronization Fix**: Inventory status counts (Active/Under Contract) now filter by `class: 'residential'` to match subtype aggregation
+- **Property Detail Back Navigation**: Property detail page tracks origin path via `?from=` query param and shows contextual back button labels (e.g., "Back to Dashboard", "Back to CMA")
+- **Buyer Search Autocomplete Fixed**: API endpoints now consistently return `{ suggestions: [...] }` format, enabling dropdown display
+- **Dashboard Quick Actions**: Replaced "Sync Data" button with "Settings" link for cleaner UX
+- **CMA Property Types**: Updated PROPERTY_TYPES to include separate entries for Ranch, Manufactured Home, Unimproved Land, Multiple Lots
 - **Properties Page Inventory Consistency**: Total Properties count now strictly matches the sum of Property Inventory by Type (subtype breakdown is authoritative)
 - **Dev-Only Debug Logging**: Added development-mode logging for inventory count reconciliation and CMA property cross-checking (address, prices, living area, $/sqft) for PDF verification
 - **Settings Page Overhaul**: New comprehensive Settings page (`/settings`) with 5 organized tabs:
