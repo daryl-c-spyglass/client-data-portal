@@ -56,16 +56,39 @@ export async function getUnifiedInventory(forceRefresh = false): Promise<Invento
 
   if (repliersClient && isRepliersConfigured()) {
     try {
-      const [activeResponse, ucResponse, closedCount, subtypeCounts, closedSubtypeCounts] = await Promise.all([
-        repliersClient.searchListings({ status: 'A', resultsPerPage: 1 }).catch(() => ({ count: 0 })),
-        repliersClient.searchListings({ status: 'U', resultsPerPage: 1 }).catch(() => ({ count: 0 })),
+      // Use sequential API calls to avoid rate limiting (429 errors)
+      // The retry logic in repliersClient will handle transient failures
+      
+      // Fetch Active count
+      let activeCount = 0;
+      try {
+        const activeResponse = await repliersClient.searchListings({ status: 'A', resultsPerPage: 1 });
+        activeCount = activeResponse.count || 0;
+      } catch (error: any) {
+        console.warn('[Inventory] Failed to fetch Active count after retries:', error.message);
+      }
+      
+      // Small delay between calls to respect rate limits
+      await new Promise(resolve => setTimeout(resolve, 300));
+      
+      // Fetch Under Contract count
+      let ucCount = 0;
+      try {
+        const ucResponse = await repliersClient.searchListings({ status: 'U', resultsPerPage: 1 });
+        ucCount = ucResponse.count || 0;
+      } catch (error: any) {
+        console.warn('[Inventory] Failed to fetch UC count after retries:', error.message);
+      }
+      
+      // Fetch database counts in parallel (these don't hit external API)
+      const [closedCount, subtypeCounts, closedSubtypeCounts] = await Promise.all([
         storage.getClosedPropertyCount().catch(() => 0),
         repliersClient.aggregateResidentialSubtypeCounts().catch(() => ({})),
         storage.getClosedPropertyCountsBySubtype().catch(() => ({})),
       ]);
 
-      inventoryData.countsByStatus.Active = activeResponse.count || 0;
-      inventoryData.countsByStatus['Under Contract'] = ucResponse.count || 0;
+      inventoryData.countsByStatus.Active = activeCount;
+      inventoryData.countsByStatus['Under Contract'] = ucCount;
       inventoryData.countsByStatus.Closed = closedCount || 0;
       
       inventoryData.totalCount = 

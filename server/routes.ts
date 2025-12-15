@@ -1595,10 +1595,25 @@ This email was sent by ${senderName} (${senderEmail}) via the MLS Grid IDX Platf
     try {
       const updateData = insertSellerUpdateSchema.parse(req.body);
       
-      // For embeddable widgets: create or find user by email if userId is "guest"
+      // Validate email is present and valid
+      const email = updateData.email;
+      if (!email || !email.trim() || !email.includes('@')) {
+        res.status(400).json({ error: "A valid email address is required" });
+        return;
+      }
+      
+      // Validate name is present
+      if (!updateData.name || !updateData.name.trim()) {
+        res.status(400).json({ error: "Name is required" });
+        return;
+      }
+      
+      // Handle user ID resolution:
+      // - If userId is "guest" or any non-existent user ID, find/create user by email
       let userId = updateData.userId;
-      if (userId === "guest") {
-        const email = updateData.email;
+      
+      if (userId === "guest" || userId === "demo-user-id") {
+        // Guest or demo user - find or create by email
         let user = await storage.getUserByEmail(email);
         
         if (!user) {
@@ -1613,6 +1628,25 @@ This email was sent by ${senderName} (${senderEmail}) via the MLS Grid IDX Platf
         }
         
         userId = user.id;
+      } else {
+        // For other userIds, verify the user exists
+        const existingUser = await storage.getUser(userId);
+        if (!existingUser) {
+          // User doesn't exist - find or create by email instead
+          let user = await storage.getUserByEmail(email);
+          
+          if (!user) {
+            user = await storage.createUser({
+              email,
+              passwordHash: "",
+              role: "client",
+              firstName: updateData.name.split(' ')[0],
+              lastName: updateData.name.split(' ').slice(1).join(' ') || "",
+            });
+          }
+          
+          userId = user.id;
+        }
       }
       
       const update = await storage.createSellerUpdate({

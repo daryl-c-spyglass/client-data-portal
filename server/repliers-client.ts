@@ -125,6 +125,8 @@ const SUBTYPE_CACHE_TTL_MS = 30 * 60 * 1000; // 30 minutes
 class RepliersClient {
   private client: AxiosInstance;
   private apiKey: string;
+  private static readonly MAX_RETRIES = 3;
+  private static readonly INITIAL_BACKOFF_MS = 1000;
 
   constructor(config: RepliersConfig) {
     this.apiKey = config.apiKey;
@@ -136,6 +138,36 @@ class RepliersClient {
       },
       timeout: 30000,
     });
+  }
+
+  // Retry with exponential backoff for rate limit (429) errors
+  private async withRetry<T>(
+    operation: () => Promise<T>,
+    context: string = 'API call'
+  ): Promise<T> {
+    let lastError: any;
+    
+    for (let attempt = 0; attempt <= RepliersClient.MAX_RETRIES; attempt++) {
+      try {
+        return await operation();
+      } catch (error: any) {
+        lastError = error;
+        const status = error.response?.status;
+        
+        // Only retry on 429 (Too Many Requests) or 503 (Service Unavailable)
+        if (status !== 429 && status !== 503) {
+          throw error;
+        }
+        
+        if (attempt < RepliersClient.MAX_RETRIES) {
+          const backoffMs = RepliersClient.INITIAL_BACKOFF_MS * Math.pow(2, attempt);
+          console.log(`⏳ ${context}: Rate limited (${status}), retrying in ${backoffMs}ms (attempt ${attempt + 1}/${RepliersClient.MAX_RETRIES})`);
+          await new Promise(resolve => setTimeout(resolve, backoffMs));
+        }
+      }
+    }
+    
+    throw lastError;
   }
   
   // Property type classification mapping - used for inventory counts and display
@@ -295,34 +327,36 @@ class RepliersClient {
   }
 
   async searchListings(params: ListingsSearchParams = {}): Promise<ListingsResponse> {
-    try {
-      const queryParams = new URLSearchParams();
-      
-      if (params.status) queryParams.append('status', params.status);
-      if (params.minPrice) queryParams.append('minPrice', params.minPrice.toString());
-      if (params.maxPrice) queryParams.append('maxPrice', params.maxPrice.toString());
-      if (params.minBeds) queryParams.append('minBeds', params.minBeds.toString());
-      if (params.maxBeds) queryParams.append('maxBeds', params.maxBeds.toString());
-      if (params.minBaths) queryParams.append('minBaths', params.minBaths.toString());
-      if (params.maxBaths) queryParams.append('maxBaths', params.maxBaths.toString());
-      if (params.minSqft) queryParams.append('minSqft', params.minSqft.toString());
-      if (params.maxSqft) queryParams.append('maxSqft', params.maxSqft.toString());
-      if (params.propertyType) queryParams.append('class', normalizeRepliersClass(params.propertyType));
-      if (params.city) queryParams.append('city', params.city);
-      if (params.postalCode) queryParams.append('zip', params.postalCode);
-      if (params.neighborhood) queryParams.append('neighborhood', params.neighborhood);
-      if (params.minLat) queryParams.append('minLat', params.minLat.toString());
-      if (params.maxLat) queryParams.append('maxLat', params.maxLat.toString());
-      if (params.minLng) queryParams.append('minLng', params.minLng.toString());
-      if (params.maxLng) queryParams.append('maxLng', params.maxLng.toString());
-      if (params.pageNum) queryParams.append('pageNum', params.pageNum.toString());
-      if (params.resultsPerPage) queryParams.append('resultsPerPage', params.resultsPerPage.toString());
-      if (params.sortBy) queryParams.append('sortBy', params.sortBy);
-      if (params.fields) queryParams.append('fields', params.fields);
-      if (params.class) queryParams.append('class', normalizeRepliersClass(params.class));
+    const queryParams = new URLSearchParams();
+    
+    if (params.status) queryParams.append('status', params.status);
+    if (params.minPrice) queryParams.append('minPrice', params.minPrice.toString());
+    if (params.maxPrice) queryParams.append('maxPrice', params.maxPrice.toString());
+    if (params.minBeds) queryParams.append('minBeds', params.minBeds.toString());
+    if (params.maxBeds) queryParams.append('maxBeds', params.maxBeds.toString());
+    if (params.minBaths) queryParams.append('minBaths', params.minBaths.toString());
+    if (params.maxBaths) queryParams.append('maxBaths', params.maxBaths.toString());
+    if (params.minSqft) queryParams.append('minSqft', params.minSqft.toString());
+    if (params.maxSqft) queryParams.append('maxSqft', params.maxSqft.toString());
+    if (params.propertyType) queryParams.append('class', normalizeRepliersClass(params.propertyType));
+    if (params.city) queryParams.append('city', params.city);
+    if (params.postalCode) queryParams.append('zip', params.postalCode);
+    if (params.neighborhood) queryParams.append('neighborhood', params.neighborhood);
+    if (params.minLat) queryParams.append('minLat', params.minLat.toString());
+    if (params.maxLat) queryParams.append('maxLat', params.maxLat.toString());
+    if (params.minLng) queryParams.append('minLng', params.minLng.toString());
+    if (params.maxLng) queryParams.append('maxLng', params.maxLng.toString());
+    if (params.pageNum) queryParams.append('pageNum', params.pageNum.toString());
+    if (params.resultsPerPage) queryParams.append('resultsPerPage', params.resultsPerPage.toString());
+    if (params.sortBy) queryParams.append('sortBy', params.sortBy);
+    if (params.fields) queryParams.append('fields', params.fields);
+    if (params.class) queryParams.append('class', normalizeRepliersClass(params.class));
 
-      const response = await this.client.get(`/listings?${queryParams.toString()}`);
-      return response.data;
+    try {
+      return await this.withRetry(
+        () => this.client.get(`/listings?${queryParams.toString()}`).then(r => r.data),
+        `searchListings(status=${params.status || 'any'})`
+      );
     } catch (error: any) {
       console.error('Repliers searchListings error:', error.response?.data || error.message);
       throw new Error(`Failed to search listings: ${error.message}`);

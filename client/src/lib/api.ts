@@ -219,6 +219,14 @@ function buildSearchParams(criteria: SearchCriteria): URLSearchParams {
     params.append('propertySubType', criteria.propertySubType);
   }
   
+  // Date range filter (full date picker support)
+  if (criteria.dateRange?.from) {
+    params.append('dateFrom', criteria.dateRange.from);
+  }
+  if (criteria.dateRange?.to) {
+    params.append('dateTo', criteria.dateRange.to);
+  }
+  
   // Additional numeric filters
   const anyC = criteria as any;
   if (anyC.soldDays !== undefined && anyC.soldDays !== null) {

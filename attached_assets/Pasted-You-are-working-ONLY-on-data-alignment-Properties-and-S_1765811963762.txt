@@ -1,0 +1,151 @@
+You are working ONLY on data alignment, Properties, and Seller Updates.
+This task is based on CONFIRMED guidance from Repliers (vendor), not assumptions.
+
+Data source: Repliers only.
+MLS: ACTRIS.
+Rental/leasing listings must be excluded globally.
+
+====================================================
+CRITICAL CONTEXT (FROM REPLIERS – CONFIRMED)
+====================================================
+
+Repliers has confirmed:
+1) `class` request inputs MUST be:
+   - residential
+   - condo
+   - commercial
+2) Sold/Closed listings ALWAYS retain their photos.
+   - Missing sold photos = implementation bug.
+3) Status updates propagate within ~15 minutes max.
+   - Zillow mismatches within that window are expected.
+
+Treat any violation of the above as a BUG.
+
+====================================================
+A) TOTAL PROPERTIES & STATUS COUNTS ARE INCORRECT (BLOCKER)
+====================================================
+
+Problem:
+- Overall Total Properties shows ONLY 9,219.
+- Active = 0 and Under Contract = 0.
+- This is incorrect and inconsistent with actual inventory and other sections.
+
+Requirements:
+1) Investigate why Active and Under Contract counts are zero:
+   - Incorrect `class` parameter
+   - Incorrect status filter logic
+   - AND vs OR logic error
+   - Status normalization failure
+   - Over-aggressive rental exclusion
+2) Confirm Total Properties is computed as:
+   Active + Under Contract + Sold/Closed (same scope)
+3) Ensure the SAME backend source is used for:
+   - Dashboard totals
+   - Properties totals
+   - Inventory by type
+4) Add temporary debug logging (dev-only):
+   - Raw Repliers counts by status BEFORE filtering
+   - Counts AFTER filtering
+   - Final totals returned to UI
+
+Acceptance criteria:
+- Active and Under Contract are non-zero and realistic.
+- Total Properties equals sum of all statuses.
+- Totals match across Dashboard, Properties, and CMA sections.
+
+====================================================
+B) PROPERTIES — DATE RANGE PICKER STILL BROKEN
+====================================================
+
+Problem:
+- Properties Date Range picker still does not work correctly.
+- Buyer Search Date Range picker DOES work.
+
+Requirement:
+- COPY the exact Date Range picker implementation from Buyer Search
+  and reuse it in Properties.
+
+Rules:
+1) Same UI component.
+2) Same date parsing logic.
+3) Same From / To Month / Day / Year behavior.
+4) Same validation rules.
+5) Same backend query mapping.
+
+Do NOT reimplement a new picker.
+Reuse the existing, working Buyer Search component.
+
+Acceptance criteria:
+- Properties Date Range behaves IDENTICALLY to Buyer Search.
+
+====================================================
+C) SELLER UPDATES — BROKEN FUNCTIONALITY (CRITICAL)
+====================================================
+
+Problems:
+1) Preview button on Seller Update cards does NOT work.
+2) Creating a Seller Update returns:
+   Error 500 – failed to create seller update.
+
+Requirements:
+1) Fix Preview button:
+   - Clicking Preview must open the Seller Update card/modal.
+   - Must display the same content that will be sent/shared.
+2) Fix Error 500 on Create Seller Update:
+   - Inspect backend logs for the failure.
+   - Identify root cause:
+     • payload validation error
+     • missing required fields
+     • auth/session issue
+     • database constraint failure
+3) Add proper error handling:
+   - Do NOT fail silently.
+   - Show meaningful UI error message if creation fails.
+
+Testing:
+- Create Seller Update with valid data → success.
+- Preview Seller Update → works.
+- Refresh page → Seller Update persists.
+
+====================================================
+D) SOLD DATA & PHOTOS — ENFORCE REPLIERS GUARANTEES
+====================================================
+
+Based on Repliers confirmation:
+- Sold listings MUST retain photos.
+
+Requirements:
+1) Audit sold/closed property mapping:
+   - Ensure photos array is not stripped or ignored for Sold status.
+2) If API returns photos:
+   - UI MUST display them.
+3) If photos array is empty:
+   - Display placeholder text exactly:
+     “No photos available”
+
+Acceptance criteria:
+- Missing sold photos are treated as bugs unless API truly returns none.
+
+====================================================
+E) FINAL ALIGNMENT CHECK
+====================================================
+
+Before marking complete, verify:
+- `class` inputs are lowercase everywhere.
+- Active/UC counts are correct.
+- Totals match across sections.
+- Properties Date Range works.
+- Seller Updates create + preview works.
+- Sold photos display correctly.
+
+====================================================
+FINAL REPORT REQUIRED
+====================================================
+
+Provide:
+1) Root cause of Active/UC = 0 and fix applied.
+2) Proof totals now match across sections.
+3) Confirmation Properties Date Range reuses Buyer Search picker.
+4) Root cause + fix for Seller Update Error 500.
+5) Proof Preview button works.
+6) Confirmation sold photos now display or correctly show placeholder.

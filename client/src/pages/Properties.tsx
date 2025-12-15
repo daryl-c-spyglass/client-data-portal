@@ -96,6 +96,16 @@ function parseCriteriaFromUrl(searchString: string): SearchCriteria | null {
     const soldDaysVal = safeParseInt(params.get('soldDays'));
     if (soldDaysVal !== undefined) (criteria as any).soldDays = soldDaysVal;
     
+    // Parse date range (full date range picker support)
+    const dateFrom = params.get('dateFrom');
+    const dateTo = params.get('dateTo');
+    if (dateFrom || dateTo) {
+      criteria.dateRange = {
+        from: dateFrom || undefined,
+        to: dateTo || undefined,
+      };
+    }
+    
     const storiesVal = safeParseInt(params.get('stories'));
     if (storiesVal !== undefined) (criteria as any).stories = storiesVal;
     
@@ -166,6 +176,13 @@ function serializeCriteriaToUrl(criteria: SearchCriteria): string {
   }
   if ((criteria as any).soldDays !== undefined) {
     params.set('soldDays', String((criteria as any).soldDays));
+  }
+  // Serialize date range (full date range picker support)
+  if (criteria.dateRange?.from) {
+    params.set('dateFrom', criteria.dateRange.from);
+  }
+  if (criteria.dateRange?.to) {
+    params.set('dateTo', criteria.dateRange.to);
   }
   if ((criteria as any).stories !== undefined) {
     params.set('stories', String((criteria as any).stories));
