@@ -4,6 +4,25 @@
 
 This project is a professional real estate IDX (Internet Data Exchange) platform integrated with the MLS Grid API. Its primary purpose is to empower real estate agents with tools for property searching, generating Comparative Market Analyses (CMAs), and sharing market insights with clients. The platform aims to combine comprehensive property browsing (similar to Zillow or Redfin) with robust, productivity-focused workflow features to streamline real estate operations.
 
+## Recent Changes (Dec 15, 2025)
+
+- **Settings Page Overhaul**: New comprehensive Settings page (`/settings`) with 5 organized tabs:
+  - Profile: Agent and brokerage information
+  - Data & Sync: MLS Grid sync status and controls
+  - Display: Price format, area units, date format preferences
+  - Embed Code: Widget embed code generator (moved from nav)
+  - Lead Gate: Lead capture configuration (moved from admin nav)
+- **Navigation Cleanup**: Removed Embed Code and Admin section from sidebar, consolidated into Settings
+- **Coming Soon Pages**: Added Clients (`/clients`) and Analytics (`/analytics`) placeholder pages with feature previews
+- **Dashboard Improvements**:
+  - Enhanced sold property floating cards with Sold Price, Year Built, Beds/Baths/SqFt
+  - Added "No photos available" placeholder for missing property images
+  - Added Recent CMAs sorting (Newest/Oldest, A-Z, Z-A)
+  - Shared `displaySoldPrice()` helper for consistent price formatting
+- **Buyer Search Autocomplete**: Cities, Zip Codes, Subdivision, and Elementary School fields now have autocomplete
+- **Properties Page**: Restored full date range picker with Month/Day/Year From+To
+- **CMA Print Styling**: Clean report style excluding agent UI with proper margins and page breaks
+
 ## Recent Changes (Dec 12, 2025)
 
 - **CMA Map Marker Consistency**: Unified map marker styling between Listings and Market Stats tabs using shared `getCompIcon` function with case-insensitive status detection. Handles all status variants: "Under Contract", "Pending", "Active Under Contract - Showing", "Contingent", etc.
