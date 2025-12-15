@@ -5,7 +5,7 @@ import { createMLSGridClient } from "./mlsgrid-client";
 import { triggerManualSync } from "./mlsgrid-sync";
 import { getHomeReviewClient, mapHomeReviewPropertyToSchema, type PropertySearchParams } from "./homereview-client";
 import { initRepliersClient, getRepliersClient, isRepliersConfigured } from "./repliers-client";
-import { getUnifiedInventory } from "./inventory-service";
+import { getUnifiedInventory, getInventoryDebugData } from "./inventory-service";
 import { geocodeAddress, geocodeProperties, isMapboxConfigured } from "./mapbox-geocoding";
 import { searchCriteriaSchema, insertCmaSchema, insertUserSchema, insertSellerUpdateSchema, updateSellerUpdateSchema, updateLeadGateSettingsSchema, isLikelyRentalProperty, filterOutRentalProperties } from "@shared/schema";
 import { findMatchingProperties, calculateMarketSummary } from "./seller-update-service";
@@ -1003,6 +1003,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Failed to fetch inventory summary:", error);
       res.status(500).json({ error: "Failed to fetch inventory summary" });
+    }
+  });
+
+  // Debug endpoint for inventory data validation (development only)
+  app.get("/api/properties/inventory/debug", async (req, res) => {
+    try {
+      const debugData = await getInventoryDebugData();
+      res.json(debugData);
+    } catch (error) {
+      console.error("Failed to fetch inventory debug data:", error);
+      res.status(500).json({ error: "Failed to fetch inventory debug data" });
     }
   });
 
@@ -2878,11 +2889,13 @@ This email was sent by ${senderName} (${senderEmail}) via the MLS Grid IDX Platf
       console.log(`[Dashboard Stats] Subtypes:`, inventory.countsBySubtype);
       
       const responseData = {
+        mlsScope: inventory.mlsScope,
         totalActiveProperties: inventory.countsByStatus.Active,
         totalUnderContractProperties: inventory.countsByStatus['Under Contract'],
         totalClosedProperties: inventory.countsByStatus.Closed,
         totalProperties: inventory.totalCount,
         countsBySubtype: inventory.countsBySubtype,
+        rentalFilteredCount: inventory.rentalFilteredCount,
         activeCmas: allCmas.length,
         sellerUpdates: activeSellerUpdates.length,
         systemStatus: healthStatus.repliersConfigured || healthStatus.mlsGridConfigured ? 'Ready' : 'Setup',
@@ -2890,6 +2903,8 @@ This email was sent by ${senderName} (${senderEmail}) via the MLS Grid IDX Platf
         mlsGridConfigured: healthStatus.mlsGridConfigured,
         dataSource: inventory.dataSource,
         lastUpdatedAt: inventory.lastUpdatedAt,
+        errors: inventory.errors,
+        isPartialData: inventory.isPartialData,
       };
       
       res.json(responseData);
@@ -3016,17 +3031,17 @@ This email was sent by ${senderName} (${senderEmail}) via the MLS Grid IDX Platf
       // Use unified inventory service (same source as Dashboard stats and Properties page)
       const inventory = await getUnifiedInventory();
       
-      // Only include Active + Under Contract counts (not Closed) for this view
-      const activeTotal = inventory.countsByStatus.Active + inventory.countsByStatus['Under Contract'];
-      
       // Sort subtypes by count descending
       const sortedSubtypes = Object.entries(inventory.countsBySubtype)
         .sort((a, b) => b[1] - a[1])
         .reduce((acc, [key, val]) => ({ ...acc, [key]: val }), {} as Record<string, number>);
       
+      // Calculate sum of subtypes to ensure consistency (totalCount should already equal this)
+      const subtypeSum = Object.values(inventory.countsBySubtype).reduce((sum, count) => sum + count, 0);
+      
       res.json({
         subtypes: sortedSubtypes,
-        total: activeTotal
+        total: subtypeSum  // Use subtypeSum for consistency with subtypes breakdown
       });
     } catch (error: any) {
       console.error("Inventory by subtype error:", error.message);

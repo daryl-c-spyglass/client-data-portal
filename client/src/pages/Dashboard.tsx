@@ -1302,7 +1302,7 @@ export default function Dashboard() {
                               </div>
                             ))}
                           <div className="pt-2 border-t text-sm text-muted-foreground">
-                            Total Active: {inventoryData.total.toLocaleString()}
+                            Total: {inventoryData.total.toLocaleString()}
                           </div>
                         </div>
                       ) : (

@@ -1,0 +1,186 @@
+You are performing a FULL DATA SYNCHRONIZATION & CONSISTENCY AUDIT across the ENTIRE agent app.
+This is NOT a UI redesign task. It is a correctness + alignment task.
+
+Data source: Repliers only (ACTRIS).
+Repliers confirmed:
+- `class` request inputs must be: residential / condo / commercial
+- Sold listings keep photos (missing sold photos = mapping/usage bug)
+- Latency for MLS updates <= 15 minutes
+
+Global rule:
+- Leasing/rental listings must be excluded from ALL property pulls, ALL counts, ALL analytics, ALL DOM, ALL outputs (PDF/share), across ALL sections.
+
+====================================================
+GOAL
+====================================================
+
+We currently have inconsistent totals and inventories between sections (Dashboard vs Properties vs others).
+I need you to perform an EXTENSIVE END-TO-END audit so that:
+- every section uses the same source-of-truth logic
+- every count, chart, table, map, PDF, share link output, and floating card is consistent
+- any update/refresh integrates everywhere (no one-off logic)
+
+Do not miss any section.
+
+====================================================
+PHASE 1 — INVENTORY “SOURCE OF TRUTH” CONTRACT (MANDATORY)
+====================================================
+
+Create ONE backend “Inventory Summary” contract that all sections must use.
+
+It must return:
+- dataSourceName (Repliers)
+- mlsScope (ACTRIS)
+- lastUpdatedAt (timestamp from sync/logs)
+- totals:
+  • totalProperties
+  • activeCount
+  • underContractCount
+  • soldClosedCount
+- countsByType/Subtype (including Other/Unknown)
+- countsByStatus
+- rentalFilteredCount (how many excluded)
+
+Rules:
+- totalProperties must equal sum(countsByStatus) and equal sum(countsByType)
+- rental filtering applied BEFORE counts
+- status mapping applied consistently BEFORE counts
+
+Then enforce:
+- Dashboard totals + inventory by type MUST use this contract
+- Properties “Repliers API total properties” + inventory MUST use this contract
+- Any other section showing totals MUST use this contract
+
+Deliverable:
+- A single endpoint or service used everywhere (no duplicates).
+- Temporary debug endpoint is OK.
+
+====================================================
+PHASE 2 — SECTION-BY-SECTION AUDIT CHECKLIST (DO NOT SKIP)
+====================================================
+
+Audit ALL sections listed below, confirm what they use for:
+- data source
+- `class` usage
+- status mapping
+- type/subtype mapping
+- date logic (sold date, list date)
+- rental exclusion
+- photos behavior
+- totals alignment with the Inventory Summary contract
+
+A) DASHBOARD
+1) Total Properties
+2) Property Inventory by Type
+3) Market Insights graphs (counts + trends must match same dataset)
+4) Recent Sold/Closed widget
+   - sold price must come from correct Repliers close price field
+   - sold date must be shown
+   - photos must appear if provided; otherwise “No photos available”
+   - floating card must match CMA property card format
+
+B) PROPERTIES MODULE
+1) “properties in Repliers API” total must match Inventory Summary
+2) Property Inventory by Type must match Dashboard + Inventory Summary
+3) Search results counts must match filters applied
+4) Date range picker must work for ANY Month/Day/Year From & To
+5) Sold Date quick filters (0–30/60/90/120/150/180) must apply by CloseDate consistently
+
+C) CMA
+1) Search/comps pulled must use same status + rental filtering rules
+2) Listings + map marker counts must match selected filter (All/Active/UC/Sold)
+3) Timeline graphs + statistics (Range/Avg/Median) must match comps dataset
+4) Market Stats:
+   - Inventory dial must use same dataset logic
+   - YoY charts must use consistent sold dataset window
+   - property maps must reflect same property universe
+
+D) CMA OUTPUTS
+1) Share link output:
+   - must match CMA displayed data (prices, DOM, counts)
+2) Print PDF output:
+   - must not capture agent UI artifacts
+   - must not be cut off
+   - must use the same data as Share link (source of truth)
+   - validate sold/closed comps accuracy with 3–5 Austin sold addresses
+
+E) BUYER SEARCH
+1) Totals/counts alignment with Inventory Summary where applicable
+2) Sold Date quick filters apply by CloseDate
+3) Saved search stores criteria correctly (including date filters)
+4) Map floating cards show consistent pricing/status/photos
+
+F) SELLER UPDATES
+1) Create Seller Update works (no 500)
+2) Preview works for cards
+3) Any property data displayed must use same property card mapping (price/photos/status)
+
+G) SETTINGS / SYNC
+1) Show data source, last updated timestamp
+2) Sync health: rate limiting handling, retries, and whether counts can become stale
+3) Ensure all sections refresh/reflect changes after sync
+
+====================================================
+PHASE 3 — CROSS-SECTION CONSISTENCY TESTS (REQUIRED)
+====================================================
+
+Run these tests and record results:
+
+Test 1: Global counts consistency
+- Compare Dashboard totalProperties vs Properties totalProperties vs Inventory Summary.
+- Must match exactly.
+
+Test 2: Type inventory consistency
+- Compare Dashboard countsByType vs Properties countsByType.
+- Must match exactly.
+
+Test 3: Market Insights alignment
+- Pick one city/subdivision filter context and confirm:
+  - Market Insights graph numbers align with the filtered dataset used elsewhere
+  - If Market Insights is global while inventory is filtered, label it clearly and keep consistent.
+
+Test 4: Sold listing correctness
+- Pick 5 sold listings:
+  - verify close price, close date, photos appear in UI
+  - verify same listing in CMA/Share/PDF shows identical values
+
+Test 5: Rate limiting resilience
+- Simulate multiple quick refreshes/requests:
+  - confirm counts do NOT fall back to 0 silently
+  - confirm retry logic works and errors are surfaced appropriately
+
+====================================================
+PHASE 4 — FIXES + HARD GUARDRAILS
+====================================================
+
+As you discover mismatches, fix them by:
+1) Removing duplicate logic (counts, mapping, filters) and reusing shared helpers.
+2) Preventing silent failures:
+   - remove patterns like `.catch(() => ({count:0}))` in inventory paths
+   - when Repliers errors occur, return explicit error states or last-known-good cached value with a warning.
+
+3) Add a “Data Consistency Debug” mode (dev-only):
+   - prints the Inventory Summary payload and the section’s computed numbers side-by-side.
+
+====================================================
+FINAL DELIVERABLES (NON-NEGOTIABLE)
+====================================================
+
+1) A written “Data Synchronization Audit Report” covering every section above:
+   - what was checked
+   - what was inconsistent
+   - what was fixed
+   - remaining risks
+
+2) A “Source of Truth Map” diagram (simple but clear) showing:
+   - Repliers → normalization layer → inventory summary → sections (Dashboard/Properties/CMA/Buyer/Seller/Outputs)
+   - where rental filtering, status mapping, class mapping, and photo handling occur
+
+3) Proof screenshots and/or logs:
+   - totals match across Dashboard + Properties
+   - inventory by type matches across Dashboard + Properties
+   - Market Insights aligned
+   - sold listings show correct sold price/date + photos
+   - PDF and Share outputs match CMA data and are not cut off
+
+Do NOT close the task until ALL sections are verified and no section is skipped.
