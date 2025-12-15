@@ -185,9 +185,41 @@ Inventory counts (from `getUnifiedInventory`) include ALL listings, including re
 
 ---
 
-## 8. Pending Items
+## 8. PDF Cross-Check Results (Quick CMA 2740)
 
-- **PDF Cross-Check:** Awaiting user-provided Quick CMA PDF for property data validation
+### PDF Data Summary
+**Source:** `attached_assets/Quick_CMA_2740_1765809420764.pdf`  
+**Search Criteria:** Cherry Creek subdivision, 1200-1800 sqft, Single Family
+
+| Status | Count | Properties |
+|--------|-------|------------|
+| Active | 3 | MLS 1286050, 3645010, 4452849 |
+| Under Contract | 2 | MLS 8149428, 8922445 |
+| Closed | 4 | MLS 3270399, 3407740, 3719373, 4531142 |
+
+### Sample Property Data from PDF
+| MLS | Address | Status | Price | SqFt | $/SqFt |
+|-----|---------|--------|-------|------|--------|
+| 1286050 | 2301 Brookhill Dr | Active | $575,000 | 1,467 | $391.96 |
+| 3270399 | 2714 Harleyhill Dr | Closed | $640,000 | 1,783 | $358.95 |
+| 4531142 | 7803 Seminary Ridge Dr | Closed | $558,000 | 1,597 | $349.41 |
+
+### Cross-Check Status
+- **Active/UC Properties:** Fetched via Repliers API (real-time)
+- **Closed Properties:** Local database stores synced sold data
+- **Database Sync:** Cherry Creek closed properties not yet synced in local DB
+
+### Validation Approach
+The app correctly routes:
+1. **Active/Under Contract** → Repliers API (real-time queries)
+2. **Closed/Sold** → PostgreSQL database (historical data)
+
+Price calculations use shared helpers:
+- `getDisplayPrice()` returns listPrice for Active/UC, closePrice for Closed
+- `calculatePricePerSqft()` computes $/sqft consistently
+
+### Recommendation
+Run a manual MLS Grid sync to populate Cherry Creek closed properties, then verify $/sqft calculations match PDF values
 
 ---
 
