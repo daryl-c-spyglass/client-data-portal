@@ -177,6 +177,8 @@ interface SearchFilters {
   cityMode?: string;
   subdivision?: string;
   subdivisionMode?: string;
+  neighborhood?: string;
+  neighborhoodMode?: string;
   
   // Address
   streetNumber?: string;
@@ -493,6 +495,11 @@ export default function BuyerSearch() {
     }
     if (filters.subdivision) {
       filters.subdivision.split(',').map(s => s.trim()).filter(s => s).forEach(s => params.append('subdivisions', s));
+      if (filters.subdivisionMode) params.set('subdivisionMode', filters.subdivisionMode);
+    }
+    if (filters.neighborhood) {
+      filters.neighborhood.split(',').map(n => n.trim()).filter(n => n).forEach(n => params.append('neighborhoods', n));
+      if (filters.neighborhoodMode) params.set('neighborhoodMode', filters.neighborhoodMode);
     }
     if (filters.postalCode) {
       filters.postalCode.split(',').map(z => z.trim()).filter(z => z).forEach(z => params.append('postalCodes', z));
@@ -545,6 +552,13 @@ export default function BuyerSearch() {
     // Location - Subdivisions (comma-separated to array)
     if (filters.subdivision) {
       filters.subdivision.split(',').map(s => s.trim()).filter(s => s).forEach(s => params.append('subdivisions', s));
+      if (filters.subdivisionMode) params.set('subdivisionMode', filters.subdivisionMode);
+    }
+    
+    // Location - Neighborhoods (comma-separated to array)
+    if (filters.neighborhood) {
+      filters.neighborhood.split(',').map(n => n.trim()).filter(n => n).forEach(n => params.append('neighborhoods', n));
+      if (filters.neighborhoodMode) params.set('neighborhoodMode', filters.neighborhoodMode);
     }
     
     // Location - Postal Codes (comma-separated to array)
@@ -616,9 +630,17 @@ export default function BuyerSearch() {
       const zips = filters.postalCode.split(',').map(z => z.trim()).filter(z => z);
       if (zips.length > 0) params.set('postalCode', zips[0]);
     }
-    if (filters.subdivision) {
-      const neighborhoods = filters.subdivision.split(',').map(s => s.trim()).filter(s => s);
-      if (neighborhoods.length > 0) params.set('neighborhood', neighborhoods[0]);
+    // For Repliers API, both subdivision and neighborhood map to the 'neighborhood' field
+    // Combine both filters if present
+    const subdivisionsList = filters.subdivision 
+      ? filters.subdivision.split(',').map(s => s.trim()).filter(s => s) 
+      : [];
+    const neighborhoodsList = filters.neighborhood 
+      ? filters.neighborhood.split(',').map(n => n.trim()).filter(n => n) 
+      : [];
+    const allNeighborhoodValues = [...subdivisionsList, ...neighborhoodsList];
+    if (allNeighborhoodValues.length > 0) {
+      params.set('neighborhood', allNeighborhoodValues[0]); // Repliers only takes single value
     }
     
     // Property type - map to Repliers class values (residential, condo, commercial)
@@ -1191,6 +1213,33 @@ export default function BuyerSearch() {
                       <div className="flex items-center space-x-2">
                         <RadioGroupItem value="Not" id="subdivision-not" />
                         <Label htmlFor="subdivision-not" className="font-normal">Not</Label>
+                      </div>
+                    </div>
+                  </RadioGroup>
+                </div>
+
+                {/* Neighborhoods */}
+                <div className="space-y-3">
+                  <Label className="text-base font-semibold">Neighborhoods</Label>
+                  <AutocompleteInput
+                    placeholder="Start typing neighborhood..."
+                    value={filters.neighborhood || ''}
+                    onChange={(value) => updateFilter('neighborhood', value || undefined)}
+                    endpoint="/api/autocomplete/neighborhoods"
+                    testId="input-neighborhood"
+                  />
+                  <RadioGroup
+                    value={filters.neighborhoodMode || 'OR'}
+                    onValueChange={(value) => updateFilter('neighborhoodMode', value)}
+                  >
+                    <div className="flex gap-6">
+                      <div className="flex items-center space-x-2">
+                        <RadioGroupItem value="OR" id="neighborhood-or" />
+                        <Label htmlFor="neighborhood-or" className="font-normal">OR</Label>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <RadioGroupItem value="Not" id="neighborhood-not" />
+                        <Label htmlFor="neighborhood-not" className="font-normal">Not</Label>
                       </div>
                     </div>
                   </RadioGroup>

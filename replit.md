@@ -6,6 +6,10 @@ This project is a professional real estate IDX (Internet Data Exchange) platform
 
 ## Recent Changes (Dec 15, 2025)
 
+- **Neighborhood Filter in CMA & Buyer Search**: Added separate Neighborhood filter (geographic boundary area) distinct from Subdivision (tract/community label)
+  - CMABuilder: New Neighborhood autocomplete field with persistence in search criteria
+  - BuyerSearch: New Neighborhoods filter with OR/Not modes and autocomplete
+  - Both use `/api/autocomplete/neighborhoods` endpoint backed by Repliers locations cache
 - **Neighborhood Review Feature**: Added neighborhood-level market stats with boundary polygon maps on Property Detail page
   - New `NeighborhoodReview` component shows Active/Under Contract/Sold counts, avg prices, avg DOM, price/sqft
   - Polygon boundary overlay from Repliers Locations API with property markers

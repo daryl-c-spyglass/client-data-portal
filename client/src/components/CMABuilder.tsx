@@ -152,6 +152,7 @@ interface InitialCMAData {
   searchCriteria?: {
     city?: string;
     subdivision?: string;
+    neighborhood?: string;
     minBeds?: string;
     maxPrice?: string;
     statuses?: string[];
@@ -192,6 +193,7 @@ export function CMABuilder({ onCreateCMA, initialData }: CMABuilderProps) {
   
   const [searchCity, setSearchCity] = useState(sc.city || "");
   const [searchSubdivision, setSearchSubdivision] = useState(sc.subdivision || "");
+  const [searchNeighborhood, setSearchNeighborhood] = useState(sc.neighborhood || "");
   const [searchMinBeds, setSearchMinBeds] = useState(sc.minBeds || "");
   const [searchMaxPrice, setSearchMaxPrice] = useState(sc.maxPrice || "");
   const [searchStatuses, setSearchStatuses] = useState<string[]>(sc.statuses || ["active"]);
@@ -278,6 +280,7 @@ export function CMABuilder({ onCreateCMA, initialData }: CMABuilderProps) {
     setComparables([]);
     setSearchCity("");
     setSearchSubdivision("");
+    setSearchNeighborhood("");
     setSearchMinBeds("");
     setSearchMaxPrice("");
     setSearchStatuses(["active"]);
@@ -296,6 +299,7 @@ export function CMABuilder({ onCreateCMA, initialData }: CMABuilderProps) {
   const clearFilters = () => {
     setSearchCity("");
     setSearchSubdivision("");
+    setSearchNeighborhood("");
     setSearchMinBeds("");
     setSearchMaxPrice("");
     setSearchStatuses(["active"]);
@@ -319,6 +323,7 @@ export function CMABuilder({ onCreateCMA, initialData }: CMABuilderProps) {
     }
     if (searchCity) params.set('city', searchCity.trim());
     if (searchSubdivision) params.set('subdivision', searchSubdivision.trim());
+    if (searchNeighborhood) params.set('neighborhood', searchNeighborhood.trim());
     if (searchMinBeds && searchMinBeds !== 'any') params.set('bedsMin', searchMinBeds);
     if (searchMaxPrice && searchMaxPrice !== 'any') params.set('maxPrice', searchMaxPrice);
     if (searchMinSqft) params.set('minSqft', searchMinSqft);
@@ -433,6 +438,7 @@ export function CMABuilder({ onCreateCMA, initialData }: CMABuilderProps) {
       const searchCriteria = {
         city: searchCity,
         subdivision: searchSubdivision,
+        neighborhood: searchNeighborhood,
         minBeds: searchMinBeds,
         maxPrice: searchMaxPrice,
         statuses: searchStatuses,
@@ -543,6 +549,17 @@ export function CMABuilder({ onCreateCMA, initialData }: CMABuilderProps) {
                 endpoint="/api/autocomplete/subdivisions"
                 testId="input-search-subdivision"
                 name="subdivision"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Neighborhood</Label>
+              <AutocompleteInput
+                placeholder="e.g., Circle C"
+                value={searchNeighborhood}
+                onChange={setSearchNeighborhood}
+                endpoint="/api/autocomplete/neighborhoods"
+                testId="input-search-neighborhood"
+                name="neighborhood"
               />
             </div>
             <div className="space-y-2">

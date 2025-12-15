@@ -606,6 +606,9 @@ export function CMAReport({
                             {property.standardStatus === 'Closed' ? 'Sold' : property.standardStatus}
                           </Badge>
                         </div>
+                        {(property.propertySubType || property.propertyType) && (
+                          <p className="text-xs text-muted-foreground">{property.propertySubType || property.propertyType}</p>
+                        )}
                         <p className="text-lg font-bold text-primary">${price.toLocaleString()}</p>
                         <div className="flex flex-wrap gap-x-3 text-xs text-muted-foreground mt-1">
                           <span>{property.bedroomsTotal || 0} beds</span>
@@ -1971,10 +1974,22 @@ export function CMAReport({
 
               {/* Additional Details */}
               <div className="space-y-2 text-sm">
+                {(floatingCardProperty.propertySubType || floatingCardProperty.propertyType) && (
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Property Type</span>
+                    <span className="font-medium">{floatingCardProperty.propertySubType || floatingCardProperty.propertyType}</span>
+                  </div>
+                )}
                 {floatingCardProperty.yearBuilt && (
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Year Built</span>
                     <span className="font-medium">{floatingCardProperty.yearBuilt}</span>
+                  </div>
+                )}
+                {(floatingCardProperty as any).neighborhood && (
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Neighborhood</span>
+                    <span className="font-medium">{(floatingCardProperty as any).neighborhood}</span>
                   </div>
                 )}
                 {(floatingCardProperty.subdivision || (floatingCardProperty as any).subdivisionName) && (

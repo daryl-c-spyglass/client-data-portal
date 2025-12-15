@@ -1,0 +1,154 @@
+You are implementing NEIGHBORHOOD support across the entire app (Repliers boundary-based Neighborhood, NOT subdivision).
+Do NOT skip any process. This is cross-section and must be consistent everywhere.
+
+Data source: Repliers only (ACTRIS).
+Neighborhood must be derived from Repliers boundary polygons and stored as a separate field from Subdivision.
+Subdivision stays for CMA comps; Neighborhood is for larger-area stats and filtering.
+
+====================================================
+A) DASHBOARD — ACTIVE PROPERTIES MUST MATCH LAST “NEIGHBORHOOD” SEARCH
+====================================================
+
+Requirement:
+1) “Active Properties” carousel on Dashboard currently says it matches “recent activity”.
+Update the logic so the “recent activity” personalization prioritizes the LAST SEARCHED NEIGHBORHOOD.
+- If user’s last search included Neighborhood, use that Neighborhood boundary to fetch active properties.
+- If no Neighborhood exists in recent activity, fallback to last Subdivision/city search.
+- If none exists, fallback to most recent Active listings.
+
+2) Add a small label under “Active Properties”:
+   “Based on your recent activity in <NeighborhoodName>”
+   If fallback used, label appropriately (Subdivision/City).
+
+Testing:
+- Search by a Neighborhood, return to Dashboard, confirm Active Properties updates to that Neighborhood.
+
+====================================================
+B) CMA — HOME AVERAGE “PROPERTIES USED IN ANALYSIS” MUST SHOW PROPERTY TYPE
+====================================================
+
+Problem observed:
+Market Stats list includes property type line (e.g., “Single Family Residence”), but Home Average “Properties Used in Analysis” list does NOT.
+
+Requirements:
+1) In CMA → Home Average → “Properties Used in Analysis” list:
+- Add a property type/subtype line for each property (same formatting as Market Stats list).
+- Use the same shared property type mapping used across the app.
+2) Ensure this property type is visible in both:
+- the list row
+- the floating card when clicked
+
+Acceptance criteria:
+- Home Average list displays property type for every property (compare to Market Stats list; must match).
+
+====================================================
+C) CMA — ADD NEIGHBORHOOD FILTER IN “SEARCH PROPERTIES”
+====================================================
+
+Requirements:
+1) In CMA Create/Search Properties panel, add a new input:
+- Neighborhood (boundary-based, not subdivision)
+- Must support typeahead suggestions (same style as Buyer Search).
+2) When Neighborhood is selected:
+- search results must be filtered by properties whose lat/lng falls inside that neighborhood polygon boundary.
+- Neighborhood filter must work alongside City, Subdivision, Status, Property Type, etc.
+3) Ensure Neighborhood is stored/attached to:
+- Subject property
+- Comparable properties
+- Results data payload
+
+Important:
+- Subdivision is still used for comps matching workflows.
+- Neighborhood filter is an additional option for broader selection/context.
+
+Testing:
+- Pick a Neighborhood, run search, verify results change compared to no Neighborhood filter.
+
+====================================================
+D) CMA MARKET REVIEW — INCORPORATE NEIGHBORHOOD CONTEXT
+====================================================
+
+Requirement:
+Add optional “Neighborhood context” inside CMA Market Review:
+- If Neighborhood filter is used OR Neighborhood is derived for the subject property:
+  - show Neighborhood name in Market Review
+  - compute market review stats either:
+    A) based on the selected CMA dataset (comps) but annotate Neighborhood name, AND/OR
+    B) add a separate “Neighborhood Review” block showing larger-area stats (preferred)
+
+Rules:
+- Do not replace subdivision-based CMA analytics.
+- Neighborhood stats are larger-area and must be clearly labeled.
+
+Deliverable:
+- Market Review shows Neighborhood name and includes Neighborhood-level stats (separately labeled).
+
+====================================================
+E) BUYER SEARCH — INCLUDE NEIGHBORHOOD FILTER + AUTOCOMPLETE
+====================================================
+
+Requirements:
+1) Add “Neighborhood” input in Buyer Search filters.
+2) Must have autocomplete suggestions (typeahead).
+3) When selected, filter results by Neighborhood boundary polygon.
+4) Ensure saved searches include Neighborhood criteria and reload correctly.
+
+Testing:
+- Type Neighborhood partial → suggestions show → select → results filtered → save search → reload → still applied.
+
+====================================================
+F) PROPERTY CARDS + FLOATING CARDS — SHOW NEIGHBORHOOD EVERYWHERE
+====================================================
+
+Requirement:
+Audit ALL property display surfaces and ensure Neighborhood is present:
+
+Surfaces to update (do not miss):
+- Dashboard Active Properties cards + floating card
+- Dashboard Recent Sold/Closed cards + floating card
+- Properties search results cards + floating card + property details page
+- CMA Search Results + floating card
+- CMA Home Average properties list + floating card
+- CMA Listings properties list + floating card
+- CMA Market Stats property lists + floating card
+- Buyer Search cards + floating card + map popups
+
+Display rules:
+- Neighborhood must be separate from Subdivision (both may be shown).
+- If Neighborhood is not available, show “Neighborhood: Not available” (do not substitute subdivision).
+
+Data rules:
+- Neighborhood must come from Repliers boundary resolution (lat/lng → boundary).
+- Cache neighborhood resolution to avoid rate limiting.
+
+====================================================
+G) IMPLEMENTATION NOTES (NON-NEGOTIABLE)
+====================================================
+
+1) Create shared helpers:
+- resolveNeighborhoodForListing(listing) -> neighborhoodName/boundaryId
+- normalizePropertyType(listing) -> SFR/Condo/TH/Multi/Mfg/Ranch/Land/Lots/Other
+
+2) Do not duplicate logic per page.
+All sections must use the same helper and same fields.
+
+3) Add dev-only debug:
+- log when neighborhood is resolved
+- log when neighborhood is missing (no lat/lng or boundary lookup failed)
+
+====================================================
+FINAL DELIVERABLES REQUIRED
+====================================================
+
+1) Screenshots showing:
+- Dashboard Active Properties reflecting last Neighborhood search
+- CMA Home Average list now includes property type
+- CMA Search Properties includes Neighborhood filter
+- Buyer Search includes Neighborhood filter with autocomplete
+- Floating cards show Neighborhood in multiple sections
+
+2) Short report:
+- where neighborhood resolution is implemented
+- where it’s cached
+- which UI components now show Neighborhood
+- confirmation that Neighborhood != Subdivision everywhere

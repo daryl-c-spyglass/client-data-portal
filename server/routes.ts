@@ -2094,7 +2094,10 @@ This email was sent by ${senderName} (${senderEmail}) via the MLS Grid IDX Platf
         maxYearBuilt: req.query.maxYearBuilt ? parseInt(req.query.maxYearBuilt as string) : undefined,
         postalCodes: parseArray(req.query.postalCodes) || parseArray(req.query.zipCodes),
         cities: parseArray(req.query.cities),
-        subdivisions: parseArray(req.query.subdivisions),
+        // Combine subdivisions and neighborhoods params - both map to subdivision field
+        subdivisions: [...(parseArray(req.query.subdivisions) || []), ...(parseArray(req.query.neighborhoods) || [])].length > 0
+          ? [...(parseArray(req.query.subdivisions) || []), ...(parseArray(req.query.neighborhoods) || [])]
+          : undefined,
         propertySubType: parseArray(req.query.propertySubType),
         limit: req.query.limit ? parseInt(req.query.limit as string) : 50,
         skip: req.query.offset ? parseInt(req.query.offset as string) : 0,
@@ -2196,7 +2199,10 @@ This email was sent by ${senderName} (${senderEmail}) via the MLS Grid IDX Platf
         city: req.query.city as string,
         cities: parseArray(req.query.cities),
         subdivision: req.query.subdivision as string,
-        subdivisions: parseArray(req.query.subdivisions),
+        // Combine subdivisions and neighborhoods params - both map to subdivision field
+        subdivisions: [...(parseArray(req.query.subdivisions) || []), ...(parseArray(req.query.neighborhoods) || [])].length > 0
+          ? [...(parseArray(req.query.subdivisions) || []), ...(parseArray(req.query.neighborhoods) || [])]
+          : undefined,
         status: req.query.status as string,
         statuses: parseArray(req.query.statuses),
         minPrice: req.query.minPrice ? parseInt(req.query.minPrice as string) : undefined,
@@ -2796,6 +2802,43 @@ This email was sent by ${senderName} (${senderEmail}) via the MLS Grid IDX Platf
       res.json({ suggestions });
     } catch (error: any) {
       console.error("School district autocomplete error:", error.message);
+      res.json({ suggestions: [] });
+    }
+  });
+  
+  app.get("/api/autocomplete/neighborhoods", async (req, res) => {
+    try {
+      const query = (req.query.q as string || '').trim();
+      const city = req.query.city as string | undefined;
+      
+      if (query.length < 2) {
+        res.json({ suggestions: [] });
+        return;
+      }
+      
+      const repliersClient = getRepliersClient();
+      if (!repliersClient) {
+        res.json({ suggestions: [] });
+        return;
+      }
+      
+      const locations = await repliersClient.autocompleteLocations(query);
+      const neighborhoods = locations
+        .filter(loc => loc.neighborhood)
+        .filter(loc => !city || loc.city?.toLowerCase() === city.toLowerCase())
+        .map(loc => ({
+          name: loc.neighborhood!,
+          city: loc.city || null,
+          area: loc.area || null,
+        }));
+      
+      const uniqueNeighborhoods = Array.from(
+        new Map(neighborhoods.map(n => [`${n.name}-${n.city}`, n])).values()
+      ).slice(0, 20);
+      
+      res.json({ suggestions: uniqueNeighborhoods.map(n => n.name) });
+    } catch (error: any) {
+      console.error("Neighborhood autocomplete error:", error.message);
       res.json({ suggestions: [] });
     }
   });
