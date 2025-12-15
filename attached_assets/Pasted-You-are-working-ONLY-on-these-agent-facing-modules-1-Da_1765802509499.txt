@@ -1,0 +1,185 @@
+You are working ONLY on these agent-facing modules:
+1) Dashboard
+2) Properties
+3) CMA Results (Print PDF)
+4) Buyer Search
+
+Data source: Repliers only.
+Leasing/rental listings must be excluded globally from all pulls, counts, widgets, and comps.
+
+Implement items ONE BY ONE, test each, and provide a final report.
+
+====================================================
+A) DASHBOARD — MAKE SUMMARY CARDS CLICKABLE (REDIRECTION ONLY)
+====================================================
+
+Requirement (no redesign):
+Make these Dashboard summary cards clickable and redirect to the correct sections:
+
+1) “Total Properties” → redirect to Properties module
+2) “Active CMAs” → redirect to CMAs section
+3) “Seller Updates” → redirect to Seller Updates section
+
+Notes:
+- Keep existing styling; just add clickability + routing.
+- Ensure accessibility: cursor pointer + keyboard navigation (Enter/Space) if possible.
+
+Testing:
+- Click each card and confirm correct redirection.
+
+====================================================
+B) DASHBOARD — RECENT SOLD/CLOSED STILL EMPTY (PERSONALIZED + FALLBACK)
+====================================================
+
+Problem:
+- Recent Sold/Closed widget is empty.
+
+Requirements:
+1) Populate Recent Sold/Closed using this logic:
+   a) If user has recent activity (recent searches in Properties, CMA, Buyer Search):
+      - Use their most recent search context (city/subdivision/criteria) to pull sold/closed listings.
+   b) If no recent activity exists:
+      - Default to the most recent sold/closed listings overall (most recent close date).
+
+2) List behavior:
+- Sorted newest close date first.
+- Show Sold Date explicitly per property.
+- Each item must be clickable and open the floating property card.
+
+3) Floating property card requirements:
+- Must show complete property info + images.
+- Images:
+  - Auto-carousel every 3 seconds
+  - Manual navigation:
+    • click left side = previous
+    • click right side = next
+  - If no images: show “No photos available”
+
+4) Rentals/leasing must be excluded (do not show rent-like closed prices).
+
+Testing:
+- With recent search context present:
+  - Confirm Recent Sold/Closed uses that context.
+- With no context:
+  - Confirm it defaults to most recent sold/closed.
+- Click a sold item:
+  - Floating card opens and carousel works.
+  - Sold Date is visible.
+
+====================================================
+C) PROPERTIES — DATE RANGE MONTH/YEAR ADJUSTABLE + SOLD DATE QUICK FILTERS
+====================================================
+
+Problems:
+- Date Range is not adjustable.
+- Need Sold Date quick range filters like CMA.
+
+Requirements:
+1) Date Range controls:
+- Make Month and Year adjustable/changeable (dropdowns or date picker).
+- Ensure user can set a valid start/end month+year.
+- Preserve selection when switching views unless Reset is clicked.
+
+2) Sold Date quick filters (place BELOW Date Range):
+Add selectable options:
+- 0–30
+- 0–60
+- 0–90
+- 0–120
+- 0–150
+- 0–180
+
+Rules:
+- These apply ONLY to Sold/Closed listings (close date).
+- If user selects Sold Date quick filter, it should update the effective date range accordingly.
+- If user selects multiple statuses including non-sold, sold-date filter should only affect sold/closed portion OR clearly disable it unless sold is selected (pick one and implement consistently).
+
+Testing:
+- Change month/year and confirm results reflect changes.
+- Select Sold Date 0–30 and confirm results are limited to last 30 days of sold/closed.
+
+====================================================
+D) CMA RESULTS — PRINT PDF STILL CUT OFF (BOTTOM) + SOLD/COMP TESTING (AUSTIN)
+====================================================
+
+Problem:
+- CMA PDF output is cut off at the bottom.
+
+Requirements:
+1) Fix print layout so nothing is clipped:
+- Remove fixed-height containers and overflow scroll behaviors for print.
+- Add proper page breaks between sections/cards.
+- Ensure all content flows into additional pages as needed.
+- Remove any UI-only toolbars and overlays from print output.
+
+2) Testing requirement (must do):
+- In Austin, test comparables for Sold/Closed:
+  - Choose 3–5 sold/closed addresses from Austin and generate CMA PDF.
+  - Confirm:
+    • No cut-off bottom clipping
+    • Sold comps appear correctly
+    • Multi-page PDF renders like a document
+
+3) Report must include the tested addresses (3–5) and results.
+
+====================================================
+E) BUYER SEARCH — ADD SOLD DATE QUICK FILTERS BELOW DATE RANGE
+====================================================
+
+Requirement:
+- Add “Sold Date” quick filters BELOW Date Range in Buyer Search:
+  - 0–30
+  - 0–60
+  - 0–90
+  - 0–120
+  - 0–150
+  - 0–180
+
+Rules:
+- Must apply to sold/closed listings by close date.
+- Must work with existing filters and not break Save Search.
+
+Testing:
+- Select Sold Date 0–60 and confirm results match last 60 days sold/closed for the search area.
+
+====================================================
+F) PROVIDE CURRENT STATUS OF REPLIERS INTEGRATION
+====================================================
+
+In the final report, include:
+- Which Repliers endpoints are being used for:
+  • Properties search
+  • Buyer Search
+  • CMA comps (active/uc/sold)
+  • Dashboard totals and Recent Sold/Closed
+- Authentication method in use (server-side key, headers)
+- Last successful sync timestamp (if applicable)
+- Known limitations (e.g., data freshness lag)
+
+====================================================
+G) QUESTIONS FOR REPLIERS (IF NEEDED)
+====================================================
+
+If inconsistencies persist after fixes, prepare a short list of questions for Repliers support, such as:
+1) Status freshness:
+   - How quickly do status changes propagate (Active → UC → Sold)?
+2) Sold/Closed close date reliability:
+   - Which field should be trusted as CloseDate?
+3) Subdivision field mapping:
+   - Which field is authoritative for subdivision vs neighborhood?
+4) Photos availability for sold listings:
+   - Are sold listing photos included or restricted?
+5) Rate limits / pagination:
+   - Any constraints that could cause empty results on multi-status searches?
+
+====================================================
+FINAL REPORT REQUIRED
+====================================================
+
+Provide:
+- Proof of dashboard card redirections working.
+- Proof Recent Sold/Closed is populated (personalized + fallback).
+- Proof Properties date range and sold-date filters work.
+- Proof Buyer Search sold-date filters work.
+- Proof CMA PDF no longer cut off + include 3–5 Austin sold comps tested.
+- Repliers integration status summary + recommended questions (if needed).

@@ -37,7 +37,7 @@ import {
   RotateCcw,
   Loader2
 } from "lucide-react";
-import { Link } from "wouter";
+import { Link, useLocation } from "wouter";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import type { Cma, Property } from "@shared/schema";
@@ -473,6 +473,7 @@ function PropertyDetailModal({
 
 export default function Dashboard() {
   const { toast } = useToast();
+  const [, navigate] = useLocation();
   const carouselRef = useRef<HTMLDivElement>(null);
   const [selectedProperty, setSelectedProperty] = useState<DashboardProperty | null>(null);
   const [propertyModalOpen, setPropertyModalOpen] = useState(false);
@@ -903,96 +904,102 @@ export default function Dashboard() {
           case 'metrics':
             return (
               <div key="metrics" className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                <Card>
-                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 gap-1">
-                    <CardTitle className="text-sm font-medium">Total Properties</CardTitle>
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <Info className="w-4 h-4 text-muted-foreground cursor-help" />
-                      </TooltipTrigger>
-                      <TooltipContent>
-                        <p>Active + Under Contract (from Repliers) + Sold (from database)</p>
-                      </TooltipContent>
-                    </Tooltip>
-                  </CardHeader>
-                  <CardContent>
-                    {isLoading ? (
-                      <Skeleton className="h-8 w-20" />
-                    ) : (
-                      <>
-                        <div className="text-2xl font-bold" data-testid="text-total-properties">
-                          {stats?.totalProperties?.toLocaleString() || 0}
-                        </div>
-                        <div className="text-xs text-muted-foreground space-y-0.5 mt-1">
-                          <p className="flex items-center gap-1">
-                            <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
-                            {stats?.totalActiveProperties?.toLocaleString() || 0} Active
-                          </p>
-                          <p className="flex items-center gap-1">
-                            <span className="w-2 h-2 rounded-full bg-amber-500"></span>
-                            {stats?.totalUnderContractProperties?.toLocaleString() || 0} Under Contract
-                          </p>
-                          <p className="flex items-center gap-1">
-                            <span className="w-2 h-2 rounded-full bg-slate-500"></span>
-                            {stats?.totalClosedProperties?.toLocaleString() || 0} Sold
-                          </p>
-                        </div>
-                      </>
-                    )}
-                  </CardContent>
-                </Card>
+                <Link href="/properties">
+                  <Card className="cursor-pointer hover-elevate transition-colors" tabIndex={0} role="button" aria-label="View all properties" onKeyDown={(e) => e.key === 'Enter' && navigate('/properties')} data-testid="card-total-properties">
+                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 gap-1">
+                      <CardTitle className="text-sm font-medium">Total Properties</CardTitle>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Info className="w-4 h-4 text-muted-foreground cursor-help" />
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p>Active + Under Contract (from Repliers) + Sold (from database)</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </CardHeader>
+                    <CardContent>
+                      {isLoading ? (
+                        <Skeleton className="h-8 w-20" />
+                      ) : (
+                        <>
+                          <div className="text-2xl font-bold" data-testid="text-total-properties">
+                            {stats?.totalProperties?.toLocaleString() || 0}
+                          </div>
+                          <div className="text-xs text-muted-foreground space-y-0.5 mt-1">
+                            <p className="flex items-center gap-1">
+                              <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
+                              {stats?.totalActiveProperties?.toLocaleString() || 0} Active
+                            </p>
+                            <p className="flex items-center gap-1">
+                              <span className="w-2 h-2 rounded-full bg-amber-500"></span>
+                              {stats?.totalUnderContractProperties?.toLocaleString() || 0} Under Contract
+                            </p>
+                            <p className="flex items-center gap-1">
+                              <span className="w-2 h-2 rounded-full bg-slate-500"></span>
+                              {stats?.totalClosedProperties?.toLocaleString() || 0} Sold
+                            </p>
+                          </div>
+                        </>
+                      )}
+                    </CardContent>
+                  </Card>
+                </Link>
 
-                <Card>
-                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 gap-1">
-                    <CardTitle className="text-sm font-medium">Active CMAs</CardTitle>
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <Info className="w-4 h-4 text-muted-foreground cursor-help" />
-                      </TooltipTrigger>
-                      <TooltipContent>
-                        <p>Total Comparative Market Analyses created</p>
-                      </TooltipContent>
-                    </Tooltip>
-                  </CardHeader>
-                  <CardContent>
-                    {isLoading ? (
-                      <Skeleton className="h-8 w-20" />
-                    ) : (
-                      <>
-                        <div className="text-2xl font-bold" data-testid="text-active-cmas">
-                          {stats?.activeCmas || 0}
-                        </div>
-                        <p className="text-xs text-muted-foreground">Total created</p>
-                      </>
-                    )}
-                  </CardContent>
-                </Card>
+                <Link href="/cmas">
+                  <Card className="cursor-pointer hover-elevate transition-colors" tabIndex={0} role="button" aria-label="View all CMAs" onKeyDown={(e) => e.key === 'Enter' && navigate('/cmas')} data-testid="card-active-cmas">
+                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 gap-1">
+                      <CardTitle className="text-sm font-medium">Active CMAs</CardTitle>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Info className="w-4 h-4 text-muted-foreground cursor-help" />
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p>Total Comparative Market Analyses created</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </CardHeader>
+                    <CardContent>
+                      {isLoading ? (
+                        <Skeleton className="h-8 w-20" />
+                      ) : (
+                        <>
+                          <div className="text-2xl font-bold" data-testid="text-active-cmas">
+                            {stats?.activeCmas || 0}
+                          </div>
+                          <p className="text-xs text-muted-foreground">Total created</p>
+                        </>
+                      )}
+                    </CardContent>
+                  </Card>
+                </Link>
 
-                <Card>
-                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 gap-1">
-                    <CardTitle className="text-sm font-medium">Seller Updates</CardTitle>
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <Info className="w-4 h-4 text-muted-foreground cursor-help" />
-                      </TooltipTrigger>
-                      <TooltipContent>
-                        <p>Active market monitoring alerts for sellers</p>
-                      </TooltipContent>
-                    </Tooltip>
-                  </CardHeader>
-                  <CardContent>
-                    {isLoading ? (
-                      <Skeleton className="h-8 w-20" />
-                    ) : (
-                      <>
-                        <div className="text-2xl font-bold" data-testid="text-saved-searches">
-                          {stats?.sellerUpdates || 0}
-                        </div>
-                        <p className="text-xs text-muted-foreground">Monitoring market</p>
-                      </>
-                    )}
-                  </CardContent>
-                </Card>
+                <Link href="/seller-updates">
+                  <Card className="cursor-pointer hover-elevate transition-colors" tabIndex={0} role="button" aria-label="View seller updates" onKeyDown={(e) => e.key === 'Enter' && navigate('/seller-updates')} data-testid="card-seller-updates">
+                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 gap-1">
+                      <CardTitle className="text-sm font-medium">Seller Updates</CardTitle>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Info className="w-4 h-4 text-muted-foreground cursor-help" />
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p>Active market monitoring alerts for sellers</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </CardHeader>
+                    <CardContent>
+                      {isLoading ? (
+                        <Skeleton className="h-8 w-20" />
+                      ) : (
+                        <>
+                          <div className="text-2xl font-bold" data-testid="text-saved-searches">
+                            {stats?.sellerUpdates || 0}
+                          </div>
+                          <p className="text-xs text-muted-foreground">Monitoring market</p>
+                        </>
+                      )}
+                    </CardContent>
+                  </Card>
+                </Link>
 
                 <Card>
                   <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 gap-1">
