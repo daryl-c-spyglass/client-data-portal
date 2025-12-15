@@ -106,6 +106,24 @@ interface LocationsResponse {
   neighborhoods?: string[];
 }
 
+// Location with boundary polygon for neighborhood reviews
+interface LocationWithBoundary {
+  area?: string;
+  city?: string;
+  neighborhood?: string;
+  class?: string;
+  map?: {
+    boundary?: number[][][]; // GeoJSON polygon coordinates [[lng, lat], ...]
+    latitude?: number;
+    longitude?: number;
+  };
+}
+
+interface LocationsWithBoundaryResponse {
+  locations: LocationWithBoundary[];
+  count: number;
+}
+
 interface NLPResponse {
   url: string;
   nlpId: string;
@@ -520,6 +538,149 @@ class RepliersClient {
     };
     return statusMap[status] || status;
   }
+
+  // Get locations (neighborhoods) with boundary polygons
+  async getLocationsWithBoundaries(params: {
+    city?: string;
+    search?: string;
+    class?: string;
+  } = {}): Promise<LocationWithBoundary[]> {
+    try {
+      const queryParams = new URLSearchParams();
+      queryParams.append('hasBoundary', 'true');
+      if (params.city) queryParams.append('city', params.city);
+      if (params.search) queryParams.append('search', params.search);
+      if (params.class) queryParams.append('class', params.class);
+      
+      const response = await this.withRetry(
+        () => this.client.get(`/locations?${queryParams.toString()}`).then(r => r.data),
+        'getLocationsWithBoundaries'
+      );
+      
+      // Response may be an array or object with locations property
+      if (Array.isArray(response)) {
+        return response;
+      }
+      return response.locations || [];
+    } catch (error: any) {
+      console.error('Repliers getLocationsWithBoundaries error:', error.response?.data || error.message);
+      throw new Error(`Failed to get locations with boundaries: ${error.message}`);
+    }
+  }
+
+  // Search listings within a polygon boundary using POST
+  // Mirrors searchListings parameter handling for consistency
+  async searchListingsInBoundary(
+    boundary: number[][][],
+    params: ListingsSearchParams = {}
+  ): Promise<ListingsResponse> {
+    try {
+      const requestBody: any = {
+        map: boundary,
+      };
+      
+      // Add all search params to the body (matching searchListings parity)
+      if (params.status) requestBody.status = params.status;
+      if (params.minPrice) requestBody.minPrice = params.minPrice;
+      if (params.maxPrice) requestBody.maxPrice = params.maxPrice;
+      if (params.minBeds) requestBody.minBeds = params.minBeds;
+      if (params.maxBeds) requestBody.maxBeds = params.maxBeds;
+      if (params.minBaths) requestBody.minBaths = params.minBaths;
+      if (params.maxBaths) requestBody.maxBaths = params.maxBaths;
+      if (params.minSqft) requestBody.minSqft = params.minSqft;
+      if (params.maxSqft) requestBody.maxSqft = params.maxSqft;
+      // Handle both propertyType and class - matching searchListings behavior
+      if (params.propertyType) requestBody.class = normalizeRepliersClass(params.propertyType);
+      if (params.class) requestBody.class = normalizeRepliersClass(params.class);
+      // Location filters for additional filtering within boundary
+      if (params.city) requestBody.city = params.city;
+      if (params.postalCode) requestBody.zip = params.postalCode;
+      if (params.neighborhood) requestBody.neighborhood = params.neighborhood;
+      // Pagination and sorting
+      if (params.pageNum) requestBody.pageNum = params.pageNum;
+      if (params.resultsPerPage) requestBody.resultsPerPage = params.resultsPerPage;
+      if (params.sortBy) requestBody.sortBy = params.sortBy;
+      if (params.fields) requestBody.fields = params.fields;
+
+      return await this.withRetry(
+        () => this.client.post('/listings', requestBody).then(r => r.data),
+        'searchListingsInBoundary'
+      );
+    } catch (error: any) {
+      console.error('Repliers searchListingsInBoundary error:', error.response?.data || error.message);
+      throw new Error(`Failed to search listings in boundary: ${error.message}`);
+    }
+  }
+
+  // Find neighborhood containing a specific point (lat/lng)
+  // Uses point-in-polygon algorithm to check which neighborhood boundary contains the point
+  async findNeighborhoodByPoint(
+    latitude: number,
+    longitude: number,
+    city?: string
+  ): Promise<LocationWithBoundary | null> {
+    try {
+      // Get all neighborhoods with boundaries for the city
+      const neighborhoods = await this.getLocationsWithBoundaries({
+        city,
+        class: 'neighborhood',
+      });
+      
+      // Check each neighborhood boundary to see if point is inside
+      for (const neighborhood of neighborhoods) {
+        if (neighborhood.map?.boundary) {
+          if (this.isPointInPolygon(longitude, latitude, neighborhood.map.boundary)) {
+            return neighborhood;
+          }
+        }
+      }
+      
+      return null;
+    } catch (error: any) {
+      console.error('Error finding neighborhood by point:', error.message);
+      return null;
+    }
+  }
+
+  // Ray casting algorithm for point-in-polygon detection
+  private isPointInPolygon(x: number, y: number, polygon: number[][][]): boolean {
+    // polygon is array of rings, first ring is outer boundary
+    const ring = polygon[0];
+    if (!ring || ring.length < 3) return false;
+    
+    let inside = false;
+    for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+      const xi = ring[i][0], yi = ring[i][1];
+      const xj = ring[j][0], yj = ring[j][1];
+      
+      const intersect = ((yi > y) !== (yj > y)) &&
+        (x < (xj - xi) * (y - yi) / (yj - yi) + xi);
+      if (intersect) inside = !inside;
+    }
+    
+    return inside;
+  }
+
+  // Autocomplete locations for neighborhood search
+  async autocompleteLocations(search: string): Promise<LocationWithBoundary[]> {
+    try {
+      const queryParams = new URLSearchParams();
+      queryParams.append('search', search);
+      
+      const response = await this.withRetry(
+        () => this.client.get(`/locations/autocomplete?${queryParams.toString()}`).then(r => r.data),
+        'autocompleteLocations'
+      );
+      
+      if (Array.isArray(response)) {
+        return response;
+      }
+      return response.locations || response.suggestions || [];
+    } catch (error: any) {
+      console.error('Repliers autocompleteLocations error:', error.response?.data || error.message);
+      throw new Error(`Failed to autocomplete locations: ${error.message}`);
+    }
+  }
 }
 
 let repliersClient: RepliersClient | null = null;
@@ -545,4 +706,4 @@ export function isRepliersConfigured(): boolean {
   return repliersClient !== null;
 }
 
-export { RepliersClient, RepliersListing, ListingsSearchParams, ListingsResponse };
+export { RepliersClient, RepliersListing, ListingsSearchParams, ListingsResponse, LocationWithBoundary };

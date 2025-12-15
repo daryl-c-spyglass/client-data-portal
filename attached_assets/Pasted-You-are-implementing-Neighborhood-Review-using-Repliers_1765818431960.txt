@@ -1,0 +1,123 @@
+You are implementing “Neighborhood Review” using Repliers boundary polygons.
+
+IMPORTANT DISTINCTION (DO NOT MIX THESE):
+- Neighborhood = larger boundary-defined area (polygon) used for broader market statistics.
+- Subdivision = smaller tract/community label used for CMA selection and comps.
+
+Goal:
+Use Repliers map boundary polygons to identify and store the Neighborhood for each property/search context, then compute neighborhood-level stats separately from subdivision-level CMA stats.
+
+====================================================
+1) DATA MODEL + TERMINOLOGY (FOUNDATION)
+====================================================
+
+Requirements:
+1) Treat Neighborhood and Subdivision as separate fields everywhere.
+   - Neighborhood: boundary area name + boundaryId + polygon geometry reference (if allowed)
+   - Subdivision: subdivision text label from listing data
+
+2) Update UI labels everywhere:
+   - “Neighborhood” must NOT display subdivision.
+   - “Subdivision” stays as subdivision.
+
+3) Confirm that in CMA workflows:
+   - CMA filters/comps default to Subdivision-based matching
+   - Neighborhood stats are shown as a separate “larger area context” panel (optional, but distinct)
+
+====================================================
+2) REPLIERS BOUNDARY LOOKUP (NEIGHBORHOOD IDENTIFICATION)
+====================================================
+
+Implement a boundary resolution flow:
+1) When we have a property with (lat, lng):
+   - call Repliers boundary endpoint(s) to determine which Neighborhood polygon contains the point
+   - store:
+     • neighborhoodName
+     • neighborhoodBoundaryId
+     • boundaryType = “neighborhood”
+     • dataSource = Repliers
+     • resolvedAt timestamp
+
+2) When user searches by Neighborhood (future support):
+   - use boundary polygon to filter listings within that boundary.
+
+Caching:
+- Cache boundary resolution results keyed by boundaryId and/or propertyId for performance.
+- Do NOT re-resolve repeatedly for the same property unless data refresh demands it.
+
+Failure behavior:
+- If boundary lookup fails, show Neighborhood = “Not available” (do not fallback to Subdivision).
+
+====================================================
+3) NEIGHBORHOOD REVIEW STATS (LARGER AREA ANALYTICS)
+====================================================
+
+Neighborhood Review must compute stats based on the Neighborhood boundary (polygon), NOT subdivision.
+
+Required metrics (example set — adjust to what we already show in Market Stats):
+- Active count, Under Contract count, Sold/Closed count (rental excluded)
+- Median sold price, average sold price, price/sqft (median/avg), DOM (median/avg)
+- YoY median sold price and YoY sold volume
+- Absorption rate + months of inventory (neighborhood level)
+- Sold date filters (0–30/60/90/120/150/180) based on close date
+- DOM distribution by status (Active / UC / Sold)
+
+Rules:
+- Leasing/rentals excluded globally.
+- Status mapping consistent with the rest of the app.
+- Field mapping consistent (closeDate, closePrice, listDate, listPrice).
+
+====================================================
+4) KEEP SUBDIVISION-BASED CMA INTACT
+====================================================
+
+CMA MUST remain Subdivision-first for comps:
+- Subdivision matching is used for comparable selection.
+- Neighborhood Review is for “bigger area stats”, shown separately and clearly labeled.
+
+Do NOT replace subdivision-based comps logic with neighborhood logic.
+
+====================================================
+5) MAP UI + BOUNDARY VISUALS
+====================================================
+
+On maps where Neighborhood Review is shown:
+- display the Neighborhood polygon boundary overlay (if supported)
+- provide a label “Neighborhood boundary”
+- provide a toggle to show/hide boundary
+
+Do NOT use subdivision boundaries for Neighborhood Review.
+
+====================================================
+6) CONSISTENCY + QA TESTS (MANDATORY)
+====================================================
+
+Test cases:
+1) Pick a property where Subdivision is known (e.g., Cherry Creek) and confirm:
+   - Neighborhood is a larger area name (not “Cherry Creek” unless Repliers defines it as neighborhood)
+   - Neighborhood boundary contains the property point
+
+2) Validate stats:
+   - Neighborhood review counts should differ from subdivision CMA counts (usually larger).
+   - Verify sold filters and DOM calculations match global rules.
+
+Deliverables:
+- Short technical summary of:
+  • which Repliers endpoints are used for boundaries
+  • what fields we store
+  • how caching works
+  • how stats are computed
+- Screenshots showing:
+  • neighborhood boundary overlay
+  • neighborhood stats panel
+  • subdivision CMA still working independently
+
+====================================================
+IMPORTANT: DO NOT SHIP WITHOUT CLEAR LABELING
+====================================================
+
+UI must clearly label:
+- Neighborhood Review (Boundary-based area stats)
+- Subdivision (CMA comps selection)
+
+Avoid user confusion by never showing subdivision values inside “Neighborhood”.
