@@ -6,6 +6,8 @@ This project is a professional real estate IDX (Internet Data Exchange) platform
 
 ## Recent Changes (Dec 15, 2025)
 
+- **Properties Page Inventory Consistency**: Total Properties count now strictly matches the sum of Property Inventory by Type (subtype breakdown is authoritative)
+- **Dev-Only Debug Logging**: Added development-mode logging for inventory count reconciliation and CMA property cross-checking (address, prices, living area, $/sqft) for PDF verification
 - **Settings Page Overhaul**: New comprehensive Settings page (`/settings`) with 5 organized tabs:
   - Profile: Agent and brokerage information
   - Data & Sync: MLS Grid sync status and controls
