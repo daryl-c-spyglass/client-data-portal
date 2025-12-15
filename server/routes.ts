@@ -3079,16 +3079,44 @@ This email was sent by ${senderName} (${senderEmail}) via the MLS Grid IDX Platf
     }
   });
   
-  // Recent Sold/Closed properties endpoint with pagination
+  // Recent Sold/Closed properties endpoint with pagination and personalization
   app.get("/api/dashboard/recent-sold", async (req, res) => {
     try {
       const page = Math.max(1, parseInt(req.query.page as string) || 1);
       const limit = Math.min(50, Math.max(1, parseInt(req.query.limit as string) || 20));
       const offset = (page - 1) * limit;
       
+      // Personalization parameters (optional - from recent activity like CMAs, saved searches)
+      const city = req.query.city as string | undefined;
+      const subdivision = req.query.subdivision as string | undefined;
+      const minPrice = req.query.minPrice ? parseInt(req.query.minPrice as string) : undefined;
+      const maxPrice = req.query.maxPrice ? parseInt(req.query.maxPrice as string) : undefined;
+      
+      const isPersonalized = !!(city || subdivision || minPrice || maxPrice);
+      
       // Get ALL sold properties from database (up to reasonable limit for pagination)
       let allDbProps = await storage.searchProperties({ status: 'Closed', limit: 1000 });
       allDbProps = filterOutRentalProperties(allDbProps);
+      
+      // Apply personalization filters if provided
+      if (city) {
+        allDbProps = allDbProps.filter(p => p.city?.toLowerCase() === city.toLowerCase());
+      }
+      if (subdivision) {
+        allDbProps = allDbProps.filter(p => p.subdivision?.toLowerCase().includes(subdivision.toLowerCase()));
+      }
+      if (minPrice) {
+        allDbProps = allDbProps.filter(p => {
+          const price = Number(p.closePrice || p.listPrice || 0);
+          return price >= minPrice;
+        });
+      }
+      if (maxPrice) {
+        allDbProps = allDbProps.filter(p => {
+          const price = Number(p.closePrice || p.listPrice || 0);
+          return price <= maxPrice;
+        });
+      }
       
       // Sort by close date descending (most recent first)
       const sortedAll = allDbProps.sort((a, b) => {
@@ -3130,7 +3158,7 @@ This email was sent by ${senderName} (${senderEmail}) via the MLS Grid IDX Platf
       });
       
       // Log for debugging
-      console.log(`[Recent Sold] Page ${page}: ${paginatedProps.length} properties, ${paginatedProps.filter(p => p.photos.length > 0).length} with photos`);
+      console.log(`[Recent Sold] Page ${page}: ${paginatedProps.length} properties, ${paginatedProps.filter(p => p.photos.length > 0).length} with photos, personalized: ${isPersonalized}${city ? `, city: ${city}` : ''}`);
       
       res.json({
         properties: paginatedProps,
@@ -3139,7 +3167,9 @@ This email was sent by ${senderName} (${senderEmail}) via the MLS Grid IDX Platf
         page: page,
         limit: limit,
         totalPages: totalPages,
-        hasMore: page < totalPages
+        hasMore: page < totalPages,
+        personalized: isPersonalized,
+        filters: isPersonalized ? { city, subdivision, minPrice, maxPrice } : null
       });
     } catch (error: any) {
       console.error("Recent sold error:", error.message);

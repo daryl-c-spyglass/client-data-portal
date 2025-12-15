@@ -129,6 +129,13 @@ interface RecentSoldResponse {
   limit: number;
   totalPages: number;
   hasMore: boolean;
+  personalized?: boolean;
+  filters?: {
+    city?: string;
+    subdivision?: string;
+    minPrice?: number;
+    maxPrice?: number;
+  } | null;
 }
 
 interface DashboardProperty {
@@ -588,8 +595,18 @@ export default function Dashboard() {
     staleTime: 5 * 60 * 1000,
   });
 
+  // Build personalized Recent Sold query URL
+  const recentSoldQueryKey = (() => {
+    const params = new URLSearchParams();
+    params.set('page', String(recentSoldPage));
+    if (personalizationParams.city) params.set('city', personalizationParams.city);
+    if (personalizationParams.minPrice) params.set('minPrice', String(personalizationParams.minPrice));
+    if (personalizationParams.maxPrice) params.set('maxPrice', String(personalizationParams.maxPrice));
+    return `/api/dashboard/recent-sold?${params.toString()}`;
+  })();
+  
   const { data: recentSoldData, isLoading: recentSoldLoading, isFetching: recentSoldFetching } = useQuery<RecentSoldResponse>({
-    queryKey: ['/api/dashboard/recent-sold', recentSoldPage],
+    queryKey: [recentSoldQueryKey],
     staleTime: 5 * 60 * 1000,
   });
   
@@ -1291,7 +1308,15 @@ export default function Dashboard() {
                         {domAnalytics && domAnalytics.length > 0 && domAnalytics[0].count > 0 
                           ? 'Days on Market Analytics' 
                           : 'Recent Sold/Closed'}
+                        {!domAnalytics?.length && recentSoldData?.personalized && (
+                          <Badge variant="secondary" className="text-xs">Personalized</Badge>
+                        )}
                       </CardTitle>
+                      {!domAnalytics?.length && recentSoldData?.personalized && recentSoldData.filters?.city && (
+                        <p className="text-sm text-muted-foreground">
+                          Based on your recent activity in {recentSoldData.filters.city}
+                        </p>
+                      )}
                     </CardHeader>
                     <CardContent>
                       {domLoading || recentSoldLoading ? (
