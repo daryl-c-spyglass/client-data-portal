@@ -471,7 +471,7 @@ function PropertyDetailModal({
           )}
           
           <div className="flex gap-2 pt-2 pb-4">
-            <Link href={`/properties/${property.id}`}>
+            <Link href={`/properties/${property.id}?from=/`}>
               <Button data-testid="button-view-full-details">
                 View Full Details
               </Button>
@@ -1079,16 +1079,12 @@ export default function Dashboard() {
                         <span className="text-xs font-medium">View CMAs</span>
                       </Button>
                     </Link>
-                    <Button 
-                      variant="outline" 
-                      className="w-full h-auto py-4 flex flex-col items-center gap-2"
-                      data-testid="button-sync-data"
-                      onClick={() => syncMutation.mutate()}
-                      disabled={syncMutation.isPending}
-                    >
-                      <RefreshCw className={`w-5 h-5 ${syncMutation.isPending ? 'animate-spin' : ''}`} />
-                      <span className="text-xs font-medium">{syncMutation.isPending ? 'Syncing...' : 'Sync Data'}</span>
-                    </Button>
+                    <Link href="/settings" className="block">
+                      <Button variant="outline" className="w-full h-auto py-4 flex flex-col items-center gap-2" data-testid="button-settings">
+                        <Settings className="w-5 h-5" />
+                        <span className="text-xs font-medium">Settings</span>
+                      </Button>
+                    </Link>
                   </div>
                 </CardContent>
               </Card>

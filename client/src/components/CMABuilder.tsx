@@ -134,14 +134,17 @@ interface UnifiedSearchResponse {
   status: string;
 }
 
-// Property type options for the dropdown
+// Property type options for the dropdown - matches Repliers propertySubType values exactly
 const PROPERTY_TYPES = [
   { value: 'any', label: 'Any' },
-  { value: 'Single Family Residential', label: 'Single Family Residential' },
+  { value: 'Single Family Residence', label: 'Single Family Residence' },
   { value: 'Condominium', label: 'Condominium' },
   { value: 'Townhouse', label: 'Townhouse' },
   { value: 'Multi-Family', label: 'Multi-Family' },
-  { value: 'Land', label: 'Land' },
+  { value: 'Ranch', label: 'Ranch' },
+  { value: 'Manufactured Home', label: 'Manufactured Home' },
+  { value: 'Unimproved Land', label: 'Unimproved Land' },
+  { value: 'Multiple Lots (Adjacent)', label: 'Multiple Lots' },
 ];
 
 interface InitialCMAData {

@@ -1,4 +1,4 @@
-import { useRoute, useLocation } from "wouter";
+import { useRoute, useLocation, useSearch } from "wouter";
 import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
@@ -11,10 +11,14 @@ import type { Property, Media } from "@shared/schema";
 export default function PropertyDetailPage() {
   const [, params] = useRoute("/properties/:id");
   const [, setLocation] = useLocation();
+  const searchString = useSearch();
   const { trackPropertyView, gateEnabled } = useLeadGateContext();
   const { selectedProperty } = useSelectedProperty();
   const [viewTracked, setViewTracked] = useState(false);
   const listingId = params?.id;
+  
+  // Parse 'from' query parameter to determine where to navigate back
+  const fromPath = new URLSearchParams(searchString).get('from') || '/properties';
 
   // Fetch property from API if not in context (direct URL access)
   const { data: fetchedProperty, isLoading, error } = useQuery({
@@ -112,6 +116,14 @@ export default function PropertyDetailPage() {
     console.log("Schedule viewing");
   };
 
+  // Determine back button label based on origin
+  const getBackLabel = () => {
+    if (fromPath === '/') return 'Back to Dashboard';
+    if (fromPath.startsWith('/cma')) return 'Back to CMA';
+    if (fromPath.startsWith('/buyer-search')) return 'Back to Buyer Search';
+    return 'Back to Search';
+  };
+
   // Show loading state when fetching
   if (isLoading && !selectedProperty) {
     return (
@@ -121,11 +133,11 @@ export default function PropertyDetailPage() {
             variant="ghost" 
             size="sm" 
             className="mb-4" 
-            onClick={() => setLocation('/properties')}
+            onClick={() => setLocation(fromPath)}
             data-testid="button-back-to-search"
           >
             <ArrowLeft className="w-4 h-4 mr-2" />
-            Back to Search
+            {getBackLabel()}
           </Button>
         </div>
         <div className="flex items-center justify-center py-12">
@@ -145,11 +157,11 @@ export default function PropertyDetailPage() {
             variant="ghost" 
             size="sm" 
             className="mb-4" 
-            onClick={() => setLocation('/properties')}
+            onClick={() => setLocation(fromPath)}
             data-testid="button-back-to-search"
           >
             <ArrowLeft className="w-4 h-4 mr-2" />
-            Back to Search
+            {getBackLabel()}
           </Button>
         </div>
         <div className="text-center py-12 text-muted-foreground">
@@ -169,11 +181,11 @@ export default function PropertyDetailPage() {
           variant="ghost" 
           size="sm" 
           className="mb-4" 
-          onClick={() => setLocation('/properties')}
+          onClick={() => setLocation(fromPath)}
           data-testid="button-back-to-search"
         >
           <ArrowLeft className="w-4 h-4 mr-2" />
-          Back to Search
+          {getBackLabel()}
         </Button>
       </div>
 

@@ -66,10 +66,14 @@ export async function getUnifiedInventory(forceRefresh = false): Promise<Invento
 
   if (repliersClient && isRepliersConfigured()) {
     try {
-      // Fetch Active count
+      // Fetch Active count - MUST filter by class: 'residential' to match subtype aggregation
       let activeCount = 0;
       try {
-        const activeResponse = await repliersClient.searchListings({ status: 'A', resultsPerPage: 1 });
+        const activeResponse = await repliersClient.searchListings({ 
+          status: 'A', 
+          class: 'residential',
+          resultsPerPage: 1 
+        });
         activeCount = activeResponse.count || 0;
       } catch (error: any) {
         const errorMsg = `Failed to fetch Active count: ${error.message}`;
@@ -80,10 +84,14 @@ export async function getUnifiedInventory(forceRefresh = false): Promise<Invento
       // Small delay between calls to respect rate limits
       await new Promise(resolve => setTimeout(resolve, 300));
       
-      // Fetch Under Contract count
+      // Fetch Under Contract count - MUST filter by class: 'residential' to match subtype aggregation
       let ucCount = 0;
       try {
-        const ucResponse = await repliersClient.searchListings({ status: 'U', resultsPerPage: 1 });
+        const ucResponse = await repliersClient.searchListings({ 
+          status: 'U', 
+          class: 'residential',
+          resultsPerPage: 1 
+        });
         ucCount = ucResponse.count || 0;
       } catch (error: any) {
         const errorMsg = `Failed to fetch Under Contract count: ${error.message}`;

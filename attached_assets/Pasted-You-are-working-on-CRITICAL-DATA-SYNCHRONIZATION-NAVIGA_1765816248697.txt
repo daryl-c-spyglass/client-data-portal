@@ -1,0 +1,195 @@
+You are working on CRITICAL DATA SYNCHRONIZATION + NAVIGATION BUGS across the agent app.
+This is NOT a cosmetic task. This is correctness and consistency across ALL sections.
+
+Data source: Repliers only (ACTRIS).
+Repliers confirmed:
+- `class` request inputs must be: residential / condo / commercial
+- SOLD listings keep photos (missing sold photos = our mapping/request bug)
+- Latency <= 15 minutes
+
+Global rule:
+- Leasing/rentals excluded everywhere (counts, results, charts, DOM, CMA, PDF, Share).
+
+====================================================
+A) DATA SYNCHRONIZATION IS STILL WRONG (BLOCKER)
+====================================================
+
+Observed mismatch:
+Dashboard “Total Properties” = 10,319
+BUT Dashboard shows status chips:
+- Active 31,476
+- Under Contract 322,851
+- Sold 22,656
+These cannot be correct if Total is 10,319.
+Also Property Inventory by Type on Dashboard sums to 10,319, while Properties page shows Total = 13,319 and type chips sum differently.
+
+Root requirement:
+We must have ONE source-of-truth for inventory totals and type/status breakdowns.
+NO section can compute totals differently.
+
+Tasks:
+1) Create/confirm a single backend endpoint/service for inventory summary (one payload):
+   - totalProperties
+   - countsByStatus (Active/UC/Sold)
+   - countsByType/Subtype (SFR, Condo, TH, Multi, Land, Ranch, Other, etc.)
+   - dataSourceName (Repliers)
+   - mlsScope (ACTRIS)
+   - lastUpdatedAt (timestamp)
+   - rentalFilteredCount
+2) Enforce ALL UI sections to use ONLY this inventory summary payload:
+   - Dashboard Total Properties card
+   - Dashboard “Property Inventory by Type”
+   - Properties header “X properties in Repliers API”
+   - Properties status chips + property type chips
+3) Fix the actual numbers:
+   - “Total Properties” MUST equal sum(countsByType) AND equal sum(countsByStatus), for the same scope.
+   - If totals shown are “filtered by recent activity” on Dashboard, then the label must reflect that and the same scope must be used for all dashboard sub-widgets. Prefer global inventory totals (ACTRIS-wide) for clarity.
+4) Add a dev-only “Consistency Debug” panel/log output:
+   - prints the inventory summary payload once
+   - prints what each section is showing
+   - highlights mismatch if any value differs
+
+Acceptance criteria:
+- Dashboard Total == sum(type inventory) == sum(status inventory.
+- Properties Total == Dashboard Total (same scope) AND same type/status totals.
+- No impossible totals (Total cannot be smaller than Active).
+
+====================================================
+B) DASHBOARD — RECENT SOLD/CLOSED NAVIGATION BUG
+====================================================
+
+Bug:
+From Dashboard → Recent Sold/Closed → click property → View Full Details
+When user hits Back, they land on Properties section, not the originating Dashboard context.
+
+Requirement:
+Implement correct “return to previous page” behavior:
+1) When navigating to property details from Dashboard Recent Sold/Closed, preserve the origin route:
+   - Add a `from` query param or use router state (e.g., `{ state: { from: location.pathname } }`)
+2) On property details page, “Back” must return user to the origin section (Dashboard), not always Properties.
+3) This must also work from other sources (CMA, Buyer Search, Properties list).
+
+Testing:
+- Click sold listing from Dashboard → open details → hit Back → returns to Dashboard.
+- Repeat from Properties list → Back returns to Properties.
+- Repeat from CMA → Back returns to CMA.
+
+====================================================
+C) CMA — PROPERTY TYPE FILTER BROKEN (SFR FILTER RETURNS RANCH)
+====================================================
+
+Bug:
+CMA filter “Single Family Residence” still includes Ranch.
+
+Requirements:
+1) Audit how CMA property type filtering is implemented:
+   - Ensure mapping uses Repliers property type/subtype fields consistently.
+2) If “Ranch” is considered a subtype/category under residential:
+   - It must still be excluded when filter is explicitly “Single Family Residence” (unless business rules say otherwise).
+3) Create a deterministic mapping table:
+   - SFR
+   - Condo
+   - Townhouse
+   - Multi-family
+   - Land/Unimproved
+   - Ranch
+   - Manufactured
+   - Lots
+   - Other
+4) Apply the same mapping across:
+   - Properties
+   - CMA search/comps
+   - Buyer Search
+   - Dashboard inventory
+
+Testing:
+- CMA filter = Single Family Residence → results contain NO Ranch-type properties.
+
+====================================================
+D) BUYER SEARCH — AUTOCOMPLETE SUGGESTIONS NOT WORKING
+====================================================
+
+Bug:
+Autocomplete suggestions for Subdivision, Cities, Zip Codes, Elementary not appearing.
+
+Requirements:
+1) Implement working typeahead suggestions with debouncing:
+   - as user types, query suggestion endpoint or cached lists
+   - show dropdown of matches
+   - click to fill input
+2) Fields:
+   - Subdivisions
+   - Cities
+   - Zip Codes
+   - Elementary schools
+3) Ensure this is not blocked by rate limiting or missing endpoints.
+
+Testing:
+- Type “Aus” → suggests “Austin”.
+- Type “787” → suggests zip matches.
+- Type partial subdivision name → suggestions show.
+- Type partial school name → suggestions show.
+
+====================================================
+E) SETTINGS — DATA SYNC UX + REMOVE DASHBOARD SYNC BUTTON
+====================================================
+
+Requirements:
+1) “Trigger Manual Sync” must work and show progress:
+   - On click, button becomes loading/disabled
+   - Show “Syncing…” status until complete
+   - On completion: show success + update “lastUpdatedAt”
+   - On failure: show error message (no silent fail)
+2) Remove “Sync Data” quick action button from Dashboard (since Sync is in Settings now).
+3) Display Preferences options:
+   - Price format (e.g., $123,456 vs 123,456 USD)
+   - Area units (sqft vs sqm)
+   - Date format (MM/DD/YYYY vs DD/MM/YYYY)
+   - Optional: Number format (comma vs dot)
+
+Testing:
+- Click Manual Sync → see loading → completes → timestamp updates.
+- Dashboard no longer shows Sync Data.
+- Display preferences show selectable options (even if not fully applied yet, but store them).
+
+====================================================
+F) SOLD LISTINGS STILL MISSING PHOTOS (CONTRADICTS REPLIERS)
+====================================================
+
+Repliers confirmed: Sold listings keep photos.
+Therefore missing sold photos = our bug.
+
+Tasks:
+1) Audit Repliers API call(s) used for sold listings in:
+   - Dashboard Recent Sold/Closed
+   - Properties sold results
+   - CMA sold comps
+2) Confirm that our request includes required photo fields/expansions (if Repliers uses includes/fields params).
+3) Confirm mapping:
+   - correct field name (e.g., photos, images, media, photoUrls, etc.)
+   - not overwritten by rental filtering or normalization
+4) Add a dev-only log for one sold listing that shows:
+   - listingId
+   - raw Repliers response (photo-related fields only)
+   - UI mapping result
+5) Fix:
+   - If Repliers provides photos → UI must show them
+   - Only show placeholder “No photos available” if response truly has none
+
+Testing:
+- Pick 3 sold listings:
+  - confirm Repliers response contains photos
+  - confirm UI displays them in floating card + details page
+
+====================================================
+FINAL REPORT REQUIRED (WITH NUMBERS + PROOF)
+====================================================
+
+Provide:
+1) Inventory summary payload (example) and confirmation of single source-of-truth use across Dashboard + Properties.
+2) Screenshot proof: Dashboard totals and Properties totals match and are mathematically consistent.
+3) Navigation fix proof: property details back returns to correct origin.
+4) CMA SFR filter proof: no Ranch results.
+5) Buyer Search autocomplete proof (4 fields).
+6) Settings sync proof: loading state + timestamp update; Dashboard sync removed.
+7) Sold photos proof: 3 sold listings showing photos (and logs showing Repliers photo fields).
