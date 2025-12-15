@@ -87,10 +87,29 @@ export default function PropertyDetailPage() {
         modificationTimestamp: new Date().toISOString(),
       }));
 
-      return { property, media };
+      // Preserve debug data from API response
+      return { 
+        property, 
+        media, 
+        _debug: data._debug || null 
+      };
     },
     enabled: !selectedProperty && !!listingId,
     staleTime: 5 * 60 * 1000, // 5 minutes
+  });
+
+  // DEV mode: Always fetch debug data from API, even if we have context data
+  // This ensures the debug panel shows raw Repliers field data
+  const { data: debugApiData } = useQuery<{ _debug: any }>({
+    queryKey: ['/api/properties/debug', listingId],
+    queryFn: async () => {
+      const response = await fetch(`/api/properties/${listingId}?source=repliers`);
+      if (!response.ok) return { _debug: null };
+      const data = await response.json();
+      return { _debug: data._debug || null };
+    },
+    enabled: import.meta.env.DEV && !!listingId,
+    staleTime: 5 * 60 * 1000,
   });
 
   // Use context data if available, otherwise use fetched data
@@ -116,6 +135,9 @@ export default function PropertyDetailPage() {
       neighborhood: null,
     },
     media: rawPropertyData.media,
+    // Preserve debug data for the debug panel
+    // Use API-fetched debug data if available (from DEV mode query), otherwise use inline data
+    _debug: debugApiData?._debug || (rawPropertyData as any)._debug || null,
   } : null;
 
   useEffect(() => {
@@ -198,7 +220,7 @@ export default function PropertyDetailPage() {
     );
   }
 
-  const { property, media } = propertyData;
+  const { property, media, _debug } = propertyData as { property: Property; media: Media[]; _debug: any };
 
   return (
     <div className="space-y-6">
@@ -222,6 +244,7 @@ export default function PropertyDetailPage() {
         onSave={handleSave}
         onShare={handleShare}
         onScheduleViewing={handleScheduleViewing}
+        debugData={_debug}
       />
     </div>
   );

@@ -52,6 +52,23 @@ const defaultIcon = L.icon({
 
 L.Marker.prototype.options.icon = defaultIcon;
 
+interface DebugData {
+  dataSource: string;
+  fetchTimestamp: string;
+  rawFields: Record<string, string | null>;
+  subdivisionSource: string;
+  subdivisionValue: string | null;
+  rawAddress?: {
+    streetNumber: string | null;
+    streetName: string | null;
+    streetSuffix: string | null;
+    unitNumber: string | null;
+    city: string | null;
+    state: string | null;
+    zip: string | null;
+  };
+}
+
 interface PropertyDetailProps {
   property: Property;
   media: Media[];
@@ -59,6 +76,7 @@ interface PropertyDetailProps {
   onSave?: () => void;
   onShare?: () => void;
   onScheduleViewing?: () => void;
+  debugData?: DebugData | null;
 }
 
 export function PropertyDetail({ 
@@ -67,7 +85,8 @@ export function PropertyDetail({
   onAddToCMA,
   onSave,
   onShare,
-  onScheduleViewing 
+  onScheduleViewing,
+  debugData
 }: PropertyDetailProps) {
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [saved, setSaved] = useState(false);
@@ -78,14 +97,18 @@ export function PropertyDetail({
   const pauseTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Check if we have valid coordinates
-  const hasCoordinates = property.latitude && property.longitude && 
-    !isNaN(Number(property.latitude)) && !isNaN(Number(property.longitude));
+  const hasCoordinates = Boolean(
+    property.latitude && 
+    property.longitude && 
+    !isNaN(Number(property.latitude)) && 
+    !isNaN(Number(property.longitude))
+  );
 
   // Fetch boundary-based neighborhood resolution using lat/lng
   // This is the ONLY source of truth for "Neighborhood" - never use listing subdivision
   const { data: neighborhoodResolution, isLoading: isLoadingNeighborhood } = useQuery<NeighborhoodResolution>({
     queryKey: ['/api/neighborhoods/by-coordinates', property.latitude, property.longitude, property.city],
-    queryFn: async () => {
+    queryFn: async (): Promise<NeighborhoodResolution> => {
       if (!hasCoordinates) return { found: false, neighborhood: null };
       const params = new URLSearchParams({
         lat: String(property.latitude),
@@ -426,11 +449,43 @@ export function PropertyDetail({
                 <CollapsibleContent>
                   <Card className="mt-2 border-dashed border-yellow-500/50 bg-yellow-50/10">
                     <CardContent className="pt-4">
-                      <div className="text-xs font-mono space-y-2">
+                      <div className="text-xs font-mono space-y-3">
+                        {/* Data Source */}
+                        {debugData && (
+                          <div className="p-2 bg-blue-50/30 rounded border border-blue-500/30">
+                            <p className="font-semibold text-blue-600">Data Source</p>
+                            <p>Source: <span className="text-foreground">{debugData.dataSource}</span></p>
+                            <p>Fetched: <span className="text-foreground">{new Date(debugData.fetchTimestamp).toLocaleString()}</span></p>
+                          </div>
+                        )}
+
+                        {/* Raw Repliers Fields */}
+                        {debugData?.rawFields && (
+                          <div className="p-2 bg-purple-50/30 rounded border border-purple-500/30">
+                            <p className="font-semibold text-purple-600">Raw Subdivision Fields (from API)</p>
+                            <div className="space-y-1 mt-1">
+                              {Object.entries(debugData.rawFields).map(([field, value]) => (
+                                <p key={field}>
+                                  {field}: <span className={value ? 'text-green-600 font-semibold' : 'text-muted-foreground'}>
+                                    {value || '(null)'}
+                                  </span>
+                                </p>
+                              ))}
+                            </div>
+                            <Separator className="my-2" />
+                            <p className="text-yellow-600 font-semibold">
+                              Subdivision Source: <span className="text-foreground">{debugData.subdivisionSource}</span>
+                            </p>
+                            <p className="text-yellow-600 font-semibold">
+                              Final Value: <span className="text-foreground">{debugData.subdivisionValue || '(none)'}</span>
+                            </p>
+                          </div>
+                        )}
+
                         <h5 className="font-semibold text-yellow-600">Location Data Mapping</h5>
                         <div className="grid grid-cols-2 gap-2">
                           <div className="space-y-1">
-                            <p className="text-muted-foreground">From Listing (MLS):</p>
+                            <p className="text-muted-foreground">From Listing (Normalized):</p>
                             <p>subdivision: <span className="text-foreground">{property.subdivision || '(empty)'}</span></p>
                             <p>neighborhood: <span className="text-foreground">{property.neighborhood || '(empty - expected)'}</span></p>
                           </div>

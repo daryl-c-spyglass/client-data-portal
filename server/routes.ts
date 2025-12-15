@@ -1117,7 +1117,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
             // CRITICAL: Repliers "neighborhood" field is actually subdivision (tract/community label)
             // True neighborhood must come from boundary polygon resolution, NOT listing data
+            // Capture ALL candidate subdivision fields for debug display
+            const rawSubdivisionFields = {
+              'address.neighborhood': addr.neighborhood || null,
+              'address.subdivisionName': addr.subdivisionName || null,
+              'details.subdivision': details.subdivision || null,
+              'listing.neighborhood': listing.neighborhood || null,
+              'listing.subdivisionName': listing.subdivisionName || null,
+              'details.community': (details as any).community || null,
+              'details.development': (details as any).development || null,
+            };
+            
+            // Fallback chain: addr.neighborhood > addr.subdivisionName > details.subdivision
             const subdivisionFromRepliers = addr.neighborhood || addr.subdivisionName || details.subdivision || null;
+            const subdivisionSource = addr.neighborhood ? 'address.neighborhood' :
+                                       addr.subdivisionName ? 'address.subdivisionName' :
+                                       details.subdivision ? 'details.subdivision' : 'none';
 
             const normalizedProperty = {
               id: listing.mlsNumber,
@@ -1171,6 +1186,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
               soldDate: listing.soldDate || null,
               modificationTimestamp: new Date().toISOString(),
               originatingSystemName: 'Repliers',
+              // DEV debug data: raw Repliers fields and fallback chain
+              _debug: {
+                dataSource: 'Repliers API',
+                fetchTimestamp: new Date().toISOString(),
+                rawFields: rawSubdivisionFields,
+                subdivisionSource: subdivisionSource,
+                subdivisionValue: subdivisionFromRepliers,
+                rawAddress: {
+                  streetNumber: addr.streetNumber || null,
+                  streetName: addr.streetName || null,
+                  streetSuffix: addr.streetSuffix || null,
+                  unitNumber: addr.unitNumber || null,
+                  city: addr.city || null,
+                  state: addr.state || null,
+                  zip: addr.zip || null,
+                },
+              },
             };
             
             res.json(normalizedProperty);
@@ -1185,11 +1217,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // CRITICAL: Legacy records may have subdivision stored in neighborhood field
         // Migrate neighborhood to subdivision before clearing it
         const subdivisionValue = property.subdivision || property.subdivisionName || property.neighborhood || null;
+        const subdivisionSource = property.subdivision ? 'db.subdivision' :
+                                   property.subdivisionName ? 'db.subdivisionName' :
+                                   property.neighborhood ? 'db.neighborhood (legacy)' : 'none';
         res.json({
           ...property,
           subdivision: subdivisionValue,
           subdivisionName: subdivisionValue,
           neighborhood: null,  // MUST be resolved from boundary polygons, never from listing data
+          _debug: {
+            dataSource: 'PostgreSQL Database',
+            fetchTimestamp: new Date().toISOString(),
+            rawFields: {
+              'db.subdivision': property.subdivision || null,
+              'db.subdivisionName': property.subdivisionName || null,
+              'db.neighborhood (legacy)': property.neighborhood || null,
+            },
+            subdivisionSource: subdivisionSource,
+            subdivisionValue: subdivisionValue,
+          },
         });
         return;
       }
@@ -1200,11 +1246,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // CRITICAL: Legacy records may have subdivision stored in neighborhood field
         // Migrate neighborhood to subdivision before clearing it
         const subdivisionValue = propertyByListingId.subdivision || propertyByListingId.subdivisionName || propertyByListingId.neighborhood || null;
+        const subdivisionSource = propertyByListingId.subdivision ? 'db.subdivision' :
+                                   propertyByListingId.subdivisionName ? 'db.subdivisionName' :
+                                   propertyByListingId.neighborhood ? 'db.neighborhood (legacy)' : 'none';
         res.json({
           ...propertyByListingId,
           subdivision: subdivisionValue,
           subdivisionName: subdivisionValue,
           neighborhood: null,  // MUST be resolved from boundary polygons, never from listing data
+          _debug: {
+            dataSource: 'PostgreSQL Database',
+            fetchTimestamp: new Date().toISOString(),
+            rawFields: {
+              'db.subdivision': propertyByListingId.subdivision || null,
+              'db.subdivisionName': propertyByListingId.subdivisionName || null,
+              'db.neighborhood (legacy)': propertyByListingId.neighborhood || null,
+            },
+            subdivisionSource: subdivisionSource,
+            subdivisionValue: subdivisionValue,
+          },
         });
         return;
       }

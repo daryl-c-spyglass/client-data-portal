@@ -1,0 +1,92 @@
+Replit — CONTINUE FIX: LOCATION DATA INTEGRITY (IDX / Client Data Portal, Repliers only)
+
+You fixed the semantic mapping: Repliers “neighborhood” field → our Subdivision, and our Neighborhood must be boundary-resolved only.
+Good. Now we must verify real-world correctness and propagate consistency across the entire app.
+
+====================================================
+1) CRITICAL VALIDATION CASE — 1601 Breezy Ct (Round Rock, TX 78664)
+====================================================
+
+We have a reported mismatch:
+Our UI previously showed “Neighborhood: Windy Park Sec 1” for this property.
+This is likely wrong and may be a mapping/legacy-data/field-selection issue.
+
+Task:
+A) Pull this listing directly from Repliers as source of truth (do NOT rely on local DB cache):
+- Implement a dev-only “Force Repliers fetch” on Property Detail OR ensure property detail always revalidates with ?source=repliers for active listings.
+
+B) In DEV “Location Debug”, show EXACT Repliers raw fields used:
+- listingId / mlsNumber
+- address fields
+- ALL candidate subdivision-like fields:
+  - address.neighborhood
+  - listing.neighborhood
+  - subdivision / subdivisionName / development / community (whatever Repliers provides)
+- show the exact fallback chain currently used to populate Subdivision
+
+C) Confirm which Repliers field actually contains the official subdivision/tract label for this listing.
+- If Repliers returns “Windy Park Sec 1” we need evidence (field name + value).
+- If Repliers returns “Greenslopes at Lake Creek” or something else, we must display that as Subdivision.
+
+Deliverable:
+- Screenshot of the Location Debug panel for 1601 Breezy Ct
+- The final displayed “Subdivision” value must match the Repliers listing field intended to represent subdivision/tract label.
+
+IMPORTANT:
+Do not use fuzzy matching, nearest subdivision, or boundary guessing for Subdivision.
+Subdivision must be direct from Repliers listing field(s) designed for subdivision/tract.
+
+====================================================
+2) NEIGHBORHOOD (LARGER AREA) MUST BE BOUNDARY-BASED AND VISIBLE EVERYWHERE
+====================================================
+
+Neighborhood = Repliers boundary polygon result ONLY (lat/lng → boundary).
+Currently it appears fixed on Property Detail, but must be consistent across the app:
+
+Update ALL sections that show properties and floating cards:
+- Dashboard: Active Properties + Recent Sold/Closed (cards + floating cards)
+- Properties: results cards + floating cards + details page
+- CMA: Search Results + floating cards + Home Average list + Listings list + Market Stats list
+- Buyer Search: results cards + floating cards + map popups
+- Any “View Full Details” pages
+
+Rules:
+- Display both:
+  - Subdivision: <listing tract/community label>
+  - Neighborhood: <boundary polygon neighborhood>
+- If Neighborhood boundary lookup fails: show “Neighborhood: Not available”
+- Never display Subdivision under the Neighborhood label.
+
+====================================================
+3) LEGACY DATABASE MIGRATION MUST NOT INTRODUCE WRONG SUBDIVISION VALUES
+====================================================
+
+You added migration logic: legacy p.neighborhood → subdivision.
+That is acceptable ONLY if legacy p.neighborhood actually stored tract/subdivision historically.
+But we must avoid “poisoning” subdivision with incorrect old values.
+
+Tasks:
+A) Add a guard: If property is fetched from DB but is Active/UC, re-validate against Repliers on-demand.
+B) Add a “data freshness” indicator (DEV only) showing if the record came from DB or Repliers and timestamp.
+C) If DB subdivision differs from Repliers subdivision, prefer Repliers and log the discrepancy (DEV log).
+
+====================================================
+4) CMA / BUYER SEARCH FILTERS MUST SUPPORT NEIGHBORHOOD SEPARATELY FROM SUBDIVISION
+====================================================
+
+- Add Neighborhood filter using boundaryId (autocomplete returns boundaryId + name).
+- Do NOT combine neighborhoods and subdivisions into one param.
+- Ensure CMA comps still remain subdivision-first by default.
+
+====================================================
+5) ACCEPTANCE CRITERIA
+====================================================
+
+1) Breezy Ct debug proof:
+- Shows exact Repliers field selection for Subdivision.
+- Final Subdivision displayed matches the correct Repliers listing field for that listing.
+2) Neighborhood is boundary-based and visible across ALL property cards/floating cards in all sections.
+3) No UI labels show “Neighborhood” when the value is actually subdivision/tract.
+4) Provide a short checklist confirming each section updated and tested.
+
+Do not close until all deliverables above are provided.
