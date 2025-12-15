@@ -1,0 +1,102 @@
+You are working ONLY on the AGENT PROPERTIES module (Property Section).
+Do NOT modify CMA pages or Buyer Search in this task.
+
+Data source: Repliers only.
+Total counts and inventory breakdowns must always stay in sync across sections.
+
+NOTE: User will provide a sample Quick CMA PDF (“Quick CMA 2740.pdf”) for cross-checking workflow and Repliers data. :contentReference[oaicite:0]{index=0}
+
+====================================================
+1) PROPERTIES — DATE RANGE MUST BE FULLY ADJUSTABLE (ANY MONTH/DAY/YEAR)
+====================================================
+
+Problem:
+- Date range currently only works for certain months.
+- User needs full flexibility to choose ANY Month/Day/Year for both From and To.
+
+Requirements:
+1) Replace/fix the Date Range control so the user can select:
+   - From: Month / Day / Year (any valid date)
+   - To: Month / Day / Year (any valid date)
+2) Ensure no “month-limited” logic exists:
+   - No restrictions tied to the current month or preloaded month window
+   - No disabled months/years unless truly invalid
+3) Validation rules:
+   - From must be <= To
+   - If invalid selection occurs, show clear inline error and do not run query
+4) Query behavior:
+   - The selected From/To date must be passed correctly to the backend request and then to Repliers.
+   - Ensure correct field mapping depending on status:
+     - Sold/Closed: filter by CloseDate (sold date)
+     - Active/Under Contract: filter by ListDate or StatusChangeDate (choose one consistently and document it)
+
+Testing:
+- Set From = 01/01/2023 and To = 12/31/2025 and run search.
+- Test random ranges across years/months (e.g., 03/15/2024 → 07/02/2024).
+- Confirm results load and date filter is applied correctly.
+
+====================================================
+2) PROPERTIES — TOTAL PROPERTIES (376,965) MUST MATCH “PROPERTY INVENTORY BY TYPE”
+====================================================
+
+Problem:
+- The “Total properties: 376,965” does not match the sum/breakdown shown in “Property Inventory by type”.
+- This creates data trust issues and is inconsistent across sections.
+
+Requirements:
+1) Single source of truth:
+   - Implement/ensure ONE backend method/endpoint provides:
+     - totalProperties
+     - countsByStatus
+     - countsByType/Subtype
+     - dataSourceName (Repliers)
+     - lastUpdatedAt
+   - Both “Total properties” and “Property Inventory by type” must be derived from the SAME payload.
+
+2) Math consistency:
+   - totalProperties must equal:
+     - sum(countsByType/Subtype) for the same scope
+     AND/OR
+     - sum(countsByStatus) for the same scope
+   - If there is an “Other/Unknown” bucket, it must be included in the sum.
+
+3) Scope consistency (critical):
+   - Ensure both totals are computed using the exact same filters:
+     - same statuses included (Active + Under Contract + Sold/Closed OR whatever is selected)
+     - same property subtype universe
+     - rental/leasing excluded consistently
+     - same geography scope (global inventory vs filtered inventory must be clearly labeled)
+4) UI:
+   - If totals represent “global inventory” while inventory by type represents “filtered inventory”, then:
+     - clearly label them differently (but preferred is to keep both in the same scope so they match).
+   - Otherwise, make them strictly synced.
+
+Testing:
+- Load Properties page and verify:
+  - Total properties value matches the sum of “Property Inventory by type” chips.
+  - Refresh the page and confirm still matches.
+  - Cross-check with Dashboard/other sections if they use the same inventory endpoint (if already implemented).
+
+====================================================
+3) QUICK CMA PDF CROSS-CHECK (FOR WORKFLOW + REPLIERS DATA)
+====================================================
+
+When user supplies “Quick CMA 2740.pdf”, use it to validate that our Repliers-backed workflow aligns with:
+- Active listings list prices and key fields (address, subdivision, year built, sqft, DOM) :contentReference[oaicite:1]{index=1}
+- Active Under Contract pricing + DOM/CDOM fields :contentReference[oaicite:2]{index=2}
+- Closed listings close price and close dates :contentReference[oaicite:3]{index=3}
+
+Requirement:
+- Add a small internal debug tool/log option (dev-only) to compare:
+  - Repliers fields used for list price/close price/close date/DOM
+  - vs the values shown in the PDF rows, for a few sample properties.
+
+====================================================
+FINAL REPORT REQUIRED
+====================================================
+
+Provide:
+1) Proof Date Range accepts any Month/Day/Year and works across multiple years.
+2) Proof Total properties matches Property Inventory by type (include sums).
+3) Summary of what was causing the mismatch and how it was fixed.
+4) Notes from Quick CMA 2740 PDF cross-check (at least 3 properties verified). :contentReference[oaicite:4]{index=4}

@@ -235,13 +235,10 @@ export default function Properties() {
   // Save search mutation
   const saveSearchMutation = useMutation({
     mutationFn: async (data: { name: string; criteria: SearchCriteria }) => {
-      return apiRequest('/api/searches', {
-        method: 'POST',
-        body: JSON.stringify({
-          userId: 'default-user',
-          name: data.name,
-          criteria: data.criteria,
-        }),
+      return apiRequest('/api/searches', 'POST', {
+        userId: 'default-user',
+        name: data.name,
+        criteria: data.criteria,
       });
     },
     onSuccess: () => {
@@ -266,7 +263,7 @@ export default function Properties() {
   // Delete search mutation
   const deleteSearchMutation = useMutation({
     mutationFn: async (id: string) => {
-      return apiRequest(`/api/searches/${id}`, { method: 'DELETE' });
+      return apiRequest(`/api/searches/${id}`, 'DELETE');
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/searches'] });
@@ -291,8 +288,8 @@ export default function Properties() {
       (criteria.status?.length && criteria.status.length > 0) ||
       criteria.cities?.length ||
       criteria.subdivisions?.length ||
-      criteria.neighborhoods?.length ||
-      criteria.postalCodes?.length ||
+      criteria.neighborhood?.length ||
+      criteria.zipCodes?.length ||
       criteria.elementarySchools?.length ||
       criteria.middleSchools?.length ||
       criteria.highSchools?.length ||
@@ -302,13 +299,13 @@ export default function Properties() {
       criteria.bedroomsMax ||
       criteria.fullBathsMin ||
       criteria.fullBathsMax ||
-      criteria.livingAreaMin ||
-      criteria.livingAreaMax ||
-      criteria.yearBuiltMin ||
-      criteria.yearBuiltMax ||
-      criteria.lotSizeMin ||
-      criteria.lotSizeMax ||
-      (criteria.propertyTypes?.length && criteria.propertyTypes.length > 0)
+      criteria.livingArea?.min ||
+      criteria.livingArea?.max ||
+      criteria.yearBuilt?.min ||
+      criteria.yearBuilt?.max ||
+      criteria.lotSizeSquareFeet?.min ||
+      criteria.lotSizeSquareFeet?.max ||
+      criteria.propertySubType
     );
   };
   
