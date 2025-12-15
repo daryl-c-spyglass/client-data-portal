@@ -1,4 +1,5 @@
 import axios, { AxiosInstance } from 'axios';
+import { normalizeRepliersClass } from '../shared/repliers-helpers';
 
 const REPLIERS_API_URL = 'https://api.repliers.io';
 
@@ -306,7 +307,7 @@ class RepliersClient {
       if (params.maxBaths) queryParams.append('maxBaths', params.maxBaths.toString());
       if (params.minSqft) queryParams.append('minSqft', params.minSqft.toString());
       if (params.maxSqft) queryParams.append('maxSqft', params.maxSqft.toString());
-      if (params.propertyType) queryParams.append('class', params.propertyType.toLowerCase());
+      if (params.propertyType) queryParams.append('class', normalizeRepliersClass(params.propertyType));
       if (params.city) queryParams.append('city', params.city);
       if (params.postalCode) queryParams.append('zip', params.postalCode);
       if (params.neighborhood) queryParams.append('neighborhood', params.neighborhood);
@@ -318,7 +319,7 @@ class RepliersClient {
       if (params.resultsPerPage) queryParams.append('resultsPerPage', params.resultsPerPage.toString());
       if (params.sortBy) queryParams.append('sortBy', params.sortBy);
       if (params.fields) queryParams.append('fields', params.fields);
-      if (params.class) queryParams.append('class', params.class);
+      if (params.class) queryParams.append('class', normalizeRepliersClass(params.class));
 
       const response = await this.client.get(`/listings?${queryParams.toString()}`);
       return response.data;
