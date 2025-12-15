@@ -443,9 +443,11 @@ class RepliersClient {
     const state = address.state || listing.stateOrProvince;
     const zip = address.zip || listing.postalCode;
     const country = address.country || listing.country;
-    // Neighborhood and Subdivision are SEPARATE fields - do not combine
-    const neighborhood = address.neighborhood || listing.neighborhood;
-    const subdivisionName = address.subdivisionName || listing.subdivisionName || details.subdivision;
+    // CRITICAL: In Repliers API, "neighborhood" field is actually the SUBDIVISION (tract/community label)
+    // True "neighborhood" must come from boundary polygon resolution, NOT from listing data
+    // Repliers uses "neighborhood" to mean subdivision - map it correctly
+    const subdivisionFromRepliers = address.neighborhood || listing.neighborhood || address.subdivisionName || listing.subdivisionName || details.subdivision;
+    // Do NOT set neighborhood from listing data - it must be resolved from boundaries only
     
     const latitude = map.latitude ?? listing.latitude;
     const longitude = map.longitude ?? listing.longitude;
@@ -488,8 +490,9 @@ class RepliersClient {
       stateOrProvince: state,
       postalCode: zip,
       country: country,
-      neighborhood: neighborhood,
-      subdivisionName: subdivisionName,
+      neighborhood: null,  // MUST be resolved from boundary polygons, never from listing data
+      subdivisionName: subdivisionFromRepliers,  // Repliers "neighborhood" field is actually subdivision
+      subdivision: subdivisionFromRepliers,  // Also set subdivision for compatibility
       elementarySchool: details.elementarySchool || listing.elementarySchool || listing.schools?.elementary || listing.raw?.ElementarySchool || null,
       middleOrJuniorSchool: details.middleSchool || listing.middleSchool || listing.schools?.middle || listing.raw?.MiddleOrJuniorSchool || null,
       highSchool: details.highSchool || listing.highSchool || listing.schools?.high || listing.raw?.HighSchool || null,

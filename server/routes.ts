@@ -565,8 +565,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
             latitude: toNumber(map.latitude ?? listing.latitude),
             longitude: toNumber(map.longitude ?? listing.longitude),
             photos: photos,
+            // CRITICAL: Repliers "neighborhood" field = subdivision (tract label), NOT geographic neighborhood
             subdivision: addr.neighborhood || listing.subdivisionName || null,
             subdivisionName: addr.neighborhood || listing.subdivisionName || null,
+            neighborhood: null,  // MUST be resolved from boundary polygons, never from listing data
             daysOnMarket: toNumber(listing.daysOnMarket),
             cumulativeDaysOnMarket: toNumber(listing.cumulativeDaysOnMarket) || toNumber(listing.daysOnMarket),
             lotSizeSquareFeet: lotSqFt,
@@ -645,8 +647,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
             latitude: toNum(p.latitude),
             longitude: toNum(p.longitude),
             photos: photos,
-            subdivision: p.subdivision || p.subdivisionName || null,
-            subdivisionName: p.subdivision || p.subdivisionName || null,
+            // CRITICAL: subdivision = tract/community label, neighborhood = boundary resolution only
+            // Legacy records may have subdivision stored in neighborhood field - migrate it
+            subdivision: p.subdivision || p.subdivisionName || p.neighborhood || null,
+            subdivisionName: p.subdivision || p.subdivisionName || p.neighborhood || null,
+            neighborhood: null,  // MUST be resolved from boundary polygons, never from listing data
             daysOnMarket: toNum(p.daysOnMarket),
             cumulativeDaysOnMarket: toNum(p.cumulativeDaysOnMarket) || toNum(p.daysOnMarket),
             lotSizeSquareFeet: lotSqFt,
@@ -1110,6 +1115,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
             const beds = details.numBedrooms ?? details.bedrooms ?? null;
             const baths = details.numBathrooms ?? details.bathrooms ?? null;
 
+            // CRITICAL: Repliers "neighborhood" field is actually subdivision (tract/community label)
+            // True neighborhood must come from boundary polygon resolution, NOT listing data
+            const subdivisionFromRepliers = addr.neighborhood || addr.subdivisionName || details.subdivision || null;
+
             const normalizedProperty = {
               id: listing.mlsNumber,
               listingId: listing.mlsNumber,
@@ -1137,7 +1146,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
               city: addr.city || '',
               stateOrProvince: addr.state || 'TX',
               postalCode: addr.zip || '',
-              subdivisionName: addr.neighborhood || null,
+              // Repliers "neighborhood" field = subdivision (tract label), NOT geographic neighborhood
+              subdivision: subdivisionFromRepliers,
+              subdivisionName: subdivisionFromRepliers,
+              neighborhood: null,  // MUST be resolved from boundary polygons, never from listing data
               unparsedAddress: fullAddress || 'Unknown Address',
               latitude: map.latitude ? String(map.latitude) : null,
               longitude: map.longitude ? String(map.longitude) : null,
@@ -1170,14 +1182,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Default: try local database
       const property = await storage.getProperty(id);
       if (property) {
-        res.json(property);
+        // CRITICAL: Legacy records may have subdivision stored in neighborhood field
+        // Migrate neighborhood to subdivision before clearing it
+        const subdivisionValue = property.subdivision || property.subdivisionName || property.neighborhood || null;
+        res.json({
+          ...property,
+          subdivision: subdivisionValue,
+          subdivisionName: subdivisionValue,
+          neighborhood: null,  // MUST be resolved from boundary polygons, never from listing data
+        });
         return;
       }
       
       // Also try by listing ID if direct ID lookup fails
       const propertyByListingId = await storage.getPropertyByListingId(id);
       if (propertyByListingId) {
-        res.json(propertyByListingId);
+        // CRITICAL: Legacy records may have subdivision stored in neighborhood field
+        // Migrate neighborhood to subdivision before clearing it
+        const subdivisionValue = propertyByListingId.subdivision || propertyByListingId.subdivisionName || propertyByListingId.neighborhood || null;
+        res.json({
+          ...propertyByListingId,
+          subdivision: subdivisionValue,
+          subdivisionName: subdivisionValue,
+          neighborhood: null,  // MUST be resolved from boundary polygons, never from listing data
+        });
         return;
       }
       
@@ -1198,7 +1226,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const allProperties = await storage.getAllProperties();
       const paginatedProperties = allProperties.slice(offset, offset + limit);
       
-      res.json(paginatedProperties);
+      // CRITICAL: Legacy records may have subdivision stored in neighborhood field
+      // Migrate neighborhood to subdivision before clearing it
+      const normalizedProperties = paginatedProperties.map(p => {
+        const subdivisionValue = p.subdivision || p.subdivisionName || p.neighborhood || null;
+        return {
+          ...p,
+          subdivision: subdivisionValue,
+          subdivisionName: subdivisionValue,
+          neighborhood: null,  // MUST be resolved from boundary polygons, never from listing data
+        };
+      });
+      
+      res.json(normalizedProperties);
     } catch (error) {
       console.error("Failed to fetch properties:", error);
       res.status(500).json({ error: "Failed to fetch properties" });

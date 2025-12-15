@@ -46,7 +46,11 @@ export default function PropertyDetailPage() {
         city: data.city,
         stateOrProvince: data.stateOrProvince || data.state || 'TX',
         postalCode: data.postalCode,
-        subdivisionName: data.subdivisionName || data.subdivision,
+        // CRITICAL: Repliers "neighborhood" field = subdivision (tract label), NOT geographic neighborhood
+        // True neighborhood comes from boundary resolution only
+        subdivision: data.subdivision || data.subdivisionName || null,
+        subdivisionName: data.subdivisionName || data.subdivision || null,
+        neighborhood: null,  // Must be resolved from boundary API, never from listing data
         unparsedAddress: data.unparsedAddress || data.address || 'Unknown Address',
         latitude: data.latitude,
         longitude: data.longitude,
@@ -90,7 +94,29 @@ export default function PropertyDetailPage() {
   });
 
   // Use context data if available, otherwise use fetched data
-  const propertyData = selectedProperty || fetchedProperty;
+  // CRITICAL: Always normalize subdivision/neighborhood regardless of source
+  // Context data may have incorrect mapping where Repliers "neighborhood" wasn't remapped to subdivision
+  const rawPropertyData = selectedProperty || fetchedProperty;
+  
+  // Normalize the property to ensure correct subdivision/neighborhood mapping
+  const propertyData = rawPropertyData ? {
+    ...rawPropertyData,
+    property: {
+      ...rawPropertyData.property,
+      // CRITICAL: If property.neighborhood has a value but property.subdivision is empty,
+      // the neighborhood value is likely the incorrectly-mapped Repliers subdivision
+      // Correct this by using neighborhood value as subdivision and setting neighborhood to null
+      subdivision: rawPropertyData.property.subdivision || rawPropertyData.property.subdivisionName || 
+                   (rawPropertyData.property.neighborhood && !rawPropertyData.property.subdivision ? 
+                     rawPropertyData.property.neighborhood : null),
+      subdivisionName: rawPropertyData.property.subdivisionName || rawPropertyData.property.subdivision || 
+                       (rawPropertyData.property.neighborhood && !rawPropertyData.property.subdivision ? 
+                         rawPropertyData.property.neighborhood : null),
+      // Neighborhood MUST come from boundary resolution, never from listing data
+      neighborhood: null,
+    },
+    media: rawPropertyData.media,
+  } : null;
 
   useEffect(() => {
     if (!viewTracked && gateEnabled && propertyData) {

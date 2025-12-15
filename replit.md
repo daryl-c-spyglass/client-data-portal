@@ -6,6 +6,13 @@ This project is a professional real estate IDX (Internet Data Exchange) platform
 
 ## Recent Changes (Dec 15, 2025)
 
+- **CRITICAL DATA MAPPING FIX**: Fixed fundamental data integrity issue where Repliers API "neighborhood" field was incorrectly displayed as neighborhood
+  - Repliers "neighborhood" field now correctly maps to `subdivision` (tract/community label from listing)
+  - `neighborhood` field now only populated via boundary polygon resolution using lat/lng coordinates
+  - PropertyDetail uses `/api/neighborhoods/by-coordinates` endpoint for geographic boundary resolution
+  - NeighborhoodReview component only renders when neighborhood is resolved from boundary (not from listing data)
+  - Dev-only Location Debug panel added to PropertyDetail for debugging location data mapping
+  - **Data Integrity Rule**: Subdivision = MLS listing field, Neighborhood = boundary polygon resolution only
 - **Neighborhood Filter in CMA & Buyer Search**: Added separate Neighborhood filter (geographic boundary area) distinct from Subdivision (tract/community label)
   - CMABuilder: New Neighborhood autocomplete field with persistence in search criteria
   - BuyerSearch: New Neighborhoods filter with OR/Not modes and autocomplete

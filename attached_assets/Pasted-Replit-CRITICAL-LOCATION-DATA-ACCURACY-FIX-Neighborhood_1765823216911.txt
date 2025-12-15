@@ -1,0 +1,105 @@
+Replit — CRITICAL LOCATION DATA ACCURACY FIX (Neighborhood vs Subdivision)
+
+Context:
+This project is IDX / Client Data Portal (NOT Home Review). Data source is Repliers only (ACTRIS).
+We have a verified mismatch:
+
+Example:
+- Our app shows for a Round Rock property (ex: 1601 Breezy Ct, Round Rock, TX 78664):
+  “Neighborhood: Windy Park Sec 1”
+- That appears incorrect; Windy Park Sec 1 is a DIFFERENT subdivision. The subdivision is reported elsewhere as “Greenslopes at Lake Creek”.
+
+This is a credibility-breaking issue. We must stop mislabeling subdivisions as neighborhoods.
+
+====================================================
+NON-NEGOTIABLE DEFINITIONS
+====================================================
+
+1) Subdivision (CMA/comps):
+- Must come ONLY from the listing’s official subdivision field from Repliers/MLS.
+- No inference, no fuzzy match, no boundary guessing.
+- If missing: display “Subdivision: Not available”.
+
+2) Neighborhood (Neighborhood Review / larger area stats):
+- Must be derived ONLY from Repliers boundary polygons (map boundaries), using property latitude/longitude.
+- Use point-in-polygon resolution to return:
+  - neighborhoodName
+  - neighborhoodBoundaryId
+  - boundaryType = “neighborhood”
+  - resolvedAt timestamp
+- If boundary lookup fails: display “Neighborhood: Not available”.
+- NEVER set Neighborhood equal to Subdivision.
+
+====================================================
+TASKS
+====================================================
+
+A) Find the exact source of “Neighborhood: Windy Park Sec 1”
+- Identify what field currently populates “Neighborhood” in:
+  - property detail page
+  - floating cards
+  - CMA property cards
+  - Buyer Search cards
+  - Dashboard cards
+- Confirm whether we are using:
+  - subdivision field incorrectly
+  - MLS “neighborhood/area” free-text field
+  - a geospatial guess
+  - cached lookup
+
+B) Fix the mapping and labels across ALL sections
+1) Ensure every property display uses:
+   - Subdivision: listing.subdivision (exact field)
+   - Neighborhood: boundary-derived name (from boundaryId resolution)
+2) Update UI labels and ensure Neighborhood is shown separately from Subdivision everywhere.
+3) Remove any fallback that sets Neighborhood = Subdivision.
+
+C) Implement / correct boundary-based neighborhood resolution (Repliers)
+1) Create or fix endpoint:
+   - GET /api/neighborhood/resolve?lat=…&lng=…
+   returns boundaryId + name + type
+2) Create or fix typeahead:
+   - GET /api/autocomplete/neighborhoods?q=…
+   returns neighborhoodName + boundaryId (NOT plain strings)
+3) Cache boundary resolution to prevent rate limits.
+
+D) Add “Location Debug” (DEV ONLY)
+For any property details page, add a collapsible debug section showing:
+- propertyId / listingId
+- lat/lng
+- raw Repliers fields used:
+  - subdivision field name + value
+  - any neighborhood/area field name + value
+- resolved boundary neighborhood:
+  - boundaryId + name + boundaryType
+- final displayed:
+  - Subdivision
+  - Neighborhood
+This is required to confirm we are not guessing.
+
+====================================================
+ACCEPTANCE TEST (MUST PASS)
+====================================================
+
+1) Test property: 1601 Breezy Ct, Round Rock, TX 78664 (or the same listingId in our system).
+2) Results must show:
+- Subdivision: (must match listing subdivision field; ex “Greenslopes at Lake Creek” if that’s what Repliers provides)
+- Neighborhood: must be boundary-based and MUST NOT show “Windy Park Sec 1” unless Repliers boundary truly resolves to that (provide boundaryId proof).
+3) Provide evidence:
+- Screenshot of property details + floating card showing Subdivision + Neighborhood separately
+- Output of the Location Debug panel for this property
+- The Repliers field mapping used (exact field names)
+
+====================================================
+IMPORTANT
+====================================================
+
+- Do NOT use fuzzy matching or “nearest subdivision” logic for Neighborhood.
+- Do NOT merge subdivisions and neighborhoods into one filter or one field.
+- If Repliers does not provide boundary polygons for the area, we must display “Neighborhood: Not available” rather than guess.
+
+When done, provide a written summary:
+- root cause
+- files changed
+- endpoints added/updated
+- test proof for Breezy Ct example
