@@ -6,6 +6,12 @@ This project is a professional real estate IDX (Internet Data Exchange) platform
 
 ## Recent Changes (Dec 15, 2025)
 
+- **Neighborhood Review Feature**: Added neighborhood-level market stats with boundary polygon maps on Property Detail page
+  - New `NeighborhoodReview` component shows Active/Under Contract/Sold counts, avg prices, avg DOM, price/sqft
+  - Polygon boundary overlay from Repliers Locations API with property markers
+  - Boundary caching in PostgreSQL with 24-hour TTL
+  - API endpoints: `/api/neighborhoods/review` and `/api/neighborhoods/by-coordinates`
+  - Clear distinction: **Neighborhood** = geographic boundary area (market overview) vs **Subdivision** = tract/community label (CMA comps)
 - **Data Synchronization Fix**: Inventory status counts (Active/Under Contract) now filter by `class: 'residential'` to match subtype aggregation
 - **Property Detail Back Navigation**: Property detail page tracks origin path via `?from=` query param and shows contextual back button labels (e.g., "Back to Dashboard", "Back to CMA")
 - **Buyer Search Autocomplete Fixed**: API endpoints now consistently return `{ suggestions: [...] }` format, enabling dropdown display
