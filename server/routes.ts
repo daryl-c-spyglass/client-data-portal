@@ -400,6 +400,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         minYearBuilt,
         maxYearBuilt,
         soldDays,
+        dateFrom,
+        dateTo,
         limit = '50',
       } = req.query as Record<string, string | undefined>;
 
@@ -745,6 +747,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
             if (!p.closeDate) return false;
             const closeDate = new Date(p.closeDate);
             return closeDate >= cutoffDate;
+          });
+        }
+        // Full date range filtering (dateFrom/dateTo)
+        if (dateFrom) {
+          const fromDate = new Date(dateFrom);
+          filtered = filtered.filter((p: any) => {
+            const dateToCheck = p.closeDate || p.listDate || p.listingContractDate;
+            if (!dateToCheck) return false;
+            return new Date(dateToCheck) >= fromDate;
+          });
+        }
+        if (dateTo) {
+          const toDate = new Date(dateTo);
+          filtered = filtered.filter((p: any) => {
+            const dateToCheck = p.closeDate || p.listDate || p.listingContractDate;
+            if (!dateToCheck) return false;
+            return new Date(dateToCheck) <= toDate;
           });
         }
         if (subdivision) {
