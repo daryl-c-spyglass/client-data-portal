@@ -1,0 +1,159 @@
+Replit — the “fixed” summary is NOT sufficient. Inventory counts are still inconsistent across Dashboard vs Properties, and some prior requirements are being bypassed.
+
+You must treat this as a BLOCKER: “Single source of truth” inventory + consistent status/type math across ALL sections.
+
+====================================================
+EVIDENCE OF CURRENT INCONSISTENCY (FROM SCREENSHOTS)
+====================================================
+
+1) Dashboard totals:
+- Total Properties: 14,819
+- Active: 14,480
+- Under Contract: 164,148
+- Sold: 22,656
+
+These status counts do NOT reconcile with “Total Properties = 14,819”.
+Total cannot be smaller than Under Contract alone.
+
+2) Dashboard “Property Inventory by Type” totals to 14,819:
+- SFR 8,845
+- Other 3,589
+- Multi 1,208
+- Land 528
+- Condo 284
+- Townhouse 149
+- Mfg 127
+- Ranch 89
+Total = 14,819
+
+3) Properties page totals:
+- Total Properties: 15,719
+- Active: 14,480
+- UC: 164,148
+- Closed: 22,656
+
+Also inconsistent because Total is far smaller than UC.
+
+4) Properties page “Property Types” chips:
+- SFR 9,510
+- Condo 284
+- TH 169
+- Multi 1,282
+- Mfg 150
+- Ranch 110
+- Land 625
+- Lots 0
+- Other 3,589
+
+These do NOT match Dashboard type inventory (SFR, TH, Multi, Mfg, Ranch, Land differ).
+Dashboard and Properties must match if the scope and source is the same.
+
+Conclusion:
+- You are mixing different scopes (e.g., “residential-only subset” vs “all status counts”), OR
+- you are counting statuses from one dataset and types from another, OR
+- status counts are NOT filtered the same way as total/type counts.
+This violates the “single source-of-truth inventory summary” requirement.
+
+====================================================
+NON-NEGOTIABLE REQUIREMENT (DO THIS EXACTLY)
+====================================================
+
+Implement ONE canonical backend inventory endpoint/service and force ALL sections to use it.
+
+Call it: `/api/inventory/summary` (name can vary but must be ONE place).
+
+The response must include:
+- scope definition (explicit!):
+  • mlsScope = ACTRIS
+  • classScope = residentialOnly OR allClasses (pick ONE, but be consistent)
+  • rentalExcluded = true
+  • statusIncluded = [Active, UnderContract, Closed]
+- totals:
+  • totalProperties
+  • activeCount
+  • underContractCount
+  • closedCount
+- countsByType (exact same mapping used everywhere)
+- countsByStatus
+- lastUpdatedAt
+- rentalFilteredCount
+
+Math rules that MUST hold (and enforce in code with assertions/log errors):
+1) totalProperties == activeCount + underContractCount + closedCount
+2) totalProperties == sum(countsByType values)   (including Other)
+3) Dashboard totals == Properties totals == same payload (same scope)
+
+If you cannot satisfy #1 because “Total Properties” is intended to mean something else (e.g., “Active residential only”), then you MUST:
+- rename the label to match scope (example: “Active Residential Inventory”)
+- and ensure all related numbers shown under it are in the same scope
+But preferred: keep TOTAL as “all statuses in scope”.
+
+====================================================
+YOU MUST ALSO FIX THE TYPE/SUBTYPE MAPPING ONCE
+====================================================
+
+Right now “Property Inventory by Type” and “Property Types chips” use different logic.
+
+Create one shared mapping function, used everywhere:
+- normalizePropertyType(repliersListing) -> one of:
+  SFR, Condo, Townhouse, Multi, Manufactured, Ranch, Land, Lots, Other
+
+Then:
+- Dashboard inventory-by-type MUST use it
+- Properties type chips MUST use it
+- CMA property filters MUST use it
+- Buyer search type filters MUST use it
+
+No duplicate mapping logic in multiple files.
+
+====================================================
+STATUS COUNTS MUST BE FILTERED IDENTICALLY TO TOTALS
+====================================================
+
+You said you “filter residential properties only” for status counts.
+If that is true, then:
+- Total Properties must also be the total for the same residential-only filter.
+OR
+- status counts must be recalculated to match total scope.
+
+You cannot mix “residential-only total” with “all under-contract total”.
+
+====================================================
+DELIVERABLES REQUIRED (DO NOT MARK DONE WITHOUT THESE)
+====================================================
+
+1) Print the exact JSON from the canonical inventory endpoint (example payload).
+2) Provide a screenshot showing Dashboard total + status counts reconcile mathematically.
+3) Provide a screenshot showing Properties total + status counts reconcile mathematically.
+4) Provide a screenshot showing Dashboard type inventory == Properties type chips (same counts).
+5) Add a dev-only “Consistency Debug” block that displays:
+   - totalProperties
+   - sum(statusCounts)
+   - sum(typeCounts)
+   and shows a warning if mismatch.
+
+====================================================
+SECONDARY ITEMS (DO AFTER ABOVE IS FIXED)
+====================================================
+
+A) Sold photos missing
+Repliers confirmed sold listings retain photos. Missing sold photos is still a bug.
+Once counts are fixed, re-audit sold listing photo requests/mapping.
+
+B) Back navigation
+Good improvement, keep it, but ensure it works from ALL origins, not dashboard only.
+
+C) Buyer search autocomplete
+Good if dropdown shows, but verify it’s returning correct Repliers suggestions.
+
+====================================================
+TEST PLAN (YOU MUST RUN THESE)
+====================================================
+
+1) Load Dashboard → record totals and confirm totals math passes.
+2) Load Properties → record totals and confirm totals math passes.
+3) Compare Dashboard type inventory vs Properties type chips → must match.
+4) Change scope (if you support filters like “recent activity”) → totals and breakdown must remain internally consistent.
+5) Stress test: ensure rate limiting no longer causes “0 counts” or mismatched partial totals.
+
+Do NOT close the ticket until inventory totals/types/status are consistent across sections and mathematically correct.
