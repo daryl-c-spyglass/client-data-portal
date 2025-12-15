@@ -384,9 +384,9 @@ export default function Properties() {
 
 
   // Fetch inventory summary for display before search
-  // Shows total counts, status counts, subtype counts from the active data source
+  // Uses canonical /api/inventory/summary endpoint (same source as Dashboard)
   const { data: inventory, isLoading: inventoryLoading } = useQuery<InventorySummary>({
-    queryKey: ['/api/properties/inventory'],
+    queryKey: ['/api/inventory/summary'],
     staleTime: 5 * 60 * 1000, // Cache for 5 minutes
   });
 

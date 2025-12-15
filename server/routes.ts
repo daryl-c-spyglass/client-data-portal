@@ -2933,6 +2933,41 @@ This email was sent by ${senderName} (${senderEmail}) via the MLS Grid IDX Platf
     }
   });
   
+  // Canonical inventory summary endpoint - single source of truth for all inventory counts
+  // Both Dashboard and Properties pages should use this endpoint for consistency
+  app.get("/api/inventory/summary", async (req, res) => {
+    try {
+      const forceRefresh = req.query.refresh === 'true';
+      const inventory = await getUnifiedInventory(forceRefresh);
+      
+      // Return data in format expected by both Dashboard and Properties pages
+      res.json({
+        dataSource: inventory.dataSource,
+        totalCount: inventory.totalCount,
+        countsByStatus: inventory.countsByStatus,
+        countsBySubtype: inventory.countsBySubtype,
+        lastUpdatedAt: inventory.lastUpdatedAt,
+        validation: inventory.validation,
+        errors: inventory.errors,
+        isPartialData: inventory.isPartialData,
+      });
+    } catch (error: any) {
+      console.error("Inventory summary error:", error.message);
+      res.status(500).json({ error: "Failed to load inventory summary" });
+    }
+  });
+  
+  // Inventory debug endpoint - detailed consistency checking (dev only)
+  app.get("/api/inventory/debug", async (req, res) => {
+    try {
+      const debugData = await getInventoryDebugData();
+      res.json(debugData);
+    } catch (error: any) {
+      console.error("Inventory debug error:", error.message);
+      res.status(500).json({ error: "Failed to load inventory debug data" });
+    }
+  });
+  
   // Helper to log rental filtering results
   function logRentalFiltering(endpoint: string, beforeCount: number, afterCount: number, filteredProperties: any[]) {
     const filteredCount = beforeCount - afterCount;

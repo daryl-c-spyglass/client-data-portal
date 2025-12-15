@@ -4,6 +4,73 @@
  */
 
 /**
+ * Canonical property type normalization function - USE THIS EVERYWHERE
+ * Must match server/inventory-service.ts normalizePropertyType exactly
+ */
+export function normalizePropertyType(propertySubType: string | null | undefined): string {
+  if (!propertySubType) return 'Other';
+  
+  const normalized = propertySubType.toLowerCase().trim();
+  
+  // Single Family
+  if (normalized.includes('single family') || normalized === 'sfr' || normalized === 'detached') {
+    return 'Single Family Residence';
+  }
+  
+  // Condominium
+  if (normalized.includes('condo') || normalized.includes('condominium')) {
+    return 'Condominium';
+  }
+  
+  // Townhouse
+  if (normalized.includes('townhouse') || normalized.includes('townhome') || normalized.includes('town house')) {
+    return 'Townhouse';
+  }
+  
+  // Multi-Family
+  if (normalized.includes('multi') || normalized.includes('duplex') || normalized.includes('triplex') || 
+      normalized.includes('fourplex') || normalized.includes('apartment')) {
+    return 'Multi-Family';
+  }
+  
+  // Manufactured Home
+  if (normalized.includes('manufactured') || normalized.includes('mobile') || normalized.includes('modular')) {
+    return 'Manufactured Home';
+  }
+  
+  // Ranch
+  if (normalized.includes('ranch') && !normalized.includes('single')) {
+    return 'Ranch';
+  }
+  
+  // Land
+  if (normalized.includes('land') || normalized.includes('lot') || normalized.includes('acreage') ||
+      normalized.includes('unimproved') || normalized.includes('vacant')) {
+    if (normalized.includes('multiple') || normalized.includes('adjacent')) {
+      return 'Multiple Lots (Adjacent)';
+    }
+    return 'Unimproved Land';
+  }
+  
+  return 'Other';
+}
+
+/**
+ * All valid property types for inventory - must match server/inventory-service.ts
+ */
+export const INVENTORY_PROPERTY_TYPES = [
+  'Single Family Residence',
+  'Condominium',
+  'Townhouse',
+  'Multi-Family',
+  'Manufactured Home',
+  'Ranch',
+  'Unimproved Land',
+  'Multiple Lots (Adjacent)',
+  'Other',
+] as const;
+
+/**
  * Property type category mappings for unified display
  */
 export const PROPERTY_TYPE_DISPLAY_MAP: Record<string, string> = {

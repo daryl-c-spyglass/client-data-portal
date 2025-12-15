@@ -94,6 +94,23 @@ interface InventoryBySubtype {
   total: number;
 }
 
+// Unified inventory summary from canonical endpoint
+interface InventorySummary {
+  dataSource: string;
+  totalCount: number;
+  countsByStatus: Record<string, number>;
+  countsBySubtype: Record<string, number>;
+  lastUpdatedAt: string;
+  validation?: {
+    statusSumMatchesTotal: boolean;
+    subtypeSumMatchesTotal: boolean;
+    statusSum: number;
+    subtypeSum: number;
+  };
+  errors?: string[];
+  isPartialData?: boolean;
+}
+
 interface DomAnalytics {
   status: string;
   daysRange: number;
@@ -596,10 +613,17 @@ export default function Dashboard() {
     staleTime: 60 * 1000,
   });
 
-  const { data: inventoryData, isLoading: inventoryLoading } = useQuery<InventoryBySubtype>({
-    queryKey: ['/api/dashboard/inventory-by-subtype'],
+  // Use canonical inventory endpoint (same source as Properties page)
+  const { data: inventorySummary, isLoading: inventoryLoading } = useQuery<InventorySummary>({
+    queryKey: ['/api/inventory/summary'],
     staleTime: 5 * 60 * 1000,
   });
+  
+  // Transform to legacy format for compatibility with existing UI code
+  const inventoryData: InventoryBySubtype | undefined = inventorySummary ? {
+    subtypes: inventorySummary.countsBySubtype,
+    total: inventorySummary.totalCount,
+  } : undefined;
 
   const { data: domAnalytics, isLoading: domLoading } = useQuery<DomAnalytics[]>({
     queryKey: ['/api/dashboard/dom-analytics'],
@@ -948,25 +972,25 @@ export default function Dashboard() {
                       </Tooltip>
                     </CardHeader>
                     <CardContent>
-                      {isLoading ? (
+                      {inventoryLoading || isLoading ? (
                         <Skeleton className="h-8 w-20" />
                       ) : (
                         <>
                           <div className="text-2xl font-bold" data-testid="text-total-properties">
-                            {stats?.totalProperties?.toLocaleString() || 0}
+                            {inventorySummary?.totalCount?.toLocaleString() || stats?.totalProperties?.toLocaleString() || 0}
                           </div>
                           <div className="text-xs text-muted-foreground space-y-0.5 mt-1">
                             <p className="flex items-center gap-1">
                               <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
-                              {stats?.totalActiveProperties?.toLocaleString() || 0} Active
+                              {(inventorySummary?.countsByStatus?.['Active'] ?? stats?.totalActiveProperties ?? 0).toLocaleString()} Active
                             </p>
                             <p className="flex items-center gap-1">
                               <span className="w-2 h-2 rounded-full bg-amber-500"></span>
-                              {stats?.totalUnderContractProperties?.toLocaleString() || 0} Under Contract
+                              {(inventorySummary?.countsByStatus?.['Under Contract'] ?? stats?.totalUnderContractProperties ?? 0).toLocaleString()} Under Contract
                             </p>
                             <p className="flex items-center gap-1">
                               <span className="w-2 h-2 rounded-full bg-slate-500"></span>
-                              {stats?.totalClosedProperties?.toLocaleString() || 0} Sold
+                              {(inventorySummary?.countsByStatus?.['Closed'] ?? stats?.totalClosedProperties ?? 0).toLocaleString()} Sold
                             </p>
                           </div>
                         </>
