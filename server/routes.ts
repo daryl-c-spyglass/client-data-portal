@@ -15,6 +15,7 @@ import passport from "passport";
 import { requireAuth, requireRole } from "./auth";
 import { fetchExternalUsers, fetchFromExternalApi } from "./external-api";
 import type { PropertyStatistics, TimelineDataPoint } from "@shared/schema";
+import { neighborhoodService } from "./neighborhood-service";
 
 // Wrapper around shared filterOutRentalProperties that adds logging
 function filterOutRentals(properties: any[]): any[] {
@@ -3459,6 +3460,112 @@ This email was sent by ${senderName} (${senderEmail}) via the MLS Grid IDX Platf
       console.error("Error serving shared CMA page:", error);
       // Fallback to default page
       res.redirect('/');
+    }
+  });
+
+  // Neighborhood Review API - market stats within neighborhood boundaries
+  app.get("/api/neighborhoods/review", async (req, res) => {
+    try {
+      const { name, city, months = '6', useRepliers = 'true' } = req.query as Record<string, string | undefined>;
+      
+      if (!name) {
+        res.status(400).json({ error: "Neighborhood name is required" });
+        return;
+      }
+      
+      const monthsNum = parseInt(months || '6', 10);
+      const shouldUseRepliers = useRepliers !== 'false';
+      
+      console.log(`[Neighborhood Review] Looking up: "${name}" in ${city || 'any city'}`);
+      
+      // First, get the boundary information
+      const boundaryInfo = await neighborhoodService.getNeighborhoodBoundary(name, city);
+      
+      if (!boundaryInfo.boundary && shouldUseRepliers) {
+        console.log(`[Neighborhood Review] No boundary found for "${name}"`);
+        // Return empty result if no boundary
+        res.json({
+          neighborhoodName: name,
+          boundary: null,
+          centerLat: null,
+          centerLng: null,
+          stats: {
+            activeCount: 0,
+            underContractCount: 0,
+            soldCount: 0,
+            avgListPrice: null,
+            avgSoldPrice: null,
+            avgPricePerSqFt: null,
+            avgDaysOnMarket: null,
+            medianListPrice: null,
+            medianSoldPrice: null,
+          },
+          listings: { active: [], underContract: [], sold: [] },
+          message: "No boundary data found for this neighborhood",
+        });
+        return;
+      }
+      
+      let stats;
+      if (boundaryInfo.boundary && shouldUseRepliers) {
+        // Use Repliers API for active/UC listings (most current data)
+        stats = await neighborhoodService.getNeighborhoodMarketStatsFromRepliers(
+          name,
+          boundaryInfo.boundary,
+          city,
+          monthsNum
+        );
+      } else {
+        // Fall back to local database
+        stats = await neighborhoodService.getNeighborhoodMarketStats(name, city, monthsNum);
+      }
+      
+      console.log(`[Neighborhood Review] Stats for "${name}": ${stats.stats.activeCount} active, ${stats.stats.underContractCount} UC, ${stats.stats.soldCount} sold`);
+      
+      res.json(stats);
+    } catch (error: any) {
+      console.error("Neighborhood review error:", error.message);
+      res.status(500).json({ error: "Failed to fetch neighborhood review data" });
+    }
+  });
+  
+  // Get neighborhood for a specific coordinate (reverse geocode to neighborhood)
+  app.get("/api/neighborhoods/by-coordinates", async (req, res) => {
+    try {
+      const { lat, lng, city } = req.query as Record<string, string | undefined>;
+      
+      if (!lat || !lng) {
+        res.status(400).json({ error: "Latitude and longitude are required" });
+        return;
+      }
+      
+      const latitude = parseFloat(lat);
+      const longitude = parseFloat(lng);
+      
+      if (isNaN(latitude) || isNaN(longitude)) {
+        res.status(400).json({ error: "Invalid coordinates" });
+        return;
+      }
+      
+      const neighborhood = await neighborhoodService.findNeighborhoodByCoordinates(latitude, longitude, city);
+      
+      if (!neighborhood) {
+        res.json({ found: false, neighborhood: null });
+        return;
+      }
+      
+      res.json({
+        found: true,
+        neighborhood: neighborhood.neighborhood,
+        city: neighborhood.city,
+        area: neighborhood.area,
+        boundary: neighborhood.map?.boundary || null,
+        centerLat: neighborhood.map?.latitude || null,
+        centerLng: neighborhood.map?.longitude || null,
+      });
+    } catch (error: any) {
+      console.error("Neighborhood lookup error:", error.message);
+      res.status(500).json({ error: "Failed to lookup neighborhood" });
     }
   });
 

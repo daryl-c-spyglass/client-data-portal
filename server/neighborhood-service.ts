@@ -7,12 +7,19 @@ import { getRepliersClient, LocationWithBoundary } from './repliers-client';
 
 neonConfig.webSocketConstructor = ws;
 
+// Memoize pool to avoid connection leaks
+let _pool: Pool | null = null;
+let _db: ReturnType<typeof drizzle> | null = null;
+
 function getDb() {
   if (!process.env.DATABASE_URL) {
     throw new Error('DATABASE_URL not configured');
   }
-  const pool = new Pool({ connectionString: process.env.DATABASE_URL });
-  return drizzle(pool);
+  if (!_pool) {
+    _pool = new Pool({ connectionString: process.env.DATABASE_URL });
+    _db = drizzle(_pool);
+  }
+  return _db!;
 }
 
 const CACHE_TTL_HOURS = 24;
@@ -74,15 +81,42 @@ export class NeighborhoodService {
     const centerLat = location.map.latitude?.toString() || null;
     const centerLng = location.map.longitude?.toString() || null;
     
-    await db.insert(neighborhoodBoundaries).values({
-      name: location.neighborhood,
-      city: location.city || null,
-      area: location.area || null,
-      boundary: location.map.boundary,
-      centerLatitude: centerLat,
-      centerLongitude: centerLng,
-      expiresAt,
-    }).onConflictDoNothing();
+    // Check if entry exists (regardless of expiration)
+    const conditions = [eq(neighborhoodBoundaries.name, location.neighborhood)];
+    if (location.city) {
+      conditions.push(eq(neighborhoodBoundaries.city, location.city));
+    }
+    
+    const existing = await db
+      .select({ id: neighborhoodBoundaries.id })
+      .from(neighborhoodBoundaries)
+      .where(and(...conditions))
+      .limit(1);
+    
+    if (existing.length > 0) {
+      // Update existing entry with fresh data and TTL
+      await db.update(neighborhoodBoundaries)
+        .set({
+          boundary: location.map.boundary,
+          centerLatitude: centerLat,
+          centerLongitude: centerLng,
+          area: location.area || null,
+          expiresAt,
+          fetchedAt: new Date(),
+        })
+        .where(eq(neighborhoodBoundaries.id, existing[0].id));
+    } else {
+      // Insert new entry
+      await db.insert(neighborhoodBoundaries).values({
+        name: location.neighborhood,
+        city: location.city || null,
+        area: location.area || null,
+        boundary: location.map.boundary,
+        centerLatitude: centerLat,
+        centerLongitude: centerLng,
+        expiresAt,
+      });
+    }
   }
 
   async findNeighborhoodByCoordinates(
