@@ -11,8 +11,19 @@ This project is a professional real estate IDX (Internet Data Exchange) platform
   - `neighborhood` field now only populated via boundary polygon resolution using lat/lng coordinates
   - PropertyDetail uses `/api/neighborhoods/by-coordinates` endpoint for geographic boundary resolution
   - NeighborhoodReview component only renders when neighborhood is resolved from boundary (not from listing data)
-  - Dev-only Location Debug panel added to PropertyDetail for debugging location data mapping
   - **Data Integrity Rule**: Subdivision = MLS listing field, Neighborhood = boundary polygon resolution only
+- **Enhanced Location Debug Panel (DEV mode)**: Property Detail page now includes comprehensive debug panel showing:
+  - Data Source (Repliers API vs PostgreSQL) with fetch timestamp
+  - Raw Subdivision Fields showing all candidate API fields (address.neighborhood, details.subdivision, etc.)
+  - Subdivision Source indicating which field was selected (e.g., "address.neighborhood")
+  - Final Value showing the resolved subdivision string
+  - Data integrity rules documentation in the panel
+  - Separate DEV-mode query always fetches fresh `_debug` payload from API regardless of cache
+- **Location Display Consistency**: Removed incorrect neighborhood displays from:
+  - Dashboard property floating cards (now shows Subdivision only)
+  - PropertyMapView info windows (now shows Subdivision only)
+  - CMAReport floating cards (now shows Subdivision only)
+  - Updated DashboardProperty TypeScript interface to include subdivision field
 - **Neighborhood Filter in CMA & Buyer Search**: Added separate Neighborhood filter (geographic boundary area) distinct from Subdivision (tract/community label)
   - CMABuilder: New Neighborhood autocomplete field with persistence in search criteria
   - BuyerSearch: New Neighborhoods filter with OR/Not modes and autocomplete
