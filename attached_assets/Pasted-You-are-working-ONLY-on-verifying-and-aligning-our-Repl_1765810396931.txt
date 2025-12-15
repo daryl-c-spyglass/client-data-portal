@@ -1,0 +1,156 @@
+You are working ONLY on verifying and aligning our Repliers integration assumptions across the entire agent app.
+This is a “validation + alignment” task first (no UI redesign), to ensure we are fully aligned with Repliers requirements and our client’s expectations.
+
+Scope:
+- Dashboard
+- Properties
+- CMA
+- Buyer Search
+- Seller Updates (only where it consumes property data)
+Data source: Repliers only.
+Leasing/rental listings must be excluded globally.
+
+====================================================
+GOAL
+====================================================
+Confirm we are using Repliers correctly (especially `class` values + MLS scope + field mappings) and eliminate any silent mismatches that cause:
+- wrong inventory counts
+- wrong property type buckets
+- status inconsistencies
+- confusing totals across sections
+
+====================================================
+1) REPLIERS “class” PARAMETER ALIGNMENT (CRITICAL)
+====================================================
+
+Repliers confirmed:
+- Supported request inputs for `class`: `residential`, `condo`, `commercial`
+- Response values may be: `ResidentialProperty`, `CondoProperty`, `CommercialProperty`
+
+Tasks:
+1) Search the codebase and audit EVERY place we call Repliers with a `class` parameter.
+2) Ensure request inputs ONLY use:
+   - residential
+   - condo
+   - commercial
+3) Ensure we never send response-type strings (e.g., ResidentialProperty) as request inputs.
+4) Add a defensive guard:
+   - If an invalid class value is detected, log an error and auto-normalize to the correct input value.
+
+Deliverable:
+- A list of all endpoints/files where `class` is used and confirmation it’s correct.
+
+====================================================
+2) MLS SCOPE ALIGNMENT (ACTRIS)
+====================================================
+
+Task:
+1) Confirm all Repliers searches are scoped to the correct MLS for Austin/Central Texas (ACTRIS), as discussed in onboarding.
+2) If Repliers requires an MLS identifier/parameter, ensure it is applied consistently across:
+   - Properties
+   - Buyer Search
+   - CMA comps
+   - Dashboard widgets (Recent Sold/Closed, totals, etc.)
+3) Add logging to show MLS scope used per request in dev mode.
+
+Deliverable:
+- Confirmation statement + where MLS scope is configured in code (single source of truth).
+
+====================================================
+3) FIELD “SOURCE OF TRUTH” MAPPING (PRICE / DATES / DOM / STATUS)
+====================================================
+
+Create a single documented mapping (and shared helpers) for:
+
+A) Prices:
+- List price (Active/UC)
+- Close price (Sold/Closed)
+
+B) Dates:
+- List date
+- Status change date (if used)
+- Close date (Sold/Closed)
+- Sold date filters (0–30/60/90/120/150/180) must use close date only
+
+C) DOM:
+- Sold/Closed DOM must be listing date → close date (not status-change unless Repliers defines otherwise)
+- Active DOM must be listing date → today
+- Under Contract DOM must be listing date → UC date (if available) OR today (define and document)
+
+D) Status normalization:
+- Ensure one shared status mapping is used everywhere:
+  - Active
+  - Under Contract/Pending
+  - Sold/Closed
+
+Tasks:
+1) Implement shared helper functions for:
+   - normalizeStatus()
+   - getDisplayPrice()
+   - getCloseDate()
+   - getListDate()
+   - computeDOM()
+2) Ensure Dashboard, Properties, CMA, Buyer Search all use these helpers (no duplicated logic).
+
+Deliverable:
+- A short “Repliers Field Mapping” document in the repo and confirmation all modules use it.
+
+====================================================
+4) INVENTORY COUNTS MUST MATCH ACROSS SECTIONS
+====================================================
+
+Task:
+1) Confirm Dashboard totals, Properties totals, and “Inventory by Type/Subtype” are derived from the SAME backend method.
+2) Confirm totals math:
+- totalProperties == sum(statusCounts) == sum(typeCounts) (including “Other/Unknown”)
+3) Ensure rental/leasing exclusion is applied BEFORE counts.
+
+Deliverable:
+- Proof via logs or a debug endpoint showing the same totals payload is used across modules.
+
+====================================================
+5) RENTAL/LEASING EXCLUSION — GLOBAL ENFORCEMENT
+====================================================
+
+Task:
+1) Confirm rental/leasing detection rules are applied consistently to:
+- search results
+- dashboard widgets
+- CMA comps
+- charts/DOM
+- counts/inventory
+2) Add a debug log count for how many rentals are filtered per request in dev.
+
+Deliverable:
+- Confirmation + examples from logs.
+
+====================================================
+6) CROSS-CHECK AGAINST SAMPLE QUICK CMA PDF (USER WILL PROVIDE)
+====================================================
+
+The user will provide “Quick CMA 2740.pdf” as a reference.
+Task:
+1) Pick 3–5 properties from the PDF and compare:
+- status
+- list/close price
+- close date
+- year built
+- DOM logic
+against what our Repliers-backed endpoints return.
+2) If mismatches exist:
+- identify whether it’s mapping logic or Repliers data freshness.
+
+Deliverable:
+- A short mismatch report + recommended fix or explanation.
+
+====================================================
+FINAL REPORT REQUIRED
+====================================================
+
+Provide a “Repliers Alignment Report” including:
+- `class` usage audit results
+- ACTRIS MLS scope confirmation
+- field mapping table + shared helper implementation locations
+- inventory consistency verification
+- rental exclusion verification
+- PDF cross-check results (3–5 properties)
