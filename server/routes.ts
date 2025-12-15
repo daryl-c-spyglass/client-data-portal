@@ -1832,13 +1832,16 @@ This email was sent by ${senderName} (${senderEmail}) via the MLS Grid IDX Platf
         };
       };
 
-      // Debug: Log the property data being used for calculations
-      console.log('📊 CMA Statistics - Processing', properties.length, 'properties');
-      properties.forEach((p: any, idx: number) => {
-        const price = Number(p.closePrice || p.listPrice);
-        const area = Number(p.livingArea);
-        console.log(`  [${idx}] ${p.unparsedAddress || p.address || 'Unknown'}: closePrice=${p.closePrice}, listPrice=${p.listPrice}, livingArea=${area}, $/sqft=${area > 0 ? (price/area).toFixed(2) : 'N/A'}`);
-      });
+      // Dev-only debug logging for PDF cross-check capability
+      // This logs property data for verifying Repliers data matches external sources (e.g., Quick CMA PDFs)
+      if (process.env.NODE_ENV === 'development') {
+        console.log('📊 CMA Statistics - Processing', properties.length, 'properties');
+        properties.forEach((p: any, idx: number) => {
+          const price = Number(p.closePrice || p.listPrice);
+          const area = Number(p.livingArea);
+          console.log(`  [${idx}] ${p.unparsedAddress || p.address || 'Unknown'}: closePrice=${p.closePrice}, listPrice=${p.listPrice}, livingArea=${area}, $/sqft=${area > 0 ? (price/area).toFixed(2) : 'N/A'}`);
+        });
+      }
 
       const prices = getNumericValues(properties.map((p: any) => Number(p.closePrice || p.listPrice)));
       const livingAreas = getNumericValues(properties.map((p: any) => Number(p.livingArea)));

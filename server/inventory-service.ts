@@ -95,9 +95,30 @@ export async function getUnifiedInventory(forceRefresh = false): Promise<Invento
         inventoryData.countsBySubtype[subtype] = repliersCount + closedSubtypeCount;
       }
 
-      // Log inventory for debugging
-      console.log(`[Inventory] Counts by status: Active=${inventoryData.countsByStatus.Active}, UC=${inventoryData.countsByStatus['Under Contract']}, Closed=${inventoryData.countsByStatus.Closed}`);
-      console.log(`[Inventory] Counts by subtype:`, inventoryData.countsBySubtype);
+      // Calculate sum of all subtypes for validation
+      const subtypeTotal = Object.values(inventoryData.countsBySubtype).reduce((sum, count) => sum + count, 0);
+      const statusTotal = inventoryData.countsByStatus.Active + 
+                          inventoryData.countsByStatus['Under Contract'] + 
+                          inventoryData.countsByStatus.Closed;
+      
+      // DESIGN DECISION: Per user requirement, "totalProperties must equal sum(countsByType/Subtype)"
+      // The subtype breakdown IS the authoritative breakdown shown in Property Inventory by Type UI.
+      // Status counts (Active/UC/Closed) come from Repliers count endpoints and may differ slightly
+      // from subtype aggregates due to how Repliers categorizes properties internally.
+      // We use subtypeTotal for totalCount to guarantee UI consistency.
+      inventoryData.totalCount = subtypeTotal;
+      
+      // Dev-only debug logging (only in development environment)
+      if (process.env.NODE_ENV === 'development') {
+        console.log(`[Inventory] Counts by status: Active=${inventoryData.countsByStatus.Active}, UC=${inventoryData.countsByStatus['Under Contract']}, Closed=${inventoryData.countsByStatus.Closed}`);
+        console.log(`[Inventory] Sum from status counts: ${statusTotal}`);
+        console.log(`[Inventory] Sum of subtypes (authoritative): ${subtypeTotal}`);
+        console.log(`[Inventory] Counts by subtype:`, inventoryData.countsBySubtype);
+        
+        if (subtypeTotal !== statusTotal) {
+          console.warn(`[Inventory] Note: Status sum (${statusTotal}) differs from subtype sum (${subtypeTotal}). This is expected due to Repliers API aggregation differences.`);
+        }
+      }
 
     } catch (error) {
       console.error('[Inventory] Error fetching from Repliers:', error);
