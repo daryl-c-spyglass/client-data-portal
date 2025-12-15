@@ -2690,7 +2690,7 @@ This email was sent by ${senderName} (${senderEmail}) via the MLS Grid IDX Platf
       
       const results = await storage.getAutocompleteCities(query, 20);
       const suggestions = results.map(r => r.value);
-      res.json(results.length > 0 ? results : { suggestions });
+      res.json({ suggestions });
     } catch (error: any) {
       console.error("City autocomplete error:", error.message);
       res.json({ suggestions: [], results: [] });
@@ -2707,7 +2707,7 @@ This email was sent by ${senderName} (${senderEmail}) via the MLS Grid IDX Platf
       
       const results = await storage.getAutocompleteSubdivisions(query, 20);
       const suggestions = results.map(r => r.value);
-      res.json(results.length > 0 ? results : { suggestions });
+      res.json({ suggestions });
     } catch (error: any) {
       console.error("Subdivision autocomplete error:", error.message);
       res.json({ suggestions: [], results: [] });
@@ -2724,7 +2724,7 @@ This email was sent by ${senderName} (${senderEmail}) via the MLS Grid IDX Platf
       
       const results = await storage.getAutocompleteZipCodes(query, 20);
       const suggestions = results.map(r => r.value);
-      res.json(results.length > 0 ? results : { suggestions });
+      res.json({ suggestions });
     } catch (error: any) {
       console.error("Postal code autocomplete error:", error.message);
       res.json({ suggestions: [], results: [] });
