@@ -983,6 +983,62 @@ export default function BuyerSearch() {
                       />
                     </div>
                   </div>
+                  
+                  {/* Sold Date Quick Filters */}
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <Label className="text-xs text-muted-foreground">Sold Date Quick Filters</Label>
+                      {(filters.dateRangeFrom || filters.dateRangeTo) && (
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => {
+                            updateFilter('dateRangeFrom', undefined);
+                            updateFilter('dateRangeTo', undefined);
+                          }}
+                          className="h-5 px-1 text-xs text-muted-foreground"
+                          data-testid="button-clear-date-filter"
+                        >
+                          Clear
+                        </Button>
+                      )}
+                    </div>
+                    <div className="flex flex-wrap gap-1.5">
+                      {[30, 60, 90, 120, 150, 180].map((days) => {
+                        const today = new Date();
+                        today.setHours(23, 59, 59, 999);
+                        const fromDate = new Date(today);
+                        fromDate.setDate(today.getDate() - days);
+                        fromDate.setHours(0, 0, 0, 0);
+                        const fromDateStr = fromDate.toISOString().split('T')[0];
+                        const todayStr = today.toISOString().split('T')[0];
+                        const isActive = filters.dateRangeFrom === fromDateStr && filters.dateRangeTo === todayStr;
+                        
+                        return (
+                          <Button
+                            key={days}
+                            type="button"
+                            size="sm"
+                            variant={isActive ? "default" : "outline"}
+                            onClick={() => {
+                              if (isActive) {
+                                updateFilter('dateRangeFrom', undefined);
+                                updateFilter('dateRangeTo', undefined);
+                              } else {
+                                updateFilter('dateRangeFrom', fromDateStr);
+                                updateFilter('dateRangeTo', todayStr);
+                              }
+                            }}
+                            data-testid={`button-sold-${days}-days`}
+                            className="h-7 px-2 text-xs"
+                          >
+                            0-{days}
+                          </Button>
+                        );
+                      })}
+                    </div>
+                  </div>
                 </div>
 
                 <Separator />

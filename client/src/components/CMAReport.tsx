@@ -849,7 +849,7 @@ export function CMAReport({
                     }
                     
                     const positions: [number, number][] = propertiesWithCoords.map(
-                      p => [p.latitude as number, p.longitude as number]
+                      p => [Number(p.latitude), Number(p.longitude)]
                     );
                     const center: [number, number] = [
                       positions.reduce((sum, pos) => sum + pos[0], 0) / positions.length,
@@ -878,7 +878,7 @@ export function CMAReport({
                             return (
                               <Marker
                                 key={property.listingId}
-                                position={[property.latitude as number, property.longitude as number]}
+                                position={[Number(property.latitude), Number(property.longitude)]}
                                 icon={getCompIcon(status)}
                               >
                                 <Popup>
@@ -1560,7 +1560,7 @@ export function CMAReport({
                       );
                     }
                     
-                    const bounds = propertiesWithCoords.map(p => [p.latitude as number, p.longitude as number] as [number, number]);
+                    const bounds = propertiesWithCoords.map(p => [Number(p.latitude), Number(p.longitude)] as [number, number]);
                     const centerLat = bounds.reduce((sum, [lat]) => sum + lat, 0) / bounds.length;
                     const centerLng = bounds.reduce((sum, [, lng]) => sum + lng, 0) / bounds.length;
                     
@@ -1586,7 +1586,7 @@ export function CMAReport({
                             return (
                               <Marker
                                 key={property.listingId}
-                                position={[property.latitude as number, property.longitude as number]}
+                                position={[Number(property.latitude), Number(property.longitude)]}
                                 icon={getCompIcon(status)}
                               >
                                 <Popup>

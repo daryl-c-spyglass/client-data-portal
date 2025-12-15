@@ -589,4 +589,52 @@
     display: block !important;
     width: 100% !important;
   }
+  
+  /* CRITICAL: Fix PDF bottom cut-off - target specific scrollable containers */
+  .cma-print > .space-y-6,
+  .cma-print [role="tabpanel"],
+  .cma-print [data-radix-scroll-area-viewport],
+  .cma-print .overflow-y-auto,
+  .cma-print .overflow-auto {
+    overflow: visible !important;
+    max-height: none !important;
+    height: auto !important;
+  }
+  
+  /* Ensure tab content expands fully */
+  .cma-print [role="tabpanel"] > div,
+  .cma-print [role="tabpanel"] > section {
+    overflow: visible !important;
+    height: auto !important;
+  }
+  
+  /* Ensure page breaks work properly for long content */
+  .cma-print [role="tabpanel"] > * {
+    break-inside: avoid-page;
+    page-break-inside: avoid;
+  }
+  
+  /* Allow table rows to break across pages if needed for very long tables */
+  .cma-print table tbody {
+    page-break-inside: auto !important;
+  }
+  
+  /* Section spacing for clarity */
+  .cma-print section,
+  .cma-print article,
+  .cma-print [data-testid*="section"] {
+    margin-bottom: 1rem !important;
+    page-break-inside: avoid;
+  }
+  
+  /* Prevent orphaned headers */
+  .cma-print h1, .cma-print h2, .cma-print h3 {
+    page-break-after: avoid !important;
+    break-after: avoid !important;
+  }
+  
+  /* Force page break before large sections if needed */
+  .cma-print [role="tabpanel"]:nth-child(n+3) {
+    page-break-before: auto;
+  }
 }
