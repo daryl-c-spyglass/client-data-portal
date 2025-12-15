@@ -19,7 +19,9 @@ import SellerUpdateNew from "@/pages/SellerUpdateNew";
 import SellerUpdateEmbed from "@/pages/SellerUpdateEmbed";
 import EmbedCodeGenerator from "@/pages/EmbedCodeGenerator";
 import BuyerSearch from "@/pages/BuyerSearch";
-import LeadGateSettings from "@/pages/LeadGateSettings";
+import Settings from "@/pages/Settings";
+import Clients from "@/pages/Clients";
+import Analytics from "@/pages/Analytics";
 import SharedCMAView from "@/pages/SharedCMAView";
 
 function Router() {
@@ -35,10 +37,9 @@ function Router() {
       <Route path="/seller-updates/new" component={SellerUpdateNew} />
       <Route path="/buyer-search" component={BuyerSearch} />
       <Route path="/embed-code" component={EmbedCodeGenerator} />
-      <Route path="/clients" component={() => <div className="p-6">Clients page coming soon</div>} />
-      <Route path="/analytics" component={() => <div className="p-6">Analytics page coming soon</div>} />
-      <Route path="/settings" component={() => <div className="p-6">Settings page coming soon</div>} />
-      <Route path="/settings/lead-gate" component={LeadGateSettings} />
+      <Route path="/clients" component={Clients} />
+      <Route path="/analytics" component={Analytics} />
+      <Route path="/settings" component={Settings} />
       <Route component={NotFound} />
     </Switch>
   );

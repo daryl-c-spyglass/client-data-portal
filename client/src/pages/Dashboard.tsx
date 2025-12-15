@@ -116,9 +116,20 @@ interface RecentSoldProperty {
   bedroomsTotal?: number;
   bathroomsTotalInteger?: number;
   livingArea?: number;
+  yearBuilt?: number;
   photos?: string[];
   standardStatus?: string;
   propertySubType?: string;
+}
+
+// Helper to display sold price consistently
+function displaySoldPrice(price?: number): string {
+  if (!price) return 'Price N/A';
+  return new Intl.NumberFormat('en-US', { 
+    style: 'currency', 
+    currency: 'USD', 
+    maximumFractionDigits: 0 
+  }).format(price);
 }
 
 interface RecentSoldResponse {
@@ -489,7 +500,7 @@ export default function Dashboard() {
   // Dashboard customization is TEMPORARY (session-only, resets on refresh)
   const [config, setConfig] = useState<DashboardConfig>(defaultConfig);
   // CMA sorting state (session-only)
-  const [cmaSortBy, setCmaSortBy] = useState<'date' | 'name' | 'comps'>('date');
+  const [cmaSortBy, setCmaSortBy] = useState<'date' | 'date-asc' | 'name' | 'name-desc'>('date');
   
   // Auto-carousel state
   const [carouselPaused, setCarouselPaused] = useState(false);
@@ -761,8 +772,10 @@ export default function Dashboard() {
     switch (cmaSortBy) {
       case 'name':
         return a.name.localeCompare(b.name);
-      case 'comps':
-        return b.comparablePropertyIds.length - a.comparablePropertyIds.length;
+      case 'name-desc':
+        return b.name.localeCompare(a.name);
+      case 'date-asc':
+        return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
       case 'date':
       default:
         return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
@@ -1374,38 +1387,67 @@ export default function Dashboard() {
                           onScroll={handleRecentSoldScroll}
                           data-testid="recent-sold-scroll-container"
                         >
-                          {allRecentSoldProps.map((prop) => (
-                            <div 
-                              key={prop.id} 
-                              className="flex items-center gap-3 p-2 rounded-md hover-elevate active-elevate-2 cursor-pointer"
-                              onClick={() => handlePropertyClick(prop as DashboardProperty)}
-                              data-testid={`recent-sold-${prop.id}`}
-                            >
-                              <div className="w-12 h-12 bg-muted rounded-md flex items-center justify-center overflow-hidden flex-shrink-0">
+                          {allRecentSoldProps.map((prop) => {
+                            const pricePerSqft = prop.closePrice && prop.livingArea 
+                              ? Number(prop.closePrice) / Number(prop.livingArea) 
+                              : null;
+                            
+                            return (
+                              <div 
+                                key={prop.id} 
+                                className="flex gap-3 p-3 rounded-md border border-red-200 dark:border-red-800 hover-elevate active-elevate-2 cursor-pointer"
+                                onClick={() => handlePropertyClick(prop as DashboardProperty)}
+                                onKeyDown={(e) => e.key === 'Enter' && handlePropertyClick(prop as DashboardProperty)}
+                                tabIndex={0}
+                                role="button"
+                                data-testid={`recent-sold-${prop.id}`}
+                              >
                                 {prop.photos && prop.photos.length > 0 ? (
-                                  <img src={prop.photos[0]} alt="" className="w-full h-full object-cover" />
+                                  <img src={prop.photos[0]} alt={prop.unparsedAddress || ''} className="w-20 h-20 object-cover rounded-md flex-shrink-0" />
                                 ) : (
-                                  <Home className="w-6 h-6 text-muted-foreground" />
+                                  <div className="w-20 h-20 bg-muted rounded-md flex flex-col items-center justify-center flex-shrink-0 p-1">
+                                    <Home className="w-5 h-5 text-muted-foreground/50 mb-0.5" />
+                                    <span className="text-[8px] text-muted-foreground text-center leading-tight">No photos available</span>
+                                  </div>
                                 )}
-                              </div>
-                              <div className="flex-1 min-w-0">
-                                <p className="text-sm font-medium truncate">{prop.unparsedAddress || 'Unknown Address'}</p>
-                                <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                                  <span className="text-primary font-medium">
-                                    {prop.closePrice ? `$${prop.closePrice.toLocaleString()}` : 'N/A'}
-                                  </span>
+                                <div className="flex-1 min-w-0">
+                                  <div className="flex items-start justify-between gap-2 flex-wrap">
+                                    <p className="font-semibold text-sm truncate max-w-[200px]">{prop.unparsedAddress || 'Unknown Address'}</p>
+                                    <Badge variant="outline" className="bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400 text-xs flex-shrink-0">
+                                      Sold
+                                    </Badge>
+                                  </div>
+                                  <p className="text-primary font-bold text-base mt-0.5">
+                                    {displaySoldPrice(prop.closePrice)}
+                                    {pricePerSqft && (
+                                      <span className="text-xs font-normal text-muted-foreground ml-1">
+                                        (${pricePerSqft.toFixed(0)}/sqft)
+                                      </span>
+                                    )}
+                                  </p>
+                                  <div className="flex items-center gap-3 text-xs text-muted-foreground mt-1">
+                                    {prop.bedroomsTotal !== null && prop.bedroomsTotal !== undefined && (
+                                      <span className="flex items-center gap-0.5"><Bed className="w-3 h-3" /> {prop.bedroomsTotal}</span>
+                                    )}
+                                    {prop.bathroomsTotalInteger !== null && prop.bathroomsTotalInteger !== undefined && (
+                                      <span className="flex items-center gap-0.5"><Bath className="w-3 h-3" /> {prop.bathroomsTotalInteger}</span>
+                                    )}
+                                    {prop.livingArea && (
+                                      <span className="flex items-center gap-0.5"><Maximize className="w-3 h-3" /> {Number(prop.livingArea).toLocaleString()}</span>
+                                    )}
+                                    {prop.yearBuilt && (
+                                      <span className="flex items-center gap-0.5"><Calendar className="w-3 h-3" /> {prop.yearBuilt}</span>
+                                    )}
+                                  </div>
                                   {prop.closeDate && (
-                                    <span>Closed {new Date(prop.closeDate).toLocaleDateString()}</span>
+                                    <p className="text-xs text-muted-foreground mt-0.5">
+                                      Closed {new Date(prop.closeDate).toLocaleDateString()}
+                                    </p>
                                   )}
                                 </div>
-                                <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                                  {prop.bedroomsTotal !== null && prop.bedroomsTotal !== undefined && <span>{prop.bedroomsTotal} bd</span>}
-                                  {prop.bathroomsTotalInteger !== null && prop.bathroomsTotalInteger !== undefined && <span>{prop.bathroomsTotalInteger} ba</span>}
-                                  {prop.livingArea && <span>{Number(prop.livingArea).toLocaleString()} sqft</span>}
-                                </div>
                               </div>
-                            </div>
-                          ))}
+                            );
+                          })}
                           {recentSoldFetching && (
                             <div className="flex justify-center py-2">
                               <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
@@ -1438,16 +1480,17 @@ export default function Dashboard() {
                         <span className="text-xs text-muted-foreground">Sort:</span>
                         <div className="flex gap-1">
                           {[
-                            { value: 'date', label: 'Date' },
-                            { value: 'name', label: 'Name' },
-                            { value: 'comps', label: 'Comps' },
+                            { value: 'date', label: 'Newest' },
+                            { value: 'date-asc', label: 'Oldest' },
+                            { value: 'name', label: 'A-Z' },
+                            { value: 'name-desc', label: 'Z-A' },
                           ].map((option) => (
                             <Button
                               key={option.value}
                               variant={cmaSortBy === option.value ? 'default' : 'ghost'}
                               size="sm"
                               className="h-6 px-2 text-xs"
-                              onClick={() => setCmaSortBy(option.value as 'date' | 'name' | 'comps')}
+                              onClick={() => setCmaSortBy(option.value as 'date' | 'date-asc' | 'name' | 'name-desc')}
                               data-testid={`button-sort-cmas-${option.value}`}
                             >
                               {option.label}

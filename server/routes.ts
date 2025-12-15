@@ -3151,6 +3151,7 @@ This email was sent by ${senderName} (${senderEmail}) via the MLS Grid IDX Platf
           bedroomsTotal: p.bedroomsTotal,
           bathroomsTotalInteger: p.bathroomsTotalInteger,
           livingArea: p.livingArea,
+          yearBuilt: p.yearBuilt,
           photos: photoUrls.length > 0 ? photoUrls : [],
           standardStatus: 'Closed',
           propertySubType: p.propertySubType

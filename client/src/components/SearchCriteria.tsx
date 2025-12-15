@@ -225,48 +225,22 @@ export function SearchCriteriaForm({ onSearch, initialCriteria = {} }: SearchCri
                 <PopoverTrigger asChild>
                   <Button variant="outline" className="w-full justify-start h-10 text-sm" data-testid="button-date-from">
                     <CalendarIcon className="mr-2 h-4 w-4" />
-                    {criteria.dateRange?.from ? format(new Date(criteria.dateRange.from), "MMM yyyy") : "From"}
+                    {criteria.dateRange?.from ? format(new Date(criteria.dateRange.from), "MMM d, yyyy") : "Select date"}
                   </Button>
                 </PopoverTrigger>
                 <PopoverContent className="w-auto p-0" align="start">
-                  <div className="p-3 space-y-3">
-                    <div className="grid grid-cols-2 gap-2">
-                      <Select
-                        value={criteria.dateRange?.from ? new Date(criteria.dateRange.from).getMonth().toString() : ''}
-                        onValueChange={(month) => {
-                          const year = criteria.dateRange?.from ? new Date(criteria.dateRange.from).getFullYear() : new Date().getFullYear();
-                          const newDate = new Date(year, parseInt(month), 1);
-                          updateCriteria('dateRange', { ...criteria.dateRange, from: newDate.toISOString() });
-                        }}
-                      >
-                        <SelectTrigger data-testid="select-date-from-month" className="h-9">
-                          <SelectValue placeholder="Month" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'].map((m, i) => (
-                            <SelectItem key={i} value={i.toString()}>{m}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      <Select
-                        value={criteria.dateRange?.from ? new Date(criteria.dateRange.from).getFullYear().toString() : ''}
-                        onValueChange={(year) => {
-                          const month = criteria.dateRange?.from ? new Date(criteria.dateRange.from).getMonth() : 0;
-                          const newDate = new Date(parseInt(year), month, 1);
-                          updateCriteria('dateRange', { ...criteria.dateRange, from: newDate.toISOString() });
-                        }}
-                      >
-                        <SelectTrigger data-testid="select-date-from-year" className="h-9">
-                          <SelectValue placeholder="Year" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {Array.from({ length: 10 }, (_, i) => new Date().getFullYear() - i).map(y => (
-                            <SelectItem key={y} value={y.toString()}>{y}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </div>
+                  <Calendar
+                    mode="single"
+                    selected={criteria.dateRange?.from ? new Date(criteria.dateRange.from) : undefined}
+                    onSelect={(date) => {
+                      if (date) {
+                        updateCriteria('dateRange', { ...criteria.dateRange, from: date.toISOString() });
+                      }
+                    }}
+                    initialFocus
+                    disabled={(date) => date > new Date()}
+                    data-testid="calendar-date-from"
+                  />
                 </PopoverContent>
               </Popover>
             </div>
@@ -276,48 +250,22 @@ export function SearchCriteriaForm({ onSearch, initialCriteria = {} }: SearchCri
                 <PopoverTrigger asChild>
                   <Button variant="outline" className="w-full justify-start h-10 text-sm" data-testid="button-date-to">
                     <CalendarIcon className="mr-2 h-4 w-4" />
-                    {criteria.dateRange?.to ? format(new Date(criteria.dateRange.to), "MMM yyyy") : "To"}
+                    {criteria.dateRange?.to ? format(new Date(criteria.dateRange.to), "MMM d, yyyy") : "Select date"}
                   </Button>
                 </PopoverTrigger>
                 <PopoverContent className="w-auto p-0" align="start">
-                  <div className="p-3 space-y-3">
-                    <div className="grid grid-cols-2 gap-2">
-                      <Select
-                        value={criteria.dateRange?.to ? new Date(criteria.dateRange.to).getMonth().toString() : ''}
-                        onValueChange={(month) => {
-                          const year = criteria.dateRange?.to ? new Date(criteria.dateRange.to).getFullYear() : new Date().getFullYear();
-                          const newDate = new Date(year, parseInt(month) + 1, 0); // Last day of month
-                          updateCriteria('dateRange', { ...criteria.dateRange, to: newDate.toISOString() });
-                        }}
-                      >
-                        <SelectTrigger data-testid="select-date-to-month" className="h-9">
-                          <SelectValue placeholder="Month" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'].map((m, i) => (
-                            <SelectItem key={i} value={i.toString()}>{m}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      <Select
-                        value={criteria.dateRange?.to ? new Date(criteria.dateRange.to).getFullYear().toString() : ''}
-                        onValueChange={(year) => {
-                          const month = criteria.dateRange?.to ? new Date(criteria.dateRange.to).getMonth() : 11;
-                          const newDate = new Date(parseInt(year), month + 1, 0); // Last day of month
-                          updateCriteria('dateRange', { ...criteria.dateRange, to: newDate.toISOString() });
-                        }}
-                      >
-                        <SelectTrigger data-testid="select-date-to-year" className="h-9">
-                          <SelectValue placeholder="Year" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {Array.from({ length: 10 }, (_, i) => new Date().getFullYear() - i).map(y => (
-                            <SelectItem key={y} value={y.toString()}>{y}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </div>
+                  <Calendar
+                    mode="single"
+                    selected={criteria.dateRange?.to ? new Date(criteria.dateRange.to) : undefined}
+                    onSelect={(date) => {
+                      if (date) {
+                        updateCriteria('dateRange', { ...criteria.dateRange, to: date.toISOString() });
+                      }
+                    }}
+                    initialFocus
+                    disabled={(date) => date > new Date()}
+                    data-testid="calendar-date-to"
+                  />
                 </PopoverContent>
               </Popover>
             </div>

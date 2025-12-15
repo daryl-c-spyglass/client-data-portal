@@ -1,0 +1,211 @@
+You are working ONLY on the AGENT APP (Dashboard, Properties, CMA Print PDF, Buyer Search, Navigation/Settings).
+Do NOT modify IDX/public pages.
+
+Data source: Repliers. Leasing/rentals excluded globally.
+Implement items ONE BY ONE, test each, and provide a final report.
+
+====================================================
+A) DASHBOARD — RECENT SOLD/CLOSED FLOATING CARD FIXES
+====================================================
+
+Problems:
+- Sold Price and Year Built are missing on the Sold/Closed floating card.
+- Sold/Closed photos sometimes missing without placeholder.
+- Sold/Closed floating card format should match CMA “Properties Used in Analysis” card style.
+- Recent CMAs list needs sorting options.
+
+Requirements:
+1) Sold/Closed floating card must include:
+   - Sold Price (must be correct from Repliers “closePrice” / sold price field)
+   - Sold Date (already requested earlier)
+   - Year Built (from Repliers)
+   - Beds / Baths / Sq Ft (if available)
+   - Status badge = Sold/Closed
+   - Address + Subdivision + Neighborhood (separate fields if available)
+2) Photo behavior:
+   - If no photos, show placeholder text/box exactly like CMA: “No photos available”
+   - Do not show broken image icon
+3) Card formatting:
+   - Copy the same layout/format used in CMA → “Properties Used in Analysis (N)”
+   - Keep styling consistent (typography, spacing, stat chips)
+4) Global consistency:
+   - Ensure Sold Price displayed here matches Sold Price used in CMA + Properties + Buyer Search (same mapping field).
+   - Add a shared helper for “displaySoldPrice()” sourced from Repliers fields to avoid mismatch.
+5) Recent CMAs sorting:
+   - Add sort dropdown/options on Dashboard “Recent CMAs”:
+     • Newest → Oldest (default)
+     • A–Z
+     • Z–A
+   - Sorting must reflect the same CMA list source as CMAs section.
+
+Testing:
+- Click multiple Sold/Closed items:
+  - Sold price shows and matches Repliers
+  - Year built shows
+  - Placeholder appears if no photos
+- Change Recent CMA sort modes and verify correct ordering.
+
+====================================================
+B) PROPERTIES — RESTORE FULL DATE RANGE PICKER (MONTH/DAY/YEAR FROM + TO)
+====================================================
+
+Problem:
+- The Date Range was changed; user wants the prior version restored.
+
+Requirements:
+- Restore the prior Date Range control that allows selecting:
+  - From: Month / Day / Year
+  - To: Month / Day / Year
+- Ensure user can change ALL parts (month, day, year) for both start and end.
+- Preserve date range selection during navigation unless Reset is clicked.
+
+Testing:
+- Set From/To dates including different months/years.
+- Run search and confirm results reflect the chosen range.
+
+====================================================
+C) CMA — PRINT PDF SHOULD NOT CAPTURE AGENT UI / MUST LOOK LIKE REPORT
+====================================================
+
+Problems:
+- Print PDF is capturing UI-only content (ex: agent “save” behavior / UI state) and looks like a screenshot.
+- PDF must resemble Share Link output style (clean report).
+
+Requirements:
+1) Print output must exclude ALL agent-only UI elements:
+   - Save button/controls
+   - Yellow toolbars/action rows
+   - Sticky headers
+   - Any edit/modify controls
+   - Any UI state artifacts (like active selections, focus outlines)
+2) PDF styling must be report-like:
+   - Clean margins
+   - Proper page breaks
+   - No clipping / no scroll containers
+3) Validate that the PDF contains only intended CMA report sections and not interactive UI.
+4) Compare against Share Link output and align structure/format as closely as possible.
+
+Testing:
+- Generate CMA → Save (agent action) → Print PDF:
+  - Confirm PDF does NOT include agent UI components or states
+  - Confirm looks like a formatted report, not a webpage screenshot
+
+====================================================
+D) BUYER SEARCH — SUGGESTIVE INPUT (AUTOCOMPLETE) NOT SHOWING
+====================================================
+
+Problem:
+- Suggestive input for Cities, Zip Codes, Subdivision, Elementary is not showing.
+
+Requirements:
+1) Implement autocomplete suggestions for:
+   - Cities
+   - Zip codes
+   - Subdivision
+   - Elementary (schools)
+2) Behavior:
+   - As user types, show suggestion list from Repliers-backed dataset.
+   - User can click a suggestion to fill the field.
+   - Must debounce input to avoid excessive API calls.
+3) Ensure suggestions work even if user types partial strings (case-insensitive).
+4) If no suggestions, show “No matches”.
+
+Testing:
+- Type 3–5 letters into each field and confirm suggestions appear.
+- Click suggestion and confirm it populates the input.
+
+====================================================
+E) NAVIGATION — MOVE “EMBED CODE” INTO SETTINGS
+====================================================
+
+Requirement:
+- Remove “Embed Code” from left navigation as a standalone item.
+- Move Embed Code UI inside Settings section as a settings page/tab:
+  - Settings → Embed Code
+- Ensure routing still works and no broken links.
+
+Testing:
+- Left nav no longer shows “Embed Code”
+- Settings contains “Embed Code” and opens properly.
+
+====================================================
+F) SETTINGS — ADD USEFUL SETTINGS (SUGGESTIONS + IMPLEMENT BASIC STRUCTURE)
+====================================================
+
+Implement a Settings structure with clear sections (even if some are placeholders):
+Suggested Settings modules:
+1) Profile
+   - Name, email (display)
+2) Data & Sync
+   - Data source = Repliers
+   - Last updated timestamp
+   - Manual sync button (if supported)
+3) Display Preferences
+   - Default statuses (Active/UC/Sold) for searches
+   - Default sort preferences
+4) Notifications (optional placeholder)
+   - Saved search alerts (future)
+5) Embed Code (moved here)
+
+Testing:
+- Settings page renders with sections, no blank placeholders without labels.
+
+====================================================
+G) CLIENTS + ANALYTICS — PROVIDE FEATURE SUGGESTIONS (AND OPTIONAL “COMING SOON” STRUCTURE)
+====================================================
+
+Clients page suggestions (agent-focused):
+- Client list with:
+  • name, email/phone
+  • saved searches
+  • shared CMAs
+  • notes
+  • last activity
+- Ability to “Send CMA” or “Share properties” to a client
+
+Analytics page suggestions:
+- Agent usage analytics:
+  • CMAs created
+  • properties viewed
+  • saved searches created
+- Market analytics:
+  • avg/median sold price trends by area
+  • DOM filters
+  • absorption/inventory summary
+- Export/download (future)
+
+Implementation requirement:
+- Replace the blank pages with a basic “Coming soon” layout that includes the above bullets so users understand future value.
+
+====================================================
+H) LEAD GATE — REVIEW PURPOSE + RECOMMENDATION
+====================================================
+
+Requirement:
+- Investigate what “Lead Gate” is intended to do in this app.
+- Provide a short recommendation:
+  - Keep it (and explain use)
+  - Rename it
+  - Move it under Settings/Admin
+  - Or remove if unused
+
+Testing:
+- Confirm Lead Gate route does not break navigation.
+
+====================================================
+FINAL REPORT REQUIRED
+====================================================
+
+Provide:
+1) Dashboard Sold/Closed floating card before/after proof:
+   - Sold price + year built added
+   - Placeholder “No photos available”
+   - CMA-style format applied
+2) Recent CMAs sorting options proof.
+3) Properties date range restored proof.
+4) CMA PDF before/after proof showing:
+   - No agent UI artifacts
+   - Report-like formatting
+5) Buyer Search autocomplete proof for 4 fields.
+6) Nav change proof: Embed Code moved under Settings.
+7) Settings structure + suggested features for Clients/Analytics + Lead Gate recommendation.
