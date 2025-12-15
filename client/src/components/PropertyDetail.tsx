@@ -23,6 +23,7 @@ import {
   Copy
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { NeighborhoodReview } from "@/components/NeighborhoodReview";
 import type { Property, Media } from "@shared/schema";
 
 const defaultIcon = L.icon({
@@ -327,7 +328,7 @@ export function PropertyDetail({
             </Card>
           </TabsContent>
 
-          <TabsContent value="neighborhood">
+          <TabsContent value="neighborhood" className="space-y-4">
             <Card>
               <CardContent className="pt-6">
                 <div className="space-y-4">
@@ -359,6 +360,15 @@ export function PropertyDetail({
                 </div>
               </CardContent>
             </Card>
+            
+            {/* Neighborhood Market Overview */}
+            {property.neighborhood && (
+              <NeighborhoodReview 
+                neighborhoodName={property.neighborhood} 
+                city={property.city || undefined}
+                months={6}
+              />
+            )}
           </TabsContent>
         </Tabs>
 
