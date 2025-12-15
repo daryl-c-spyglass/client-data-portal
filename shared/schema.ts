@@ -304,6 +304,27 @@ export type InsertLeadGateSettings = z.infer<typeof insertLeadGateSettingsSchema
 export type UpdateLeadGateSettings = z.infer<typeof updateLeadGateSettingsSchema>;
 export type LeadGateSettings = typeof leadGateSettings.$inferSelect;
 
+// Neighborhood Boundaries Cache - Store fetched boundaries from Repliers API
+// This is SEPARATE from the subdivision field used for CMA comps
+export const neighborhoodBoundaries = pgTable("neighborhood_boundaries", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(), // Neighborhood name from Repliers
+  city: text("city"), // City for scoping lookups
+  area: text("area"), // Area/region
+  boundary: json("boundary").$type<number[][][]>(), // GeoJSON polygon coordinates [[lng, lat], ...]
+  centerLatitude: decimal("center_latitude", { precision: 10, scale: 7 }),
+  centerLongitude: decimal("center_longitude", { precision: 10, scale: 7 }),
+  fetchedAt: timestamp("fetched_at").notNull().defaultNow(),
+  expiresAt: timestamp("expires_at"), // Optional TTL for cache invalidation
+});
+
+export const insertNeighborhoodBoundarySchema = createInsertSchema(neighborhoodBoundaries).omit({ 
+  id: true, 
+  fetchedAt: true 
+});
+export type InsertNeighborhoodBoundary = z.infer<typeof insertNeighborhoodBoundarySchema>;
+export type NeighborhoodBoundary = typeof neighborhoodBoundaries.$inferSelect;
+
 // Search Criteria Types (for validation) - All fields optional for flexible querying
 // Handle both single string and array for multi-select filters from query params
 const stringOrArray = z.union([z.string(), z.array(z.string())]).transform((val) => 
