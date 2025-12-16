@@ -405,6 +405,12 @@ export function PropertyDetail({
                       {isLoadingNeighborhood && hasCoordinates && (
                         <li className="text-muted-foreground/60">Neighborhood: Loading...</li>
                       )}
+                      {!resolvedNeighborhood && !isLoadingNeighborhood && hasCoordinates && (
+                        <li className="text-muted-foreground/60">Neighborhood: Not available</li>
+                      )}
+                      {!hasCoordinates && (
+                        <li className="text-muted-foreground/60">Neighborhood: Coordinates required</li>
+                      )}
                       <li>City: {property.city || 'N/A'}</li>
                       <li>State: {property.stateOrProvince || 'TX'}</li>
                       <li>ZIP: {property.postalCode || 'N/A'}</li>

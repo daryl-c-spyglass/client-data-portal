@@ -1118,21 +1118,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
             // CRITICAL: Repliers "neighborhood" field is actually subdivision (tract/community label)
             // True neighborhood must come from boundary polygon resolution, NOT listing data
             // Capture ALL candidate subdivision fields for debug display
+            // Use type assertions for properties not in TypeScript defs but present in API response
             const rawSubdivisionFields = {
               'address.neighborhood': addr.neighborhood || null,
-              'address.subdivisionName': addr.subdivisionName || null,
-              'details.subdivision': details.subdivision || null,
-              'listing.neighborhood': listing.neighborhood || null,
-              'listing.subdivisionName': listing.subdivisionName || null,
+              'address.subdivisionName': (addr as any).subdivisionName || null,
+              'details.subdivision': (details as any).subdivision || null,
+              'listing.neighborhood': (listing as any).neighborhood || null,
+              'listing.subdivisionName': (listing as any).subdivisionName || null,
               'details.community': (details as any).community || null,
               'details.development': (details as any).development || null,
             };
             
             // Fallback chain: addr.neighborhood > addr.subdivisionName > details.subdivision
-            const subdivisionFromRepliers = addr.neighborhood || addr.subdivisionName || details.subdivision || null;
+            const subdivisionFromRepliers = addr.neighborhood || (addr as any).subdivisionName || (details as any).subdivision || null;
             const subdivisionSource = addr.neighborhood ? 'address.neighborhood' :
-                                       addr.subdivisionName ? 'address.subdivisionName' :
-                                       details.subdivision ? 'details.subdivision' : 'none';
+                                       (addr as any).subdivisionName ? 'address.subdivisionName' :
+                                       (details as any).subdivision ? 'details.subdivision' : 'none';
 
             const normalizedProperty = {
               id: listing.mlsNumber,
