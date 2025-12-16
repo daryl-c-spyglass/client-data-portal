@@ -2245,6 +2245,96 @@ This email was sent by ${senderName} (${senderEmail}) via the MLS Grid IDX Platf
     }
   });
 
+  // Repliers API diagnostic endpoint - test connection and capabilities
+  app.get("/api/repliers/test", async (req, res) => {
+    try {
+      if (!repliersClient) {
+        res.status(503).json({ 
+          success: false,
+          error: "Repliers API not configured - missing REPLIERS_API_KEY",
+          configured: false,
+          capabilities: { active: false, underContract: false, sold: false }
+        });
+        return;
+      }
+
+      console.log('🔍 Testing Repliers API connection and capabilities...');
+      
+      const capabilities = { active: false, underContract: false, sold: false };
+      const testResults: any = {};
+      
+      // Test Active listings
+      try {
+        const activeResult = await repliersClient.searchListings({
+          status: 'A',
+          class: 'residential',
+          resultsPerPage: 1,
+          pageNum: 1
+        });
+        capabilities.active = true;
+        testResults.activeCount = (activeResult as any).numResults || activeResult.listings?.length || 0;
+        console.log(`✅ Repliers Active (A) test successful`);
+      } catch (err: any) {
+        console.log(`❌ Repliers Active (A) test failed:`, err.message);
+        testResults.activeError = err.message;
+      }
+      
+      // Test Under Contract listings
+      try {
+        const ucResult = await repliersClient.searchListings({
+          status: 'U',
+          class: 'residential',
+          resultsPerPage: 1,
+          pageNum: 1
+        });
+        capabilities.underContract = true;
+        testResults.underContractCount = (ucResult as any).numResults || ucResult.listings?.length || 0;
+        console.log(`✅ Repliers Under Contract (U) test successful`);
+      } catch (err: any) {
+        console.log(`❌ Repliers Under Contract (U) test failed:`, err.message);
+        testResults.underContractError = err.message;
+      }
+      
+      // Test Sold listings (may not be enabled for all feeds)
+      try {
+        const soldResult = await repliersClient.searchListings({
+          status: 'S',
+          class: 'residential',
+          resultsPerPage: 1,
+          pageNum: 1
+        });
+        capabilities.sold = true;
+        testResults.soldCount = (soldResult as any).numResults || soldResult.listings?.length || 0;
+        console.log(`✅ Repliers Sold (S) test successful`);
+      } catch (err: any) {
+        console.log(`⚠️ Repliers Sold (S) not available:`, err.message);
+        testResults.soldError = err.message;
+        testResults.soldNote = "Sold data requires Repliers to enable status 'S' for your ACTRIS feed. Contact Repliers support.";
+      }
+      
+      const success = capabilities.active || capabilities.underContract;
+      
+      res.json({
+        success,
+        configured: true,
+        message: success 
+          ? `Repliers API connected. Active: ${capabilities.active ? 'Yes' : 'No'}, Under Contract: ${capabilities.underContract ? 'Yes' : 'No'}, Sold: ${capabilities.sold ? 'Yes' : 'No (contact Repliers to enable)'}`
+          : "Repliers API configured but no data access",
+        capabilities,
+        testResults
+      });
+    } catch (error: any) {
+      console.error('❌ Repliers API test failed:', error.message);
+      
+      res.status(500).json({
+        success: false,
+        configured: true,
+        error: error.message,
+        capabilities: { active: false, underContract: false, sold: false }
+      });
+    }
+  });
+
   // MLS Grid direct search endpoint (real-time Active listings from IDX)
   app.get("/api/mlsgrid/search", async (req, res) => {
     try {

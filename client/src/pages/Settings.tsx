@@ -146,6 +146,38 @@ export default function Settings() {
     },
   });
 
+  const [repliersCapabilities, setRepliersCapabilities] = useState<{
+    active: boolean;
+    underContract: boolean;
+    sold: boolean;
+  } | null>(null);
+
+  const testRepliersMutation = useMutation({
+    mutationFn: async () => {
+      const response = await apiRequest("/api/repliers/test", "GET");
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || "Repliers connection test failed");
+      }
+      return response.json();
+    },
+    onSuccess: (data) => {
+      setRepliersCapabilities(data.capabilities);
+      toast({
+        title: data.success ? "Connection successful" : "Connection issue",
+        description: data.message || "Repliers API test complete.",
+        variant: data.capabilities?.sold ? "default" : "default",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Connection failed",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
   useEffect(() => {
     if (leadGateSettings) {
       leadGateForm.reset({
@@ -366,10 +398,30 @@ export default function Settings() {
                   </div>
                   <div>
                     <p className="font-medium">Repliers API</p>
-                    <p className="text-xs text-muted-foreground">Active/Under Contract listings with photos</p>
+                    <p className="text-xs text-muted-foreground">
+                      {repliersCapabilities 
+                        ? `Active: ${repliersCapabilities.active ? '✓' : '✗'}, Under Contract: ${repliersCapabilities.underContract ? '✓' : '✗'}, Sold: ${repliersCapabilities.sold ? '✓' : '✗ (not enabled)'}`
+                        : 'Active/Under Contract listings with photos'}
+                    </p>
+                    {repliersCapabilities && !repliersCapabilities.sold && (
+                      <p className="text-xs text-amber-600 dark:text-amber-400 mt-1">
+                        Sold data requires Repliers to enable it for your feed
+                      </p>
+                    )}
                   </div>
                 </div>
-                <Badge>Connected</Badge>
+                <div className="flex items-center gap-2">
+                  <Badge>Connected</Badge>
+                  <Button 
+                    size="sm" 
+                    variant="outline"
+                    onClick={() => testRepliersMutation.mutate()}
+                    disabled={testRepliersMutation.isPending}
+                    data-testid="button-test-repliers"
+                  >
+                    {testRepliersMutation.isPending ? 'Testing...' : 'Test'}
+                  </Button>
+                </div>
               </div>
             </CardContent>
           </Card>
