@@ -2188,6 +2188,53 @@ This email was sent by ${senderName} (${senderEmail}) via the MLS Grid IDX Platf
     }
   });
 
+  // MLS Grid diagnostic endpoint - test API connection
+  app.get("/api/mlsgrid/test", requireAuth, async (req, res) => {
+    try {
+      if (!mlsGridClient) {
+        res.status(503).json({ 
+          success: false,
+          error: "MLS Grid API not configured - missing MLSGRID_API_URL or MLSGRID_API_TOKEN",
+          configured: false
+        });
+        return;
+      }
+
+      console.log('🔍 Testing MLS Grid API connection...');
+      
+      // Try to fetch a small batch of properties to verify connection
+      const testResult = await mlsGridClient.getProperties({ limit: 1 });
+      
+      const propertyCount = testResult?.value?.length || 0;
+      const sampleProperty = testResult?.value?.[0];
+      
+      console.log(`✅ MLS Grid API test successful - got ${propertyCount} properties`);
+      
+      res.json({
+        success: true,
+        configured: true,
+        message: "MLS Grid API connection successful",
+        testResults: {
+          propertiesReturned: propertyCount,
+          sampleListingId: sampleProperty?.ListingId || sampleProperty?.ListingKey || null,
+          sampleStatus: sampleProperty?.StandardStatus || null,
+          sampleCity: sampleProperty?.City || null,
+        }
+      });
+    } catch (error: any) {
+      console.error('❌ MLS Grid API test failed:', error.message);
+      console.error('Full error:', error.response?.data || error);
+      
+      res.status(500).json({
+        success: false,
+        configured: true,
+        error: error.message,
+        details: error.response?.data || null,
+        statusCode: error.response?.status || null
+      });
+    }
+  });
+
   // MLS Grid direct search endpoint (real-time Active listings from IDX)
   app.get("/api/mlsgrid/search", async (req, res) => {
     try {

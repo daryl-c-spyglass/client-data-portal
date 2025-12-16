@@ -122,6 +122,30 @@ export default function Settings() {
     },
   });
 
+  const testMlsGridMutation = useMutation({
+    mutationFn: async () => {
+      const response = await apiRequest("GET", "/api/mlsgrid/test");
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || "MLS Grid connection test failed");
+      }
+      return response.json();
+    },
+    onSuccess: (data) => {
+      toast({
+        title: data.success ? "Connection successful" : "Connection issue",
+        description: data.message || "MLS Grid API is responding.",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Connection failed",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
   useEffect(() => {
     if (leadGateSettings) {
       leadGateForm.reset({
@@ -319,10 +343,21 @@ export default function Settings() {
                   </div>
                   <div>
                     <p className="font-medium">MLS Grid API</p>
-                    <p className="text-xs text-muted-foreground">Austin Board of REALTORS</p>
+                    <p className="text-xs text-muted-foreground">Sold/Closed listings from Austin Board of REALTORS</p>
                   </div>
                 </div>
-                <Badge>Connected</Badge>
+                <div className="flex items-center gap-2">
+                  <Badge>Configured</Badge>
+                  <Button 
+                    size="sm" 
+                    variant="outline"
+                    onClick={() => testMlsGridMutation.mutate()}
+                    disabled={testMlsGridMutation.isPending}
+                    data-testid="button-test-mlsgrid"
+                  >
+                    {testMlsGridMutation.isPending ? 'Testing...' : 'Test'}
+                  </Button>
+                </div>
               </div>
               <div className="flex items-center justify-between p-3 border rounded-lg">
                 <div className="flex items-center gap-3">
@@ -331,7 +366,7 @@ export default function Settings() {
                   </div>
                   <div>
                     <p className="font-medium">Repliers API</p>
-                    <p className="text-xs text-muted-foreground">Active listings with coordinates</p>
+                    <p className="text-xs text-muted-foreground">Active/Under Contract listings with photos</p>
                   </div>
                 </div>
                 <Badge>Connected</Badge>
