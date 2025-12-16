@@ -124,7 +124,7 @@ export default function Settings() {
 
   const testMlsGridMutation = useMutation({
     mutationFn: async () => {
-      const response = await apiRequest("GET", "/api/mlsgrid/test");
+      const response = await apiRequest("/api/mlsgrid/test", "GET");
       if (!response.ok) {
         const error = await response.json();
         throw new Error(error.error || "MLS Grid connection test failed");
