@@ -1216,10 +1216,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const property = await storage.getProperty(id);
       if (property) {
         // CRITICAL: Legacy records may have subdivision stored in neighborhood field
-        // Migrate neighborhood to subdivision before clearing it
-        const subdivisionValue = property.subdivision || property.subdivisionName || property.neighborhood || null;
+        // Use type assertions for legacy field access
+        const propAny = property as any;
+        const subdivisionValue = property.subdivision || propAny.subdivisionName || property.neighborhood || null;
         const subdivisionSource = property.subdivision ? 'db.subdivision' :
-                                   property.subdivisionName ? 'db.subdivisionName' :
+                                   propAny.subdivisionName ? 'db.subdivisionName' :
                                    property.neighborhood ? 'db.neighborhood (legacy)' : 'none';
         res.json({
           ...property,
@@ -1231,7 +1232,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             fetchTimestamp: new Date().toISOString(),
             rawFields: {
               'db.subdivision': property.subdivision || null,
-              'db.subdivisionName': property.subdivisionName || null,
+              'db.subdivisionName': propAny.subdivisionName || null,
               'db.neighborhood (legacy)': property.neighborhood || null,
             },
             subdivisionSource: subdivisionSource,
@@ -1245,10 +1246,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const propertyByListingId = await storage.getPropertyByListingId(id);
       if (propertyByListingId) {
         // CRITICAL: Legacy records may have subdivision stored in neighborhood field
-        // Migrate neighborhood to subdivision before clearing it
-        const subdivisionValue = propertyByListingId.subdivision || propertyByListingId.subdivisionName || propertyByListingId.neighborhood || null;
+        // Use type assertions for legacy field access
+        const propAny = propertyByListingId as any;
+        const subdivisionValue = propertyByListingId.subdivision || propAny.subdivisionName || propertyByListingId.neighborhood || null;
         const subdivisionSource = propertyByListingId.subdivision ? 'db.subdivision' :
-                                   propertyByListingId.subdivisionName ? 'db.subdivisionName' :
+                                   propAny.subdivisionName ? 'db.subdivisionName' :
                                    propertyByListingId.neighborhood ? 'db.neighborhood (legacy)' : 'none';
         res.json({
           ...propertyByListingId,
@@ -1260,7 +1262,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             fetchTimestamp: new Date().toISOString(),
             rawFields: {
               'db.subdivision': propertyByListingId.subdivision || null,
-              'db.subdivisionName': propertyByListingId.subdivisionName || null,
+              'db.subdivisionName': propAny.subdivisionName || null,
               'db.neighborhood (legacy)': propertyByListingId.neighborhood || null,
             },
             subdivisionSource: subdivisionSource,
@@ -1288,9 +1290,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const paginatedProperties = allProperties.slice(offset, offset + limit);
       
       // CRITICAL: Legacy records may have subdivision stored in neighborhood field
-      // Migrate neighborhood to subdivision before clearing it
+      // Use type assertions for legacy field access
       const normalizedProperties = paginatedProperties.map(p => {
-        const subdivisionValue = p.subdivision || p.subdivisionName || p.neighborhood || null;
+        const pAny = p as any;
+        const subdivisionValue = p.subdivision || pAny.subdivisionName || p.neighborhood || null;
         return {
           ...p,
           subdivision: subdivisionValue,
@@ -2074,57 +2077,78 @@ This email was sent by ${senderName} (${senderEmail}) via the MLS Grid IDX Platf
     }
   });
 
-  // Repliers/MLS Grid sync endpoint - triggers manual sync for active data
+  // Repliers/MLS Grid sync endpoint - triggers manual sync for active and sold data
   app.post("/api/sync", requireAuth, async (req, res) => {
     try {
       console.log('🔄 Manual data sync triggered by user');
       
-      // Primary: Sync from Repliers (Active/Under Contract)
+      const syncResults = {
+        repliers: { success: false, message: '', count: 0 },
+        mlsGrid: { success: false, message: '', initiated: false }
+      };
+      
+      // Sync from Repliers (Active/Under Contract listings - real-time)
       if (repliersClient) {
-        console.log('📡 Syncing data from Repliers API...');
+        console.log('📡 Syncing active listings from Repliers API...');
         try {
-          // Fetch fresh data from Repliers to validate connection
           const testResult = await repliersClient.searchListings({
             status: 'A',
             resultsPerPage: 5,
           });
           
           console.log(`✅ Repliers sync verified: ${testResult.count} total active listings available`);
-          
-          // Update sync timestamps in the module-level variable
-          syncTimestamps.lastSyncAttempt = new Date();
-          syncTimestamps.lastSuccessfulSync = new Date();
+          syncResults.repliers = { 
+            success: true, 
+            message: 'Active listings verified', 
+            count: testResult.count 
+          };
           syncTimestamps.lastDataPull = new Date();
-          
-          res.json({ 
-            message: "Repliers data sync completed successfully", 
-            timestamp: new Date().toISOString(),
-            source: "Repliers API",
-            activeListingsAvailable: testResult.count,
-            status: "success"
-          });
-          return;
         } catch (repliersError: any) {
           console.error('❌ Repliers sync failed:', repliersError.message);
-          syncTimestamps.lastSyncAttempt = new Date();
+          syncResults.repliers.message = repliersError.message;
         }
       }
       
-      // Fallback: Sync from MLS Grid (historical data)
+      // Always sync from MLS Grid for sold/closed data (stored in database)
       if (mlsGridClient) {
-        console.log('📊 Fallback: Syncing from MLS Grid...');
+        console.log('📊 Syncing sold/closed data from MLS Grid...');
+        syncResults.mlsGrid.initiated = true;
+        
+        // Trigger async sync - don't wait for it
         triggerManualSync()
           .then(() => {
-            console.log('✅ Manual MLS Grid sync completed');
+            console.log('✅ Manual MLS Grid sync completed - sold data updated');
             syncTimestamps.lastSuccessfulSync = new Date();
           })
-          .catch(err => console.error('❌ Manual MLS Grid sync failed:', err));
+          .catch(err => {
+            console.error('❌ Manual MLS Grid sync failed:', err.message || err);
+          });
+        
+        syncResults.mlsGrid.success = true;
+        syncResults.mlsGrid.message = 'Sync initiated (runs in background)';
+      }
+      
+      syncTimestamps.lastSyncAttempt = new Date();
+      
+      // Build response based on what was synced
+      if (syncResults.repliers.success || syncResults.mlsGrid.initiated) {
+        syncTimestamps.lastSuccessfulSync = new Date();
         
         res.json({ 
-          message: "MLS Grid sync initiated - this may take several minutes", 
+          message: "Data sync initiated successfully", 
           timestamp: new Date().toISOString(),
-          source: "MLS Grid API",
-          note: "Check server logs for progress"
+          sources: {
+            repliers: syncResults.repliers.success 
+              ? `Active listings verified (${syncResults.repliers.count} available)` 
+              : 'Not available',
+            mlsGrid: syncResults.mlsGrid.initiated 
+              ? 'Sold data sync running in background' 
+              : 'Not configured'
+          },
+          note: syncResults.mlsGrid.initiated 
+            ? 'MLS Grid sync for sold data may take several minutes. Check server logs for progress.'
+            : undefined,
+          status: "success"
         });
         return;
       }

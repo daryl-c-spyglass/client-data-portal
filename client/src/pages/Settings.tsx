@@ -95,6 +95,33 @@ export default function Settings() {
     },
   });
 
+  const syncMutation = useMutation({
+    mutationFn: async () => {
+      const response = await apiRequest("POST", "/api/sync");
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || "Failed to trigger sync");
+      }
+      return response.json();
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/sync/status"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/stats/dashboard"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/inventory/summary"] });
+      toast({
+        title: "Sync initiated",
+        description: data.message || "Data synchronization has been triggered.",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Sync failed",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
   useEffect(() => {
     if (leadGateSettings) {
       leadGateForm.reset({
@@ -264,9 +291,15 @@ export default function Settings() {
                 </div>
                 <Switch defaultChecked data-testid="switch-auto-sync" />
               </div>
-              <Button variant="outline" className="w-full" data-testid="button-manual-sync">
-                <RefreshCw className="w-4 h-4 mr-2" />
-                Trigger Manual Sync
+              <Button 
+                variant="outline" 
+                className="w-full" 
+                data-testid="button-manual-sync"
+                onClick={() => syncMutation.mutate()}
+                disabled={syncMutation.isPending}
+              >
+                <RefreshCw className={`w-4 h-4 mr-2 ${syncMutation.isPending ? 'animate-spin' : ''}`} />
+                {syncMutation.isPending ? 'Syncing...' : 'Trigger Manual Sync'}
               </Button>
             </CardContent>
           </Card>
