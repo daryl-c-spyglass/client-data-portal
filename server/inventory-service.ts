@@ -308,8 +308,48 @@ async function countClosedListingsUnified(): Promise<{
     subtypeCounts[subtype] = 0;
   }
   
+  // Try Repliers API first (status='S' for Sold/Closed)
+  const repliersClient = getRepliersClient();
+  if (repliersClient && isRepliersConfigured()) {
+    try {
+      let totalClosed = 0;
+      let pageNum = 1;
+      let hasMore = true;
+      
+      while (hasMore && pageNum <= 50) { // Safety limit
+        const response = await repliersClient.searchListings({
+          status: 'S',
+          class: 'residential',
+          resultsPerPage: 200,
+          pageNum,
+        });
+        
+        const listings = response.listings || [];
+        
+        for (const listing of listings) {
+          // Skip rentals
+          if (isRentalListing(listing)) continue;
+          
+          const rawSubtype = listing.details?.style || (listing as any).propertySubType || 'Other';
+          const normalizedType = normalizePropertyType(rawSubtype);
+          subtypeCounts[normalizedType] = (subtypeCounts[normalizedType] || 0) + 1;
+          totalClosed++;
+        }
+        
+        hasMore = listings.length >= 200;
+        pageNum++;
+      }
+      
+      console.log(`[Inventory] Counted ${totalClosed} closed listings from Repliers API`);
+      return { totalClosed, subtypeCounts };
+      
+    } catch (error: any) {
+      console.error('[Inventory] Failed to get closed counts from Repliers, falling back to database:', error.message);
+    }
+  }
+  
+  // Fallback to database if Repliers fails or not configured
   try {
-    // Get closed properties with subtypes from database
     const closedSubtypeCounts = await storage.getClosedPropertyCountsBySubtype();
     
     let totalClosed = 0;

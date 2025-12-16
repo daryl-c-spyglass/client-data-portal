@@ -840,9 +840,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
           // Pending is treated as Under Contract
           fetchPromises.push(fetchFromRepliers('P').then(results => ({ results, expectedStatus: 'Under Contract' })));
         } else if (statusType === 'closed' || statusType === 'sold') {
-          // Repliers API only supports 'A' (Active) and 'U' (Under Contract)
-          // For closed/sold listings, always fetch from database
-          fetchPromises.push(fetchFromDatabase().then(results => ({ results, expectedStatus: 'Closed' })));
+          // Try Repliers API with status='S' (Sold/Closed) first
+          // Per Repliers: ClosedDate → soldDate, ClosePrice → soldPrice
+          // Note: May not be enabled for all MLS feeds - will fall back to database if error
+          fetchPromises.push(
+            fetchFromRepliers('S')
+              .then(results => ({ results, expectedStatus: 'Closed' }))
+              .catch(async (err) => {
+                // Repliers doesn't support sold status for this feed - fall back to database
+                console.log(`⚠️ Repliers sold data not available, using database fallback`);
+                const dbResults = await fetchFromDatabase();
+                return { results: dbResults, expectedStatus: 'Closed' };
+              })
+          );
         }
       }
 
@@ -3416,32 +3426,60 @@ This email was sent by ${senderName} (${senderEmail}) via the MLS Grid IDX Platf
       
       const isPersonalized = !!(city || subdivision || minPrice || maxPrice);
       
-      // Get ALL sold properties from database (up to reasonable limit for pagination)
-      let allDbProps = await storage.searchProperties({ status: 'Closed', limit: 1000 });
-      allDbProps = filterOutRentalProperties(allDbProps);
+      // Get sold properties from Repliers API (status='S')
+      // Per Repliers: status 'S' returns sold/closed listings with soldDate/soldPrice fields
+      // Photos available for 3 months of historical listings by default
+      let allSoldProps: any[] = [];
+      
+      if (repliersClient) {
+        try {
+          const repliersResult = await repliersClient.searchListings({
+            status: 'S',
+            class: 'residential',
+            resultsPerPage: 200,
+            pageNum: 1
+          });
+          
+          if (repliersResult?.listings) {
+            allSoldProps = repliersResult.listings.map((listing: any) => 
+              repliersClient!.mapToStandardProperty(listing)
+            );
+            console.log(`[Recent Sold] Fetched ${allSoldProps.length} sold properties from Repliers`);
+          }
+        } catch (repliersError: any) {
+          console.error('[Recent Sold] Repliers API error, falling back to database:', repliersError.message);
+          // Fallback to database if Repliers fails
+          allSoldProps = await storage.searchProperties({ status: 'Closed', limit: 1000 });
+        }
+      } else {
+        // Fallback to database if Repliers not configured
+        allSoldProps = await storage.searchProperties({ status: 'Closed', limit: 1000 });
+      }
+      
+      allSoldProps = filterOutRentalProperties(allSoldProps);
       
       // Apply personalization filters if provided
       if (city) {
-        allDbProps = allDbProps.filter(p => p.city?.toLowerCase() === city.toLowerCase());
+        allSoldProps = allSoldProps.filter(p => p.city?.toLowerCase() === city.toLowerCase());
       }
       if (subdivision) {
-        allDbProps = allDbProps.filter(p => p.subdivision?.toLowerCase().includes(subdivision.toLowerCase()));
+        allSoldProps = allSoldProps.filter(p => p.subdivision?.toLowerCase().includes(subdivision.toLowerCase()));
       }
       if (minPrice) {
-        allDbProps = allDbProps.filter(p => {
+        allSoldProps = allSoldProps.filter(p => {
           const price = Number(p.closePrice || p.listPrice || 0);
           return price >= minPrice;
         });
       }
       if (maxPrice) {
-        allDbProps = allDbProps.filter(p => {
+        allSoldProps = allSoldProps.filter(p => {
           const price = Number(p.closePrice || p.listPrice || 0);
           return price <= maxPrice;
         });
       }
       
       // Sort by close date descending (most recent first)
-      const sortedAll = allDbProps.sort((a, b) => {
+      const sortedAll = allSoldProps.sort((a, b) => {
         const dateA = a.closeDate ? new Date(a.closeDate).getTime() : 0;
         const dateB = b.closeDate ? new Date(b.closeDate).getTime() : 0;
         return dateB - dateA;
@@ -3453,28 +3491,25 @@ This email was sent by ${senderName} (${senderEmail}) via the MLS Grid IDX Platf
       // Get paginated slice
       const paginatedSlice = sortedAll.slice(offset, offset + limit);
       
-      // Fetch photos from media table for these properties
-      const listingIds = paginatedSlice.map(p => p.id || p.listingId).filter(Boolean) as string[];
-      const mediaMap = await storage.getMediaForListingIds(listingIds);
-      
+      // Map properties - Repliers returns photos directly in the response
       const paginatedProps = paginatedSlice.map(p => {
         const propId = p.id || p.listingId;
-        const propMedia = propId ? mediaMap[propId] : [];
-        const photoUrls = propMedia?.map(m => m.mediaURL).filter(Boolean) || [];
+        // Repliers returns photos directly as an array (3 months historical available)
+        const photoUrls = p.photos || [];
         
         return {
           id: propId,
           listingId: p.listingId || p.id,
-          unparsedAddress: p.unparsedAddress,
+          unparsedAddress: p.unparsedAddress || p.address,
           city: p.city,
           stateOrProvince: p.stateOrProvince,
-          closePrice: p.closePrice || p.listPrice,
-          closeDate: p.closeDate,
-          bedroomsTotal: p.bedroomsTotal,
-          bathroomsTotalInteger: p.bathroomsTotalInteger,
-          livingArea: p.livingArea,
+          closePrice: p.closePrice || p.soldPrice || p.listPrice,
+          closeDate: p.closeDate || p.soldDate,
+          bedroomsTotal: p.bedroomsTotal || p.bedrooms,
+          bathroomsTotalInteger: p.bathroomsTotalInteger || p.bathrooms,
+          livingArea: p.livingArea || p.sqft,
           yearBuilt: p.yearBuilt,
-          photos: photoUrls.length > 0 ? photoUrls : [],
+          photos: photoUrls,
           standardStatus: 'Closed',
           propertySubType: p.propertySubType
         };
