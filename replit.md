@@ -4,6 +4,27 @@
 
 This project is a professional real estate IDX (Internet Data Exchange) platform integrated with the MLS Grid API. Its primary purpose is to empower real estate agents with tools for property searching, generating Comparative Market Analyses (CMAs), and sharing market insights with clients. The platform aims to combine comprehensive property browsing (similar to Zillow or Redfin) with robust, productivity-focused workflow features to streamline real estate operations.
 
+## Recent Changes (Dec 16, 2025)
+
+- **Dashboard Sold Price Fix**: Dashboard sold/closed property cards now correctly display closePrice instead of listPrice
+  - PropertyDetailModal: Uses closePrice for sold/closed properties, listPrice for active listings
+  - Recent Sales Activity: Uses displaySoldPrice(closePrice) helper for sold properties
+  - Fixed "Price upon request" display when sold price was available
+- **Properties Page Autocomplete**: Fixed AutocompleteInput component to properly handle API response formats
+  - Now handles both `{ suggestions: [...] }` format and direct array responses
+  - Converts string suggestions to AutocompleteOption format for consistent display
+- **Seller Update Preview Page**: Added new preview page for seller updates
+  - New route: `/seller-updates/:id/preview`
+  - Displays update details, matching properties, and market stats
+  - Shows sample properties with photos and pricing
+- **Neighborhood Display Improvements**: Property Detail page now shows clear fallback states
+  - "Loading..." while fetching boundary resolution
+  - "Not available" when neighborhood couldn't be resolved from boundaries
+  - "Coordinates required" when property lacks lat/lng data
+- **TypeScript Fixes**: Fixed LSP errors in server/routes.ts
+  - Used type assertions for Repliers API response properties not in TypeScript definitions
+  - Resolved subdivisionName/subdivision property access errors
+
 ## Recent Changes (Dec 15, 2025)
 
 - **CRITICAL DATA MAPPING FIX**: Fixed fundamental data integrity issue where Repliers API "neighborhood" field was incorrectly displayed as neighborhood
