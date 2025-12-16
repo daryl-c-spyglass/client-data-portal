@@ -2188,8 +2188,8 @@ This email was sent by ${senderName} (${senderEmail}) via the MLS Grid IDX Platf
     }
   });
 
-  // MLS Grid diagnostic endpoint - test API connection
-  app.get("/api/mlsgrid/test", requireAuth, async (req, res) => {
+  // MLS Grid diagnostic endpoint - test API connection (no auth required for diagnostics)
+  app.get("/api/mlsgrid/test", async (req, res) => {
     try {
       if (!mlsGridClient) {
         res.status(503).json({ 
