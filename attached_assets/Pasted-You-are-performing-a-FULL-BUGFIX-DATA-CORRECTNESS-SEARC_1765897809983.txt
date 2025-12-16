@@ -1,0 +1,243 @@
+You are performing a **FULL BUGFIX + DATA CORRECTNESS + SEARCH SUGGESTIONS RESTORE** pass across the **Client Data Portal**.
+
+This is **NOT** a UI redesign task. This is a **correctness + routing + data mapping + autocomplete** task.
+
+**Data source: Repliers only (ACTRIS).**
+**Global rule (NON-NEGOTIABLE):** Leasing/rental listings must be excluded from **ALL** property pulls, **ALL** counts, **ALL** analytics, **ALL** DOM, and **ALL** outputs (PDF/share) across **ALL** sections.
+
+Also: **Do NOT bypass any steps** in the fixing + updating process. Complete every phase and provide proofs before closing.
+
+====================================================
+GOAL
+====
+
+Fix the following issues end-to-end (no one-off logic, no masking):
+
+1. **Dashboard → Recent Sold/Closed**
+
+   * Clicking a sold/closed property card still shows **“Price upon request”** even when sold price exists.
+   * Sold/closed properties still show **no photos**.
+
+2. **Properties → Search inputs**
+
+   * **Suggestive/autocomplete** for **Neighborhoods, Subdivisions, Cities, Zip Codes** is not showing while user types.
+   * Must restore typeahead suggestions with correct source-of-truth rules (no fuzzy guessing).
+
+3. **Seller Updates**
+
+   * After creating an update, preview is still broken:
+
+     > “404 Page Not Found — Did you forget to add the page to the router?”
+   * Must fix routing and preview rendering.
+
+4. **Buyer Search / Property Detail**
+
+   * Some properties show **empty Neighborhood**. Must fix so Neighborhood is populated when resolvable, otherwise show `Neighborhood: Not available`.
+   * Example property page to validate: `/properties/ACT4447742` (provided by user).
+
+====================================================
+PHASE 0 — REPRO + TRACE (MANDATORY)
+===================================
+
+1. For each issue, capture:
+
+* UI repro steps
+* Network requests (payload + response)
+* Console errors / stack traces
+* The exact mapping inputs/outputs (before and after normalization)
+
+2. Add **dev-only debug logging** behind flags:
+
+* `DEBUG_PRICE_MAPPING=true`
+* `DEBUG_PHOTO_MAPPING=true`
+* `DEBUG_SEARCH_SUGGESTIONS=true`
+* `DEBUG_ROUTING_SELLER_UPDATES=true`
+* `DEBUG_LOCATION_MAPPING=true`
+
+Deliverable:
+
+* “Repro Notes” in PR description with screenshots of Network/Console for each bug.
+
+====================================================
+PHASE 1 — DASHBOARD: SOLD/CLOSED PRICE MUST NEVER BE “PRICE UPON REQUEST” IF SOLD PRICE EXISTS
+==============================================================================================
+
+1. Identify the exact component and mapper used when clicking a Recent Sold/Closed card (modal/detail route/card overlay).
+2. Identify why it chooses “Price upon request” (typically because it’s reading the wrong field: listPrice instead of closePrice, or not reading sold fields for sold status).
+3. Implement ONE shared rule in the normalization/card-mapping layer:
+
+**Price Display Rule**
+
+* If `status` is Sold/Closed → **displayPrice = closePrice** (normalized from Repliers sold/close price field)
+* Else → displayPrice = listPrice (or applicable active price)
+* Only show “Price upon request” if **no valid numeric price exists** after normalization
+
+4. Ensure Dashboard uses the shared mapper (no dashboard-specific price logic).
+
+Acceptance Criteria:
+
+* Clicking any sold/closed card never shows “Price upon request” if sold/close price exists.
+* Same sold listing shows consistent price everywhere that uses the shared property card mapper.
+
+Validation:
+
+* Verify 5 sold listings (Austin) show sold price on click.
+
+====================================================
+PHASE 2 — DASHBOARD: SOLD/CLOSED PHOTOS MUST RENDER WHEN PROVIDED BY REPLIERS
+=============================================================================
+
+1. Confirm Repliers sold listing response includes photos for the selected sold listings.
+2. Trace photo pipeline and fix where photos are dropped:
+
+* Repliers response → normalization → cache → card mapper → UI card component
+
+3. Ensure sold queries do not omit photo fields (no “fields=…” missing photos).
+4. Card behavior:
+
+* If `photos[0]` exists → render it
+* Else → show “No photos available” (no broken image)
+
+Acceptance Criteria:
+
+* Sold/closed cards display photos when Repliers provides them.
+* No sold cards silently lose photos due to mapping or field selection.
+
+Validation:
+
+* Verify 5 sold/closed listings show photos (when available in Repliers).
+
+====================================================
+PHASE 3 — PROPERTIES SEARCH: RESTORE AUTOCOMPLETE FOR NEIGHBORHOODS / SUBDIVISIONS / CITIES / ZIP
+=================================================================================================
+
+Implement typeahead suggestions that appear while the user types in search inputs.
+
+Rules (CRITICAL):
+
+* **Neighborhood** suggestions MUST come from **Repliers boundary polygons dataset only** (lat/lng → boundary). No fuzzy matching from listing text.
+* **Subdivision** suggestions come from MLS listing data fields only (Repliers field, even if misnamed).
+* Cities + Zip codes come from listing fields/aggregations (Repliers-derived), not arbitrary user-entered history.
+* Rentals/leasing excluded from any suggestion datasets that originate from listings.
+
+Tasks:
+
+1. Identify the UI components for Neighborhood/Subdivision/City/Zip inputs and why suggestions are not firing (missing API call, broken debounce, endpoint 404, CORS, etc.).
+2. Add (or fix) backend endpoints for suggestions:
+
+* `/api/suggestions/cities?q=`
+* `/api/suggestions/zips?q=`
+* `/api/suggestions/subdivisions?q=`
+* `/api/suggestions/neighborhoods?q=` (BOUNDARY SOURCE ONLY)
+
+3. Add client typeahead behavior:
+
+* debounce (250–400ms)
+* min length (2–3 chars)
+* show dropdown results
+* keyboard navigation optional but preferred
+
+4. Ensure suggestions are scoped consistently with ACTRIS + Repliers-only rules, and do not include rentals.
+
+Acceptance Criteria:
+
+* Suggestions appear while typing for Neighborhood/Subdivision/City/Zip.
+* Neighborhood suggestions are boundary-derived only (no listing-text “neighborhood” leakage).
+* Subdivision suggestions are listing-derived only.
+* No rentals appear in any suggestion list.
+
+Validation:
+
+* Screen recording showing suggestions working in each input.
+
+====================================================
+PHASE 4 — SELLER UPDATES: FIX PREVIEW 404 (ROUTER + POST-CREATE NAVIGATION)
+===========================================================================
+
+1. Identify the preview route that the app navigates to after creating an update.
+2. Confirm router config includes the preview page route and param structure exactly.
+3. Fix one of:
+
+* missing route registration
+* mismatched path (`/seller-updates/:id/preview` vs `/seller-update/preview/:id`)
+* missing SPA fallback for deep links
+
+4. Validate the preview page fetches the update by ID and renders correctly.
+
+Acceptance Criteria:
+
+* Create Seller Update → list shows item → preview opens (no 404)
+* Refresh preview URL works
+* Opening preview in a new tab works
+
+Validation:
+
+* Screenshot/video of create → preview and refresh.
+
+====================================================
+PHASE 5 — NEIGHBORHOOD MAPPING: FIX EMPTY NEIGHBORHOOD WITHOUT CONFLATING SUBDIVISION
+=====================================================================================
+
+You MUST enforce the platform rules:
+
+* **Subdivision** = listing-derived tract/community label from listing data (Repliers “neighborhood” field maps to subdivision when that’s how ACTRIS comes through).
+* **Neighborhood** = boundary polygon only (lat/lng → boundary).
+* If unresolved: show `Neighborhood: Not available`.
+* Never populate Neighborhood from listing fields.
+
+Tasks:
+
+1. For property detail + buyer search property card:
+
+* Ensure lat/lng is present (from listing)
+* Call boundary resolver using lat/lng
+* Store `resolvedNeighborhood` separately from `subdivision`
+
+2. If boundary resolver fails:
+
+* render `Neighborhood: Not available` (not empty)
+
+3. Apply consistently across:
+
+* Buyer Search cards
+* Property detail page (validate example `/properties/ACT4447742`)
+* Any other place Neighborhood appears (CMA/share/PDF if applicable)
+
+Acceptance Criteria:
+
+* Properties that can be resolved via boundary polygons show Neighborhood.
+* Properties that cannot be resolved show `Neighborhood: Not available` (never blank).
+* Subdivision remains correct and independent.
+
+Validation:
+
+* Verify the provided example property page and 5 additional listings:
+
+  * show Subdivision value (if present)
+  * show Neighborhood from boundary OR Not available
+
+====================================================
+FINAL DELIVERABLES (NON-NEGOTIABLE)
+===================================
+
+1. Written “Fix Report” covering each issue:
+
+* root cause
+* files changed
+* before/after behavior
+* tests performed
+
+2. Proof artifacts:
+
+* Dashboard sold card click shows sold price (not “Price upon request”)
+* Dashboard sold card shows photo (when available)
+* Properties inputs show suggestions for Neighborhood/Subdivision/City/Zip
+* Seller Update preview works (no 404) + refresh works
+* Neighborhood shows resolved value OR `Neighborhood: Not available` on `/properties/ACT4447742`
+
+3. Guardrails:
+
+* No silent fallbacks to 0/empty on API errors
+* Dev-only debug flags are OFF by default in production
+
+Do NOT close the task until all acceptance criteria are met and proofs are attached.

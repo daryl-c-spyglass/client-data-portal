@@ -54,7 +54,23 @@ function AutocompleteInput({ id, placeholder, values, onChange, apiEndpoint, tes
         const response = await fetch(`${apiEndpoint}?search=${encodeURIComponent(inputValue)}`);
         if (response.ok) {
           const data = await response.json();
-          setSuggestions(data.filter((item: AutocompleteOption) => 
+          // Handle both formats: { suggestions: [...] } and direct array
+          let results: AutocompleteOption[] = [];
+          if (Array.isArray(data)) {
+            // Direct array format with {value, count} objects
+            results = data;
+          } else if (data.suggestions && Array.isArray(data.suggestions)) {
+            // { suggestions: [...] } format - convert strings to AutocompleteOption
+            results = data.suggestions.map((s: string | AutocompleteOption) => 
+              typeof s === 'string' ? { value: s, count: 0 } : s
+            );
+          } else if (data.results && Array.isArray(data.results)) {
+            // { results: [...] } format
+            results = data.results.map((s: string | AutocompleteOption) => 
+              typeof s === 'string' ? { value: s, count: 0 } : s
+            );
+          }
+          setSuggestions(results.filter((item: AutocompleteOption) => 
             !values.includes(item.value)
           ));
         }

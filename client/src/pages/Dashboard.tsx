@@ -175,6 +175,8 @@ interface DashboardProperty {
   stateOrProvince?: string;
   postalCode?: string;
   listPrice?: number;
+  closePrice?: number;
+  closeDate?: string;
   standardStatus?: string;
   bedroomsTotal?: number;
   bathroomsTotalInteger?: number;
@@ -330,11 +332,16 @@ function PropertyDetailModal({
   
   const photos = property.photos || [];
   const address = property.unparsedAddress || property.address || 'Unknown Address';
-  const formattedPrice = property.listPrice 
-    ? new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(Number(property.listPrice))
+  
+  // PHASE 1 FIX: Use closePrice for Sold/Closed properties, listPrice for others
+  const isSoldOrClosed = property.standardStatus?.toLowerCase() === 'closed' || 
+                         property.standardStatus?.toLowerCase() === 'sold';
+  const displayPrice = isSoldOrClosed ? property.closePrice : property.listPrice;
+  const formattedPrice = displayPrice 
+    ? new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(Number(displayPrice))
     : 'Price upon request';
-  const pricePerSqft = property.listPrice && property.livingArea 
-    ? Number(property.listPrice) / Number(property.livingArea) 
+  const pricePerSqft = displayPrice && property.livingArea 
+    ? Number(displayPrice) / Number(property.livingArea) 
     : null;
   
   // Handle click on left/right side of image for navigation

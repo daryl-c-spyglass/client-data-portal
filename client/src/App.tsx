@@ -16,6 +16,7 @@ import PropertyDetailPage from "@/pages/PropertyDetailPage";
 import CMADetailPage from "@/pages/CMADetailPage";
 import SellerUpdates from "@/pages/SellerUpdates";
 import SellerUpdateNew from "@/pages/SellerUpdateNew";
+import SellerUpdatePreview from "@/pages/SellerUpdatePreview";
 import SellerUpdateEmbed from "@/pages/SellerUpdateEmbed";
 import EmbedCodeGenerator from "@/pages/EmbedCodeGenerator";
 import BuyerSearch from "@/pages/BuyerSearch";
@@ -35,6 +36,7 @@ function Router() {
       <Route path="/cmas/:id" component={CMADetailPage} />
       <Route path="/seller-updates" component={SellerUpdates} />
       <Route path="/seller-updates/new" component={SellerUpdateNew} />
+      <Route path="/seller-updates/:id/preview" component={SellerUpdatePreview} />
       <Route path="/buyer-search" component={BuyerSearch} />
       <Route path="/embed-code" component={EmbedCodeGenerator} />
       <Route path="/clients" component={Clients} />
