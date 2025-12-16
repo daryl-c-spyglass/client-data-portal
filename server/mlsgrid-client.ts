@@ -260,12 +260,20 @@ export class MLSGridClient {
 
 export function createMLSGridClient(): MLSGridClient | null {
   const apiUrl = process.env.MLSGRID_API_URL;
-  const apiToken = process.env.MLSGRID_API_TOKEN;
+  // Support both old MLSGRID_API_TOKEN and new MLS_GRID_BBO/MLS_GRID_VOW secrets
+  // BBO (Broker Back Office) is preferred for sold data access needed for CMAs
+  const apiToken = process.env.MLS_GRID_BBO || process.env.MLS_GRID_VOW || process.env.MLSGRID_API_TOKEN;
 
   if (!apiUrl || !apiToken) {
     console.warn('MLS Grid API credentials not found. Some features will be disabled.');
+    console.warn('  MLSGRID_API_URL:', apiUrl ? 'set' : 'missing');
+    console.warn('  MLS_GRID_BBO:', process.env.MLS_GRID_BBO ? 'set' : 'missing');
+    console.warn('  MLS_GRID_VOW:', process.env.MLS_GRID_VOW ? 'set' : 'missing');
     return null;
   }
+
+  const tokenSource = process.env.MLS_GRID_BBO ? 'BBO' : (process.env.MLS_GRID_VOW ? 'VOW' : 'legacy');
+  console.log(`🔑 MLS Grid API initialized with ${tokenSource} credentials`);
 
   return new MLSGridClient({
     apiUrl,

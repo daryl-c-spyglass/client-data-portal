@@ -11,15 +11,23 @@ This project is a professional real estate IDX (Internet Data Exchange) platform
   - Active/Under Contract listings work correctly (11-13 results from Repliers API, matching MLS)
   - Sold/Closed listings require MLS Grid → database sync to populate recent data
   - Database contains 22,656 closed properties but newest is from Jan 2021
+- **MLS Grid API Credentials Updated**: Now supports new VOW and BBO API tokens
+  - Code updated to use `MLS_GRID_BBO` (preferred for sold data) or `MLS_GRID_VOW` secrets
+  - Falls back to legacy `MLSGRID_API_TOKEN` if new secrets not present
+  - Logs which credential source is being used at startup
 - **Manual Sync Enhancement**: Updated Settings sync to trigger BOTH data sources
   - Previously only validated Repliers connection (Active listings)
   - Now triggers MLS Grid sync for sold/closed data in background
   - Connected "Trigger Manual Sync" button with loading state and toast notifications
   - API returns status for both Repliers (Active) and MLS Grid (Sold) sync results
+- **MLS Grid Diagnostic Endpoint**: Added `/api/mlsgrid/test` to verify API connection
+  - Settings page now has "Test" button next to MLS Grid data source
+  - Returns success/failure with detailed error information for debugging
 - **Data Source Architecture Note**: 
   - **Repliers API**: Active ('A') and Under Contract ('U') listings only - real-time
   - **MLS Grid API → PostgreSQL**: Sold/Closed listings - requires scheduled/manual sync
   - Scheduled sync runs daily at 12:00 AM CST
+  - Credentials: `MLS_GRID_BBO` (Broker Back Office) preferred for sold data access
 - **Dashboard Sold Price Fix**: Dashboard sold/closed property cards now correctly display closePrice instead of listPrice
   - PropertyDetailModal: Uses closePrice for sold/closed properties, listPrice for active listings
   - Recent Sales Activity: Uses displaySoldPrice(closePrice) helper for sold properties
