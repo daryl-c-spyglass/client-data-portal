@@ -9,6 +9,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Calendar, Clock, User, CheckCircle2, Circle, AlertCircle, RefreshCw, ChevronDown, ChevronRight, Bug, List, Grid3X3, ArrowDownUp, CalendarDays, X } from "lucide-react";
 import { format, startOfMonth, endOfMonth, addMonths, addWeeks, addDays, parseISO, startOfWeek, endOfWeek, eachDayOfInterval, isSameMonth, isSameDay, isToday } from "date-fns";
 
@@ -125,38 +126,70 @@ function CalendarItemCard({ item }: { item: CalendarItem }) {
   );
 }
 
-function CalendarGridItem({ item }: { item: CalendarItem }) {
+function CalendarGridItem({ item, showAgentName = false }: { item: CalendarItem; showAgentName?: boolean }) {
   const isTask = item.type === "task";
   const isCompleted = item.completed;
   
-  return (
-    <div 
-      className={`text-xs p-1 rounded truncate cursor-pointer hover-elevate ${
-        isTask 
-          ? isCompleted 
-            ? "bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 line-through opacity-60" 
-            : "bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300"
-          : "bg-primary/10 text-primary"
-      }`}
-      title={`${item.title}${item.start && !item.allDay ? ` - ${format(parseISO(item.start), "h:mm a")}` : ""}`}
-      data-testid={`grid-item-${item.id}`}
-    >
-      {!item.allDay && item.start && (
-        <span className="font-medium mr-1">{format(parseISO(item.start), "h:mm")}</span>
+  const tooltipContent = (
+    <div className="space-y-1">
+      <div className="font-medium">{item.title}</div>
+      {item.start && (
+        <div className="flex items-center gap-1 text-xs">
+          <Clock className="h-3 w-3" />
+          {item.allDay ? "All day" : format(parseISO(item.start), "h:mm a")}
+          {item.end && !item.allDay && ` - ${format(parseISO(item.end), "h:mm a")}`}
+        </div>
       )}
-      {item.title}
+      <div className="text-xs">
+        <Badge variant="outline" className="text-xs">
+          {isTask ? "Task" : "Event"}
+        </Badge>
+      </div>
+      {showAgentName && item.assignedTo && (
+        <div className="flex items-center gap-1 text-xs">
+          <User className="h-3 w-3" />
+          {item.assignedTo}
+        </div>
+      )}
     </div>
+  );
+  
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <div 
+          className={`text-xs p-1 rounded truncate cursor-pointer hover-elevate ${
+            isTask 
+              ? isCompleted 
+                ? "bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 line-through opacity-60" 
+                : "bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300"
+              : "bg-primary/10 text-primary"
+          }`}
+          data-testid={`grid-item-${item.id}`}
+        >
+          {!item.allDay && item.start && (
+            <span className="font-medium mr-1">{format(parseISO(item.start), "h:mm")}</span>
+          )}
+          {item.title}
+        </div>
+      </TooltipTrigger>
+      <TooltipContent side="top" align="start">
+        {tooltipContent}
+      </TooltipContent>
+    </Tooltip>
   );
 }
 
 function DayPopoverContent({ 
   date, 
   items,
-  onClose
+  onClose,
+  showAgentName = false,
 }: { 
   date: Date; 
   items: CalendarItem[];
   onClose?: () => void;
+  showAgentName?: boolean;
 }) {
   return (
     <div className="w-80">
@@ -185,13 +218,18 @@ function DayPopoverContent({
               className="p-2 rounded border bg-card text-sm"
               data-testid={`popover-item-${item.id}`}
             >
-              <div className="flex items-center gap-2 mb-1">
+              <div className="flex items-center gap-2 mb-1 flex-wrap">
                 <span className={`font-medium ${item.completed ? "line-through opacity-60" : ""}`}>
                   {item.title}
                 </span>
                 <Badge variant="outline" className="text-xs">
                   {item.type === "task" ? "Task" : "Event"}
                 </Badge>
+                {showAgentName && item.assignedTo && (
+                  <Badge variant="secondary" className="text-xs">
+                    {item.assignedTo}
+                  </Badge>
+                )}
               </div>
               <div className="flex items-center gap-3 text-xs text-muted-foreground">
                 {item.start && (
@@ -199,12 +237,6 @@ function DayPopoverContent({
                     <Clock className="h-3 w-3" />
                     {item.allDay ? "All day" : format(parseISO(item.start), "h:mm a")}
                     {item.end && !item.allDay && ` - ${format(parseISO(item.end), "h:mm a")}`}
-                  </span>
-                )}
-                {item.assignedTo && (
-                  <span className="flex items-center gap-1">
-                    <User className="h-3 w-3" />
-                    {item.assignedTo}
                   </span>
                 )}
               </div>
@@ -226,11 +258,13 @@ function DayCellWithPopover({
   dayItems,
   isCurrentMonth,
   isDayToday,
+  showAgentName = false,
 }: {
   day: Date;
   dayItems: CalendarItem[];
   isCurrentMonth: boolean;
   isDayToday: boolean;
+  showAgentName?: boolean;
 }) {
   const [isOpen, setIsOpen] = useState(false);
   const dateKey = format(day, "yyyy-MM-dd");
@@ -250,7 +284,7 @@ function DayCellWithPopover({
       </div>
       <div className="space-y-0.5 overflow-hidden">
         {dayItems.slice(0, 3).map((item) => (
-          <CalendarGridItem key={item.id} item={item} />
+          <CalendarGridItem key={item.id} item={item} showAgentName={showAgentName} />
         ))}
         {hasOverflow && (
           <Popover open={isOpen} onOpenChange={setIsOpen}>
@@ -266,7 +300,8 @@ function DayCellWithPopover({
               <DayPopoverContent 
                 date={day} 
                 items={dayItems} 
-                onClose={() => setIsOpen(false)} 
+                onClose={() => setIsOpen(false)}
+                showAgentName={showAgentName}
               />
             </PopoverContent>
           </Popover>
@@ -278,10 +313,12 @@ function DayCellWithPopover({
 
 function MonthCalendarGrid({ 
   items, 
-  currentMonth 
+  currentMonth,
+  showAgentName = false,
 }: { 
   items: CalendarItem[]; 
   currentMonth: Date;
+  showAgentName?: boolean;
 }) {
   const monthStart = startOfMonth(currentMonth);
   const monthEnd = endOfMonth(currentMonth);
@@ -340,6 +377,7 @@ function MonthCalendarGrid({
                 dayItems={dayItems}
                 isCurrentMonth={isCurrentMonth}
                 isDayToday={isDayToday}
+                showAgentName={showAgentName}
               />
             );
           })}
@@ -351,10 +389,12 @@ function MonthCalendarGrid({
 
 function WeekCalendarGrid({ 
   items, 
-  weekDate 
+  weekDate,
+  showAgentName = false,
 }: { 
   items: CalendarItem[]; 
   weekDate: Date;
+  showAgentName?: boolean;
 }) {
   // Show week containing the specified date
   const weekStart = startOfWeek(weekDate, { weekStartsOn: 0 });
@@ -414,7 +454,7 @@ function WeekCalendarGrid({
             >
               <div className="space-y-1">
                 {dayItems.map((item) => (
-                  <CalendarGridItem key={item.id} item={item} />
+                  <CalendarGridItem key={item.id} item={item} showAgentName={showAgentName} />
                 ))}
                 {dayItems.length === 0 && (
                   <div className="text-xs text-muted-foreground text-center pt-4">
@@ -432,10 +472,12 @@ function WeekCalendarGrid({
 
 function DayCalendarView({ 
   items, 
-  dayDate 
+  dayDate,
+  showAgentName = false,
 }: { 
   items: CalendarItem[]; 
   dayDate: Date;
+  showAgentName?: boolean;
 }) {
   const dateKey = format(dayDate, "yyyy-MM-dd");
   const isDayToday = isToday(dayDate);
@@ -469,50 +511,132 @@ function DayCalendarView({
           </div>
         ) : (
           <div className="space-y-2">
-            {dayItems.map((item) => (
-              <div
-                key={item.id}
-                className="p-3 rounded-lg border bg-card hover-elevate"
-                data-testid={`day-item-${item.id}`}
-              >
-                <div className="flex items-center gap-2 mb-1">
-                  {item.type === "task" ? (
-                    item.completed ? (
-                      <CheckCircle2 className="h-4 w-4 text-green-500" />
-                    ) : (
-                      <Circle className="h-4 w-4 text-muted-foreground" />
-                    )
-                  ) : (
-                    <Calendar className="h-4 w-4 text-primary" />
-                  )}
-                  <span className={`font-medium ${item.completed ? "line-through opacity-60" : ""}`}>
-                    {item.title}
-                  </span>
-                  <Badge variant="outline" className="text-xs ml-auto">
-                    {item.type === "task" ? "Task" : "Event"}
-                  </Badge>
-                </div>
-                <div className="flex items-center gap-4 text-sm text-muted-foreground ml-6">
+            {dayItems.map((item) => {
+              const isTask = item.type === "task";
+              const tooltipContent = (
+                <div className="space-y-1">
+                  <div className="font-medium">{item.title}</div>
                   {item.start && (
-                    <span className="flex items-center gap-1">
+                    <div className="flex items-center gap-1 text-xs">
                       <Clock className="h-3 w-3" />
                       {item.allDay ? "All day" : format(parseISO(item.start), "h:mm a")}
                       {item.end && !item.allDay && ` - ${format(parseISO(item.end), "h:mm a")}`}
-                    </span>
+                    </div>
                   )}
-                  {item.contact && (
-                    <span className="flex items-center gap-1">
+                  <div className="text-xs">
+                    <Badge variant="outline" className="text-xs">
+                      {isTask ? "Task" : "Event"}
+                    </Badge>
+                  </div>
+                  {showAgentName && item.assignedTo && (
+                    <div className="flex items-center gap-1 text-xs">
                       <User className="h-3 w-3" />
-                      {item.contact}
-                    </span>
+                      {item.assignedTo}
+                    </div>
                   )}
                 </div>
-              </div>
-            ))}
+              );
+              
+              return (
+                <Tooltip key={item.id}>
+                  <TooltipTrigger asChild>
+                    <div
+                      className="p-3 rounded-lg border bg-card hover-elevate cursor-pointer"
+                      data-testid={`day-item-${item.id}`}
+                    >
+                      <div className="flex items-center gap-2 mb-1">
+                        {isTask ? (
+                          item.completed ? (
+                            <CheckCircle2 className="h-4 w-4 text-green-500" />
+                          ) : (
+                            <Circle className="h-4 w-4 text-muted-foreground" />
+                          )
+                        ) : (
+                          <Calendar className="h-4 w-4 text-primary" />
+                        )}
+                        <span className={`font-medium ${item.completed ? "line-through opacity-60" : ""}`}>
+                          {item.title}
+                        </span>
+                        <Badge variant="outline" className="text-xs ml-auto">
+                          {isTask ? "Task" : "Event"}
+                        </Badge>
+                      </div>
+                      <div className="flex items-center gap-4 text-sm text-muted-foreground ml-6 flex-wrap">
+                        {item.start && (
+                          <span className="flex items-center gap-1">
+                            <Clock className="h-3 w-3" />
+                            {item.allDay ? "All day" : format(parseISO(item.start), "h:mm a")}
+                            {item.end && !item.allDay && ` - ${format(parseISO(item.end), "h:mm a")}`}
+                          </span>
+                        )}
+                        {item.contact && (
+                          <span className="flex items-center gap-1">
+                            <User className="h-3 w-3" />
+                            {item.contact}
+                          </span>
+                        )}
+                        {showAgentName && item.assignedTo && (
+                          <Badge variant="secondary" className="text-xs">
+                            {item.assignedTo}
+                          </Badge>
+                        )}
+                      </div>
+                    </div>
+                  </TooltipTrigger>
+                  <TooltipContent side="top" align="start">
+                    {tooltipContent}
+                  </TooltipContent>
+                </Tooltip>
+              );
+            })}
           </div>
         )}
       </div>
     </div>
+  );
+}
+
+function CalendarLegend({ horizontal = false }: { horizontal?: boolean }) {
+  if (horizontal) {
+    return (
+      <div className="flex items-center gap-4 p-3 border rounded-lg bg-card">
+        <span className="text-xs font-medium text-muted-foreground">Legend:</span>
+        <div className="flex items-center gap-2">
+          <div className="w-3 h-3 rounded bg-primary/10" />
+          <span className="text-xs text-muted-foreground">Event</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <div className="w-3 h-3 rounded bg-blue-100 dark:bg-blue-900/30" />
+          <span className="text-xs text-muted-foreground">Task</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <div className="w-3 h-3 rounded bg-green-100 dark:bg-green-900/30" />
+          <span className="text-xs text-muted-foreground">Completed</span>
+        </div>
+      </div>
+    );
+  }
+  
+  return (
+    <Card className="w-48 shrink-0">
+      <CardHeader className="py-3 px-4">
+        <CardTitle className="text-sm">Legend</CardTitle>
+      </CardHeader>
+      <CardContent className="py-2 px-4 space-y-2">
+        <div className="flex items-center gap-2">
+          <div className="w-3 h-3 rounded bg-primary/10" />
+          <span className="text-xs text-muted-foreground">Event</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <div className="w-3 h-3 rounded bg-blue-100 dark:bg-blue-900/30" />
+          <span className="text-xs text-muted-foreground">Task (pending)</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <div className="w-3 h-3 rounded bg-green-100 dark:bg-green-900/30" />
+          <span className="text-xs text-muted-foreground">Task (completed)</span>
+        </div>
+      </CardContent>
+    </Card>
   );
 }
 
@@ -1072,14 +1196,50 @@ export default function CalendarPage() {
               ))}
             </div>
           ) : viewMode === "month" ? (
-            /* Month Grid View */
-            <MonthCalendarGrid items={sortedItems} currentMonth={currentMonth} />
+            /* Month Grid View with Legend */
+            <div className="space-y-4">
+              <div className="lg:hidden">
+                <CalendarLegend horizontal />
+              </div>
+              <div className="flex gap-4">
+                <div className="flex-1 min-w-0">
+                  <MonthCalendarGrid 
+                    items={sortedItems} 
+                    currentMonth={currentMonth} 
+                    showAgentName={selectedUserId === "all"} 
+                  />
+                </div>
+                <div className="hidden lg:block">
+                  <CalendarLegend />
+                </div>
+              </div>
+            </div>
           ) : viewMode === "week" ? (
-            /* Week Grid View */
-            <WeekCalendarGrid items={sortedItems} weekDate={currentWeek} />
+            /* Week Grid View with Legend */
+            <div className="space-y-4">
+              <div className="lg:hidden">
+                <CalendarLegend horizontal />
+              </div>
+              <div className="flex gap-4">
+                <div className="flex-1 min-w-0">
+                  <WeekCalendarGrid 
+                    items={sortedItems} 
+                    weekDate={currentWeek} 
+                    showAgentName={selectedUserId === "all"} 
+                  />
+                </div>
+                <div className="hidden lg:block">
+                  <CalendarLegend />
+                </div>
+              </div>
+            </div>
           ) : (
             /* Day View */
-            <DayCalendarView items={sortedItems} dayDate={currentDay} />
+            <DayCalendarView 
+              items={sortedItems} 
+              dayDate={currentDay} 
+              showAgentName={selectedUserId === "all"} 
+            />
           )}
         </>
       )}

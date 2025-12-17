@@ -1,0 +1,274 @@
+Replit Agent Prompt — Calendar UI Upgrade (Exact Implementation Notes)
+
+You are working in the existing Mission Control web app – Calendar page.
+Implement sorting + view modes similar to Google Calendar, and fix the latest UX issues.
+
+1) Requirements Summary
+A) Default sort
+
+Calendar items must default to Newest → Oldest (descending by startAt).
+
+B) Sort options (dropdown)
+
+Add a Sort dropdown with:
+
+Newest → Oldest (default)
+
+Oldest → Newest
+
+A → Z (by title)
+
+Z → A (by `title)
+
+Persist selection in localStorage.
+
+C) View modes (toggle)
+
+Add a View selector similar to Google Calendar:
+
+List
+
+Month
+
+Week
+
+Day
+
+Default view: List
+Persist selection in localStorage.
+
+UI fixes required
+
+View dropdown must not overlap
+
+Month navigation arrows must not overlap Sort dropdown arrow (see item #8)
+
+D) Month grid view (must-have)
+
+Implement a month grid:
+
+7 columns (Sun–Sat)
+
+5–6 rows (weeks)
+
+Each cell shows date number and items starting that day.
+
+Week/Day views can be basic but implement Month at minimum.
+
+2) Data Normalization (do this first)
+
+Normalize all calendar items into:
+
+type CalendarItem = {
+  id: string;
+  title: string;
+  startAt: string; // ISO
+  endAt?: string | null;
+  type: "task" | "appointment" | "event";
+  agentId?: string | null;
+  agentName?: string | null; // ADD THIS if available from API/users map
+  colorKey?: string | null;  // used for legend + consistent colors
+  raw?: any;
+};
+
+
+Rules:
+
+If no start date/time → startAt = null (List bottom, not in grid)
+
+Title fallback: "Untitled"
+
+3) Sorting Implementation (client-side)
+
+Implement:
+
+function sortItems(items: CalendarItem[], sort: "newest" | "oldest" | "az" | "za"): CalendarItem[]
+
+
+Definitions:
+
+newest: startAt desc
+
+oldest: startAt asc
+
+az/za: title asc/desc (lowercase + trim)
+
+missing startAt always last
+
+Persist:
+
+localStorage.setItem("calendarSort", sort)
+Default: "newest"
+
+4) View Mode State + Persistence
+
+State:
+
+viewMode: "list" | "month" | "week" | "day"
+
+Persist:
+
+localStorage.setItem("calendarViewMode", viewMode)
+
+5) Month View — Exact Rendering Rules
+A) Calendar grid dates
+
+Grid start = Sunday of week containing 1st of month
+
+Grid end = Saturday of week containing last day
+
+Render day cells in order.
+
+B) Items placement + overflow
+
+In each day cell show first 3 items.
+
+If more than 3:
+
+Show “View all (N)” button.
+
+Clicking opens a floating popover/card listing all items + details.
+
+C) Hover tooltip (NEW requirement)
+
+If Filter = All Agents:
+
+Hovering an appointment/event in Month / Week / Day must show a tooltip that includes:
+
+Title
+
+Time range
+
+Type
+
+Agent name
+
+Tooltip should be a proper UI tooltip component (not native title attr).
+
+If Filter = single agent:
+
+Tooltip can omit agent name (optional), but must still show basic details.
+
+D) Cell UI
+
+Date number
+
+Gray out days outside month
+
+Highlight today
+
+6) Week View (basic acceptable)
+
+7 columns for current week
+
+List items per day
+
+Support the same hover tooltip behavior (agent name shown when All Agents).
+
+7) Day View (basic acceptable)
+
+Single-day list
+
+Support the same hover tooltip behavior (agent name shown when All Agents).
+
+8) Toolbar Controls + Layout Fixes
+
+Controls in toolbar row (near Month nav / Today / Refresh):
+
+Sort dropdown
+
+View dropdown
+
+Today button
+
+Refresh button
+
+Month navigation arrows (left/right)
+
+A) Fix overlap: Month right arrow overlaps Sort arrow (NEW)
+
+Rework layout spacing so:
+
+Month navigation arrows are grouped near month title
+
+Sort dropdown arrow has its own space
+
+Ensure no overlap at common widths (responsive).
+
+Use flexbox with consistent gaps and min-width on controls.
+
+B) Fix Today button not working (NEW)
+
+Today must:
+
+Set the currently displayed date range back to today:
+
+If in Month view → jump to current month
+
+If in Week view → jump to current week containing today
+
+If in Day view → jump to today
+
+If in List view → adjust the range to include today (or set month/week context to today)
+
+Trigger a refresh of the visible items without breaking current filters.
+
+9) Legend (NEW requirement)
+
+Add a Legend panel on the right side of the calendar for:
+
+Month view
+
+Week view
+
+Legend shows the meaning of colors used for appointments. Requirements:
+
+Use consistent color mapping (colorKey) across items.
+
+At minimum, legend should cover:
+
+Appointment types (task vs appointment vs event) OR
+
+Agent-based colors (if you are coloring by agent)
+
+Choose ONE approach and be consistent:
+
+If calendar items are color-coded by agent, legend should list agents (name + color).
+
+If color-coded by type, legend should list type labels.
+
+The legend must update based on:
+
+current filter (All vs single agent)
+
+currently loaded items (only show relevant legend entries)
+
+Keep the UI subtle and aligned with Mission Control styling.
+
+10) Loading / Empty / Error
+
+List view: keep existing skeletons/errors
+
+Month/Week/Day:
+
+grid skeleton while loading
+
+“No items found” state
+
+Do not refetch on sort/view changes.
+
+11) Deliverables
+
+Provide file paths changed
+
+Confirm:
+
+Right month arrow no longer overlaps Sort arrow
+
+Tooltip shows agent name when Filter = All Agents (Month/Week/Day)
+
+Legend appears on the right in Month & Week and matches colors used
+
+Today button works correctly in all views
+
+All prior features still work (sort, view toggle, refresh animation, month overflow popover)
