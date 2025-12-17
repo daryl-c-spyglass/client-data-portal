@@ -4330,8 +4330,8 @@ This email was sent by ${senderName} (${senderEmail}) via the MLS Grid IDX Platf
   const fubCache = new Map<string, { data: any; timestamp: number }>();
   const FUB_CACHE_TTL = 3 * 60 * 1000; // 3 minutes
   
-  // FUB API client helper
-  async function fubApiRequest(endpoint: string, options: RequestInit = {}) {
+  // FUB API client helper with improved error handling
+  async function fubApiRequest(endpoint: string, options: RequestInit = {}): Promise<{ data: any; status: number }> {
     const apiKey = process.env.FUB_API_KEY;
     if (!apiKey) {
       throw new Error('FUB_API_KEY not configured');
@@ -4341,7 +4341,10 @@ This email was sent by ${senderName} (${senderEmail}) via the MLS Grid IDX Platf
     // FUB uses Basic auth with API key as username and empty password
     const authToken = Buffer.from(`${apiKey}:`).toString('base64');
     
-    const response = await fetch(`${baseUrl}${endpoint}`, {
+    const fullUrl = `${baseUrl}${endpoint}`;
+    console.log(`[FUB API] Calling: ${endpoint.split('?')[0]}`);
+    
+    const response = await fetch(fullUrl, {
       ...options,
       headers: {
         'Authorization': `Basic ${authToken}`,
@@ -4350,22 +4353,34 @@ This email was sent by ${senderName} (${senderEmail}) via the MLS Grid IDX Platf
       },
     });
     
+    // Improved error handling with specific messages
     if (!response.ok) {
-      throw new Error(`FUB API error: ${response.status} ${response.statusText}`);
+      const status = response.status;
+      if (status === 401 || status === 403) {
+        throw new Error(`FUB authentication failed (status ${status}): Check Basic Auth + API key permissions. The API key may not have access to this resource.`);
+      }
+      if (status === 429) {
+        throw new Error('Rate limited by FUB. Please retry later.');
+      }
+      throw new Error(`FUB API error: ${status} ${response.statusText}`);
     }
     
-    return response.json();
+    const data = await response.json();
+    return { data, status: response.status };
   }
   
   // Get calendar events from FUB for a specific agent
+  // Uses /appointments first, falls back to /tasks if appointments returns empty
+  // Note: FUB appointments only returns items created in FUB that the API key user owns
+  // or has calendar sharing enabled - Google calendar events may not appear
   app.get("/api/fub/calendar", async (req, res) => {
     try {
       const { agentId, start, end, userId } = req.query as Record<string, string>;
       
-      // Use agentId or userId (FUB uses userId)
-      const fubUserId = agentId || userId;
+      // Use agentId or userId - treat empty string as "all"
+      const fubUserId = (agentId && agentId !== '') ? agentId : (userId && userId !== '') ? userId : null;
       
-      console.log(`[FUB Calendar] Fetching events - agentId: ${fubUserId}, start: ${start}, end: ${end}`);
+      console.log(`[FUB Calendar] Fetching - userId: ${fubUserId || 'all'}, start: ${start}, end: ${end}`);
       
       const cacheKey = `fub_calendar_${fubUserId || 'all'}_${start || 'default'}_${end || 'default'}`;
       const cached = fubCache.get(cacheKey);
@@ -4375,72 +4390,119 @@ This email was sent by ${senderName} (${senderEmail}) via the MLS Grid IDX Platf
         return;
       }
       
-      // Build query params
-      const params = new URLSearchParams();
-      if (fubUserId) params.append('assignedTo', fubUserId);
-      if (start) params.append('start', start);
-      if (end) params.append('end', end);
-      params.append('limit', '100');
-      
-      // Try events endpoint first, fall back to tasks if needed
-      let events: any[] = [];
+      let appointments: any[] = [];
       let tasks: any[] = [];
+      let appointmentsError: string | null = null;
+      let tasksError: string | null = null;
+      let dataSource = 'appointments';
       
+      // Try /appointments endpoint first (FUB's calendar events)
+      // Per FUB docs: userId, start (ISO datetime), end (ISO datetime)
+      // Use local timezone context by not forcing UTC
       try {
-        const eventsResponse = await fubApiRequest(`/events?${params.toString()}`);
-        events = eventsResponse?.events || eventsResponse || [];
+        const apptParams = new URLSearchParams();
+        if (fubUserId) apptParams.append('userId', fubUserId);
+        // Use date strings directly - FUB accepts YYYY-MM-DD format
+        if (start) apptParams.append('start', start);
+        if (end) apptParams.append('end', end);
+        apptParams.append('limit', '100');
+        
+        const { data: apptResponse } = await fubApiRequest(`/appointments?${apptParams.toString()}`);
+        appointments = apptResponse?.appointments || [];
+        console.log(`[FUB Calendar] Appointments returned: ${appointments.length}`);
       } catch (e: any) {
-        console.log(`[FUB Calendar] Events endpoint failed: ${e.message}`);
+        appointmentsError = e.message;
+        console.log(`[FUB Calendar] Appointments endpoint failed: ${e.message}`);
       }
       
+      // Always fetch tasks as fallback/supplement
+      // FUB tasks use: assignedUserId, dueStart, dueEnd (per user-provided docs)
       try {
-        const tasksResponse = await fubApiRequest(`/tasks?${params.toString()}`);
-        tasks = tasksResponse?.tasks || tasksResponse || [];
+        const taskParams = new URLSearchParams();
+        if (fubUserId) taskParams.append('assignedUserId', fubUserId);
+        if (start) taskParams.append('dueStart', start);
+        if (end) taskParams.append('dueEnd', end);
+        taskParams.append('limit', '100');
+        
+        const { data: tasksResponse } = await fubApiRequest(`/tasks?${taskParams.toString()}`);
+        tasks = tasksResponse?.tasks || [];
+        console.log(`[FUB Calendar] Tasks returned: ${tasks.length}`);
       } catch (e: any) {
+        tasksError = e.message;
         console.log(`[FUB Calendar] Tasks endpoint failed: ${e.message}`);
       }
       
-      // Combine and format
+      // If both endpoints failed, surface the error
+      if (appointmentsError && tasksError) {
+        console.error(`[FUB Calendar] Both endpoints failed`);
+        res.status(502).json({
+          error: 'Both FUB calendar endpoints failed',
+          appointmentsError,
+          tasksError,
+          help: 'Check FUB API key permissions. Appointments may require calendar sharing to be enabled.',
+        });
+        return;
+      }
+      
+      // Determine data source for debug info
+      if (appointments.length > 0 && tasks.length > 0) {
+        dataSource = 'appointments + tasks';
+      } else if (appointments.length > 0) {
+        dataSource = 'appointments';
+      } else if (tasks.length > 0) {
+        dataSource = 'tasks (fallback)';
+      } else {
+        dataSource = 'none (empty results)';
+      }
+      
+      // Combine and format calendar items
       const calendarItems = [
-        ...events.map((e: any) => ({
-          id: e.id,
-          type: 'event',
-          title: e.title || e.name || 'Event',
-          description: e.description || e.notes,
-          start: e.startDate || e.start || e.dueDate,
-          end: e.endDate || e.end,
-          allDay: e.allDay || false,
-          assignedTo: e.assignedTo || e.userId,
-          contact: e.person?.name || e.personName || null,
-          contactId: e.personId || e.person?.id,
+        ...appointments.map((a: any) => ({
+          id: String(a.id),
+          type: 'event' as const,
+          title: a.title || a.name || 'Appointment',
+          description: a.description || a.notes || null,
+          start: a.start || a.startDate || a.created,
+          end: a.end || a.endDate || null,
+          allDay: a.allDay || false,
+          assignedTo: a.userId || a.assignedTo || null,
+          contact: a.person?.name || a.personName || null,
+          contactId: a.personId || a.person?.id || null,
         })),
         ...tasks.map((t: any) => ({
-          id: t.id,
-          type: 'task',
-          title: t.title || t.name || 'Task',
-          description: t.description || t.notes,
-          start: t.dueDate || t.due,
+          id: String(t.id),
+          type: 'task' as const,
+          title: t.name || t.title || 'Task',
+          description: t.note || t.description || null,
+          start: t.dueDate || t.due || t.created,
           end: null,
           allDay: true,
-          assignedTo: t.assignedTo || t.userId,
+          assignedTo: t.assignedUserId || t.userId || null,
           contact: t.person?.name || t.personName || null,
-          contactId: t.personId || t.person?.id,
-          completed: t.completed || t.isCompleted || false,
+          contactId: t.personId || t.person?.id || null,
+          completed: t.isCompleted || t.completed || false,
         })),
       ].sort((a, b) => new Date(a.start || 0).getTime() - new Date(b.start || 0).getTime());
       
       const result = {
         items: calendarItems,
         count: calendarItems.length,
-        dataSource: 'Follow Up Boss',
+        dataSource,
         agentId: fubUserId || 'all',
         dateRange: { start, end },
         fetchedAt: new Date().toISOString(),
+        debug: {
+          appointmentsCount: appointments.length,
+          tasksCount: tasks.length,
+          appointmentsError,
+          tasksError,
+          note: 'FUB appointments only shows events created in FUB that the API key user owns or has sharing enabled. Google Calendar events may not appear.',
+        },
       };
       
       fubCache.set(cacheKey, { data: result, timestamp: Date.now() });
       
-      console.log(`[FUB Calendar] Fetched ${calendarItems.length} items for agent ${fubUserId || 'all'}`);
+      console.log(`[FUB Calendar] Returning ${calendarItems.length} items (${dataSource}) for agent ${fubUserId || 'all'}`);
       
       res.json(result);
     } catch (error: any) {
@@ -4448,7 +4510,8 @@ This email was sent by ${senderName} (${senderEmail}) via the MLS Grid IDX Platf
       res.status(500).json({ 
         error: 'Failed to fetch calendar data', 
         details: error.message,
-        note: process.env.FUB_API_KEY ? 'API key configured' : 'API key not configured'
+        note: process.env.FUB_API_KEY ? 'API key configured' : 'API key not configured',
+        help: 'If you see authentication errors, verify the FUB_API_KEY has correct permissions and uses Basic Auth format.',
       });
     }
   });
@@ -4476,8 +4539,8 @@ This email was sent by ${senderName} (${senderEmail}) via the MLS Grid IDX Platf
       params.append('limit', limit);
       params.append('sort', '-created');  // Most recent first
       
-      const response = await fubApiRequest(`/people?${params.toString()}`);
-      const people = response?.people || response || [];
+      const { data: response } = await fubApiRequest(`/people?${params.toString()}`);
+      const people = response?.people || [];
       
       // Format leads
       const leads = people.map((p: any) => ({
@@ -4540,8 +4603,8 @@ This email was sent by ${senderName} (${senderEmail}) via the MLS Grid IDX Platf
         return;
       }
       
-      const response = await fubApiRequest('/users');
-      const users = response?.users || response || [];
+      const { data: response } = await fubApiRequest('/users');
+      const users = response?.users || [];
       
       const result = {
         users: users.map((u: any) => ({

@@ -2,12 +2,12 @@ import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Calendar, Clock, User, CheckCircle2, Circle, AlertCircle, RefreshCw } from "lucide-react";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { Calendar, Clock, User, CheckCircle2, Circle, AlertCircle, RefreshCw, ChevronDown, ChevronRight, Bug } from "lucide-react";
 import { format, startOfMonth, endOfMonth, addMonths, parseISO } from "date-fns";
 
 interface CalendarItem {
@@ -31,6 +31,13 @@ interface CalendarData {
   agentId: string;
   dateRange: { start?: string; end?: string };
   fetchedAt: string;
+  debug?: {
+    appointmentsCount: number;
+    tasksCount: number;
+    appointmentsError: string | null;
+    tasksError: string | null;
+    note: string;
+  };
 }
 
 interface FubUser {
@@ -104,6 +111,62 @@ function CalendarItemCard({ item }: { item: CalendarItem }) {
         </div>
       </div>
     </div>
+  );
+}
+
+function DebugPanel({ calendarData, startDate, endDate }: { calendarData: CalendarData; startDate: string; endDate: string }) {
+  const [isOpen, setIsOpen] = useState(false);
+  const isDev = import.meta.env.DEV;
+  
+  if (!isDev) return null;
+  
+  return (
+    <Collapsible open={isOpen} onOpenChange={setIsOpen}>
+      <Card className="bg-muted/50 border-dashed">
+        <CollapsibleTrigger asChild>
+          <button 
+            className="flex items-center justify-between w-full px-4 py-2 text-left hover-elevate rounded-md"
+            data-testid="button-debug-toggle"
+          >
+            <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
+              <Bug className="h-4 w-4" />
+              Debug Details
+            </div>
+            {isOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+          </button>
+        </CollapsibleTrigger>
+        <CollapsibleContent>
+          <CardContent className="pt-0 pb-3 text-xs font-mono space-y-1">
+            <div className="grid grid-cols-2 gap-x-4 gap-y-1">
+              <p><span className="text-muted-foreground">Agent ID:</span> {calendarData.agentId || "all"}</p>
+              <p><span className="text-muted-foreground">Data Source:</span> {calendarData.dataSource}</p>
+              <p><span className="text-muted-foreground">Date Range:</span> {startDate} to {endDate}</p>
+              <p><span className="text-muted-foreground">Total Items:</span> {calendarData.count}</p>
+              {calendarData.debug && (
+                <>
+                  <p><span className="text-muted-foreground">Appointments:</span> {calendarData.debug.appointmentsCount}</p>
+                  <p><span className="text-muted-foreground">Tasks:</span> {calendarData.debug.tasksCount}</p>
+                </>
+              )}
+              <p className="col-span-2"><span className="text-muted-foreground">Fetched:</span> {calendarData.fetchedAt}</p>
+            </div>
+            {calendarData.debug?.appointmentsError && (
+              <p className="text-amber-600 dark:text-amber-400">
+                Appointments error: {calendarData.debug.appointmentsError}
+              </p>
+            )}
+            {calendarData.debug?.tasksError && (
+              <p className="text-amber-600 dark:text-amber-400">
+                Tasks error: {calendarData.debug.tasksError}
+              </p>
+            )}
+            {calendarData.debug?.note && (
+              <p className="text-muted-foreground italic pt-2">{calendarData.debug.note}</p>
+            )}
+          </CardContent>
+        </CollapsibleContent>
+      </Card>
+    </Collapsible>
   );
 }
 
@@ -260,18 +323,8 @@ export default function CalendarPage() {
         </CardContent>
       </Card>
       
-      {process.env.NODE_ENV === "development" && calendarData && (
-        <Card className="bg-muted/50">
-          <CardHeader className="py-2">
-            <CardTitle className="text-sm">Debug Info</CardTitle>
-          </CardHeader>
-          <CardContent className="py-2 text-xs font-mono">
-            <p>Agent ID: {calendarData.agentId || "all"}</p>
-            <p>Date Range: {startDate} to {endDate}</p>
-            <p>Items Returned: {calendarData.count}</p>
-            <p>Fetched At: {calendarData.fetchedAt}</p>
-          </CardContent>
-        </Card>
+      {calendarData && (
+        <DebugPanel calendarData={calendarData} startDate={startDate} endDate={endDate} />
       )}
       
       {isLoading && (
@@ -289,11 +342,25 @@ export default function CalendarPage() {
       
       {error && (
         <Card className="border-destructive">
-          <CardContent className="py-4">
+          <CardContent className="py-4 space-y-3">
             <div className="flex items-center gap-3 text-destructive">
               <AlertCircle className="h-5 w-5" />
-              <p>Failed to load calendar data. Please try again.</p>
+              <div>
+                <p className="font-medium">Failed to load calendar data</p>
+                <p className="text-sm text-muted-foreground mt-1">
+                  {(error as Error).message || 'Please try again.'}
+                </p>
+              </div>
             </div>
+            <div className="flex gap-2">
+              <Button size="sm" onClick={() => refetch()} data-testid="button-retry">
+                <RefreshCw className="h-4 w-4 mr-2" />
+                Retry
+              </Button>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Note: If the API key only has visibility for its own user, calendar events for other agents may not be accessible.
+            </p>
           </CardContent>
         </Card>
       )}

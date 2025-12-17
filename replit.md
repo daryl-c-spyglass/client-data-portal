@@ -54,6 +54,11 @@ The UI incorporates Spyglass Realty branding with an orange primary color scheme
 - **Mission Control (ReZen) API**: For agent production volume reporting.
   - Mock endpoint: `GET /api/rezen/mock/production?agentId=...` for UI testing without live API
 - **Follow Up Boss (FUB) API**: For calendar events and lead management.
+  - Uses HTTP Basic Auth: username = API key, password = empty
+  - Calendar uses `/appointments` endpoint (returns FUB-created events only, not Google Calendar sync)
+  - Falls back to `/tasks` endpoint (uses `assignedUserId`, `dueStart`, `dueEnd` params)
+  - Note: Appointments may return empty even if users have Google Calendar events - results are restricted to events created in FUB, owned by the API key user, with calendar sharing enabled
+  - API endpoints: `/api/fub/calendar`, `/api/fub/leads`, `/api/fub/users`, `/api/fub/status`
 - **`connect-pg-simple`**: PostgreSQL-backed session management.
 - **Google Fonts CDN**: Typography (Inter font family).
 - **Recharts**: Charting and data visualization.

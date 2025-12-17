@@ -1,0 +1,91 @@
+You are working in an existing Mission Control web app. The Calendar page shows: “Failed to load calendar data. Please try again.”
+
+Objective
+
+Fix the calendar data loading by correcting Follow Up Boss (FUB) API usage, authentication, error handling, and by adding a reliable fallback strategy.
+
+Credentials & Security
+
+FUB API key is already provided and must be stored as env var: FUB_API_KEY
+
+Never expose FUB_API_KEY to the browser
+
+All FUB calls must be made server-side via backend routes.
+
+FUB API requirements (follow official docs)
+
+Base URL must be https://api.followupboss.com/v1/... and HTTPS only. 
+Follow Up Boss
+
+Use HTTP Basic Auth with:
+
+username = API key
+
+password = blank (or any value if required by client) 
+Follow Up Boss
++1
+
+Implement server-side fetch with correct Authorization header (Basic base64(apiKey + ":" + password)).
+
+What to implement/fix
+
+Locate the Calendar frontend + backend route it calls.
+
+In the backend route, add robust logging + return useful errors:
+
+Log status code + endpoint called (DO NOT log API key)
+
+If status is 401/403, return a clear message: “FUB authentication failed (check Basic Auth + key permissions).”
+
+If status is 429, return: “Rate limited by FUB, retry later.”
+
+Ensure date filters sent to FUB are in correct format (use ISO date-time strings).
+
+Fetch calendar items using this strategy:
+
+First try GET /v1/appointments with userId (agent) and limit/date filters if supported by existing code.
+
+If appointments return empty OR endpoint fails due to restrictions, fallback to GET /v1/tasks because it supports agent assignment filters like assignedUserId and due range filters (dueStart, dueEnd). 
+Follow Up Boss
++1
+
+IMPORTANT: /appointments can return nothing even if users have Google calendar events because results are restricted (must be created in FUB, belong to API key user, and calendar sharing enabled). Do not treat empty appointments as “error”; treat it as “no appointments” and fallback to tasks. 
+Follow Up Boss
+
+Agent-specific behavior
+
+Calendar must change when switching the selected agent.
+
+If agent selector includes “All agents”, do NOT send empty string values; use a sentinel like "all" and interpret it server-side as no filtering.
+
+If the API key only has visibility for its own user, document that limitation in the UI error/help text.
+
+UI behavior
+
+Keep the existing Calendar layout.
+
+Improve the error display:
+
+Show a “Retry” button (already exists)
+
+Add a small “Debug details” collapsible in development mode that shows:
+
+endpoint used (appointments/tasks fallback)
+
+item count returned
+
+time range and agentId used
+
+Deliverables
+
+Provide the exact files changed + paths.
+
+Confirm Calendar loads without the error banner.
+
+Confirm an agent switch changes the query and results.
+
+Add a short README note explaining:
+
+FUB Basic Auth requirement
+
+why appointments might be empty and why tasks are used as fallback
