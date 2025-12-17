@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
-import { ArrowLeft, Share2, Link as LinkIcon, Copy, Check, Trash2, ExternalLink, Printer } from "lucide-react";
+import { ArrowLeft, Share2, Link as LinkIcon, Copy, Check, Trash2, ExternalLink, Printer, Loader2 } from "lucide-react";
 import { SiFacebook, SiX, SiInstagram, SiTiktok } from "react-icons/si";
 import { Link } from "wouter";
 import { CMAReport } from "@/components/CMAReport";
@@ -397,6 +397,40 @@ export default function CMADetailPage() {
         </div>
 
         <div className="flex items-center gap-2">
+          <Button 
+            variant="outline" 
+            onClick={async () => {
+              try {
+                let shareUrl: string;
+                if (cma?.publicLink) {
+                  shareUrl = `${window.location.origin}/share/cma/${cma.publicLink}`;
+                } else {
+                  const result = await shareMutation.mutateAsync();
+                  shareUrl = `${window.location.origin}/share/cma/${result.shareToken}`;
+                }
+                await navigator.clipboard.writeText(shareUrl);
+                toast({
+                  title: "URL copied to clipboard",
+                  description: shareUrl,
+                });
+              } catch (error) {
+                toast({
+                  title: "Error",
+                  description: "Failed to generate or copy share URL",
+                  variant: "destructive",
+                });
+              }
+            }}
+            disabled={shareMutation.isPending}
+            data-testid="button-produce-url"
+          >
+            {shareMutation.isPending ? (
+              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+            ) : (
+              <LinkIcon className="w-4 h-4 mr-2" />
+            )}
+            Produce URL
+          </Button>
           <Button variant="outline" onClick={handlePrint} data-testid="button-print-header">
             <Printer className="w-4 h-4 mr-2" />
             Print

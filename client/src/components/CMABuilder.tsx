@@ -156,8 +156,12 @@ interface InitialCMAData {
     city?: string;
     subdivision?: string;
     neighborhood?: string;
+    zipCode?: string;
     minBeds?: string;
+    minPrice?: string;
     maxPrice?: string;
+    minBaths?: string;
+    maxBaths?: string;
     statuses?: string[];
     minSqft?: string;
     maxSqft?: string;
@@ -197,8 +201,12 @@ export function CMABuilder({ onCreateCMA, initialData }: CMABuilderProps) {
   const [searchCity, setSearchCity] = useState(sc.city || "");
   const [searchSubdivision, setSearchSubdivision] = useState(sc.subdivision || "");
   const [searchNeighborhood, setSearchNeighborhood] = useState(sc.neighborhood || "");
+  const [searchZipCode, setSearchZipCode] = useState(sc.zipCode || "");
   const [searchMinBeds, setSearchMinBeds] = useState(sc.minBeds || "");
+  const [searchMinPrice, setSearchMinPrice] = useState(sc.minPrice || "");
   const [searchMaxPrice, setSearchMaxPrice] = useState(sc.maxPrice || "");
+  const [searchMinBaths, setSearchMinBaths] = useState(sc.minBaths || "");
+  const [searchMaxBaths, setSearchMaxBaths] = useState(sc.maxBaths || "");
   const [searchStatuses, setSearchStatuses] = useState<string[]>(sc.statuses || ["active"]);
   const [searchEnabled, setSearchEnabled] = useState(!!initialData?.searchCriteria);
 
@@ -289,8 +297,12 @@ export function CMABuilder({ onCreateCMA, initialData }: CMABuilderProps) {
     setSearchCity("");
     setSearchSubdivision("");
     setSearchNeighborhood("");
+    setSearchZipCode("");
     setSearchMinBeds("");
+    setSearchMinPrice("");
     setSearchMaxPrice("");
+    setSearchMinBaths("");
+    setSearchMaxBaths("");
     setSearchStatuses(["active"]);
     setSearchEnabled(false);
     setSearchMinSqft("");
@@ -308,8 +320,12 @@ export function CMABuilder({ onCreateCMA, initialData }: CMABuilderProps) {
     setSearchCity("");
     setSearchSubdivision("");
     setSearchNeighborhood("");
+    setSearchZipCode("");
     setSearchMinBeds("");
+    setSearchMinPrice("");
     setSearchMaxPrice("");
+    setSearchMinBaths("");
+    setSearchMaxBaths("");
     setSearchStatuses(["active"]);
     setSearchMinSqft("");
     setSearchMaxSqft("");
@@ -332,8 +348,12 @@ export function CMABuilder({ onCreateCMA, initialData }: CMABuilderProps) {
     if (searchCity) params.set('city', searchCity.trim());
     if (searchSubdivision) params.set('subdivision', searchSubdivision.trim());
     if (searchNeighborhood) params.set('neighborhood', searchNeighborhood.trim());
+    if (searchZipCode) params.set('postalCode', searchZipCode.trim());
     if (searchMinBeds && searchMinBeds !== 'any') params.set('bedsMin', searchMinBeds);
+    if (searchMinPrice && searchMinPrice !== 'any') params.set('minPrice', searchMinPrice);
     if (searchMaxPrice && searchMaxPrice !== 'any') params.set('maxPrice', searchMaxPrice);
+    if (searchMinBaths && searchMinBaths !== 'any') params.set('bathsMin', searchMinBaths);
+    if (searchMaxBaths && searchMaxBaths !== 'any') params.set('bathsMax', searchMaxBaths);
     if (searchMinSqft) params.set('minSqft', searchMinSqft);
     if (searchMaxSqft) params.set('maxSqft', searchMaxSqft);
     if (searchMinLotAcres) params.set('minLotAcres', searchMinLotAcres);
@@ -474,8 +494,12 @@ export function CMABuilder({ onCreateCMA, initialData }: CMABuilderProps) {
         city: searchCity,
         subdivision: searchSubdivision,
         neighborhood: searchNeighborhood,
+        zipCode: searchZipCode,
         minBeds: searchMinBeds,
+        minPrice: searchMinPrice,
         maxPrice: searchMaxPrice,
+        minBaths: searchMinBaths,
+        maxBaths: searchMaxBaths,
         statuses: searchStatuses,
         minSqft: searchMinSqft,
         maxSqft: searchMaxSqft,
@@ -611,6 +635,17 @@ export function CMABuilder({ onCreateCMA, initialData }: CMABuilderProps) {
                   />
                 </div>
                 <div className="space-y-2">
+                  <Label>Zip Code</Label>
+                  <AutocompleteInput
+                    placeholder="e.g., 78704"
+                    value={searchZipCode}
+                    onChange={setSearchZipCode}
+                    endpoint="/api/autocomplete/postalCodes"
+                    testId="input-search-zipcode"
+                    name="zipCode"
+                  />
+                </div>
+                <div className="space-y-2">
                   <Label>Min Beds</Label>
                   <Select value={searchMinBeds} onValueChange={setSearchMinBeds}>
                     <SelectTrigger data-testid="select-min-beds">
@@ -622,6 +657,38 @@ export function CMABuilder({ onCreateCMA, initialData }: CMABuilderProps) {
                       <SelectItem value="3">3+</SelectItem>
                       <SelectItem value="4">4+</SelectItem>
                       <SelectItem value="5">5+</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label>Min Baths</Label>
+                  <Select value={searchMinBaths} onValueChange={setSearchMinBaths}>
+                    <SelectTrigger data-testid="select-min-baths">
+                      <SelectValue placeholder="Any" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="any">Any</SelectItem>
+                      <SelectItem value="1">1+</SelectItem>
+                      <SelectItem value="2">2+</SelectItem>
+                      <SelectItem value="3">3+</SelectItem>
+                      <SelectItem value="4">4+</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label>Min Price</Label>
+                  <Select value={searchMinPrice} onValueChange={setSearchMinPrice}>
+                    <SelectTrigger data-testid="select-min-price">
+                      <SelectValue placeholder="Any" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="any">Any</SelectItem>
+                      <SelectItem value="100000">$100K</SelectItem>
+                      <SelectItem value="200000">$200K</SelectItem>
+                      <SelectItem value="300000">$300K</SelectItem>
+                      <SelectItem value="500000">$500K</SelectItem>
+                      <SelectItem value="750000">$750K</SelectItem>
+                      <SelectItem value="1000000">$1M</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -638,6 +705,7 @@ export function CMABuilder({ onCreateCMA, initialData }: CMABuilderProps) {
                       <SelectItem value="750000">$750K</SelectItem>
                       <SelectItem value="1000000">$1M</SelectItem>
                       <SelectItem value="2000000">$2M</SelectItem>
+                      <SelectItem value="5000000">$5M</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>

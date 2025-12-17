@@ -1,3 +1,4 @@
+import { useState, useRef, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useParams } from "wouter";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -5,7 +6,9 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
-import { Loader2, AlertCircle, Home, TrendingUp, Calendar, FileText } from "lucide-react";
+import { Dialog, DialogContent } from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Loader2, AlertCircle, Home, TrendingUp, Calendar, FileText, ChevronLeft, ChevronRight, X } from "lucide-react";
 import type { Property, PropertyStatistics, TimelineDataPoint } from "@shared/schema";
 
 interface SharedCMAData {
@@ -23,6 +26,51 @@ interface SharedCMAData {
 
 export default function SharedCMAView() {
   const { token } = useParams<{ token: string }>();
+  
+  // Photo modal state
+  const [selectedProperty, setSelectedProperty] = useState<Property | null>(null);
+  const [photoIndex, setPhotoIndex] = useState(0);
+  const [photoModalOpen, setPhotoModalOpen] = useState(false);
+  const autoAdvanceRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  
+  // Get photos from property
+  const getPropertyPhotos = (property: Property): string[] => {
+    const photos = (property as any).photos as string[] | undefined;
+    if (photos && photos.length > 0) return photos;
+    return [];
+  };
+  
+  // Handle photo click
+  const handlePhotoClick = (property: Property) => {
+    const photos = getPropertyPhotos(property);
+    if (photos.length > 0) {
+      setSelectedProperty(property);
+      setPhotoIndex(0);
+      setPhotoModalOpen(true);
+    }
+  };
+  
+  // Auto-advance carousel
+  useEffect(() => {
+    if (autoAdvanceRef.current) {
+      clearInterval(autoAdvanceRef.current);
+    }
+    
+    if (selectedProperty && photoModalOpen) {
+      const photos = getPropertyPhotos(selectedProperty);
+      if (photos.length > 1) {
+        autoAdvanceRef.current = setInterval(() => {
+          setPhotoIndex((prev) => (prev + 1) % photos.length);
+        }, 3000);
+      }
+    }
+    
+    return () => {
+      if (autoAdvanceRef.current) {
+        clearInterval(autoAdvanceRef.current);
+      }
+    };
+  }, [selectedProperty, photoModalOpen]);
 
   const { data, isLoading, isError, error } = useQuery<SharedCMAData>({
     queryKey: ['/api/share/cma', token],
@@ -313,59 +361,85 @@ export default function SharedCMAView() {
           </CardHeader>
           <CardContent>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {properties.map((property) => (
-                <Card key={property.id} className="overflow-hidden">
-                  <CardContent className="p-4">
-                    <div className="flex items-start justify-between gap-2 mb-2">
-                      <div className="flex-1">
-                        <p className="font-semibold text-sm line-clamp-1">{property.unparsedAddress}</p>
-                        <p className="text-xs text-muted-foreground">
-                          {property.city}, {property.stateOrProvince} {property.postalCode}
-                        </p>
+              {properties.map((property) => {
+                const photos = getPropertyPhotos(property);
+                const hasPhotos = photos.length > 0;
+                return (
+                  <Card key={property.id} className="overflow-hidden">
+                    {hasPhotos && (
+                      <div 
+                        className="relative h-48 cursor-pointer group"
+                        onClick={() => handlePhotoClick(property)}
+                        data-testid={`property-photo-${property.id}`}
+                      >
+                        <img 
+                          src={photos[0]} 
+                          alt={property.unparsedAddress || 'Property'} 
+                          className="w-full h-full object-cover transition-transform group-hover:scale-105"
+                        />
+                        {photos.length > 1 && (
+                          <Badge 
+                            variant="secondary" 
+                            className="absolute bottom-2 right-2 bg-black/60 text-white border-0"
+                          >
+                            +{photos.length - 1} photos
+                          </Badge>
+                        )}
+                        <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors" />
                       </div>
-                      <Badge variant={property.standardStatus === 'Closed' ? 'secondary' : 'default'}>
-                        {property.standardStatus === 'Closed' ? 'Sold' : property.standardStatus}
-                      </Badge>
-                    </div>
-                    <Separator className="my-2" />
-                    <div className="grid grid-cols-2 gap-2 text-sm">
-                      <div>
-                        <span className="text-muted-foreground">Price:</span>
-                        <span className="ml-2 font-medium">{getPriceDisplay(property)}</span>
-                      </div>
-                      <div>
-                        <span className="text-muted-foreground">$/SqFt:</span>
-                        <span className="ml-2 font-medium">
-                          ${property.livingArea 
-                            ? ((property.standardStatus === 'Closed' && property.closePrice 
-                                ? Number(property.closePrice) 
-                                : Number(property.listPrice || 0)) / Number(property.livingArea)).toFixed(0)
-                            : 'N/A'
-                          }
-                        </span>
-                      </div>
-                      <div>
-                        <span className="text-muted-foreground">Beds/Baths:</span>
-                        <span className="ml-2 font-medium">{property.bedroomsTotal} / {property.bathroomsTotalInteger}</span>
-                      </div>
-                      <div>
-                        <span className="text-muted-foreground">SqFt:</span>
-                        <span className="ml-2 font-medium">{Number(property.livingArea || 0).toLocaleString()}</span>
-                      </div>
-                      <div>
-                        <span className="text-muted-foreground">Year:</span>
-                        <span className="ml-2 font-medium">{property.yearBuilt || 'N/A'}</span>
-                      </div>
-                      {property.closeDate && (
-                        <div>
-                          <span className="text-muted-foreground">Sold:</span>
-                          <span className="ml-2 font-medium">{new Date(property.closeDate).toLocaleDateString()}</span>
+                    )}
+                    <CardContent className="p-4">
+                      <div className="flex items-start justify-between gap-2 mb-2">
+                        <div className="flex-1">
+                          <p className="font-semibold text-sm line-clamp-1">{property.unparsedAddress}</p>
+                          <p className="text-xs text-muted-foreground">
+                            {property.city}, {property.stateOrProvince} {property.postalCode}
+                          </p>
                         </div>
-                      )}
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
+                        <Badge variant={property.standardStatus === 'Closed' ? 'secondary' : 'default'}>
+                          {property.standardStatus === 'Closed' ? 'Sold' : property.standardStatus}
+                        </Badge>
+                      </div>
+                      <Separator className="my-2" />
+                      <div className="grid grid-cols-2 gap-2 text-sm">
+                        <div>
+                          <span className="text-muted-foreground">Price:</span>
+                          <span className="ml-2 font-medium">{getPriceDisplay(property)}</span>
+                        </div>
+                        <div>
+                          <span className="text-muted-foreground">$/SqFt:</span>
+                          <span className="ml-2 font-medium">
+                            ${property.livingArea 
+                              ? ((property.standardStatus === 'Closed' && property.closePrice 
+                                  ? Number(property.closePrice) 
+                                  : Number(property.listPrice || 0)) / Number(property.livingArea)).toFixed(0)
+                              : 'N/A'
+                            }
+                          </span>
+                        </div>
+                        <div>
+                          <span className="text-muted-foreground">Beds/Baths:</span>
+                          <span className="ml-2 font-medium">{property.bedroomsTotal} / {property.bathroomsTotalInteger}</span>
+                        </div>
+                        <div>
+                          <span className="text-muted-foreground">SqFt:</span>
+                          <span className="ml-2 font-medium">{Number(property.livingArea || 0).toLocaleString()}</span>
+                        </div>
+                        <div>
+                          <span className="text-muted-foreground">Year:</span>
+                          <span className="ml-2 font-medium">{property.yearBuilt || 'N/A'}</span>
+                        </div>
+                        {property.closeDate && (
+                          <div>
+                            <span className="text-muted-foreground">Sold:</span>
+                            <span className="ml-2 font-medium">{new Date(property.closeDate).toLocaleDateString()}</span>
+                          </div>
+                        )}
+                      </div>
+                    </CardContent>
+                  </Card>
+                );
+              })}
             </div>
           </CardContent>
         </Card>
@@ -374,6 +448,63 @@ export default function SharedCMAView() {
           <p>Comparative Market Analysis provided by MLS Grid IDX Platform</p>
         </div>
       </div>
+      
+      {/* Photo Modal */}
+      <Dialog open={photoModalOpen} onOpenChange={setPhotoModalOpen}>
+        <DialogContent className="max-w-4xl p-0 overflow-hidden">
+          {selectedProperty && (
+            <div className="relative">
+              <div className="relative aspect-video bg-black">
+                <img
+                  src={getPropertyPhotos(selectedProperty)[photoIndex]}
+                  alt={`Photo ${photoIndex + 1}`}
+                  className="w-full h-full object-contain"
+                />
+                {getPropertyPhotos(selectedProperty).length > 1 && (
+                  <>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="absolute left-2 top-1/2 -translate-y-1/2 bg-black/50 hover:bg-black/70 text-white"
+                      onClick={() => setPhotoIndex((prev) => 
+                        (prev - 1 + getPropertyPhotos(selectedProperty).length) % getPropertyPhotos(selectedProperty).length
+                      )}
+                      data-testid="button-photo-prev"
+                    >
+                      <ChevronLeft className="w-6 h-6" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="absolute right-2 top-1/2 -translate-y-1/2 bg-black/50 hover:bg-black/70 text-white"
+                      onClick={() => setPhotoIndex((prev) => 
+                        (prev + 1) % getPropertyPhotos(selectedProperty).length
+                      )}
+                      data-testid="button-photo-next"
+                    >
+                      <ChevronRight className="w-6 h-6" />
+                    </Button>
+                  </>
+                )}
+                <div className="absolute bottom-2 left-1/2 -translate-x-1/2 bg-black/60 text-white px-3 py-1 rounded-full text-sm">
+                  {photoIndex + 1} / {getPropertyPhotos(selectedProperty).length}
+                </div>
+              </div>
+              <div className="p-4 bg-background">
+                <h3 className="font-semibold">{selectedProperty.unparsedAddress}</h3>
+                <p className="text-sm text-muted-foreground">
+                  {selectedProperty.city}, {selectedProperty.stateOrProvince} {selectedProperty.postalCode}
+                </p>
+                <div className="flex items-center gap-4 mt-2 text-sm">
+                  <span className="font-semibold">{getPriceDisplay(selectedProperty)}</span>
+                  <span>{selectedProperty.bedroomsTotal} bed / {selectedProperty.bathroomsTotalInteger} bath</span>
+                  <span>{Number(selectedProperty.livingArea || 0).toLocaleString()} sqft</span>
+                </div>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
