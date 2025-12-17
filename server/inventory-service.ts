@@ -308,7 +308,7 @@ async function countClosedListingsUnified(): Promise<{
     subtypeCounts[subtype] = 0;
   }
   
-  // Try Repliers API first (status='S' for Sold/Closed)
+  // Try Repliers API first (standardStatus='Closed' for Sold/Closed - RESO-compliant)
   const repliersClient = getRepliersClient();
   if (repliersClient && isRepliersConfigured()) {
     try {
@@ -318,7 +318,7 @@ async function countClosedListingsUnified(): Promise<{
       
       while (hasMore && pageNum <= 50) { // Safety limit
         const response = await repliersClient.searchListings({
-          status: 'S',
+          standardStatus: 'Closed',
           class: 'residential',
           resultsPerPage: 200,
           pageNum,

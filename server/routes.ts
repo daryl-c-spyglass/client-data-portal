@@ -2102,7 +2102,7 @@ This email was sent by ${senderName} (${senderEmail}) via the MLS Grid IDX Platf
         console.log('📡 Syncing active listings from Repliers API...');
         try {
           const testResult = await repliersClient.searchListings({
-            status: 'A',
+            standardStatus: 'Active',
             resultsPerPage: 5,
           });
           
@@ -2263,53 +2263,53 @@ This email was sent by ${senderName} (${senderEmail}) via the MLS Grid IDX Platf
       const capabilities = { active: false, underContract: false, sold: false };
       const testResults: any = {};
       
-      // Test Active listings
+      // Test Active listings using RESO-compliant standardStatus
       try {
         const activeResult = await repliersClient.searchListings({
-          status: 'A',
+          standardStatus: 'Active',
           class: 'residential',
           resultsPerPage: 1,
           pageNum: 1
         });
         capabilities.active = true;
         testResults.activeCount = (activeResult as any).numResults || activeResult.listings?.length || 0;
-        console.log(`✅ Repliers Active (A) test successful`);
+        console.log(`✅ Repliers Active (standardStatus=Active) test successful`);
       } catch (err: any) {
-        console.log(`❌ Repliers Active (A) test failed:`, err.message);
+        console.log(`❌ Repliers Active test failed:`, err.message);
         testResults.activeError = err.message;
       }
       
-      // Test Under Contract listings
+      // Test Under Contract / Pending listings
       try {
         const ucResult = await repliersClient.searchListings({
-          status: 'U',
+          standardStatus: 'Pending',
           class: 'residential',
           resultsPerPage: 1,
           pageNum: 1
         });
         capabilities.underContract = true;
         testResults.underContractCount = (ucResult as any).numResults || ucResult.listings?.length || 0;
-        console.log(`✅ Repliers Under Contract (U) test successful`);
+        console.log(`✅ Repliers Pending (standardStatus=Pending) test successful`);
       } catch (err: any) {
-        console.log(`❌ Repliers Under Contract (U) test failed:`, err.message);
+        console.log(`❌ Repliers Pending test failed:`, err.message);
         testResults.underContractError = err.message;
       }
       
-      // Test Sold listings (may not be enabled for all feeds)
+      // Test Closed/Sold listings using RESO-compliant standardStatus
       try {
         const soldResult = await repliersClient.searchListings({
-          status: 'S',
+          standardStatus: 'Closed',
           class: 'residential',
           resultsPerPage: 1,
           pageNum: 1
         });
         capabilities.sold = true;
         testResults.soldCount = (soldResult as any).numResults || soldResult.listings?.length || 0;
-        console.log(`✅ Repliers Sold (S) test successful`);
+        console.log(`✅ Repliers Closed (standardStatus=Closed) test successful`);
       } catch (err: any) {
-        console.log(`⚠️ Repliers Sold (S) not available:`, err.message);
+        console.log(`⚠️ Repliers Closed not available:`, err.message);
         testResults.soldError = err.message;
-        testResults.soldNote = "Sold data requires Repliers to enable status 'S' for your ACTRIS feed. Contact Repliers support.";
+        testResults.soldNote = "Check Repliers documentation for standardStatus filtering.";
       }
       
       const success = capabilities.active || capabilities.underContract;
@@ -3332,9 +3332,9 @@ This email was sent by ${senderName} (${senderEmail}) via the MLS Grid IDX Platf
       
       const hasPersonalization = !!(city || minPrice || maxPrice || propertyType);
       
-      // Build search params with optional personalization filters
+      // Build search params with optional personalization filters (RESO-compliant)
       const searchParams: any = {
-        status: 'A',
+        standardStatus: 'Active',
         resultsPerPage: fetchLimit,
         sortBy: 'createdOnDesc',
       };
@@ -3357,7 +3357,7 @@ This email was sent by ${senderName} (${senderEmail}) via the MLS Grid IDX Platf
       // FALLBACK: If personalized search yields no/few results, fetch general listings
       if (hasPersonalization && properties.length < 5) {
         const fallbackParams: any = {
-          status: 'A',
+          standardStatus: 'Active',
           resultsPerPage: fetchLimit,
           sortBy: 'createdOnDesc',
         };
@@ -3516,15 +3516,14 @@ This email was sent by ${senderName} (${senderEmail}) via the MLS Grid IDX Platf
       
       const isPersonalized = !!(city || subdivision || minPrice || maxPrice);
       
-      // Get sold properties from Repliers API (status='S')
-      // Per Repliers: status 'S' returns sold/closed listings with soldDate/soldPrice fields
+      // Get sold properties from Repliers API using RESO-compliant standardStatus='Closed'
       // Photos available for 3 months of historical listings by default
       let allSoldProps: any[] = [];
       
       if (repliersClient) {
         try {
           const repliersResult = await repliersClient.searchListings({
-            status: 'S',
+            standardStatus: 'Closed',
             class: 'residential',
             resultsPerPage: 200,
             pageNum: 1

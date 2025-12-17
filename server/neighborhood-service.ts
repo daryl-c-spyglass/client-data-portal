@@ -294,13 +294,13 @@ export class NeighborhoodService {
     }
     
     const activeResponse = await client.searchListingsInBoundary(boundary, {
-      status: 'A',
+      standardStatus: 'Active',
       class: 'residential',
       resultsPerPage: 50,
     });
     
     const ucResponse = await client.searchListingsInBoundary(boundary, {
-      status: 'U',
+      standardStatus: 'Pending',
       class: 'residential',
       resultsPerPage: 50,
     });

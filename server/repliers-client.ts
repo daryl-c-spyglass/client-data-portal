@@ -8,7 +8,9 @@ interface RepliersConfig {
 }
 
 interface ListingsSearchParams {
-  status?: string;
+  status?: string;  // Legacy: A=Available, U=Unavailable
+  standardStatus?: string;  // RESO-compliant: Active, Pending, Closed, Active Under Contract, etc.
+  lastStatus?: string;  // Detailed sub-status (use with status, not standardStatus)
   minPrice?: number;
   maxPrice?: number;
   minBeds?: number;
@@ -347,7 +349,13 @@ class RepliersClient {
   async searchListings(params: ListingsSearchParams = {}): Promise<ListingsResponse> {
     const queryParams = new URLSearchParams();
     
-    if (params.status) queryParams.append('status', params.status);
+    // Use standardStatus (RESO-compliant) OR status+lastStatus (legacy), never both
+    if (params.standardStatus) {
+      queryParams.append('standardStatus', params.standardStatus);
+    } else if (params.status) {
+      queryParams.append('status', params.status);
+      if (params.lastStatus) queryParams.append('lastStatus', params.lastStatus);
+    }
     if (params.minPrice) queryParams.append('minPrice', params.minPrice.toString());
     if (params.maxPrice) queryParams.append('maxPrice', params.maxPrice.toString());
     if (params.minBeds) queryParams.append('minBeds', params.minBeds.toString());
@@ -583,7 +591,13 @@ class RepliersClient {
       };
       
       // Add all search params to the body (matching searchListings parity)
-      if (params.status) requestBody.status = params.status;
+      // Use standardStatus (RESO-compliant) OR status (legacy), never both
+      if (params.standardStatus) {
+        requestBody.standardStatus = params.standardStatus;
+      } else if (params.status) {
+        requestBody.status = params.status;
+        if (params.lastStatus) requestBody.lastStatus = params.lastStatus;
+      }
       if (params.minPrice) requestBody.minPrice = params.minPrice;
       if (params.maxPrice) requestBody.maxPrice = params.maxPrice;
       if (params.minBeds) requestBody.minBeds = params.minBeds;

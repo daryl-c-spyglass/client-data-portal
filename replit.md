@@ -4,26 +4,24 @@
 
 This project is a professional real estate IDX (Internet Data Exchange) platform integrated with the MLS Grid API. Its primary purpose is to empower real estate agents with tools for property searching, generating Comparative Market Analyses (CMAs), and sharing market insights with clients. The platform aims to combine comprehensive property browsing (similar to Zillow or Redfin) with robust, productivity-focused workflow features to streamline real estate operations.
 
-## Recent Changes (Dec 16, 2025)
+## Recent Changes (Dec 17, 2025)
 
-- **Repliers Sold Data Integration (In Progress)**: Code updated to support Repliers API for sold listings
-  - Added status='S' support for sold/closed listings from Repliers
-  - Code tries Repliers first, falls back to database if sold data not enabled
-  - **Current Status**: Repliers ACTRIS feed returns error `status must be one of [A, U]` - sold data not yet enabled
-  - **Action Required**: Contact Repliers support to enable status 'S' for ACTRIS feed
-  - Once enabled, sold data will automatically flow with photos (3 months historical)
-- **Repliers API Diagnostic Endpoint**: Added `/api/repliers/test` to verify API connection and capabilities
-  - Settings page now has "Test" button next to Repliers data source
-  - Tests Active (A), Under Contract (U), and Sold (S) status support separately
-  - Shows which capabilities are enabled for your feed
-  - Displays warning if sold data not enabled with instructions to contact Repliers
-- **Settings Page Data Source Status**: Enhanced to show detailed capability status
-  - Shows Active: ✓, Under Contract: ✓, Sold: ✓/✗ for Repliers
-  - Displays amber warning when sold data requires Repliers to enable it
-- **Data Source Architecture Update**: 
-  - **Repliers API**: Primary source for all statuses (A/U/S) when enabled
-  - **Database Fallback**: Used for sold data when Repliers status 'S' not available
-  - Code automatically detects and falls back without configuration changes
+- **Repliers Sold Data Integration FIXED**: All listing statuses now working via Repliers API
+  - **Root Cause**: Was using wrong parameter `status='S'` - Repliers uses RESO-compliant `standardStatus`
+  - **Solution**: Updated all code to use `standardStatus=Active/Pending/Closed` (RESO-compliant)
+  - Active listings: `standardStatus=Active`
+  - Under Contract/Pending: `standardStatus=Pending`
+  - Sold/Closed: `standardStatus=Closed`
+  - All statuses now working with photos from Repliers (3 months historical for sold)
+- **Repliers API Diagnostic Endpoint**: `/api/repliers/test` verifies connection and capabilities
+  - Tests Active, Pending/Under Contract, and Closed status support
+  - All three statuses now show as enabled
+- **Settings Page Data Source Status**: Shows capability status for each data source
+  - Active: ✓, Under Contract: ✓, Sold: ✓ for Repliers
+- **Data Source Architecture**: 
+  - **Repliers API**: Primary source for ALL statuses (Active, Pending, Closed)
+  - **Database Fallback**: Only used if Repliers API fails
+  - Uses RESO-compliant `standardStatus` parameter (not legacy `status`)
 - **Dashboard Sold Price Fix**: Dashboard sold/closed property cards now correctly display closePrice instead of listPrice
   - PropertyDetailModal: Uses closePrice for sold/closed properties, listPrice for active listings
   - Recent Sales Activity: Uses displaySoldPrice(closePrice) helper for sold properties
