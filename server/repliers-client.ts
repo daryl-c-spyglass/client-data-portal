@@ -11,6 +11,7 @@ interface ListingsSearchParams {
   status?: string;  // Legacy: A=Available, U=Unavailable
   standardStatus?: string;  // RESO-compliant: Active, Pending, Closed, Active Under Contract, etc.
   lastStatus?: string;  // Detailed sub-status (use with status, not standardStatus)
+  type?: string;  // Sale or Lease - use 'Sale' to exclude rental/lease listings
   minPrice?: number;
   maxPrice?: number;
   minBeds?: number;
@@ -356,6 +357,8 @@ class RepliersClient {
       queryParams.append('status', params.status);
       if (params.lastStatus) queryParams.append('lastStatus', params.lastStatus);
     }
+    // type=Sale or type=Lease - use to filter out rentals from Closed results
+    if (params.type) queryParams.append('type', params.type);
     if (params.minPrice) queryParams.append('minPrice', params.minPrice.toString());
     if (params.maxPrice) queryParams.append('maxPrice', params.maxPrice.toString());
     if (params.minBeds) queryParams.append('minBeds', params.minBeds.toString());

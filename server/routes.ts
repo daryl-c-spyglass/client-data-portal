@@ -442,7 +442,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       let allResults: NormalizedProperty[] = [];
       
       // Helper function to fetch from Repliers
-      const fetchFromRepliers = async (repliersStatus: string): Promise<NormalizedProperty[]> => {
+      // isSaleOnly: set to true for Closed status to exclude leased rentals
+      const fetchFromRepliers = async (repliersStatus: string, isSaleOnly: boolean = false): Promise<NormalizedProperty[]> => {
         if (!isRepliersConfigured()) {
           return [];
         }
@@ -459,11 +460,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
           console.log(`🔍 [Subdivision Search] Query: "${subdivision}"`);
           console.log(`   - Status: ${repliersStatus}`);
           console.log(`   - City: ${city || 'any'}`);
+          console.log(`   - Type filter: ${isSaleOnly ? 'Sale only' : 'All'}`);
           console.log(`   - Field used: neighborhood (Repliers API field)`);
         }
         
-        const response = await repliersClient.searchListings({
-          status: repliersStatus,
+        // Build search params - add type=Sale for Closed to exclude leased rentals
+        const searchParams: any = {
+          standardStatus: repliersStatus,  // RESO-compliant: Active, Pending, Closed
           postalCode: postalCode,
           city: city,
           neighborhood: subdivision,  // Maps to Repliers "neighborhood" field
@@ -474,7 +477,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
           minSqft: minSqft ? parseInt(minSqft, 10) : undefined,
           maxSqft: maxSqft ? parseInt(maxSqft, 10) : undefined,
           resultsPerPage: effectiveLimit,
-        });
+        };
+        
+        // CRITICAL: For Closed status, add type=sale to exclude leased rentals
+        // standardStatus=Closed returns BOTH sold sales AND leased rentals
+        if (isSaleOnly) {
+          searchParams.type = 'sale';  // lowercase required by Repliers API
+        }
+        
+        const response = await repliersClient.searchListings(searchParams);
         
         // Log subdivision search results
         if (subdivision) {
@@ -494,6 +505,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
           ].filter(Boolean).join(' ');
 
           // Comprehensive status mapping - handles both single-letter codes and full strings
+          // CRITICAL: Check lastStatus first for sold properties, as Repliers returns status="U" for sold listings
+          const lastStatus = listing.lastStatus || '';
+          const lastStatusMap: Record<string, string> = {
+            'Sld': 'Closed',  // Sold
+            'Lsd': 'Closed',  // Leased (if type=sale was not filtered)
+          };
+          
           const statusMap: Record<string, string> = {
             // Single-letter codes from Repliers API
             'A': 'Active',
@@ -516,12 +534,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
             'Withdrawn': 'Withdrawn',
             'Terminated': 'Terminated',
           };
-          const rawStatus = listing.status || listing.standardStatus || 'Active';
-          const mappedStatus = statusMap[rawStatus] || rawStatus;
           
-          // Log status mapping for debugging (only when there's a potential mismatch)
-          if (rawStatus !== mappedStatus && rawStatus !== 'A' && rawStatus !== 'U' && rawStatus !== 'S' && rawStatus !== 'P') {
-            console.log(`📋 Status mapping: "${rawStatus}" → "${mappedStatus}" for ${listing.mlsNumber || 'unknown MLS#'}`);
+          const rawStatus = listing.status || listing.standardStatus || 'Active';
+          // CRITICAL: If lastStatus indicates sold (Sld), override the status mapping to Closed
+          // This handles Repliers returning status="U" with lastStatus="Sld" for sold properties
+          let mappedStatus: string;
+          if (lastStatusMap[lastStatus]) {
+            mappedStatus = lastStatusMap[lastStatus];
+          } else {
+            mappedStatus = statusMap[rawStatus] || rawStatus;
+          }
+          
+          // Log status mapping for debugging
+          if (lastStatus === 'Sld' || lastStatus === 'Lsd') {
+            console.log(`📋 Status mapping: status="${rawStatus}", lastStatus="${lastStatus}" → "${mappedStatus}" for ${listing.mlsNumber || 'unknown MLS#'}`);
           }
 
           const toNumber = (val: any): number | null => {
@@ -833,18 +859,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       for (const statusType of statusList) {
         if (statusType === 'active') {
-          fetchPromises.push(fetchFromRepliers('A').then(results => ({ results, expectedStatus: 'Active' })));
+          // RESO-compliant: standardStatus=Active
+          fetchPromises.push(fetchFromRepliers('Active').then(results => ({ results, expectedStatus: 'Active' })));
         } else if (statusType === 'under_contract') {
-          fetchPromises.push(fetchFromRepliers('U').then(results => ({ results, expectedStatus: 'Under Contract' })));
+          // RESO-compliant: standardStatus=Pending (covers Active Under Contract, Pending, Under Contract)
+          fetchPromises.push(fetchFromRepliers('Pending').then(results => ({ results, expectedStatus: 'Under Contract' })));
         } else if (statusType === 'pending') {
-          // Pending is treated as Under Contract
-          fetchPromises.push(fetchFromRepliers('P').then(results => ({ results, expectedStatus: 'Under Contract' })));
+          // Pending is treated as Under Contract - use standardStatus=Pending
+          fetchPromises.push(fetchFromRepliers('Pending').then(results => ({ results, expectedStatus: 'Under Contract' })));
         } else if (statusType === 'closed' || statusType === 'sold') {
-          // Try Repliers API with status='S' (Sold/Closed) first
+          // RESO-compliant: standardStatus=Closed for sold/closed listings
           // Per Repliers: ClosedDate → soldDate, ClosePrice → soldPrice
-          // Note: May not be enabled for all MLS feeds - will fall back to database if error
+          // CRITICAL: Pass isSaleOnly=true to exclude leased rentals from Closed results
           fetchPromises.push(
-            fetchFromRepliers('S')
+            fetchFromRepliers('Closed', true)  // true = filter to Sale type only
               .then(results => ({ results, expectedStatus: 'Closed' }))
               .catch(async (err) => {
                 // Repliers doesn't support sold status for this feed - fall back to database

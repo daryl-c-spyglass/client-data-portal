@@ -7,12 +7,18 @@ This project is a professional real estate IDX (Internet Data Exchange) platform
 ## Recent Changes (Dec 17, 2025)
 
 - **Repliers Sold Data Integration FIXED**: All listing statuses now working via Repliers API
-  - **Root Cause**: Was using wrong parameter `status='S'` - Repliers uses RESO-compliant `standardStatus`
-  - **Solution**: Updated all code to use `standardStatus=Active/Pending/Closed` (RESO-compliant)
+  - **Root Cause #1**: Was using wrong parameter `status='S'` - Repliers uses RESO-compliant `standardStatus`
+  - **Root Cause #2**: `standardStatus=Closed` returns BOTH sold sales AND leased rentals - need `type=sale` filter
+  - **Root Cause #3**: Repliers returns `status="U"` with `lastStatus="Sld"` for sold listings - need to check lastStatus
+  - **Solution**: 
+    - Use `standardStatus=Active/Pending/Closed` (RESO-compliant) instead of legacy `status` codes
+    - Add `type=sale` filter for Closed queries to exclude leased rentals
+    - Check `lastStatus` field - if "Sld" (Sold), map status to "Closed" regardless of primary status
   - Active listings: `standardStatus=Active`
   - Under Contract/Pending: `standardStatus=Pending`
-  - Sold/Closed: `standardStatus=Closed`
+  - Sold/Closed: `standardStatus=Closed&type=sale` + check `lastStatus=Sld`
   - All statuses now working with photos from Repliers (3 months historical for sold)
+- **Subdivision Search Now Returns Sold Listings**: Travis Heights and other subdivisions now show Active, Under Contract, AND Closed listings
 - **Repliers API Diagnostic Endpoint**: `/api/repliers/test` verifies connection and capabilities
   - Tests Active, Pending/Under Contract, and Closed status support
   - All three statuses now show as enabled
@@ -22,6 +28,7 @@ This project is a professional real estate IDX (Internet Data Exchange) platform
   - **Repliers API**: Primary source for ALL statuses (Active, Pending, Closed)
   - **Database Fallback**: Only used if Repliers API fails
   - Uses RESO-compliant `standardStatus` parameter (not legacy `status`)
+  - Uses `type=sale` to exclude rental/lease listings from Closed results
 - **Dashboard Sold Price Fix**: Dashboard sold/closed property cards now correctly display closePrice instead of listPrice
   - PropertyDetailModal: Uses closePrice for sold/closed properties, listPrice for active listings
   - Recent Sales Activity: Uses displaySoldPrice(closePrice) helper for sold properties
