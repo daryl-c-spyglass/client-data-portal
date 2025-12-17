@@ -43,7 +43,7 @@ function DrawControl({
         marker: false,
         polygon: {
           allowIntersection: false,
-          showArea: true,
+          showArea: false,
           shapeOptions: {
             color: "#f97316",
             fillColor: "#f97316",
