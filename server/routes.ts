@@ -4444,6 +4444,12 @@ This email was sent by ${senderName} (${senderEmail}) via the MLS Grid IDX Platf
   const FUB_CACHE_TTL = 3 * 60 * 1000; // 3 minutes
   
   // FUB API client helper with improved error handling
+  // CRITICAL: Always call FUB from server-side (not browser) to avoid CORS/auth issues
+  // DOCTYPE error = HTML returned instead of JSON. Common reasons:
+  // - Wrong URL (relative path instead of absolute)
+  // - Missing Basic Auth header
+  // - Calling FUB from client-side (blocked by CORS)
+  // - Proxy returning index.html for unknown routes
   async function fubApiRequest(endpoint: string, options: RequestInit = {}): Promise<{ data: any; status: number }> {
     const apiKey = process.env.FUB_API_KEY;
     if (!apiKey) {
@@ -4455,30 +4461,68 @@ This email was sent by ${senderName} (${senderEmail}) via the MLS Grid IDX Platf
     const authToken = Buffer.from(`${apiKey}:`).toString('base64');
     
     const fullUrl = `${baseUrl}${endpoint}`;
-    console.log(`[FUB API] Calling: ${endpoint.split('?')[0]}`);
+    const isDev = process.env.NODE_ENV !== 'production';
+    
+    // DEV-only logging
+    if (isDev) {
+      console.log(`[FUB API] Calling: ${fullUrl.split('?')[0]}`);
+    }
     
     const response = await fetch(fullUrl, {
       ...options,
       headers: {
         'Authorization': `Basic ${authToken}`,
+        'Accept': 'application/json',
         'Content-Type': 'application/json',
         ...options.headers,
       },
     });
     
-    // Improved error handling with specific messages
+    // DEV-only: Log response info for debugging
+    const contentType = response.headers.get('content-type') || '';
+    if (isDev) {
+      console.log(`[FUB API] Response: status=${response.status}, content-type=${contentType}`);
+    }
+    
+    // CRITICAL: Check content-type BEFORE parsing JSON to prevent crashes
+    if (!contentType.includes('application/json')) {
+      const text = await response.text();
+      const preview = text.slice(0, 200);
+      console.error(`[FUB API] Non-JSON response from ${endpoint}:`);
+      console.error(`  Status: ${response.status}`);
+      console.error(`  Content-Type: ${contentType}`);
+      console.error(`  Body preview: ${preview}`);
+      throw new Error(`FUB API returned non-JSON response (status ${response.status}, content-type: ${contentType}). This may indicate incorrect URL, missing auth, or calling from browser.`);
+    }
+    
+    // Handle HTTP errors
     if (!response.ok) {
       const status = response.status;
+      let errorMessage: string;
+      try {
+        const errorData = await response.json();
+        errorMessage = errorData.message || errorData.error || JSON.stringify(errorData);
+      } catch {
+        errorMessage = response.statusText;
+      }
+      
       if (status === 401 || status === 403) {
-        throw new Error(`FUB authentication failed (status ${status}): Check Basic Auth + API key permissions. The API key may not have access to this resource.`);
+        throw new Error(`FUB authentication failed (status ${status}): ${errorMessage}. Check Basic Auth + API key permissions.`);
       }
       if (status === 429) {
         throw new Error('Rate limited by FUB. Please retry later.');
       }
-      throw new Error(`FUB API error: ${status} ${response.statusText}`);
+      throw new Error(`FUB API error: ${status} ${errorMessage}`);
     }
     
     const data = await response.json();
+    
+    // DEV-only: Log success info
+    if (isDev) {
+      const itemCount = data?.appointments?.length || data?.tasks?.length || data?.users?.length || data?.people?.length || 'N/A';
+      console.log(`[FUB API] Success: ${itemCount} items returned`);
+    }
+    
     return { data, status: response.status };
   }
   
@@ -4706,38 +4750,73 @@ This email was sent by ${senderName} (${senderEmail}) via the MLS Grid IDX Platf
     }
   });
   
-  // Get FUB users (agents) list
+  // Get FUB users (agents) list - fetches ALL users with pagination
+  // Note: FUB may return paginated results, so we fetch all pages
   app.get("/api/fub/users", async (req, res) => {
     try {
-      const cacheKey = 'fub_users';
+      const cacheKey = 'fub_users_all';
       const cached = fubCache.get(cacheKey);
-      if (cached && Date.now() - cached.timestamp < FUB_CACHE_TTL * 2) {
+      // Cache for 30 minutes since user list changes infrequently
+      if (cached && Date.now() - cached.timestamp < 30 * 60 * 1000) {
+        console.log('[FUB Users] Cache hit');
         res.json(cached.data);
         return;
       }
       
-      const { data: response } = await fubApiRequest('/users');
-      const users = response?.users || [];
+      console.log('[FUB API] Calling: /users');
+      
+      // Fetch all users with pagination (FUB typically limits to 100 per page)
+      const allUsers: any[] = [];
+      let offset = 0;
+      const limit = 100;
+      const maxPages = 10; // Safety cap: 1000 users max
+      
+      for (let page = 0; page < maxPages; page++) {
+        const params = new URLSearchParams();
+        params.append('limit', String(limit));
+        params.append('offset', String(offset));
+        
+        const { data: response } = await fubApiRequest(`/users?${params.toString()}`);
+        const users = response?.users || [];
+        
+        allUsers.push(...users);
+        console.log(`[FUB Users] Page ${page + 1}: fetched ${users.length} users (total: ${allUsers.length})`);
+        
+        // If we got fewer than limit, we've reached the end
+        if (users.length < limit) {
+          break;
+        }
+        
+        offset += limit;
+      }
+      
+      // Format and sort users alphabetically by name (case-insensitive)
+      const formattedUsers = allUsers.map((u: any) => ({
+        id: String(u.id),
+        name: `${u.firstName || ''} ${u.lastName || ''}`.trim() || u.name || u.email || 'Unknown',
+        email: u.email,
+        role: u.role,
+        active: u.isActive !== false,
+      })).sort((a, b) => a.name.toLowerCase().localeCompare(b.name.toLowerCase()));
       
       const result = {
-        users: users.map((u: any) => ({
-          id: u.id,
-          name: `${u.firstName || ''} ${u.lastName || ''}`.trim() || u.name,
-          email: u.email,
-          role: u.role,
-          active: u.isActive !== false,
-        })),
-        count: users.length,
+        users: formattedUsers,
+        count: formattedUsers.length,
         dataSource: 'Follow Up Boss',
         fetchedAt: new Date().toISOString(),
       };
       
       fubCache.set(cacheKey, { data: result, timestamp: Date.now() });
       
+      console.log(`[FUB Users] Total: ${formattedUsers.length} users fetched and sorted`);
+      
       res.json(result);
     } catch (error: any) {
       console.error('[FUB Users] Fetch error:', error.message);
-      res.status(500).json({ error: error.message });
+      res.status(500).json({ 
+        error: error.message,
+        help: 'Check FUB_API_KEY permissions. The API key must have access to read users.'
+      });
     }
   });
 

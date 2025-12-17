@@ -187,8 +187,37 @@ export default function CalendarPage() {
     enabled: statusData?.configured === true,
   });
   
+  // Build proper query params URL for calendar API
+  const calendarUrl = useMemo(() => {
+    const params = new URLSearchParams();
+    if (selectedUserId && selectedUserId !== "all") {
+      params.append("agentId", selectedUserId);
+    }
+    params.append("start", startDate);
+    params.append("end", endDate);
+    return `/api/fub/calendar?${params.toString()}`;
+  }, [selectedUserId, startDate, endDate]);
+
   const { data: calendarData, isLoading, error, refetch } = useQuery<CalendarData>({
-    queryKey: ["/api/fub/calendar", selectedUserId === "all" ? "" : selectedUserId, startDate, endDate],
+    queryKey: ["/api/fub/calendar", selectedUserId, startDate, endDate],
+    queryFn: async () => {
+      const res = await fetch(calendarUrl, { credentials: "include" });
+      
+      // Check content-type before parsing
+      const contentType = res.headers.get("content-type") || "";
+      if (!contentType.includes("application/json")) {
+        const text = await res.text();
+        console.error("[Calendar] Non-JSON response:", contentType, text.slice(0, 200));
+        throw new Error(`Server returned HTML instead of JSON (content-type: ${contentType}). This may indicate a routing or authentication issue.`);
+      }
+      
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({ error: res.statusText }));
+        throw new Error(errorData.error || `HTTP ${res.status}`);
+      }
+      
+      return res.json();
+    },
     enabled: statusData?.configured === true,
   });
   

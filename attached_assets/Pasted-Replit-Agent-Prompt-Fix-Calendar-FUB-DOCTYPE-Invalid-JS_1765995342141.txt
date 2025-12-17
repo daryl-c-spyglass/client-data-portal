@@ -1,0 +1,145 @@
+Replit Agent Prompt — Fix Calendar FUB “DOCTYPE/Invalid JSON” + Improve Leads Agent Filter List
+
+We still have issues in the Mission Control web app:
+
+Calendar shows: “Failed to load calendar data” and error:
+Unexpected token '<', "<!DOCTYPE "... is not valid JSON
+
+Leads works, but in Leads → Filters → Assigned Agent, when selecting All agents, the dropdown only shows a limited subset of names. We need it to show all agent names alphabetically so the user can manually select any agent.
+
+Part A — Calendar Fix (FUB) using /v1/appointments
+Root cause to address
+
+The “Unexpected token '<' … DOCTYPE” error means Calendar is receiving HTML instead of JSON (wrong URL, auth missing, or calling from the browser/proxy incorrectly). Fix must prevent JSON parse crashes and ensure correct FUB server-side calls.
+
+Requirements
+A1) Force server-side proxy route (like Leads does)
+
+Do NOT call Follow Up Boss directly from the browser.
+
+Create or repair backend route:
+
+GET /api/fub/appointments?start=...&end=...&agentId=...
+
+Frontend Calendar must call this backend route.
+
+A2) Call the correct FUB endpoint
+
+Backend must call:
+
+GET https://api.followupboss.com/v1/appointments
+
+A3) FUB Auth (Basic Auth)
+
+Use env var FUB_API_KEY
+
+Send header:
+
+Authorization: Basic base64(FUB_API_KEY + ":")
+
+Also send:
+
+Accept: application/json
+
+A4) Prevent JSON parsing crash + add diagnostics
+
+In the backend route:
+
+Check response.ok and content-type includes application/json BEFORE calling response.json()
+
+If not JSON:
+
+read response.text()
+
+return a readable error with:
+
+status code
+
+content-type
+
+first ~200 chars of response text (DEV ONLY)
+
+do NOT log secrets
+
+Add DEV-only logs:
+
+exact URL being called (must be https://api.followupboss.com/v1/appointments)
+
+status code
+
+content-type
+
+item count if JSON
+
+A5) UI behavior
+
+If appointments are empty, show “No events found” (NOT an error).
+
+Keep the current Calendar UI and filters (Agent selector, month navigation, refresh).
+
+A6) Explain why it happened (in a short dev note)
+
+Add a short note in code comments or a README:
+
+DOCTYPE error = HTML returned instead of JSON
+
+common reasons: wrong URL (relative), missing Basic Auth, calling FUB from client-side, or proxy returning index.html
+
+Part B — Leads Filter Fix: “Assigned Agent” dropdown should show ALL agents alphabetically
+Current issue
+
+In Leads → Filters → Assigned Agent:
+
+selecting “All agents” results in a limited set of names available for manual selection.
+We need:
+
+All agent names
+
+sorted alphabetically
+
+available for manual selection even when “All agents” is selected
+
+Requirements
+B1) Identify how agent options are currently populated
+
+Find where the agent list comes from (hardcoded list, paginated API, partial search, limited permission scope, etc.)
+
+Leads section already works with FUB, so reuse the same auth/proxy pattern.
+
+B2) Fetch all agents/users from FUB (server-side)
+
+Implement/reuse a backend route such as:
+
+GET /api/fub/users (or whatever naming fits the codebase)
+
+Backend should call the appropriate FUB endpoint to retrieve users/agents.
+
+Handle pagination if FUB returns paginated results (continue until all are fetched, with a reasonable max safety cap).
+
+Cache results for ~10–30 minutes to avoid repeated loads.
+
+B3) Sort and display
+
+In the frontend dropdown:
+
+show the full list
+
+sort by display name A→Z (case-insensitive)
+
+keep “All agents” as the top option, but do NOT restrict the list after selecting it
+
+B4) Keep filtering behavior correct
+
+“All agents” should mean no filtering on assigned agent.
+
+If user manually selects a specific agent, apply that filter normally.
+
+Deliverables
+
+Calendar loads without DOCTYPE/JSON parsing errors and returns usable UI (even if empty).
+
+Leads → Assigned Agent dropdown shows all agents alphabetically and is not limited.
+
+List exact files changed + paths.
+
+Brief explanation: why Leads worked but Calendar failed (proxy/auth/URL issue), and what was fixed.
