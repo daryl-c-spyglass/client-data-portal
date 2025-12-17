@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -10,9 +10,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Checkbox } from "@/components/ui/checkbox";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { X, Plus, TrendingUp, Search, Loader2, AlertCircle, Home, MousePointerClick, RotateCcw, ChevronLeft, ChevronRight, Info } from "lucide-react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { X, Plus, TrendingUp, Search, Loader2, AlertCircle, Home, MousePointerClick, RotateCcw, ChevronLeft, ChevronRight, Info, Map, ListFilter } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
+import { PolygonMapSearch } from "@/components/PolygonMapSearch";
+import { apiRequest } from "@/lib/queryClient";
 import type { Property } from "@shared/schema";
 
 interface AutocompleteInputProps {
@@ -256,6 +259,11 @@ export function CMABuilder({ onCreateCMA, initialData }: CMABuilderProps) {
   const [searchSoldDays, setSearchSoldDays] = useState(sc.soldDays || "");
   const [searchPropertyType, setSearchPropertyType] = useState(sc.propertyType || "");
   
+  // Search mode state
+  const [searchMode, setSearchMode] = useState<'criteria' | 'map'>('criteria');
+  const [mapSearchResults, setMapSearchResults] = useState<Property[]>([]);
+  const [isMapSearching, setIsMapSearching] = useState(false);
+  
   // Property detail dialog state
   const [selectedProperty, setSelectedProperty] = useState<Property | null>(null);
   const [currentPhotoIndex, setCurrentPhotoIndex] = useState(0);
@@ -374,6 +382,33 @@ export function CMABuilder({ onCreateCMA, initialData }: CMABuilderProps) {
     setSearchEnabled(true);
     refetch();
   };
+
+  // Map polygon search handler
+  const handlePolygonSearch = async (boundary: number[][][]) => {
+    setIsMapSearching(true);
+    try {
+      const response = await apiRequest('/api/properties/search/polygon', 'POST', {
+        boundary,
+        statuses: searchStatuses,
+        limit: 50,
+      });
+      const data = await response.json();
+      setMapSearchResults(data.properties || []);
+    } catch (err) {
+      console.error('Polygon search error:', err);
+      setMapSearchResults([]);
+    } finally {
+      setIsMapSearching(false);
+    }
+  };
+
+  const handleClearPolygonSearch = () => {
+    setMapSearchResults([]);
+  };
+
+  // Get the active results based on search mode
+  const activeSearchResults = searchMode === 'map' ? mapSearchResults : searchResults;
+  const activeResultCount = searchMode === 'map' ? mapSearchResults.length : totalResults;
 
   const handleAddComparable = (property: Property) => {
     if (comparables.length >= 5) {
@@ -528,218 +563,272 @@ export function CMABuilder({ onCreateCMA, initialData }: CMABuilderProps) {
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
-            <div className="space-y-2">
-              <Label>City</Label>
-              <AutocompleteInput
-                placeholder="e.g., Austin"
-                value={searchCity}
-                onChange={setSearchCity}
-                endpoint="/api/autocomplete/cities"
-                testId="input-search-city"
-                name="city"
+          <Tabs value={searchMode} onValueChange={(v) => setSearchMode(v as 'criteria' | 'map')} className="w-full">
+            <TabsList className="grid w-full grid-cols-2 mb-4">
+              <TabsTrigger value="criteria" className="gap-2" data-testid="tab-search-criteria">
+                <ListFilter className="w-4 h-4" />
+                Search by Criteria
+              </TabsTrigger>
+              <TabsTrigger value="map" className="gap-2" data-testid="tab-search-map">
+                <Map className="w-4 h-4" />
+                Search by Map
+              </TabsTrigger>
+            </TabsList>
+            
+            <TabsContent value="criteria" className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+                <div className="space-y-2">
+                  <Label>City</Label>
+                  <AutocompleteInput
+                    placeholder="e.g., Austin"
+                    value={searchCity}
+                    onChange={setSearchCity}
+                    endpoint="/api/autocomplete/cities"
+                    testId="input-search-city"
+                    name="city"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Subdivision</Label>
+                  <AutocompleteInput
+                    placeholder="e.g., Barton Hills"
+                    value={searchSubdivision}
+                    onChange={setSearchSubdivision}
+                    endpoint="/api/autocomplete/subdivisions"
+                    testId="input-search-subdivision"
+                    name="subdivision"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Neighborhood</Label>
+                  <AutocompleteInput
+                    placeholder="e.g., Circle C"
+                    value={searchNeighborhood}
+                    onChange={setSearchNeighborhood}
+                    endpoint="/api/autocomplete/neighborhoods"
+                    testId="input-search-neighborhood"
+                    name="neighborhood"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Min Beds</Label>
+                  <Select value={searchMinBeds} onValueChange={setSearchMinBeds}>
+                    <SelectTrigger data-testid="select-min-beds">
+                      <SelectValue placeholder="Any" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="any">Any</SelectItem>
+                      <SelectItem value="2">2+</SelectItem>
+                      <SelectItem value="3">3+</SelectItem>
+                      <SelectItem value="4">4+</SelectItem>
+                      <SelectItem value="5">5+</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label>Max Price</Label>
+                  <Select value={searchMaxPrice} onValueChange={setSearchMaxPrice}>
+                    <SelectTrigger data-testid="select-max-price">
+                      <SelectValue placeholder="Any" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="any">Any</SelectItem>
+                      <SelectItem value="300000">$300K</SelectItem>
+                      <SelectItem value="500000">$500K</SelectItem>
+                      <SelectItem value="750000">$750K</SelectItem>
+                      <SelectItem value="1000000">$1M</SelectItem>
+                      <SelectItem value="2000000">$2M</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label>Property Type</Label>
+                  <Select value={searchPropertyType} onValueChange={setSearchPropertyType}>
+                    <SelectTrigger data-testid="select-property-type">
+                      <SelectValue placeholder="Any" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {PROPERTY_TYPES.map(type => (
+                        <SelectItem key={type.value} value={type.value}>{type.label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              <div className="flex flex-wrap gap-4 items-center">
+                <Label className="text-sm font-medium">Status:</Label>
+                <div className="flex items-center space-x-2">
+                  <Checkbox 
+                    id="status-active"
+                    checked={searchStatuses.includes("active")}
+                    onCheckedChange={() => toggleStatus("active")}
+                    data-testid="checkbox-status-active"
+                  />
+                  <label htmlFor="status-active" className="text-sm cursor-pointer">Active</label>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <Checkbox 
+                    id="status-under-contract"
+                    checked={searchStatuses.includes("under_contract")}
+                    onCheckedChange={() => toggleStatus("under_contract")}
+                    data-testid="checkbox-status-under-contract"
+                  />
+                  <label htmlFor="status-under-contract" className="text-sm cursor-pointer">Under Contract</label>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <Checkbox 
+                    id="status-closed"
+                    checked={searchStatuses.includes("closed")}
+                    onCheckedChange={() => toggleStatus("closed")}
+                    data-testid="checkbox-status-closed"
+                  />
+                  <label htmlFor="status-closed" className="text-sm cursor-pointer">Sold/Closed</label>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-4">
+                <div className="space-y-2">
+                  <Label>Sold Date</Label>
+                  <Select value={searchSoldDays} onValueChange={setSearchSoldDays}>
+                    <SelectTrigger data-testid="select-sold-days">
+                      <SelectValue placeholder="Any" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="any">Any</SelectItem>
+                      <SelectItem value="30">0-30 days</SelectItem>
+                      <SelectItem value="60">0-60 days</SelectItem>
+                      <SelectItem value="90">0-90 days</SelectItem>
+                      <SelectItem value="120">0-120 days</SelectItem>
+                      <SelectItem value="150">0-150 days</SelectItem>
+                      <SelectItem value="180">0-180 days</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label>Min Sq Ft</Label>
+                  <Input
+                    type="number"
+                    placeholder="e.g., 1500"
+                    value={searchMinSqft}
+                    onChange={(e) => setSearchMinSqft(e.target.value)}
+                    data-testid="input-min-sqft"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Max Sq Ft</Label>
+                  <Input
+                    type="number"
+                    placeholder="e.g., 3000"
+                    value={searchMaxSqft}
+                    onChange={(e) => setSearchMaxSqft(e.target.value)}
+                    data-testid="input-max-sqft"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Min Lot (Acres)</Label>
+                  <Input
+                    type="number"
+                    step="0.01"
+                    placeholder="e.g., 0.25"
+                    value={searchMinLotAcres}
+                    onChange={(e) => setSearchMinLotAcres(e.target.value)}
+                    data-testid="input-min-lot-acres"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Max Lot (Acres)</Label>
+                  <Input
+                    type="number"
+                    step="0.01"
+                    placeholder="e.g., 1.0"
+                    value={searchMaxLotAcres}
+                    onChange={(e) => setSearchMaxLotAcres(e.target.value)}
+                    data-testid="input-max-lot-acres"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Stories</Label>
+                  <Select value={searchStories} onValueChange={setSearchStories}>
+                    <SelectTrigger data-testid="select-stories">
+                      <SelectValue placeholder="Any" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="any">Any</SelectItem>
+                      <SelectItem value="1">1</SelectItem>
+                      <SelectItem value="2">2</SelectItem>
+                      <SelectItem value="3">3+</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label>Min Year Built</Label>
+                  <Input
+                    type="number"
+                    placeholder="e.g., 1990"
+                    value={searchMinYearBuilt}
+                    onChange={(e) => setSearchMinYearBuilt(e.target.value)}
+                    data-testid="input-min-year-built"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Max Year Built</Label>
+                  <Input
+                    type="number"
+                    placeholder="e.g., 2024"
+                    value={searchMaxYearBuilt}
+                    onChange={(e) => setSearchMaxYearBuilt(e.target.value)}
+                    data-testid="input-max-year-built"
+                  />
+                </div>
+              </div>
+              <Button onClick={handleSearch} disabled={isLoading} data-testid="button-search-properties">
+                {isLoading ? (
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                ) : (
+                  <Search className="w-4 h-4 mr-2" />
+                )}
+                Search Properties
+              </Button>
+            </TabsContent>
+            
+            <TabsContent value="map" className="space-y-4">
+              <div className="flex flex-wrap gap-4 items-center mb-4">
+                <Label className="text-sm font-medium">Status:</Label>
+                <div className="flex items-center space-x-2">
+                  <Checkbox 
+                    id="map-status-active"
+                    checked={searchStatuses.includes("active")}
+                    onCheckedChange={() => toggleStatus("active")}
+                    data-testid="checkbox-map-status-active"
+                  />
+                  <label htmlFor="map-status-active" className="text-sm cursor-pointer">Active</label>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <Checkbox 
+                    id="map-status-under-contract"
+                    checked={searchStatuses.includes("under_contract")}
+                    onCheckedChange={() => toggleStatus("under_contract")}
+                    data-testid="checkbox-map-status-uc"
+                  />
+                  <label htmlFor="map-status-under-contract" className="text-sm cursor-pointer">Under Contract</label>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <Checkbox 
+                    id="map-status-closed"
+                    checked={searchStatuses.includes("closed")}
+                    onCheckedChange={() => toggleStatus("closed")}
+                    data-testid="checkbox-map-status-closed"
+                  />
+                  <label htmlFor="map-status-closed" className="text-sm cursor-pointer">Sold/Closed</label>
+                </div>
+              </div>
+              <PolygonMapSearch
+                onSearch={handlePolygonSearch}
+                onClear={handleClearPolygonSearch}
+                isLoading={isMapSearching}
+                resultCount={mapSearchResults.length}
               />
-            </div>
-            <div className="space-y-2">
-              <Label>Subdivision</Label>
-              <AutocompleteInput
-                placeholder="e.g., Barton Hills"
-                value={searchSubdivision}
-                onChange={setSearchSubdivision}
-                endpoint="/api/autocomplete/subdivisions"
-                testId="input-search-subdivision"
-                name="subdivision"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label>Neighborhood</Label>
-              <AutocompleteInput
-                placeholder="e.g., Circle C"
-                value={searchNeighborhood}
-                onChange={setSearchNeighborhood}
-                endpoint="/api/autocomplete/neighborhoods"
-                testId="input-search-neighborhood"
-                name="neighborhood"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label>Min Beds</Label>
-              <Select value={searchMinBeds} onValueChange={setSearchMinBeds}>
-                <SelectTrigger data-testid="select-min-beds">
-                  <SelectValue placeholder="Any" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="any">Any</SelectItem>
-                  <SelectItem value="2">2+</SelectItem>
-                  <SelectItem value="3">3+</SelectItem>
-                  <SelectItem value="4">4+</SelectItem>
-                  <SelectItem value="5">5+</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-2">
-              <Label>Max Price</Label>
-              <Select value={searchMaxPrice} onValueChange={setSearchMaxPrice}>
-                <SelectTrigger data-testid="select-max-price">
-                  <SelectValue placeholder="Any" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="any">Any</SelectItem>
-                  <SelectItem value="300000">$300K</SelectItem>
-                  <SelectItem value="500000">$500K</SelectItem>
-                  <SelectItem value="750000">$750K</SelectItem>
-                  <SelectItem value="1000000">$1M</SelectItem>
-                  <SelectItem value="2000000">$2M</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-2">
-              <Label>Property Type</Label>
-              <Select value={searchPropertyType} onValueChange={setSearchPropertyType}>
-                <SelectTrigger data-testid="select-property-type">
-                  <SelectValue placeholder="Any" />
-                </SelectTrigger>
-                <SelectContent>
-                  {PROPERTY_TYPES.map(type => (
-                    <SelectItem key={type.value} value={type.value}>{type.label}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-          <div className="flex flex-wrap gap-4 items-center">
-            <Label className="text-sm font-medium">Status:</Label>
-            <div className="flex items-center space-x-2">
-              <Checkbox 
-                id="status-active"
-                checked={searchStatuses.includes("active")}
-                onCheckedChange={() => toggleStatus("active")}
-                data-testid="checkbox-status-active"
-              />
-              <label htmlFor="status-active" className="text-sm cursor-pointer">Active</label>
-            </div>
-            <div className="flex items-center space-x-2">
-              <Checkbox 
-                id="status-under-contract"
-                checked={searchStatuses.includes("under_contract")}
-                onCheckedChange={() => toggleStatus("under_contract")}
-                data-testid="checkbox-status-under-contract"
-              />
-              <label htmlFor="status-under-contract" className="text-sm cursor-pointer">Under Contract</label>
-            </div>
-            <div className="flex items-center space-x-2">
-              <Checkbox 
-                id="status-closed"
-                checked={searchStatuses.includes("closed")}
-                onCheckedChange={() => toggleStatus("closed")}
-                data-testid="checkbox-status-closed"
-              />
-              <label htmlFor="status-closed" className="text-sm cursor-pointer">Sold/Closed</label>
-            </div>
-          </div>
-          <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-4">
-            <div className="space-y-2">
-              <Label>Sold Date</Label>
-              <Select value={searchSoldDays} onValueChange={setSearchSoldDays}>
-                <SelectTrigger data-testid="select-sold-days">
-                  <SelectValue placeholder="Any" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="any">Any</SelectItem>
-                  <SelectItem value="30">0-30 days</SelectItem>
-                  <SelectItem value="60">0-60 days</SelectItem>
-                  <SelectItem value="90">0-90 days</SelectItem>
-                  <SelectItem value="120">0-120 days</SelectItem>
-                  <SelectItem value="150">0-150 days</SelectItem>
-                  <SelectItem value="180">0-180 days</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-2">
-              <Label>Min Sq Ft</Label>
-              <Input
-                type="number"
-                placeholder="e.g., 1500"
-                value={searchMinSqft}
-                onChange={(e) => setSearchMinSqft(e.target.value)}
-                data-testid="input-min-sqft"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label>Max Sq Ft</Label>
-              <Input
-                type="number"
-                placeholder="e.g., 3000"
-                value={searchMaxSqft}
-                onChange={(e) => setSearchMaxSqft(e.target.value)}
-                data-testid="input-max-sqft"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label>Min Lot (Acres)</Label>
-              <Input
-                type="number"
-                step="0.01"
-                placeholder="e.g., 0.25"
-                value={searchMinLotAcres}
-                onChange={(e) => setSearchMinLotAcres(e.target.value)}
-                data-testid="input-min-lot-acres"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label>Max Lot (Acres)</Label>
-              <Input
-                type="number"
-                step="0.01"
-                placeholder="e.g., 1.0"
-                value={searchMaxLotAcres}
-                onChange={(e) => setSearchMaxLotAcres(e.target.value)}
-                data-testid="input-max-lot-acres"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label>Stories</Label>
-              <Select value={searchStories} onValueChange={setSearchStories}>
-                <SelectTrigger data-testid="select-stories">
-                  <SelectValue placeholder="Any" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="any">Any</SelectItem>
-                  <SelectItem value="1">1</SelectItem>
-                  <SelectItem value="2">2</SelectItem>
-                  <SelectItem value="3">3+</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-2">
-              <Label>Min Year Built</Label>
-              <Input
-                type="number"
-                placeholder="e.g., 1990"
-                value={searchMinYearBuilt}
-                onChange={(e) => setSearchMinYearBuilt(e.target.value)}
-                data-testid="input-min-year-built"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label>Max Year Built</Label>
-              <Input
-                type="number"
-                placeholder="e.g., 2024"
-                value={searchMaxYearBuilt}
-                onChange={(e) => setSearchMaxYearBuilt(e.target.value)}
-                data-testid="input-max-year-built"
-              />
-            </div>
-          </div>
-          <Button onClick={handleSearch} disabled={isLoading} data-testid="button-search-properties">
-            {isLoading ? (
-              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-            ) : (
-              <Search className="w-4 h-4 mr-2" />
-            )}
-            Search Properties
-          </Button>
+            </TabsContent>
+          </Tabs>
         </CardContent>
       </Card>
 
@@ -976,17 +1065,23 @@ export function CMABuilder({ onCreateCMA, initialData }: CMABuilderProps) {
 
       <Card>
         <CardHeader>
-          <CardTitle>
-            Search Results {totalResults > 0 && `(${totalResults.toLocaleString()} found)`}
+          <CardTitle className="flex items-center gap-2">
+            Search Results {activeResultCount > 0 && `(${activeResultCount.toLocaleString()} found)`}
+            {searchMode === 'map' && mapSearchResults.length > 0 && (
+              <Badge variant="outline" className="ml-2">
+                <Map className="w-3 h-3 mr-1" />
+                Map Search
+              </Badge>
+            )}
           </CardTitle>
         </CardHeader>
         <CardContent>
-          {isLoading ? (
+          {(isLoading || isMapSearching) ? (
             <div className="text-center py-12">
               <Loader2 className="w-8 h-8 mx-auto animate-spin text-muted-foreground mb-2" />
               <p className="text-sm text-muted-foreground">Searching properties...</p>
             </div>
-          ) : isError ? (
+          ) : isError && searchMode === 'criteria' ? (
             <div className="text-center py-12">
               <AlertCircle className="w-8 h-8 mx-auto text-destructive mb-2" />
               <p className="text-sm text-destructive mb-2">Unable to search properties</p>
@@ -994,9 +1089,9 @@ export function CMABuilder({ onCreateCMA, initialData }: CMABuilderProps) {
                 The property search service may be temporarily unavailable. Please try again later.
               </p>
             </div>
-          ) : searchResults.length > 0 ? (
+          ) : activeSearchResults.length > 0 ? (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {searchResults.map((property) => {
+              {activeSearchResults.map((property) => {
                 // Photos are returned directly from Repliers API in property.photos
                 const photos = (property as any).photos as string[] | undefined;
                 const primaryPhoto = photos?.[0];
@@ -1114,17 +1209,27 @@ export function CMABuilder({ onCreateCMA, initialData }: CMABuilderProps) {
                 );
               })}
             </div>
-          ) : searchEnabled ? (
+          ) : (searchEnabled || (searchMode === 'map' && mapSearchResults.length === 0)) ? (
             <div className="text-center py-12 text-muted-foreground">
-              <Search className="w-12 h-12 mx-auto mb-4 opacity-50" />
-              <p className="text-sm mb-2">No properties found matching your criteria</p>
-              <p className="text-xs">Try adjusting your search filters</p>
+              {searchMode === 'map' ? (
+                <>
+                  <Map className="w-12 h-12 mx-auto mb-4 opacity-50" />
+                  <p className="text-sm mb-2">Draw a polygon on the map to search</p>
+                  <p className="text-xs">Properties within your drawn area will appear here</p>
+                </>
+              ) : (
+                <>
+                  <Search className="w-12 h-12 mx-auto mb-4 opacity-50" />
+                  <p className="text-sm mb-2">No properties found matching your criteria</p>
+                  <p className="text-xs">Try adjusting your search filters</p>
+                </>
+              )}
             </div>
           ) : (
             <div className="text-center py-12 text-muted-foreground">
               <Search className="w-12 h-12 mx-auto mb-4 opacity-50" />
               <p className="text-sm mb-2">Search for properties to add to your CMA</p>
-              <p className="text-xs">Use the filters above and click "Search Properties"</p>
+              <p className="text-xs">Use the filters above and click "Search Properties" or draw a map polygon</p>
             </div>
           )}
         </CardContent>

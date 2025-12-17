@@ -1,11 +1,21 @@
 import { useQuery } from "@tanstack/react-query";
 import { useParams, Link } from "wouter";
-import { ArrowLeft, Mail, Home, DollarSign, Bed, Bath, Ruler, Calendar } from "lucide-react";
+import { ArrowLeft, Mail, Home, DollarSign, Bed, Bath, Ruler, Calendar, Phone, MapPin } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import type { SellerUpdate } from "@shared/schema";
+import spyglassLogo from "@assets/Large_Logo_1765233192587.jpeg";
+
+const AGENT_INFO = {
+  name: "Ryan Rodenbeck",
+  title: "Broker / Owner",
+  email: "ryan@spyglassrealty.com",
+  phone: "(512) 710-7101",
+  company: "Spyglass Realty",
+  website: "spyglassrealty.com",
+};
 
 interface PreviewProperty {
   id: string;
@@ -124,6 +134,52 @@ export default function SellerUpdatePreview() {
           {update.isActive ? 'Active' : 'Paused'}
         </Badge>
       </div>
+
+      <Card className="overflow-hidden border-primary/20">
+        <div className="bg-gradient-to-r from-primary/10 via-primary/5 to-transparent p-6">
+          <div className="flex flex-col md:flex-row items-center gap-6">
+            <img 
+              src={spyglassLogo} 
+              alt="Spyglass Realty" 
+              className="h-20 w-auto object-contain"
+              data-testid="img-logo"
+            />
+            <div className="flex-1 text-center md:text-left">
+              <h2 className="text-xl font-bold text-primary">{AGENT_INFO.company}</h2>
+              <p className="text-lg font-semibold">{AGENT_INFO.name}</p>
+              <p className="text-sm text-muted-foreground">{AGENT_INFO.title}</p>
+            </div>
+            <div className="flex flex-col gap-2 text-sm">
+              <a 
+                href={`mailto:${AGENT_INFO.email}`} 
+                className="flex items-center gap-2 hover:text-primary transition-colors"
+                data-testid="link-agent-email"
+              >
+                <Mail className="w-4 h-4 text-primary" />
+                {AGENT_INFO.email}
+              </a>
+              <a 
+                href={`tel:${AGENT_INFO.phone.replace(/\D/g, '')}`} 
+                className="flex items-center gap-2 hover:text-primary transition-colors"
+                data-testid="link-agent-phone"
+              >
+                <Phone className="w-4 h-4 text-primary" />
+                {AGENT_INFO.phone}
+              </a>
+              <a 
+                href={`https://${AGENT_INFO.website}`} 
+                target="_blank" 
+                rel="noopener noreferrer"
+                className="flex items-center gap-2 hover:text-primary transition-colors"
+                data-testid="link-agent-website"
+              >
+                <MapPin className="w-4 h-4 text-primary" />
+                {AGENT_INFO.website}
+              </a>
+            </div>
+          </div>
+        </div>
+      </Card>
 
       <div className="grid gap-4 md:grid-cols-4">
         <Card>

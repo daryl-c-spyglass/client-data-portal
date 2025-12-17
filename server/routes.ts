@@ -1054,6 +1054,119 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Polygon search - search properties within a drawn polygon boundary
+  app.post("/api/properties/search/polygon", async (req, res) => {
+    try {
+      const { boundary, statuses, limit = 50 } = req.body;
+      
+      if (!boundary || !Array.isArray(boundary) || boundary.length === 0) {
+        res.status(400).json({ error: "Valid boundary polygon is required" });
+        return;
+      }
+      
+      console.log(`[Polygon Search] Searching within boundary with ${statuses?.length || 1} status(es)`);
+      
+      const repliersClient = getRepliersClient();
+      if (!repliersClient) {
+        res.status(503).json({ error: "Repliers API not configured" });
+        return;
+      }
+      
+      const statusList: string[] = statuses || ['active'];
+      const allResults: any[] = [];
+      
+      for (const status of statusList) {
+        try {
+          let searchParams: any = {
+            class: 'residential',
+            resultsPerPage: Math.min(limit, 100),
+          };
+          
+          // Map frontend status to Repliers API params
+          if (status === 'active') {
+            searchParams.status = 'A';
+          } else if (status === 'under_contract') {
+            searchParams.status = 'U';
+          } else if (status === 'closed' || status === 'sold') {
+            searchParams.standardStatus = 'Closed';
+            searchParams.type = 'sale';
+          }
+          
+          const response = await repliersClient.searchListingsInBoundary(boundary, searchParams);
+          const listings = response.listings || [];
+          
+          // Transform listings to standard format
+          for (const listing of listings) {
+            // Skip rentals - use type assertion for additional fields
+            const listingAny = listing as any;
+            const combined = [
+              listing.details?.propertyType,
+              listingAny.class,
+              listingAny.type
+            ].filter(Boolean).join(' ').toLowerCase();
+            
+            if (combined.includes('lease') || combined.includes('rental')) continue;
+            
+            const photos = Array.isArray(listing.images)
+              ? listing.images.slice(0, 10)
+              : [];
+            
+            const closePrice = listing.soldPrice || listing.closePrice;
+            const standardStatus = status === 'active' ? 'Active'
+              : status === 'under_contract' ? 'Under Contract'
+              : 'Closed';
+            
+            const mlsNum = listing.mlsNumber || listingAny.listingId;
+            const fullAddress = listing.address?.streetName 
+              ? `${listing.address.streetNumber || ''} ${listing.address.streetName}${listing.address.streetSuffix ? ' ' + listing.address.streetSuffix : ''}`
+              : listingAny.address?.full || 'Unknown';
+            
+            allResults.push({
+              id: `R-${mlsNum}`,
+              listingId: mlsNum,
+              unparsedAddress: fullAddress,
+              city: listing.address?.city || null,
+              stateOrProvince: listing.address?.state || 'TX',
+              postalCode: listing.address?.zip || null,
+              listPrice: listing.listPrice,
+              closePrice: closePrice,
+              standardStatus,
+              bedroomsTotal: listing.details?.numBedrooms || null,
+              bathroomsTotalInteger: listing.details?.numBathrooms || null,
+              livingArea: listing.details?.sqft || null,
+              yearBuilt: listing.details?.yearBuilt || null,
+              propertySubType: listing.details?.propertyType || null,
+              latitude: listing.map?.latitude || null,
+              longitude: listing.map?.longitude || null,
+              photos,
+              daysOnMarket: listing.daysOnMarket || null,
+              subdivisionName: listing.address?.neighborhood || listingAny.subdivisionName || null,
+            });
+          }
+          
+          console.log(`[Polygon Search] Found ${listings.length} ${status} listings in boundary`);
+        } catch (err: any) {
+          console.error(`[Polygon Search] Error fetching ${status}:`, err.message);
+        }
+      }
+      
+      // Apply rental filtering and limit
+      const filteredResults = filterOutRentals(allResults);
+      const finalResults = filteredResults.slice(0, limit);
+      
+      console.log(`[Polygon Search] Returning ${finalResults.length} properties`);
+      
+      res.json({
+        properties: finalResults,
+        count: finalResults.length,
+        statuses: statusList,
+      });
+    } catch (error: any) {
+      console.error("Polygon search error:", error.message);
+      res.status(500).json({ error: "Failed to search within boundary" });
+    }
+  });
+
   // Inventory summary endpoint - returns total counts from ACTIVE data source (Repliers)
   // Uses unified inventory service for consistency with Dashboard
   app.get("/api/properties/inventory", async (req, res) => {

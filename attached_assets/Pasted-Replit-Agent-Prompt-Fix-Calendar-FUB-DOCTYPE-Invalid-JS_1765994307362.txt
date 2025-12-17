@@ -1,0 +1,85 @@
+Replit Agent Prompt — Fix Calendar FUB “DOCTYPE/Invalid JSON” Error Using /v1/appointments
+
+We still have Calendar errors. UI shows:
+
+“Failed to load calendar data”
+
+Unexpected token '<', "<!DOCTYPE "... is not valid JSON
+
+This indicates the Calendar fetch is receiving HTML instead of JSON. Leads from FUB work, so compare the Leads implementation and make Calendar use the same server-side proxy/auth pattern.
+
+Requirements
+1) Ensure Calendar uses a server-side API route (like Leads does)
+
+Do NOT call https://api.followupboss.com directly from the browser.
+
+Create/repair a backend route:
+
+GET /api/fub/appointments?start=...&end=...&agentId=...
+
+Frontend Calendar must call this route, not FUB directly.
+
+2) Call the FUB endpoint exactly:
+
+GET https://api.followupboss.com/v1/appointments
+
+3) Implement FUB authentication correctly (Basic Auth)
+
+Use env var FUB_API_KEY
+
+Send Authorization: Basic base64(FUB_API_KEY + ":")
+
+Also send Accept: application/json
+
+4) Fix the JSON parsing crash (root cause of DOCTYPE error)
+
+In the backend route:
+
+After fetching from FUB, check:
+
+response.ok
+
+content-type header includes application/json
+
+If not JSON, read await response.text() and return a safe error:
+
+include status code
+
+include first ~200 chars of the returned text (DEV ONLY)
+
+do NOT log secrets
+This will prevent response.json() from throwing and will tell us what HTML page we’re receiving (404 page, auth page, app index.html, etc.)
+
+5) Identify why HTML is being returned
+
+Add debug logs (DEV ONLY):
+
+the exact URL being called (ensure it’s https://api.followupboss.com/v1/appointments)
+
+response status code
+
+response content-type
+
+Most likely fix is one of:
+
+using the wrong URL (relative path)
+
+missing Basic Auth header
+
+calling from client-side instead of server-side
+
+6) Behavior expectations
+
+If FUB returns an empty JSON list for appointments, the Calendar should show “No events found” (NOT an error).
+
+Keep the current Calendar UI and filters.
+
+7) Deliverables
+
+List files changed + paths
+
+Confirm Calendar loads without the DOCTYPE/JSON error
+
+Confirm the backend route returns JSON (even if empty)
+
+Brief note: why Leads worked but Calendar failed (e.g., Leads used server-side proxy/auth; Calendar did not)
