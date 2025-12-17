@@ -131,7 +131,7 @@ function LeadCard({ lead }: { lead: Lead }) {
 }
 
 export default function LeadsPage() {
-  const [selectedUserId, setSelectedUserId] = useState<string>("");
+  const [selectedUserId, setSelectedUserId] = useState<string>("all");
   const [searchQuery, setSearchQuery] = useState("");
   
   const { data: statusData, isLoading: statusLoading } = useQuery<{ configured: boolean; status: string; message: string }>({
@@ -144,7 +144,7 @@ export default function LeadsPage() {
   });
   
   const { data: leadsData, isLoading, error, refetch } = useQuery<LeadsData>({
-    queryKey: ["/api/fub/leads", selectedUserId],
+    queryKey: ["/api/fub/leads", selectedUserId === "all" ? "" : selectedUserId],
     enabled: statusData?.configured === true,
   });
   
@@ -217,7 +217,7 @@ export default function LeadsPage() {
                   <SelectValue placeholder="All agents" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">All agents</SelectItem>
+                  <SelectItem value="all">All agents</SelectItem>
                   {usersData?.users?.filter(u => u.active).map((user) => (
                     <SelectItem key={user.id} value={user.id}>
                       {user.name || user.email}

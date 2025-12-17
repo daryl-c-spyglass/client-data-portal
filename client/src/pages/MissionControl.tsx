@@ -5,10 +5,11 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { TrendingUp, DollarSign, Home, Users, AlertCircle, RefreshCw } from "lucide-react";
+import { TrendingUp, DollarSign, Home, Users, AlertCircle, RefreshCw, FlaskConical } from "lucide-react";
 import { format, subDays } from "date-fns";
 
 interface ProductionData {
@@ -137,6 +138,7 @@ export default function MissionControl() {
   const [agentId, setAgentId] = useState("");
   const [dateRange, setDateRange] = useState("30");
   const [emphasis, setEmphasis] = useState<"volume" | "count">("volume");
+  const [useMockData, setUseMockData] = useState(false);
   
   const startDate = format(subDays(new Date(), parseInt(dateRange)), "yyyy-MM-dd");
   const endDate = format(new Date(), "yyyy-MM-dd");
@@ -145,9 +147,25 @@ export default function MissionControl() {
     queryKey: ["/api/rezen/status"],
   });
   
+  // Build the API URL with query params - mock mode defaults to sample agent ID
+  const effectiveAgentId = useMockData ? (agentId || 'agent_ryan_001') : agentId;
+  const apiPath = useMockData ? '/api/rezen/mock/production' : '/api/rezen/production';
+  
   const { data: production, isLoading, error, refetch } = useQuery<ProductionData>({
-    queryKey: ["/api/rezen/production", agentId, startDate, endDate],
-    enabled: !!agentId && statusData?.configured === true,
+    queryKey: [apiPath, effectiveAgentId, startDate, endDate],
+    queryFn: async () => {
+      // Safety check: never request live endpoint without an agentId
+      if (!useMockData && !effectiveAgentId) {
+        throw new Error('Agent ID is required for live ReZen data');
+      }
+      const url = `${apiPath}?agentId=${encodeURIComponent(effectiveAgentId)}&startDate=${startDate}&endDate=${endDate}`;
+      const res = await fetch(url, { credentials: 'include' });
+      if (!res.ok) {
+        throw new Error(`${res.status}: ${await res.text()}`);
+      }
+      return res.json();
+    },
+    enabled: useMockData || (!!agentId && statusData?.configured === true),
   });
   
   const isConfigured = statusData?.configured === true;
@@ -241,7 +259,7 @@ export default function MissionControl() {
             <div className="flex items-end">
               <Button 
                 onClick={() => refetch()} 
-                disabled={!agentId || !isConfigured}
+                disabled={!useMockData && (!agentId || !isConfigured)}
                 className="w-full"
                 data-testid="button-refresh"
               >
@@ -250,10 +268,28 @@ export default function MissionControl() {
               </Button>
             </div>
           </div>
+          
+          <div className="mt-4 pt-4 border-t flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <FlaskConical className="h-4 w-4 text-muted-foreground" />
+              <Label htmlFor="mock-toggle" className="text-sm">Use Mock Data (Testing)</Label>
+            </div>
+            <Switch 
+              id="mock-toggle"
+              checked={useMockData}
+              onCheckedChange={setUseMockData}
+              data-testid="switch-mock-data"
+            />
+          </div>
+          {useMockData && (
+            <p className="text-xs text-muted-foreground mt-2">
+              Using sample data for testing. Agent ID will default to "agent_ryan_001" if empty.
+            </p>
+          )}
         </CardContent>
       </Card>
       
-      {!agentId && isConfigured && (
+      {!useMockData && !agentId && isConfigured && (
         <Card>
           <CardContent className="py-8 text-center text-muted-foreground">
             <TrendingUp className="h-12 w-12 mx-auto mb-4 opacity-50" />

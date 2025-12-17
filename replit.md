@@ -52,6 +52,7 @@ The UI incorporates Spyglass Realty branding with an orange primary color scheme
 - **PostgreSQL**: Persistent data storage, leveraging Neon serverless driver for production.
 - **Amazon S3**: Storage for media assets (images, documents).
 - **Mission Control (ReZen) API**: For agent production volume reporting.
+  - Mock endpoint: `GET /api/rezen/mock/production?agentId=...` for UI testing without live API
 - **Follow Up Boss (FUB) API**: For calendar events and lead management.
 - **`connect-pg-simple`**: PostgreSQL-backed session management.
 - **Google Fonts CDN**: Typography (Inter font family).

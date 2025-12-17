@@ -1,0 +1,134 @@
+Replit Agent Prompt — Mission Control: Add ReZen Sample Data + Fix Calendar Select Error
+
+You are working in an existing Mission Control / Agent Dashboard web app.
+
+Task A — Create Sample ReZen Data for Testing (Mission Control → Reports)
+
+Goal: Add a mock/testing endpoint (or mock data module) so we can test the Reports UI without relying on live ReZen.
+
+Requirements
+
+Create a mock data file or mock endpoint such as:
+
+GET /api/rezen/mock/production?agentId=...&start=...&end=...
+OR a mock module that the Reports UI can switch to in development.
+
+Return JSON in this shape (use exactly this sample data so we can validate bucketing + volume math):
+
+{
+  "agentId": "agent_ryan_001",
+  "agentName": "Ryan Rodenbeck",
+  "startDate": "2025-11-18",
+  "endDate": "2025-12-18",
+  "currency": "USD",
+  "records": [
+    {
+      "id": "rz_1001",
+      "side": "buyer",
+      "status": "under_contract",
+      "address": "1201 E 7th St, Austin, TX 78702",
+      "contractDate": "2025-12-01",
+      "closeDate": null,
+      "contractPrice": 685000,
+      "closePrice": null,
+      "listPrice": null
+    },
+    {
+      "id": "rz_1002",
+      "side": "buyer",
+      "status": "closed",
+      "address": "4402 Speedway, Austin, TX 78751",
+      "contractDate": "2025-10-20",
+      "closeDate": "2025-11-15",
+      "contractPrice": 515000,
+      "closePrice": 510000,
+      "listPrice": null
+    },
+    {
+      "id": "rz_2001",
+      "side": "seller",
+      "status": "active_listing",
+      "address": "3107 Cherrywood Rd, Austin, TX 78722",
+      "listDate": "2025-12-05",
+      "contractDate": null,
+      "closeDate": null,
+      "listPrice": 799000,
+      "contractPrice": null,
+      "closePrice": null
+    },
+    {
+      "id": "rz_2002",
+      "side": "seller",
+      "status": "under_contract",
+      "address": "901 S 1st St #210, Austin, TX 78704",
+      "listDate": "2025-11-10",
+      "contractDate": "2025-11-28",
+      "closeDate": null,
+      "listPrice": 465000,
+      "contractPrice": 455000,
+      "closePrice": null
+    },
+    {
+      "id": "rz_2003",
+      "side": "seller",
+      "status": "closed",
+      "address": "6500 Burnet Rd, Austin, TX 78757",
+      "listDate": "2025-09-01",
+      "contractDate": "2025-10-01",
+      "closeDate": "2025-11-02",
+      "listPrice": 925000,
+      "contractPrice": 910000,
+      "closePrice": 905000
+    }
+  ],
+  "notes": {
+    "volumeRules": {
+      "active_listing": "sum(listPrice)",
+      "under_contract": "sum(contractPrice)",
+      "closed": "sum(closePrice)"
+    }
+  }
+}
+
+
+Ensure this can be used by the Reports UI (even if Reports page isn’t finished yet).
+
+Add a short README note explaining how to hit the mock endpoint and what it’s for.
+
+Task B — Fix Calendar Runtime Error (Radix/shadcn Select.Item value cannot be empty string)
+
+We currently get this runtime error on the Calendar page:
+
+A <Select.Item /> must have a value prop that is not an empty string...
+
+Requirements
+
+Find the Calendar page/component that renders a <SelectItem value="">...
+
+Replace any empty-string SelectItem values with a sentinel like "all" or "none":
+
+Example: change value="" → value="all" for “All Agents”
+
+Update the logic so "all" means “no agent filter” when building the API request.
+
+Verify the Calendar page loads without runtime error.
+
+Implementation Notes
+
+Search the codebase for:
+
+<SelectItem value="">
+
+value=""
+
+Make sure no SelectItem uses empty string.
+
+Keep UI behavior the same (placeholder + ability to select “All”).
+
+Deliverables
+
+Show the exact file paths changed/created.
+
+Confirm Calendar route renders without the runtime error.
+
+Provide the final endpoints/URLs to test the mock ReZen data.

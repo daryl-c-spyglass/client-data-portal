@@ -108,7 +108,7 @@ function CalendarItemCard({ item }: { item: CalendarItem }) {
 }
 
 export default function CalendarPage() {
-  const [selectedUserId, setSelectedUserId] = useState<string>("");
+  const [selectedUserId, setSelectedUserId] = useState<string>("all");
   const [monthOffset, setMonthOffset] = useState(0);
   
   const currentMonth = addMonths(new Date(), monthOffset);
@@ -125,7 +125,7 @@ export default function CalendarPage() {
   });
   
   const { data: calendarData, isLoading, error, refetch } = useQuery<CalendarData>({
-    queryKey: ["/api/fub/calendar", selectedUserId, startDate, endDate],
+    queryKey: ["/api/fub/calendar", selectedUserId === "all" ? "" : selectedUserId, startDate, endDate],
     enabled: statusData?.configured === true,
   });
   
@@ -206,7 +206,7 @@ export default function CalendarPage() {
                   <SelectValue placeholder="All agents" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">All agents</SelectItem>
+                  <SelectItem value="all">All agents</SelectItem>
                   {usersData?.users?.filter(u => u.active).map((user) => (
                     <SelectItem key={user.id} value={user.id}>
                       {user.name || user.email}

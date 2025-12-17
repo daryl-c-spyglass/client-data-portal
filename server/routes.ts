@@ -4140,6 +4140,189 @@ This email was sent by ${senderName} (${senderEmail}) via the MLS Grid IDX Platf
   });
   
   // ============================================================
+  // ReZen Mock Data Endpoint - For Testing Mission Control UI
+  // ============================================================
+  // GET /api/rezen/mock/production?agentId=agent_ryan_001&startDate=2025-11-18&endDate=2025-12-18
+  // Returns sample ReZen data for testing the Reports/Mission Control UI
+  app.get("/api/rezen/mock/production", async (req, res) => {
+    try {
+      const { agentId, startDate, endDate } = req.query as Record<string, string>;
+      
+      console.log(`[ReZen Mock] Serving mock production data - agentId: ${agentId || 'any'}, startDate: ${startDate}, endDate: ${endDate}`);
+      
+      // Sample mock data with exact structure for testing bucketing + volume math
+      const mockData = {
+        agentId: agentId || "agent_ryan_001",
+        agentName: "Ryan Rodenbeck",
+        startDate: startDate || "2025-11-18",
+        endDate: endDate || "2025-12-18",
+        currency: "USD",
+        records: [
+          {
+            id: "rz_1001",
+            side: "buyer",
+            status: "under_contract",
+            address: "1201 E 7th St, Austin, TX 78702",
+            contractDate: "2025-12-01",
+            closeDate: null,
+            contractPrice: 685000,
+            closePrice: null,
+            listPrice: null
+          },
+          {
+            id: "rz_1002",
+            side: "buyer",
+            status: "closed",
+            address: "4402 Speedway, Austin, TX 78751",
+            contractDate: "2025-10-20",
+            closeDate: "2025-11-15",
+            contractPrice: 515000,
+            closePrice: 510000,
+            listPrice: null
+          },
+          {
+            id: "rz_2001",
+            side: "seller",
+            status: "active_listing",
+            address: "3107 Cherrywood Rd, Austin, TX 78722",
+            listDate: "2025-12-05",
+            contractDate: null,
+            closeDate: null,
+            listPrice: 799000,
+            contractPrice: null,
+            closePrice: null
+          },
+          {
+            id: "rz_2002",
+            side: "seller",
+            status: "under_contract",
+            address: "901 S 1st St #210, Austin, TX 78704",
+            listDate: "2025-11-10",
+            contractDate: "2025-11-28",
+            closeDate: null,
+            listPrice: 465000,
+            contractPrice: 455000,
+            closePrice: null
+          },
+          {
+            id: "rz_2003",
+            side: "seller",
+            status: "closed",
+            address: "6500 Burnet Rd, Austin, TX 78757",
+            listDate: "2025-09-01",
+            contractDate: "2025-10-01",
+            closeDate: "2025-11-02",
+            listPrice: 925000,
+            contractPrice: 910000,
+            closePrice: 905000
+          }
+        ],
+        notes: {
+          volumeRules: {
+            active_listing: "sum(listPrice)",
+            under_contract: "sum(contractPrice)",
+            closed: "sum(closePrice)"
+          }
+        }
+      };
+      
+      // Transform mock data into the production response format for Mission Control
+      const production = {
+        buyer: {
+          active: { count: 0, volume: 0 },
+          underContract: { count: 0, volume: 0 },
+          closed: { count: 0, volume: 0 },
+        },
+        seller: {
+          active: { count: 0, volume: 0 },
+          underContract: { count: 0, volume: 0 },
+          closed: { count: 0, volume: 0 },
+        },
+        totals: {
+          active: { count: 0, volume: 0 },
+          underContract: { count: 0, volume: 0 },
+          closed: { count: 0, volume: 0 },
+        },
+        transactions: [] as any[],
+        dataSource: 'ReZen Mock API',
+        fetchedAt: new Date().toISOString(),
+        rawMockData: mockData,
+      };
+      
+      // Process mock records
+      for (const record of mockData.records) {
+        const side = record.side as 'buyer' | 'seller';
+        let status: 'active' | 'under_contract' | 'closed';
+        let volume: number;
+        
+        // Map status and calculate volume according to rules
+        if (record.status === 'active_listing') {
+          status = 'active';
+          volume = record.listPrice || 0;
+        } else if (record.status === 'under_contract') {
+          status = 'under_contract';
+          volume = record.contractPrice || 0;
+        } else if (record.status === 'closed') {
+          status = 'closed';
+          volume = record.closePrice || 0;
+        } else {
+          continue;
+        }
+        
+        // Update side-specific counts
+        if (side === 'buyer') {
+          if (status === 'active') {
+            production.buyer.active.count++;
+            production.buyer.active.volume += volume;
+          } else if (status === 'under_contract') {
+            production.buyer.underContract.count++;
+            production.buyer.underContract.volume += volume;
+          } else if (status === 'closed') {
+            production.buyer.closed.count++;
+            production.buyer.closed.volume += volume;
+          }
+        } else {
+          if (status === 'active') {
+            production.seller.active.count++;
+            production.seller.active.volume += volume;
+          } else if (status === 'under_contract') {
+            production.seller.underContract.count++;
+            production.seller.underContract.volume += volume;
+          } else if (status === 'closed') {
+            production.seller.closed.count++;
+            production.seller.closed.volume += volume;
+          }
+        }
+        
+        // Store transaction summary
+        production.transactions.push({
+          id: record.id,
+          address: record.address,
+          status: status,
+          side: side,
+          volume: volume,
+          closingDate: record.closeDate || record.contractDate,
+        });
+      }
+      
+      // Calculate totals
+      production.totals.active.count = production.buyer.active.count + production.seller.active.count;
+      production.totals.active.volume = production.buyer.active.volume + production.seller.active.volume;
+      production.totals.underContract.count = production.buyer.underContract.count + production.seller.underContract.count;
+      production.totals.underContract.volume = production.buyer.underContract.volume + production.seller.underContract.volume;
+      production.totals.closed.count = production.buyer.closed.count + production.seller.closed.count;
+      production.totals.closed.volume = production.buyer.closed.volume + production.seller.closed.volume;
+      
+      console.log(`[ReZen Mock] Production: ${production.totals.closed.count} closed ($${production.totals.closed.volume}), ${production.totals.underContract.count} under contract ($${production.totals.underContract.volume}), ${production.totals.active.count} active ($${production.totals.active.volume})`);
+      
+      res.json(production);
+    } catch (error: any) {
+      console.error('[ReZen Mock] Error:', error.message);
+      res.status(500).json({ error: 'Failed to generate mock data', details: error.message });
+    }
+  });
+  
+  // ============================================================
   // Follow Up Boss (FUB) API Routes - Calendar & Leads
   // ============================================================
   
