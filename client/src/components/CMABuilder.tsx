@@ -859,42 +859,266 @@ export function CMABuilder({ onCreateCMA, initialData }: CMABuilderProps) {
             </TabsContent>
             
             <TabsContent value="map" className="space-y-4">
-              <div className="flex flex-wrap gap-4 items-center mb-4">
-                <Label className="text-sm font-medium">Status:</Label>
-                <div className="flex items-center space-x-2">
-                  <Checkbox 
-                    id="map-status-active"
-                    checked={searchStatuses.includes("active")}
-                    onCheckedChange={() => toggleStatus("active")}
-                    data-testid="checkbox-map-status-active"
-                  />
-                  <label htmlFor="map-status-active" className="text-sm cursor-pointer">Active</label>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <Checkbox 
-                    id="map-status-under-contract"
-                    checked={searchStatuses.includes("under_contract")}
-                    onCheckedChange={() => toggleStatus("under_contract")}
-                    data-testid="checkbox-map-status-uc"
-                  />
-                  <label htmlFor="map-status-under-contract" className="text-sm cursor-pointer">Under Contract</label>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <Checkbox 
-                    id="map-status-closed"
-                    checked={searchStatuses.includes("closed")}
-                    onCheckedChange={() => toggleStatus("closed")}
-                    data-testid="checkbox-map-status-closed"
-                  />
-                  <label htmlFor="map-status-closed" className="text-sm cursor-pointer">Sold/Closed</label>
-                </div>
-              </div>
               <PolygonMapSearch
                 onSearch={handlePolygonSearch}
                 onClear={handleClearPolygonSearch}
                 isLoading={isMapSearching}
                 resultCount={mapSearchResults.length}
               />
+              
+              <Separator className="my-6" />
+              
+              <div className="space-y-4">
+                <h4 className="font-medium text-sm text-muted-foreground">Filter properties within polygon:</h4>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+                  <div className="space-y-2">
+                    <Label>City</Label>
+                    <AutocompleteInput
+                      placeholder="e.g., Austin"
+                      value={searchCity}
+                      onChange={setSearchCity}
+                      endpoint="/api/autocomplete/cities"
+                      testId="input-map-search-city"
+                      name="map-city"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Subdivision</Label>
+                    <AutocompleteInput
+                      placeholder="e.g., Barton Hills"
+                      value={searchSubdivision}
+                      onChange={setSearchSubdivision}
+                      endpoint="/api/autocomplete/subdivisions"
+                      testId="input-map-search-subdivision"
+                      name="map-subdivision"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Neighborhood</Label>
+                    <AutocompleteInput
+                      placeholder="e.g., Circle C"
+                      value={searchNeighborhood}
+                      onChange={setSearchNeighborhood}
+                      endpoint="/api/autocomplete/neighborhoods"
+                      testId="input-map-search-neighborhood"
+                      name="map-neighborhood"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Zip Code</Label>
+                    <AutocompleteInput
+                      placeholder="e.g., 78704"
+                      value={searchZipCode}
+                      onChange={setSearchZipCode}
+                      endpoint="/api/autocomplete/postalCodes"
+                      testId="input-map-search-zipcode"
+                      name="map-zipCode"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Min Beds</Label>
+                    <Select value={searchMinBeds} onValueChange={setSearchMinBeds}>
+                      <SelectTrigger data-testid="select-map-min-beds">
+                        <SelectValue placeholder="Any" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="any">Any</SelectItem>
+                        <SelectItem value="2">2+</SelectItem>
+                        <SelectItem value="3">3+</SelectItem>
+                        <SelectItem value="4">4+</SelectItem>
+                        <SelectItem value="5">5+</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Min Baths</Label>
+                    <Select value={searchMinBaths} onValueChange={setSearchMinBaths}>
+                      <SelectTrigger data-testid="select-map-min-baths">
+                        <SelectValue placeholder="Any" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="any">Any</SelectItem>
+                        <SelectItem value="1">1+</SelectItem>
+                        <SelectItem value="2">2+</SelectItem>
+                        <SelectItem value="3">3+</SelectItem>
+                        <SelectItem value="4">4+</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Min Price</Label>
+                    <Select value={searchMinPrice} onValueChange={setSearchMinPrice}>
+                      <SelectTrigger data-testid="select-map-min-price">
+                        <SelectValue placeholder="Any" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="any">Any</SelectItem>
+                        <SelectItem value="100000">$100K</SelectItem>
+                        <SelectItem value="200000">$200K</SelectItem>
+                        <SelectItem value="300000">$300K</SelectItem>
+                        <SelectItem value="500000">$500K</SelectItem>
+                        <SelectItem value="750000">$750K</SelectItem>
+                        <SelectItem value="1000000">$1M</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Max Price</Label>
+                    <Select value={searchMaxPrice} onValueChange={setSearchMaxPrice}>
+                      <SelectTrigger data-testid="select-map-max-price">
+                        <SelectValue placeholder="Any" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="any">Any</SelectItem>
+                        <SelectItem value="300000">$300K</SelectItem>
+                        <SelectItem value="500000">$500K</SelectItem>
+                        <SelectItem value="750000">$750K</SelectItem>
+                        <SelectItem value="1000000">$1M</SelectItem>
+                        <SelectItem value="2000000">$2M</SelectItem>
+                        <SelectItem value="5000000">$5M</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Property Type</Label>
+                    <Select value={searchPropertyType} onValueChange={setSearchPropertyType}>
+                      <SelectTrigger data-testid="select-map-property-type">
+                        <SelectValue placeholder="Any" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {PROPERTY_TYPES.map(type => (
+                          <SelectItem key={type.value} value={type.value}>{type.label}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+                <div className="flex flex-wrap gap-4 items-center">
+                  <Label className="text-sm font-medium">Status:</Label>
+                  <div className="flex items-center space-x-2">
+                    <Checkbox 
+                      id="map-status-active"
+                      checked={searchStatuses.includes("active")}
+                      onCheckedChange={() => toggleStatus("active")}
+                      data-testid="checkbox-map-status-active"
+                    />
+                    <label htmlFor="map-status-active" className="text-sm cursor-pointer">Active</label>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <Checkbox 
+                      id="map-status-under-contract"
+                      checked={searchStatuses.includes("under_contract")}
+                      onCheckedChange={() => toggleStatus("under_contract")}
+                      data-testid="checkbox-map-status-uc"
+                    />
+                    <label htmlFor="map-status-under-contract" className="text-sm cursor-pointer">Under Contract</label>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <Checkbox 
+                      id="map-status-closed"
+                      checked={searchStatuses.includes("closed")}
+                      onCheckedChange={() => toggleStatus("closed")}
+                      data-testid="checkbox-map-status-closed"
+                    />
+                    <label htmlFor="map-status-closed" className="text-sm cursor-pointer">Sold/Closed</label>
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-4">
+                  <div className="space-y-2">
+                    <Label>Sold Date</Label>
+                    <Select value={searchSoldDays} onValueChange={setSearchSoldDays}>
+                      <SelectTrigger data-testid="select-map-sold-days">
+                        <SelectValue placeholder="Any" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="any">Any</SelectItem>
+                        <SelectItem value="30">0-30 days</SelectItem>
+                        <SelectItem value="60">0-60 days</SelectItem>
+                        <SelectItem value="90">0-90 days</SelectItem>
+                        <SelectItem value="120">0-120 days</SelectItem>
+                        <SelectItem value="150">0-150 days</SelectItem>
+                        <SelectItem value="180">0-180 days</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Min Sq Ft</Label>
+                    <Input
+                      type="number"
+                      placeholder="e.g., 1500"
+                      value={searchMinSqft}
+                      onChange={(e) => setSearchMinSqft(e.target.value)}
+                      data-testid="input-map-min-sqft"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Max Sq Ft</Label>
+                    <Input
+                      type="number"
+                      placeholder="e.g., 3000"
+                      value={searchMaxSqft}
+                      onChange={(e) => setSearchMaxSqft(e.target.value)}
+                      data-testid="input-map-max-sqft"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Min Lot (Acres)</Label>
+                    <Input
+                      type="number"
+                      step="0.01"
+                      placeholder="e.g., 0.25"
+                      value={searchMinLotAcres}
+                      onChange={(e) => setSearchMinLotAcres(e.target.value)}
+                      data-testid="input-map-min-lot-acres"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Max Lot (Acres)</Label>
+                    <Input
+                      type="number"
+                      step="0.01"
+                      placeholder="e.g., 1.0"
+                      value={searchMaxLotAcres}
+                      onChange={(e) => setSearchMaxLotAcres(e.target.value)}
+                      data-testid="input-map-max-lot-acres"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Stories</Label>
+                    <Select value={searchStories} onValueChange={setSearchStories}>
+                      <SelectTrigger data-testid="select-map-stories">
+                        <SelectValue placeholder="Any" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="any">Any</SelectItem>
+                        <SelectItem value="1">1</SelectItem>
+                        <SelectItem value="2">2</SelectItem>
+                        <SelectItem value="3">3+</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Min Year Built</Label>
+                    <Input
+                      type="number"
+                      placeholder="e.g., 1990"
+                      value={searchMinYearBuilt}
+                      onChange={(e) => setSearchMinYearBuilt(e.target.value)}
+                      data-testid="input-map-min-year-built"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Max Year Built</Label>
+                    <Input
+                      type="number"
+                      placeholder="e.g., 2024"
+                      value={searchMaxYearBuilt}
+                      onChange={(e) => setSearchMaxYearBuilt(e.target.value)}
+                      data-testid="input-map-max-year-built"
+                    />
+                  </div>
+                </div>
+              </div>
             </TabsContent>
           </Tabs>
         </CardContent>
