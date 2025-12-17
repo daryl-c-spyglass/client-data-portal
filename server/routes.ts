@@ -1143,9 +1143,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
             const streetNumber = String(listing.address?.streetNumber || '').trim();
             if (/^0+$/.test(streetNumber)) continue;
             
-            const photos = Array.isArray(listing.images)
+            const rawPhotos = Array.isArray(listing.images)
               ? listing.images.slice(0, 10)
               : [];
+            const photos = rawPhotos.map((img: string) => 
+              img.startsWith('http') ? img : `https://cdn.repliers.io/${img}`
+            );
             
             const closePrice = listing.soldPrice || listing.closePrice;
             const standardStatus = status === 'active' ? 'Active'

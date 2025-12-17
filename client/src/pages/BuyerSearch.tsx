@@ -139,6 +139,7 @@ import {
   Calendar,
   Home,
   ExternalLink,
+  Loader2,
 } from "lucide-react";
 import { PropertyCard } from "@/components/PropertyCard";
 import { PropertyMapView } from "@/components/PropertyMapView";
@@ -371,6 +372,7 @@ export default function BuyerSearch() {
   const [mapStatusUnderContract, setMapStatusUnderContract] = useState(false);
   const [mapStatusClosed, setMapStatusClosed] = useState(false);
   const [mapCurrentPage, setMapCurrentPage] = useState(0);
+  const [currentBoundary, setCurrentBoundary] = useState<number[][][] | null>(null);
   const mapPageSize = 50;
   
   // Floating card state
@@ -867,6 +869,12 @@ export default function BuyerSearch() {
 
   // Polygon map search handler (uses separate map status state)
   const handlePolygonSearch = async (boundary: number[][][]) => {
+    setCurrentBoundary(boundary);
+    await executePolygonSearch(boundary);
+  };
+  
+  // Execute polygon search with current filters
+  const executePolygonSearch = async (boundary: number[][][]) => {
     setIsMapSearching(true);
     try {
       // Build statuses array from map-specific status filters
@@ -890,9 +898,17 @@ export default function BuyerSearch() {
       setIsMapSearching(false);
     }
   };
+  
+  // Re-run polygon search with current boundary and updated filters
+  const handleMapFilterSearch = () => {
+    if (currentBoundary) {
+      executePolygonSearch(currentBoundary);
+    }
+  };
 
   const handleClearPolygonSearch = () => {
     setMapSearchResults([]);
+    setCurrentBoundary(null);
   };
 
   return (
@@ -3056,13 +3072,17 @@ export default function BuyerSearch() {
                 <div className="pt-4">
                   <Button
                     className="w-full"
-                    onClick={handleSearch}
-                    disabled={activeFiltersCount === 0}
+                    onClick={viewMode === 'map' ? handleMapFilterSearch : handleSearch}
+                    disabled={viewMode === 'map' ? (!currentBoundary || isMapSearching) : activeFiltersCount === 0}
                     data-testid="button-search"
                     size="lg"
                   >
-                    <Search className="w-4 h-4 mr-2" />
-                    Search Properties
+                    {isMapSearching ? (
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    ) : (
+                      <Search className="w-4 h-4 mr-2" />
+                    )}
+                    {viewMode === 'map' && !currentBoundary ? 'Draw polygon first' : 'Search Properties'}
                   </Button>
                 </div>
               </div>
