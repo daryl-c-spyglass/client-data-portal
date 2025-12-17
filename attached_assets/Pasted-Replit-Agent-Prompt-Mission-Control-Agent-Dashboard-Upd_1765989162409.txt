@@ -1,0 +1,184 @@
+Replit Agent Prompt — Mission Control (Agent Dashboard) Updates
+
+You are working inside an existing “Mission Control / Agent Dashboard” web app.
+
+Primary Goals
+
+Reports (left sidebar) → Mission Control (ReZen): show agent production volume reporting.
+
+Calendar (left sidebar) → Follow Up Boss (FUB): ensure the calendar populates from FUB per-agent correctly (agent-specific).
+
+Leads (left sidebar) → FUB: do not rebuild leads, but add a verification path/logging to confirm it’s pulling per-agent correctly.
+
+API Credentials (MUST be server-side only)
+ReZen (Mission Control API)
+
+Key: real_4yFrpZhdn6RQA5gKpRv2AMd6QPph64f7kKtB
+
+Env var: REZEN_API_KEY
+
+Follow Up Boss (FUB)
+
+Key: fka_1efVEOtBMolcLxclc3Xtk8swVdtuJ3TjBL
+
+Env var: FUB_API_KEY
+
+Do NOT hardcode keys in frontend code. Create backend routes that proxy requests.
+
+UI Requirements
+Left Sidebar
+
+Under Reports, add a new section/link: Mission Control (ReZen)
+
+Under Calendar, ensure it shows FUB calendar events (not placeholder/static)
+
+Keep the styling consistent with the existing Mission Control layout.
+
+Part A — Reports (ReZen) Production + Volume
+What to show
+
+In Reports → Mission Control (ReZen), show these categories with both Total Volume ($) and Count:
+
+Buyer Side
+
+Buyer Under Contract
+
+Buyer Closed
+
+Seller Side
+
+Seller Active Listing
+
+Seller Under Contract
+
+Seller Closed
+
+If the API cannot support “Active Listing” or cannot reliably separate buyer/seller, gracefully degrade to:
+
+Under Contract (total volume + count)
+
+Closed (total volume + count)
+…and clearly label missing breakdowns as: “Not available from source”.
+
+Filters
+
+Agent selector (or use existing selected agent context if already present)
+
+Date range selector (default: last 30 days)
+
+Optional toggle: “Emphasize Volume / Emphasize Count” (still display both)
+
+Data & mapping logic
+
+Use the existing ReZen Mission Control API integration already in the codebase, but now implement a backend endpoint (or expand existing) to fetch agent production for the selected time range.
+
+Centralize status mapping into a single function, e.g.:
+
+Active Listing
+
+Under Contract
+
+Closed
+
+Centralize side mapping (“Buyer” vs “Seller”) using the best available field(s) from the payload.
+
+Volume calculation:
+
+sum the best available numeric field (e.g., closePrice, contractPrice, listPrice, etc. depending on status)
+
+Document in code comments which field you chose for each status, and why.
+
+Non-functional
+
+Loading skeleton
+
+Empty state: “No production found for this period”
+
+Error state: readable error + console logs
+
+Add basic caching (in-memory keyed by agentId + dateRange for ~3–10 minutes) to reduce API load
+
+Part B — Calendar (FUB) Agent-Specific Calendar Feed
+Requirement
+
+The Calendar section in the left side must populate from Follow Up Boss and must reflect the selected agent’s calendar/events.
+
+Implementation steps
+
+Create a backend route like:
+
+GET /api/fub/calendar?agentId=...&start=...&end=...
+
+The backend route must:
+
+read FUB_API_KEY from env
+
+call the appropriate FUB endpoint(s) for calendar/events/tasks/appointments (use whatever existing code already uses; do not invent endpoints if the project already has them)
+
+apply filtering so results are for the selected agent (agentId or assignedTo or equivalent FUB field)
+
+Frontend Calendar component should call your backend route and render:
+
+list view (date/time + title + related contact if available)
+
+loading/empty/error states
+
+Verification requirement
+
+Add a lightweight “Debug” capability that can be toggled in dev mode:
+
+log the exact query params sent (agentId/start/end)
+
+log how many items returned
+
+optionally display “Data source: FUB” + “Agent: {name/id}” somewhere subtle
+
+Part C — Leads (FUB) Quick Validation (No Rebuild)
+
+The leads section appears to be working. Do not redesign it.
+
+However:
+
+Ensure the leads request is agent-specific (selected agent affects results).
+
+Add minimal logging in dev mode:
+
+selected agent identifier
+
+number of leads returned
+
+any filters being applied
+
+If you discover the leads call is not filtering by agent, fix it by:
+
+moving the API call server-side if it isn’t already
+
+applying the correct FUB filter/parameter to scope to the agent
+
+keeping the UI unchanged
+
+Security + Architecture Rules
+
+Keys must never ship to the browser.
+
+All ReZen and FUB requests must go through backend routes.
+
+Ensure the backend routes return only the data needed for the UI (avoid dumping full raw payloads).
+
+Deliverables
+
+Working Reports → Mission Control (ReZen) panel with filters and computed totals.
+
+Working Calendar → FUB feed that changes correctly when switching agents.
+
+Leads section remains stable; add verification logging and fix agent scoping only if needed.
+
+Show the exact files changed + paths.
+
+Add a short README note documenting:
+
+REZEN_API_KEY, FUB_API_KEY
+
+backend routes created
+
+mapping assumptions for ReZen status/side + volume fields
