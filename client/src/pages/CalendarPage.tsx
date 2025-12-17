@@ -10,7 +10,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { Calendar, Clock, User, CheckCircle2, Circle, AlertCircle, RefreshCw, ChevronDown, ChevronRight, Bug, List, Grid3X3, ArrowDownUp, CalendarDays, X } from "lucide-react";
+import { Calendar, Clock, User, CheckCircle2, Circle, AlertCircle, RefreshCw, ChevronDown, ChevronLeft, ChevronRight, Bug, List, Grid3X3, ArrowDownUp, CalendarDays, X } from "lucide-react";
 import { format, startOfMonth, endOfMonth, addMonths, addWeeks, addDays, parseISO, startOfWeek, endOfWeek, eachDayOfInterval, isSameMonth, isSameDay, isToday } from "date-fns";
 
 type SortOption = "newest" | "oldest" | "az" | "za";
@@ -212,41 +212,54 @@ function DayPopoverContent({
       </div>
       <ScrollArea className="max-h-[300px]">
         <div className="space-y-2 pr-2">
-          {items.map((item) => (
-            <div 
-              key={item.id}
-              className="p-2 rounded border bg-card text-sm"
-              data-testid={`popover-item-${item.id}`}
-            >
-              <div className="flex items-center gap-2 mb-1 flex-wrap">
-                <span className={`font-medium ${item.completed ? "line-through opacity-60" : ""}`}>
-                  {item.title}
-                </span>
-                <Badge variant="outline" className="text-xs">
-                  {item.type === "task" ? "Task" : "Event"}
-                </Badge>
-                {showAgentName && item.assignedTo && (
-                  <Badge variant="secondary" className="text-xs">
-                    {item.assignedTo}
-                  </Badge>
-                )}
-              </div>
-              <div className="flex items-center gap-3 text-xs text-muted-foreground">
-                {item.start && (
-                  <span className="flex items-center gap-1">
-                    <Clock className="h-3 w-3" />
-                    {item.allDay ? "All day" : format(parseISO(item.start), "h:mm a")}
-                    {item.end && !item.allDay && ` - ${format(parseISO(item.end), "h:mm a")}`}
-                  </span>
-                )}
-              </div>
-              {item.contact && (
-                <div className="text-xs text-muted-foreground mt-1">
-                  Contact: {item.contact}
+          {items.map((item) => {
+            const isTask = item.type === "task";
+            const isCompleted = item.completed;
+            const colorClass = isTask 
+              ? isCompleted 
+                ? "bg-green-100 dark:bg-green-900/30" 
+                : "bg-blue-100 dark:bg-blue-900/30"
+              : "bg-primary/10";
+            
+            return (
+              <div 
+                key={item.id}
+                className="p-2 rounded border bg-card text-sm flex gap-2"
+                data-testid={`popover-item-${item.id}`}
+              >
+                <div className={`w-2 shrink-0 rounded ${colorClass}`} />
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 mb-1 flex-wrap">
+                    <span className={`font-medium ${isCompleted ? "line-through opacity-60" : ""}`}>
+                      {item.title}
+                    </span>
+                    <Badge variant="outline" className="text-xs">
+                      {isTask ? "Task" : "Event"}
+                    </Badge>
+                    {showAgentName && item.assignedTo && (
+                      <Badge variant="secondary" className="text-xs">
+                        {item.assignedTo}
+                      </Badge>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                    {item.start && (
+                      <span className="flex items-center gap-1">
+                        <Clock className="h-3 w-3" />
+                        {item.allDay ? "All day" : format(parseISO(item.start), "h:mm a")}
+                        {item.end && !item.allDay && ` - ${format(parseISO(item.end), "h:mm a")}`}
+                      </span>
+                    )}
+                  </div>
+                  {item.contact && (
+                    <div className="text-xs text-muted-foreground mt-1">
+                      Contact: {item.contact}
+                    </div>
+                  )}
                 </div>
-              )}
-            </div>
-          ))}
+              </div>
+            );
+          })}
         </div>
       </ScrollArea>
     </div>
@@ -1018,33 +1031,35 @@ export default function CalendarPage() {
             </div>
             
             {/* Period Navigation */}
-            <div className="space-y-2">
+            <div className="space-y-2 min-w-[200px]">
               <Label>{getPeriodLabel()}</Label>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 shrink-0">
                 <Button 
                   variant="outline" 
-                  size="sm"
+                  size="icon"
                   onClick={handlePrev}
                   data-testid="button-prev"
+                  className="shrink-0"
                 >
-                  ←
+                  <ChevronLeft className="h-4 w-4" />
                 </Button>
-                <span className="flex-1 text-center font-medium text-sm min-w-[140px]">
+                <span className="flex-1 text-center font-medium text-sm whitespace-nowrap px-2">
                   {getNavigationLabel()}
                 </span>
                 <Button 
                   variant="outline" 
-                  size="sm"
+                  size="icon"
                   onClick={handleNext}
                   data-testid="button-next"
+                  className="shrink-0"
                 >
-                  →
+                  <ChevronRight className="h-4 w-4" />
                 </Button>
               </div>
             </div>
             
             {/* Sort Dropdown */}
-            <div className="space-y-2 min-w-[160px]">
+            <div className="space-y-2 min-w-[170px]">
               <Label>Sort</Label>
               <Select value={sortOption} onValueChange={(v) => setSortOption(v as SortOption)}>
                 <SelectTrigger data-testid="select-sort" className="w-full">
