@@ -142,6 +142,7 @@ import {
 } from "lucide-react";
 import { PropertyCard } from "@/components/PropertyCard";
 import { PropertyMapView } from "@/components/PropertyMapView";
+import { PolygonMapSearch } from "@/components/PolygonMapSearch";
 import { useSelectedProperty } from "@/contexts/SelectedPropertyContext";
 import type { Property, Media } from "@shared/schema";
 import { formatPropertyType } from "@/lib/property-type-utils";
@@ -362,6 +363,13 @@ export default function BuyerSearch() {
     searchState?.searchTriggered ? 1 : 0
   );
   const pageSize = 50;
+  
+  // Polygon map search state (separate from list filters)
+  const [mapSearchResults, setMapSearchResults] = useState<Property[]>([]);
+  const [isMapSearching, setIsMapSearching] = useState(false);
+  const [mapStatusActive, setMapStatusActive] = useState(true);
+  const [mapStatusUnderContract, setMapStatusUnderContract] = useState(false);
+  const [mapStatusClosed, setMapStatusClosed] = useState(false);
   
   // Floating card state
   const [floatingCardOpen, setFloatingCardOpen] = useState(false);
@@ -853,6 +861,35 @@ export default function BuyerSearch() {
   const handleSearch = () => {
     setCurrentPage(0);
     setSearchTrigger(prev => prev + 1);
+  };
+
+  // Polygon map search handler (uses separate map status state)
+  const handlePolygonSearch = async (boundary: number[][][]) => {
+    setIsMapSearching(true);
+    try {
+      // Build statuses array from map-specific status filters
+      const statuses: string[] = [];
+      if (mapStatusActive) statuses.push('active');
+      if (mapStatusUnderContract) statuses.push('under_contract');
+      if (mapStatusClosed) statuses.push('closed');
+      
+      const response = await apiRequest('/api/properties/search/polygon', 'POST', {
+        boundary,
+        statuses: statuses.length > 0 ? statuses : ['active'],
+        limit: 100,
+      });
+      const data = await response.json();
+      setMapSearchResults(data.properties || []);
+    } catch (err) {
+      console.error('Polygon search error:', err);
+      setMapSearchResults([]);
+    } finally {
+      setIsMapSearching(false);
+    }
+  };
+
+  const handleClearPolygonSearch = () => {
+    setMapSearchResults([]);
   };
 
   return (
@@ -3005,33 +3042,77 @@ export default function BuyerSearch() {
             </div>
           </CardHeader>
           <CardContent>
-            {isLoading ? (
+            {viewMode === 'map' ? (
+              <div className="space-y-6">
+                {/* Status Filter for Map Search (separate from list filters) */}
+                <div className="flex flex-wrap gap-4 items-center">
+                  <Label className="text-sm font-medium">Status:</Label>
+                  <div className="flex items-center space-x-2">
+                    <Switch
+                      id="map-status-active"
+                      checked={mapStatusActive}
+                      onCheckedChange={(checked) => setMapStatusActive(checked)}
+                      data-testid="switch-map-status-active"
+                    />
+                    <label htmlFor="map-status-active" className="text-sm cursor-pointer">Active</label>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <Switch
+                      id="map-status-under-contract"
+                      checked={mapStatusUnderContract}
+                      onCheckedChange={(checked) => setMapStatusUnderContract(checked)}
+                      data-testid="switch-map-status-uc"
+                    />
+                    <label htmlFor="map-status-under-contract" className="text-sm cursor-pointer">Under Contract</label>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <Switch
+                      id="map-status-closed"
+                      checked={mapStatusClosed}
+                      onCheckedChange={(checked) => setMapStatusClosed(checked)}
+                      data-testid="switch-map-status-closed"
+                    />
+                    <label htmlFor="map-status-closed" className="text-sm cursor-pointer">Sold/Closed</label>
+                  </div>
+                </div>
+
+                {/* Polygon Map Search */}
+                <PolygonMapSearch
+                  onSearch={handlePolygonSearch}
+                  onClear={handleClearPolygonSearch}
+                  isLoading={isMapSearching}
+                  resultCount={mapSearchResults.length}
+                />
+
+                {/* Map Search Results */}
+                {mapSearchResults.length > 0 && (
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between">
+                      <h3 className="font-semibold">Properties in Selected Area</h3>
+                      <Badge variant="secondary">{mapSearchResults.length} found</Badge>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {mapSearchResults.map((property: any) => {
+                        const propertyId = property.listingId || property.id;
+                        const media = property.photos?.length ? convertPhotosToMedia(property.photos, propertyId) : [];
+                        return (
+                          <PropertyCard 
+                            key={property.id} 
+                            property={property}
+                            media={media}
+                            onClick={() => handlePropertyClick(property, property.photos || [])}
+                          />
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+              </div>
+            ) : isLoading ? (
               <div className="text-center py-12 text-muted-foreground">
                 Searching properties...
               </div>
             ) : properties && properties.length > 0 ? (
-              viewMode === 'map' ? (
-                <>
-                  {isGeocoding && (
-                    <div className="mb-4 p-3 bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800 rounded-md">
-                      <div className="flex items-center gap-2">
-                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-500"></div>
-                        <span className="text-sm text-blue-700 dark:text-blue-300">
-                          Finding property locations...
-                        </span>
-                      </div>
-                    </div>
-                  )}
-                  <PropertyMapView 
-                    properties={properties}
-                    isLoading={isLoading}
-                    onPropertyClick={(property) => {
-                      const propertyWithPhotos = property as Property & { photos?: string[] };
-                      handlePropertyClick(property, propertyWithPhotos.photos || []);
-                    }}
-                  />
-                </>
-              ) : (
                 <>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     {properties.map((property: any) => {
@@ -3072,7 +3153,6 @@ export default function BuyerSearch() {
                     </div>
                   )}
                 </>
-              )
             ) : searchTrigger > 0 ? (
               <div className="text-center py-12 text-muted-foreground">
                 <Filter className="w-12 h-12 mx-auto mb-4 opacity-50" />
