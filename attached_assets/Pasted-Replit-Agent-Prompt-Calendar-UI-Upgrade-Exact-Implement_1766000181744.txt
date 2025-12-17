@@ -1,0 +1,273 @@
+Replit Agent Prompt — Calendar UI Upgrade (Exact Implementation Notes)
+
+You are working in the existing Mission Control web app – Calendar page.
+Implement sorting, view modes, and UI behavior similar to Google Calendar, plus recent UX feedback fixes.
+
+1) Requirements Summary
+A) Default sort
+
+Calendar items must default to Newest → Oldest (descending by startAt).
+
+B) Sort options (dropdown)
+
+Add a Sort dropdown with:
+
+Newest → Oldest (default)
+
+Oldest → Newest
+
+A → Z (by title)
+
+Z → A (by title)
+
+Persist selection in localStorage.
+
+C) View modes (toggle)
+
+Add a View selector similar to Google Calendar:
+
+List
+
+Month
+
+Week
+
+Day
+
+Default view: List
+Persist selection in localStorage.
+
+⚠️ Important UI fix
+
+Ensure View options do NOT overlap each other.
+
+Use a proper dropdown/popover component with correct spacing and z-index.
+
+Menu must render cleanly on all screen sizes.
+
+D) Month grid view (must-have)
+
+Implement a month grid:
+
+7 columns (Sun–Sat)
+
+5–6 rows (weeks)
+
+Each cell shows date number and items starting that day.
+
+Week/Day views can be basic, but Month view is required.
+
+2) Data Normalization (do this first)
+
+Normalize all FUB calendar data (tasks / appointments / events) into:
+
+type CalendarItem = {
+  id: string;
+  title: string;
+  startAt: string; // ISO
+  endAt?: string | null;
+  type: "task" | "appointment" | "event";
+  agentId?: string | null;
+  raw?: any;
+};
+
+
+Rules:
+
+If no start date/time → startAt = null
+
+Show at bottom of List view
+
+Do NOT render in Month/Week/Day grid
+
+Title fallback: "Untitled"
+
+3) Sorting Implementation (client-side)
+
+Implement:
+
+function sortItems(
+  items: CalendarItem[],
+  sort: "newest" | "oldest" | "az" | "za"
+): CalendarItem[]
+
+
+Rules:
+
+newest: startAt desc
+
+oldest: startAt asc
+
+az / za: normalize title (lowercase + trim)
+
+Items with missing startAt always last
+
+Persist sort:
+
+localStorage.setItem("calendarSort", sort)
+
+
+Default: "newest"
+
+4) View Mode State + Persistence
+
+State:
+
+viewMode: "list" | "month" | "week" | "day"
+
+
+Persist:
+
+localStorage.setItem("calendarViewMode", viewMode)
+
+5) Month View — Exact Rendering Rules
+A) Calendar grid dates
+
+Grid start = Sunday of week containing 1st of month
+
+Grid end = Saturday of week containing last day
+
+Render sequential day cells
+
+B) Items placement
+
+Show items whose startAt matches the cell date (local timezone)
+
+🔴 UPDATED REQUIREMENT (replace +N behavior)
+
+Show first 3 items
+
+If more than 3:
+
+Replace “+N more” with “View all (N)”
+
+Clicking opens a floating card / popover anchored to that day
+
+C) Floating card behavior (Month view overflow)
+
+Appears above the calendar (popover or dialog)
+
+Shows ALL items for that date
+
+Includes:
+
+Date header
+
+Title
+
+Type (task / appointment / event)
+
+Start → end time
+
+Assigned agent (if available)
+
+Related contact (if available)
+
+Scrollable
+
+Close on:
+
+click outside
+
+ESC
+
+close icon
+
+❌ Do NOT show “+4 / +5” text anymore.
+
+D) Cell UI
+
+Date number (top-right)
+
+Gray out days outside current month
+
+Highlight “today”
+
+E) Interaction
+
+Clicking an item opens existing detail view or modal
+
+6) Week View (basic acceptable)
+
+7 columns (current week)
+
+Stacked list per day
+
+No hourly grid required
+
+7) Day View (basic acceptable)
+
+Single column
+
+Header shows selected date
+
+8) Toolbar Controls (match existing layout)
+
+In the Calendar toolbar (near Month nav / Today / Refresh):
+
+Controls:
+
+Sort dropdown
+
+View dropdown
+
+Refresh button
+
+🔄 Refresh Button UX (NEW)
+
+When Refresh is clicked:
+
+Disable button
+
+Rotate refresh icon while loading
+
+On success:
+
+Button turns green briefly (800–1200ms)
+
+Then returns to original color
+
+On failure:
+
+Stop animation
+
+Re-enable button
+
+Keep existing error UI
+
+Use states:
+
+isRefreshing
+refreshSuccess
+
+9) Loading / Empty / Error States
+
+List view: keep existing behavior
+
+Month/Week/Day:
+
+Grid skeleton while loading
+
+“No items found for this period” when empty
+
+Changing sort or view must NOT refetch data
+
+10) Deliverables
+
+File paths changed
+
+Confirm:
+
+Default sort = newest → oldest
+
+Sort dropdown works
+
+View dropdown does not overlap
+
+List ↔ Month/Week/Day toggle works
+
+Month overflow opens floating card (not +N)
+
+Refresh button animates + success state
+
+Selections persist via localStorage

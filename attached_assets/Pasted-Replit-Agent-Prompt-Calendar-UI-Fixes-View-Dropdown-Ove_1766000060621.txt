@@ -1,0 +1,121 @@
+Replit Agent Prompt — Calendar UI Fixes: View Dropdown Overlap + Month Overflow Popover + Refresh Animation
+
+We have new Calendar UI feedback to implement.
+
+1) Fix: View options overlap each other
+
+Issue: The View dropdown/options are visually overlapping.
+
+Requirements
+
+Locate the View selector/dropdown component (List/Month/Week/Day).
+
+Fix layout so options never overlap:
+
+Use a proper dropdown/popover component (Radix/shadcn DropdownMenu or Select) with correct z-index.
+
+Ensure menu renders in a portal layer if needed.
+
+Add spacing/padding so items are fully readable and clickable.
+
+Confirm it works on common widths and doesn’t overlap the calendar header controls.
+
+2) Month view: if appointments > 3, show a floating card with ALL appointments + details (no “+4/+5”)
+
+Current behavior: Shows first 3, then “+N more”.
+
+New behavior
+
+Still show first 3 items in the day cell.
+
+If there are more than 3:
+
+Replace the “+N more” text with a clickable chip/button like “View all (7)”.
+
+Clicking opens a floating card/popover anchored to that day cell (NOT a separate page).
+
+The floating card lists all appointments for that date with details.
+
+Floating card requirements
+
+Should be a popover/modal style (prefer Popover anchored to the cell, or Dialog on mobile).
+
+Show:
+
+Date header (e.g., “Dec 18, 2025”)
+
+For each item:
+
+Title
+
+Type (task/appointment/event)
+
+Start time → end time (if available)
+
+Assigned agent (if available)
+
+Related contact (if available)
+
+Scrollable if many items.
+
+Close behavior:
+
+click outside closes
+
+ESC closes
+
+close icon (×)
+
+Important: Do not display “+4/+5 etc.” anymore—use the floating card approach.
+
+3) Refresh button: interactive animation + success state
+
+Current behavior: Static refresh button.
+
+New behavior
+
+When user clicks Refresh:
+
+Disable the button while refresh is in progress
+
+Rotate the refresh icon (spinner-like rotation)
+
+When refresh completes successfully:
+
+button turns green briefly (e.g., 800–1200ms) to indicate success
+
+then returns to the original color
+
+If refresh fails:
+
+show error state (keep existing error UI)
+
+button can turn red briefly or just stop rotating and re-enable
+
+Implementation details
+
+Add UI states:
+
+isRefreshing (true while fetching)
+
+refreshSuccess (true briefly on success)
+
+Rotation:
+
+CSS animation on icon while isRefreshing
+
+Color change:
+
+apply a “success” class when refreshSuccess
+
+Ensure this works in both List view and Month/Week/Day views.
+
+Deliverables
+
+Provide exact file paths changed.
+
+Confirm:
+
+View dropdown no longer overlaps and is usable.
+
+Month view overflow opens a floating card showing all items + details.

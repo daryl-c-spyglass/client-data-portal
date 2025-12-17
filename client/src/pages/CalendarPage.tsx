@@ -7,11 +7,13 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { Calendar, Clock, User, CheckCircle2, Circle, AlertCircle, RefreshCw, ChevronDown, ChevronRight, Bug, List, Grid3X3, ArrowDownUp } from "lucide-react";
-import { format, startOfMonth, endOfMonth, addMonths, addWeeks, parseISO, startOfWeek, endOfWeek, eachDayOfInterval, isSameMonth, isSameDay, isToday } from "date-fns";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Calendar, Clock, User, CheckCircle2, Circle, AlertCircle, RefreshCw, ChevronDown, ChevronRight, Bug, List, Grid3X3, ArrowDownUp, CalendarDays, X } from "lucide-react";
+import { format, startOfMonth, endOfMonth, addMonths, addWeeks, addDays, parseISO, startOfWeek, endOfWeek, eachDayOfInterval, isSameMonth, isSameDay, isToday } from "date-fns";
 
 type SortOption = "newest" | "oldest" | "az" | "za";
-type ViewMode = "list" | "month" | "week";
+type ViewMode = "list" | "month" | "week" | "day";
 
 interface CalendarItem {
   id: string;
@@ -147,6 +149,133 @@ function CalendarGridItem({ item }: { item: CalendarItem }) {
   );
 }
 
+function DayPopoverContent({ 
+  date, 
+  items,
+  onClose
+}: { 
+  date: Date; 
+  items: CalendarItem[];
+  onClose?: () => void;
+}) {
+  return (
+    <div className="w-80">
+      <div className="flex items-center justify-between mb-3 pb-2 border-b">
+        <div>
+          <div className="font-semibold">{format(date, "EEEE")}</div>
+          <div className="text-sm text-muted-foreground">{format(date, "MMMM d, yyyy")}</div>
+        </div>
+        {onClose && (
+          <Button 
+            variant="ghost" 
+            size="icon" 
+            className="h-6 w-6" 
+            onClick={onClose}
+            data-testid="button-popover-close"
+          >
+            <X className="h-4 w-4" />
+          </Button>
+        )}
+      </div>
+      <ScrollArea className="max-h-[300px]">
+        <div className="space-y-2 pr-2">
+          {items.map((item) => (
+            <div 
+              key={item.id}
+              className="p-2 rounded border bg-card text-sm"
+              data-testid={`popover-item-${item.id}`}
+            >
+              <div className="flex items-center gap-2 mb-1">
+                <span className={`font-medium ${item.completed ? "line-through opacity-60" : ""}`}>
+                  {item.title}
+                </span>
+                <Badge variant="outline" className="text-xs">
+                  {item.type === "task" ? "Task" : "Event"}
+                </Badge>
+              </div>
+              <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                {item.start && (
+                  <span className="flex items-center gap-1">
+                    <Clock className="h-3 w-3" />
+                    {item.allDay ? "All day" : format(parseISO(item.start), "h:mm a")}
+                    {item.end && !item.allDay && ` - ${format(parseISO(item.end), "h:mm a")}`}
+                  </span>
+                )}
+                {item.assignedTo && (
+                  <span className="flex items-center gap-1">
+                    <User className="h-3 w-3" />
+                    {item.assignedTo}
+                  </span>
+                )}
+              </div>
+              {item.contact && (
+                <div className="text-xs text-muted-foreground mt-1">
+                  Contact: {item.contact}
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      </ScrollArea>
+    </div>
+  );
+}
+
+function DayCellWithPopover({
+  day,
+  dayItems,
+  isCurrentMonth,
+  isDayToday,
+}: {
+  day: Date;
+  dayItems: CalendarItem[];
+  isCurrentMonth: boolean;
+  isDayToday: boolean;
+}) {
+  const [isOpen, setIsOpen] = useState(false);
+  const dateKey = format(day, "yyyy-MM-dd");
+  const hasOverflow = dayItems.length > 3;
+
+  return (
+    <div 
+      className={`min-h-[100px] p-1 border-b border-r ${
+        !isCurrentMonth ? "bg-muted/30" : ""
+      } ${isDayToday ? "bg-primary/5" : ""}`}
+      data-testid={`calendar-cell-${dateKey}`}
+    >
+      <div className={`text-sm font-medium mb-1 ${
+        !isCurrentMonth ? "text-muted-foreground" : ""
+      } ${isDayToday ? "text-primary" : ""}`}>
+        {format(day, "d")}
+      </div>
+      <div className="space-y-0.5 overflow-hidden">
+        {dayItems.slice(0, 3).map((item) => (
+          <CalendarGridItem key={item.id} item={item} />
+        ))}
+        {hasOverflow && (
+          <Popover open={isOpen} onOpenChange={setIsOpen}>
+            <PopoverTrigger asChild>
+              <button
+                className="text-xs text-primary hover:underline cursor-pointer pl-1 font-medium"
+                data-testid={`button-day-popover-${dateKey}`}
+              >
+                View all ({dayItems.length})
+              </button>
+            </PopoverTrigger>
+            <PopoverContent className="p-3" align="start">
+              <DayPopoverContent 
+                date={day} 
+                items={dayItems} 
+                onClose={() => setIsOpen(false)} 
+              />
+            </PopoverContent>
+          </Popover>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function MonthCalendarGrid({ 
   items, 
   currentMonth 
@@ -174,7 +303,6 @@ function MonthCalendarGrid({
       if (!map[dateKey]) map[dateKey] = [];
       map[dateKey].push(item);
     }
-    // Sort items within each day by time
     for (const key of Object.keys(map)) {
       map[key].sort((a, b) => {
         if (!a.start) return 1;
@@ -189,7 +317,6 @@ function MonthCalendarGrid({
   
   return (
     <div className="border rounded-lg overflow-hidden">
-      {/* Header row */}
       <div className="grid grid-cols-7 bg-muted">
         {weekDays.map((day) => (
           <div key={day} className="p-2 text-center text-sm font-medium border-b">
@@ -198,7 +325,6 @@ function MonthCalendarGrid({
         ))}
       </div>
       
-      {/* Calendar weeks */}
       {weeks.map((week, weekIdx) => (
         <div key={weekIdx} className="grid grid-cols-7">
           {week.map((day) => {
@@ -208,29 +334,13 @@ function MonthCalendarGrid({
             const isDayToday = isToday(day);
             
             return (
-              <div 
+              <DayCellWithPopover
                 key={dateKey}
-                className={`min-h-[100px] p-1 border-b border-r ${
-                  !isCurrentMonth ? "bg-muted/30" : ""
-                } ${isDayToday ? "bg-primary/5" : ""}`}
-                data-testid={`calendar-cell-${dateKey}`}
-              >
-                <div className={`text-sm font-medium mb-1 ${
-                  !isCurrentMonth ? "text-muted-foreground" : ""
-                } ${isDayToday ? "text-primary" : ""}`}>
-                  {format(day, "d")}
-                </div>
-                <div className="space-y-0.5 overflow-hidden">
-                  {dayItems.slice(0, 3).map((item) => (
-                    <CalendarGridItem key={item.id} item={item} />
-                  ))}
-                  {dayItems.length > 3 && (
-                    <div className="text-xs text-muted-foreground pl-1">
-                      +{dayItems.length - 3} more
-                    </div>
-                  )}
-                </div>
-              </div>
+                day={day}
+                dayItems={dayItems}
+                isCurrentMonth={isCurrentMonth}
+                isDayToday={isDayToday}
+              />
             );
           })}
         </div>
@@ -320,6 +430,92 @@ function WeekCalendarGrid({
   );
 }
 
+function DayCalendarView({ 
+  items, 
+  dayDate 
+}: { 
+  items: CalendarItem[]; 
+  dayDate: Date;
+}) {
+  const dateKey = format(dayDate, "yyyy-MM-dd");
+  const isDayToday = isToday(dayDate);
+  
+  const dayItems = useMemo(() => {
+    return items
+      .filter(item => {
+        if (!item.start) return false;
+        return format(parseISO(item.start), "yyyy-MM-dd") === dateKey;
+      })
+      .sort((a, b) => {
+        if (!a.start) return 1;
+        if (!b.start) return -1;
+        return new Date(a.start).getTime() - new Date(b.start).getTime();
+      });
+  }, [items, dateKey]);
+  
+  return (
+    <div className="border rounded-lg overflow-hidden">
+      <div className={`p-4 text-center border-b bg-muted ${isDayToday ? "bg-primary/10" : ""}`}>
+        <div className="text-sm text-muted-foreground">{format(dayDate, "EEEE")}</div>
+        <div className={`text-2xl font-bold ${isDayToday ? "text-primary" : ""}`}>
+          {format(dayDate, "MMMM d, yyyy")}
+        </div>
+      </div>
+      
+      <div className="p-4 min-h-[400px]" data-testid={`day-view-${dateKey}`}>
+        {dayItems.length === 0 ? (
+          <div className="text-center text-muted-foreground py-8">
+            No items scheduled for this day
+          </div>
+        ) : (
+          <div className="space-y-2">
+            {dayItems.map((item) => (
+              <div
+                key={item.id}
+                className="p-3 rounded-lg border bg-card hover-elevate"
+                data-testid={`day-item-${item.id}`}
+              >
+                <div className="flex items-center gap-2 mb-1">
+                  {item.type === "task" ? (
+                    item.completed ? (
+                      <CheckCircle2 className="h-4 w-4 text-green-500" />
+                    ) : (
+                      <Circle className="h-4 w-4 text-muted-foreground" />
+                    )
+                  ) : (
+                    <Calendar className="h-4 w-4 text-primary" />
+                  )}
+                  <span className={`font-medium ${item.completed ? "line-through opacity-60" : ""}`}>
+                    {item.title}
+                  </span>
+                  <Badge variant="outline" className="text-xs ml-auto">
+                    {item.type === "task" ? "Task" : "Event"}
+                  </Badge>
+                </div>
+                <div className="flex items-center gap-4 text-sm text-muted-foreground ml-6">
+                  {item.start && (
+                    <span className="flex items-center gap-1">
+                      <Clock className="h-3 w-3" />
+                      {item.allDay ? "All day" : format(parseISO(item.start), "h:mm a")}
+                      {item.end && !item.allDay && ` - ${format(parseISO(item.end), "h:mm a")}`}
+                    </span>
+                  )}
+                  {item.contact && (
+                    <span className="flex items-center gap-1">
+                      <User className="h-3 w-3" />
+                      {item.contact}
+                    </span>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function DebugPanel({ calendarData, startDate, endDate }: { calendarData: CalendarData; startDate: string; endDate: string }) {
   const [isOpen, setIsOpen] = useState(false);
   const isDev = import.meta.env.DEV;
@@ -380,6 +576,11 @@ export default function CalendarPage() {
   const [selectedUserId, setSelectedUserId] = useState<string>("all");
   const [monthOffset, setMonthOffset] = useState(0);
   const [weekOffset, setWeekOffset] = useState(0);
+  const [dayOffset, setDayOffset] = useState(0);
+  
+  // Refresh button states
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [refreshSuccess, setRefreshSuccess] = useState(false);
   
   // Initialize from localStorage
   const [sortOption, setSortOption] = useState<SortOption>(() => {
@@ -395,7 +596,7 @@ export default function CalendarPage() {
   const [viewMode, setViewMode] = useState<ViewMode>(() => {
     if (typeof window !== "undefined") {
       const saved = localStorage.getItem(STORAGE_KEYS.viewMode);
-      if (saved && ["list", "month", "week"].includes(saved)) {
+      if (saved && ["list", "month", "week", "day"].includes(saved)) {
         return saved as ViewMode;
       }
     }
@@ -413,9 +614,14 @@ export default function CalendarPage() {
   
   const currentMonth = addMonths(new Date(), monthOffset);
   const currentWeek = addWeeks(new Date(), weekOffset);
+  const currentDay = addDays(new Date(), dayOffset);
   
   // Compute date range based on view mode for API fetching
   const { startDate, endDate } = useMemo(() => {
+    if (viewMode === "day") {
+      const dayStr = format(currentDay, "yyyy-MM-dd");
+      return { startDate: dayStr, endDate: dayStr };
+    }
     if (viewMode === "week") {
       const weekStart = startOfWeek(currentWeek, { weekStartsOn: 0 });
       const weekEnd = endOfWeek(currentWeek, { weekStartsOn: 0 });
@@ -429,11 +635,13 @@ export default function CalendarPage() {
       startDate: format(startOfMonth(currentMonth), "yyyy-MM-dd"),
       endDate: format(endOfMonth(currentMonth), "yyyy-MM-dd"),
     };
-  }, [viewMode, currentMonth, currentWeek]);
+  }, [viewMode, currentMonth, currentWeek, currentDay]);
   
   // Navigation handlers based on view mode
   const handlePrev = () => {
-    if (viewMode === "week") {
+    if (viewMode === "day") {
+      setDayOffset(d => d - 1);
+    } else if (viewMode === "week") {
       setWeekOffset(w => w - 1);
     } else {
       setMonthOffset(m => m - 1);
@@ -441,7 +649,9 @@ export default function CalendarPage() {
   };
   
   const handleNext = () => {
-    if (viewMode === "week") {
+    if (viewMode === "day") {
+      setDayOffset(d => d + 1);
+    } else if (viewMode === "week") {
       setWeekOffset(w => w + 1);
     } else {
       setMonthOffset(m => m + 1);
@@ -451,16 +661,42 @@ export default function CalendarPage() {
   const handleToday = () => {
     setMonthOffset(0);
     setWeekOffset(0);
+    setDayOffset(0);
+  };
+  
+  // Handle refresh with animation
+  const handleRefresh = async (refetchFn: () => Promise<any>) => {
+    setIsRefreshing(true);
+    setRefreshSuccess(false);
+    try {
+      await refetchFn();
+      setRefreshSuccess(true);
+      setTimeout(() => setRefreshSuccess(false), 1000);
+    } catch (e) {
+      // Error handled by query
+    } finally {
+      setIsRefreshing(false);
+    }
   };
   
   // Get navigation label based on view mode
   const getNavigationLabel = () => {
+    if (viewMode === "day") {
+      return format(currentDay, "EEE, MMM d, yyyy");
+    }
     if (viewMode === "week") {
       const weekStart = startOfWeek(currentWeek, { weekStartsOn: 0 });
       const weekEnd = endOfWeek(currentWeek, { weekStartsOn: 0 });
       return `${format(weekStart, "MMM d")} - ${format(weekEnd, "MMM d, yyyy")}`;
     }
     return format(currentMonth, "MMM yyyy");
+  };
+  
+  // Get period label for filter section
+  const getPeriodLabel = () => {
+    if (viewMode === "day") return "Day";
+    if (viewMode === "week") return "Week";
+    return "Month";
   };
   
   const { data: statusData, isLoading: statusLoading } = useQuery<{ configured: boolean; status: string; message: string }>({
@@ -642,7 +878,7 @@ export default function CalendarPage() {
             
             {/* Period Navigation */}
             <div className="space-y-2">
-              <Label>{viewMode === "week" ? "Week" : "Month"}</Label>
+              <Label>{getPeriodLabel()}</Label>
               <div className="flex items-center gap-2">
                 <Button 
                   variant="outline" 
@@ -652,7 +888,7 @@ export default function CalendarPage() {
                 >
                   ←
                 </Button>
-                <span className="flex-1 text-center font-medium text-sm">
+                <span className="flex-1 text-center font-medium text-sm min-w-[140px]">
                   {getNavigationLabel()}
                 </span>
                 <Button 
@@ -684,15 +920,14 @@ export default function CalendarPage() {
             </div>
             
             {/* View Toggle */}
-            <div className="space-y-2">
+            <div className="space-y-2 lg:col-span-2">
               <Label>View</Label>
-              <div className="flex items-center gap-1">
+              <div className="flex items-center gap-1 flex-wrap">
                 <Button
                   variant={viewMode === "list" ? "default" : "outline"}
                   size="sm"
                   onClick={() => setViewMode("list")}
                   data-testid="button-view-list"
-                  className="flex-1"
                 >
                   <List className="h-4 w-4 mr-1" />
                   List
@@ -702,7 +937,6 @@ export default function CalendarPage() {
                   size="sm"
                   onClick={() => setViewMode("month")}
                   data-testid="button-view-month"
-                  className="flex-1"
                 >
                   <Grid3X3 className="h-4 w-4 mr-1" />
                   Month
@@ -712,16 +946,24 @@ export default function CalendarPage() {
                   size="sm"
                   onClick={() => setViewMode("week")}
                   data-testid="button-view-week"
-                  className="flex-1"
                 >
                   <Calendar className="h-4 w-4 mr-1" />
                   Week
+                </Button>
+                <Button
+                  variant={viewMode === "day" ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => setViewMode("day")}
+                  data-testid="button-view-day"
+                >
+                  <CalendarDays className="h-4 w-4 mr-1" />
+                  Day
                 </Button>
               </div>
             </div>
             
             {/* Action Buttons */}
-            <div className="flex items-end gap-2 lg:col-span-2">
+            <div className="flex items-end gap-2">
               <Button 
                 variant="outline"
                 onClick={handleToday}
@@ -730,11 +972,12 @@ export default function CalendarPage() {
                 Today
               </Button>
               <Button 
-                onClick={() => refetch()} 
-                disabled={!isConfigured}
+                onClick={() => handleRefresh(refetch)} 
+                disabled={!isConfigured || isRefreshing}
                 data-testid="button-refresh"
+                className={refreshSuccess ? "bg-green-600 dark:bg-green-500 hover:bg-green-700 dark:hover:bg-green-600 text-white" : ""}
               >
-                <RefreshCw className="h-4 w-4 mr-2" />
+                <RefreshCw className={`h-4 w-4 mr-2 ${isRefreshing ? "animate-spin" : ""}`} />
                 Refresh
               </Button>
             </div>
@@ -809,7 +1052,7 @@ export default function CalendarPage() {
               <CardContent className="py-8 text-center text-muted-foreground">
                 <Calendar className="h-12 w-12 mx-auto mb-4 opacity-50" />
                 <p>No items found for this period</p>
-                <p className="text-sm mt-1">{format(currentMonth, "MMMM yyyy")}</p>
+                <p className="text-sm mt-1">{getNavigationLabel()}</p>
               </CardContent>
             </Card>
           ) : viewMode === "list" ? (
@@ -831,9 +1074,12 @@ export default function CalendarPage() {
           ) : viewMode === "month" ? (
             /* Month Grid View */
             <MonthCalendarGrid items={sortedItems} currentMonth={currentMonth} />
-          ) : (
+          ) : viewMode === "week" ? (
             /* Week Grid View */
             <WeekCalendarGrid items={sortedItems} weekDate={currentWeek} />
+          ) : (
+            /* Day View */
+            <DayCalendarView items={sortedItems} dayDate={currentDay} />
           )}
         </>
       )}
