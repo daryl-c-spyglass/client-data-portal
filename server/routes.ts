@@ -1057,7 +1057,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Polygon search - search properties within a drawn polygon boundary
   app.post("/api/properties/search/polygon", async (req, res) => {
     try {
-      const { boundary, statuses, limit = 50 } = req.body;
+      const { 
+        boundary, 
+        statuses, 
+        limit = 50,
+        minBeds,
+        minBaths,
+        minPrice,
+        maxPrice,
+        minSqft,
+        maxSqft,
+        propertyType,
+        minYearBuilt,
+        maxYearBuilt,
+        soldDays
+      } = req.body;
       
       if (!boundary || !Array.isArray(boundary) || boundary.length === 0) {
         res.status(400).json({ error: "Valid boundary polygon is required" });
@@ -1066,6 +1080,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       console.log(`[Polygon Search] Searching within boundary with ${statuses?.length || 1} status(es)`);
       console.log(`[Polygon Search] Boundary has ${boundary[0]?.length || 0} points:`, JSON.stringify(boundary[0]?.slice(0, 3)));
+      console.log(`[Polygon Search] Filters: minBeds=${minBeds}, minBaths=${minBaths}, minPrice=${minPrice}, maxPrice=${maxPrice}, minSqft=${minSqft}, maxSqft=${maxSqft}`);
       
       const repliersClient = getRepliersClient();
       if (!repliersClient) {
@@ -1082,6 +1097,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
             class: 'residential',
             resultsPerPage: Math.min(limit, 100),
           };
+          
+          // Add filter parameters if provided
+          if (minBeds) searchParams.minBeds = minBeds;
+          if (minBaths) searchParams.minBaths = minBaths;
+          if (minPrice) searchParams.minPrice = minPrice;
+          if (maxPrice) searchParams.maxPrice = maxPrice;
+          if (minSqft) searchParams.minSqft = minSqft;
+          if (maxSqft) searchParams.maxSqft = maxSqft;
+          if (propertyType) searchParams.propertyType = propertyType;
+          if (minYearBuilt) searchParams.minYearBuilt = minYearBuilt;
+          if (maxYearBuilt) searchParams.maxYearBuilt = maxYearBuilt;
+          if (soldDays && (status === 'closed' || status === 'sold')) {
+            const soldDate = new Date();
+            soldDate.setDate(soldDate.getDate() - soldDays);
+            searchParams.soldAfter = soldDate.toISOString().split('T')[0];
+          }
           
           // Map frontend status to Repliers API params
           if (status === 'active') {
@@ -1108,6 +1139,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
             
             if (combined.includes('lease') || combined.includes('rental')) continue;
             
+            // Skip listings with invalid/placeholder addresses (e.g., "0000", "00000")
+            const streetNumber = String(listing.address?.streetNumber || '').trim();
+            if (/^0+$/.test(streetNumber)) continue;
+            
             const photos = Array.isArray(listing.images)
               ? listing.images.slice(0, 10)
               : [];
@@ -1121,6 +1156,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
             const fullAddress = listing.address?.streetName 
               ? `${listing.address.streetNumber || ''} ${listing.address.streetName}${listing.address.streetSuffix ? ' ' + listing.address.streetSuffix : ''}`
               : listingAny.address?.full || 'Unknown';
+            
+            // Skip addresses that look like placeholders
+            if (fullAddress.match(/^0{2,}/)) continue;
             
             allResults.push({
               id: `R-${mlsNum}`,

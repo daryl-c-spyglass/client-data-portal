@@ -271,6 +271,7 @@ export function CMABuilder({ onCreateCMA, initialData }: CMABuilderProps) {
   const [searchMode, setSearchMode] = useState<'criteria' | 'map'>('criteria');
   const [mapSearchResults, setMapSearchResults] = useState<Property[]>([]);
   const [isMapSearching, setIsMapSearching] = useState(false);
+  const [currentBoundary, setCurrentBoundary] = useState<number[][][] | null>(null);
   
   // Property detail dialog state
   const [selectedProperty, setSelectedProperty] = useState<Property | null>(null);
@@ -405,12 +406,28 @@ export function CMABuilder({ onCreateCMA, initialData }: CMABuilderProps) {
 
   // Map polygon search handler
   const handlePolygonSearch = async (boundary: number[][][]) => {
+    setCurrentBoundary(boundary);
+    await executePolygonSearch(boundary);
+  };
+  
+  // Execute polygon search with current filters
+  const executePolygonSearch = async (boundary: number[][][]) => {
     setIsMapSearching(true);
     try {
       const response = await apiRequest('/api/properties/search/polygon', 'POST', {
         boundary,
         statuses: searchStatuses,
         limit: 50,
+        minBeds: searchMinBeds && searchMinBeds !== 'any' ? parseInt(searchMinBeds) : undefined,
+        minBaths: searchMinBaths && searchMinBaths !== 'any' ? parseInt(searchMinBaths) : undefined,
+        minPrice: searchMinPrice && searchMinPrice !== 'any' ? parseInt(searchMinPrice) : undefined,
+        maxPrice: searchMaxPrice && searchMaxPrice !== 'any' ? parseInt(searchMaxPrice) : undefined,
+        minSqft: searchMinSqft ? parseInt(searchMinSqft) : undefined,
+        maxSqft: searchMaxSqft ? parseInt(searchMaxSqft) : undefined,
+        propertyType: searchPropertyType && searchPropertyType !== 'any' ? searchPropertyType : undefined,
+        minYearBuilt: searchMinYearBuilt ? parseInt(searchMinYearBuilt) : undefined,
+        maxYearBuilt: searchMaxYearBuilt ? parseInt(searchMaxYearBuilt) : undefined,
+        soldDays: searchSoldDays && searchSoldDays !== 'any' ? parseInt(searchSoldDays) : undefined,
       });
       const data = await response.json();
       setMapSearchResults(data.properties || []);
@@ -421,9 +438,17 @@ export function CMABuilder({ onCreateCMA, initialData }: CMABuilderProps) {
       setIsMapSearching(false);
     }
   };
+  
+  // Re-run polygon search with current boundary and updated filters
+  const handleMapFilterSearch = () => {
+    if (currentBoundary) {
+      executePolygonSearch(currentBoundary);
+    }
+  };
 
   const handleClearPolygonSearch = () => {
     setMapSearchResults([]);
+    setCurrentBoundary(null);
   };
 
   // Get the active results based on search mode
@@ -1118,6 +1143,18 @@ export function CMABuilder({ onCreateCMA, initialData }: CMABuilderProps) {
                     />
                   </div>
                 </div>
+                <Button 
+                  onClick={handleMapFilterSearch} 
+                  disabled={isMapSearching || !currentBoundary} 
+                  data-testid="button-map-search-properties"
+                >
+                  {isMapSearching ? (
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  ) : (
+                    <Search className="w-4 h-4 mr-2" />
+                  )}
+                  {currentBoundary ? 'Search Properties' : 'Draw polygon first'}
+                </Button>
               </div>
             </TabsContent>
           </Tabs>
@@ -1176,17 +1213,41 @@ export function CMABuilder({ onCreateCMA, initialData }: CMABuilderProps) {
                 </p>
               </div>
             ) : (
-              <div 
-                className="text-center py-8 text-muted-foreground cursor-pointer hover-elevate rounded-lg border border-dashed border-muted-foreground/30 transition-colors hover:border-primary/50"
-                onClick={() => searchSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
-                data-testid="button-select-subject"
-              >
-                <Home className="w-8 h-8 mx-auto mb-2 opacity-50" />
-                <p className="text-sm mb-2">No subject property selected</p>
-                <p className="text-xs flex items-center justify-center gap-1">
-                  <MousePointerClick className="w-3 h-3" />
-                  Click here to search for a property
-                </p>
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <Label>Search by Address</Label>
+                  <AutocompleteInput
+                    placeholder="Enter property address..."
+                    value=""
+                    onChange={async (address) => {
+                      if (address.length > 5) {
+                        try {
+                          const res = await fetch(`/api/search?address=${encodeURIComponent(address)}&limit=1`);
+                          const data = await res.json();
+                          if (data.properties?.[0]) {
+                            setSubjectProperty(data.properties[0]);
+                          }
+                        } catch (err) {
+                          console.error('Address search error:', err);
+                        }
+                      }
+                    }}
+                    endpoint="/api/autocomplete/addresses"
+                    testId="input-subject-address"
+                    name="subject-address"
+                  />
+                </div>
+                <div className="text-center text-muted-foreground">
+                  <p className="text-xs mb-2">or</p>
+                  <div 
+                    className="py-4 cursor-pointer hover-elevate rounded-lg border border-dashed border-muted-foreground/30 transition-colors hover:border-primary/50"
+                    onClick={() => searchSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
+                    data-testid="button-select-subject"
+                  >
+                    <MousePointerClick className="w-6 h-6 mx-auto mb-2 opacity-50" />
+                    <p className="text-xs">Select from search results below</p>
+                  </div>
+                </div>
               </div>
             )}
           </CardContent>
