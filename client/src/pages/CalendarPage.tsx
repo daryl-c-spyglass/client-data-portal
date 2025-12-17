@@ -869,11 +869,28 @@ export default function CalendarPage() {
   const isConfigured = statusData?.configured === true;
   const isStatusChecking = statusLoading || statusData === undefined;
   
-  // Sort items based on selected sort option
+  // Create a map from user ID to user name for agent name resolution
+  const userIdToName = useMemo(() => {
+    const map: Record<string, string> = {};
+    if (usersData?.users) {
+      for (const user of usersData.users) {
+        map[user.id] = user.name || user.email || `User ${user.id}`;
+      }
+    }
+    return map;
+  }, [usersData?.users]);
+
+  // Sort items based on selected sort option and resolve agent names
   const sortedItems = useMemo(() => {
     if (!calendarData?.items) return [];
     
-    const items = [...calendarData.items];
+    // First, resolve agent names from IDs
+    const items = calendarData.items.map(item => ({
+      ...item,
+      assignedTo: item.assignedTo 
+        ? (userIdToName[item.assignedTo] || item.assignedTo)
+        : undefined,
+    }));
     
     // Separate items with and without start dates
     const withDate = items.filter(item => item.start);
@@ -897,7 +914,7 @@ export default function CalendarPage() {
     }
     
     return [...withDate, ...withoutDate];
-  }, [calendarData?.items, sortOption]);
+  }, [calendarData?.items, sortOption, userIdToName]);
   
   // Group items by date for list view
   const groupedItems = useMemo(() => {
@@ -1027,11 +1044,11 @@ export default function CalendarPage() {
             </div>
             
             {/* Sort Dropdown */}
-            <div className="space-y-2">
+            <div className="space-y-2 min-w-[160px]">
               <Label>Sort</Label>
               <Select value={sortOption} onValueChange={(v) => setSortOption(v as SortOption)}>
-                <SelectTrigger data-testid="select-sort">
-                  <ArrowDownUp className="h-4 w-4 mr-2" />
+                <SelectTrigger data-testid="select-sort" className="w-full">
+                  <ArrowDownUp className="h-4 w-4 mr-2 shrink-0" />
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>

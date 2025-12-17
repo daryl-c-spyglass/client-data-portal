@@ -1,0 +1,118 @@
+Replit Agent Prompt — Calendar Remaining Fixes (Arrow Overlap, Hover Agent Name, Today Button)
+
+We still have 3 unresolved issues on the Calendar page (see screenshot). Please fix these without changing the overall layout/design.
+
+1) Fix: Month right-arrow overlaps Sort dropdown arrow (STILL BROKEN)
+Problem
+
+In Month view toolbar, the Month navigation right arrow visually overlaps the Sort dropdown arrow.
+
+Requirements
+
+Refactor the toolbar layout so controls never overlap.
+
+Group the month navigation controls (left arrow, month label, right arrow) in a dedicated container with fixed spacing.
+
+The Sort dropdown must have its own space and not be pushed under/over by arrows.
+
+Implementation guidance (do this)
+
+Use a flex container with gap and flex-wrap: wrap or min widths.
+
+Add a min-width to the Sort control container.
+
+Ensure z-index doesn’t cause clickable overlap.
+
+Verify on typical widths (desktop + narrow laptop).
+
+Acceptance test
+
+In Month view, the right arrow is clearly separated from the Sort dropdown and both are clickable independently.
+
+2) Fix: Tooltip on hover must show Agent Name when Filter = “All agents” (STILL BROKEN)
+Problem
+
+When Agent filter is “All agents”, hovering on an appointment/event/task does NOT show the agent name in the hover tooltip. This must work in Month, Week, and Day views.
+
+Requirements
+
+When Agent filter value is “all” (or equivalent sentinel):
+
+Hover tooltip must include Agent: <agentName>
+
+When a specific agent is selected:
+
+Agent line may be omitted (optional), but tooltip must still show title + time/type.
+
+Critical dependency
+
+Ensure calendar items include agentName (not just agentId).
+
+If the calendar fetch only returns agentId, then map agentId → agentName using the FUB users list already used in Leads (or create/reuse /api/fub/users).
+
+Normalize each CalendarItem with agentId and agentName.
+
+Implementation guidance
+
+Use a consistent tooltip component across Month/Week/Day event rendering (do NOT rely on native title="").
+
+Tooltip content should include:
+
+Title
+
+Time (start–end if available)
+
+Type (task/appointment/event)
+
+Agent name (only when All agents)
+
+Acceptance test
+
+Switch Agent filter to “All agents”
+
+Hover any appointment in Month view → tooltip shows agent name
+
+Repeat in Week and Day views → same behavior
+
+3) Fix: Today button not working (STILL BROKEN)
+Problem
+
+Clicking “Today” does not correctly jump the calendar to today / current period.
+
+Requirements
+
+Implement “Today” behavior for each view:
+
+Month view: jump to current month and highlight today
+
+Week view: jump to the week containing today
+
+Day view: jump to today
+
+List view: reset the internal anchor date to today and reload the visible range
+
+Implementation guidance
+
+Maintain a single source of truth date state, e.g. anchorDate (Date object).
+
+“Today” sets anchorDate = new Date().
+
+Month/Week/Day grids must compute their ranges from anchorDate.
+
+After setting today, trigger data reload for the new range (same agent filter preserved).
+
+Acceptance test
+
+Navigate to a different month (e.g., Dec 2025), click Today → returns to the current month
+
+In Week view, click Today → returns to current week
+
+In Day view, click Today → returns to current day
+
+Deliverables
+
+List exact files changed + paths
+
+Confirm the 3 acceptance tests above pass
+
+Keep UI styling consistent; do not remove current controls/features
