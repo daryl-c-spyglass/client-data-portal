@@ -3370,7 +3370,8 @@ This email was sent by ${senderName} (${senderEmail}) via the MLS Grid IDX Platf
       if (city) searchParams.city = city;
       if (minPrice) searchParams.minPrice = minPrice;
       if (maxPrice) searchParams.maxPrice = maxPrice;
-      if (propertyType) searchParams.type = propertyType;
+      // NOTE: propertyType filtering done client-side since Repliers 'type' param is for sale/lease only
+      // if (propertyType) searchParams.propertyType = propertyType;
       
       // Fetch active listings from Repliers with personalization
       let result = await repliersClient.searchListings(searchParams);
@@ -3933,6 +3934,451 @@ This email was sent by ${senderName} (${senderEmail}) via the MLS Grid IDX Platf
     } catch (error: any) {
       console.error("Neighborhood lookup error:", error.message);
       res.status(500).json({ error: "Failed to lookup neighborhood" });
+    }
+  });
+
+  // ============================================================
+  // ReZen (Mission Control) API Routes - Agent Production/Volume
+  // ============================================================
+  
+  // Simple in-memory cache for ReZen data
+  const rezenCache = new Map<string, { data: any; timestamp: number }>();
+  const REZEN_CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+  
+  // ReZen API client helper
+  async function rezenApiRequest(endpoint: string, options: RequestInit = {}) {
+    const apiKey = process.env.REZEN_API_KEY;
+    if (!apiKey) {
+      throw new Error('REZEN_API_KEY not configured');
+    }
+    
+    const baseUrl = 'https://arrakis.therealbrokerage.com/api/v1';
+    const response = await fetch(`${baseUrl}${endpoint}`, {
+      ...options,
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+        ...options.headers,
+      },
+    });
+    
+    if (!response.ok) {
+      throw new Error(`ReZen API error: ${response.status} ${response.statusText}`);
+    }
+    
+    return response.json();
+  }
+  
+  // Map transaction status to unified categories
+  function mapRezenStatus(status: string): 'active' | 'under_contract' | 'closed' | 'other' {
+    const normalized = (status || '').toLowerCase().replace(/[_\s]/g, '');
+    if (['activelisting', 'active', 'new', 'listed'].some(s => normalized.includes(s))) return 'active';
+    if (['undercontract', 'pending', 'contract', 'approved'].some(s => normalized.includes(s))) return 'under_contract';
+    if (['closed', 'settled', 'paid', 'complete'].some(s => normalized.includes(s))) return 'closed';
+    return 'other';
+  }
+  
+  // Map transaction side (buyer/seller)
+  function mapRezenSide(transaction: any): 'buyer' | 'seller' | 'unknown' {
+    // Check common fields for side indication
+    const side = (transaction.side || transaction.representationType || transaction.transactionType || '').toLowerCase();
+    if (side.includes('buyer') || side.includes('buy') || side.includes('purchase')) return 'buyer';
+    if (side.includes('seller') || side.includes('sell') || side.includes('list')) return 'seller';
+    return 'unknown';
+  }
+  
+  // Get volume from transaction based on status
+  function getRezenVolume(transaction: any, status: string): number {
+    // For closed: use closePrice or soldPrice
+    // For under contract: use contractPrice or listPrice
+    // For active: use listPrice
+    const mappedStatus = mapRezenStatus(status);
+    
+    if (mappedStatus === 'closed') {
+      return Number(transaction.closePrice || transaction.soldPrice || transaction.salePrice || transaction.dealPrice || 0);
+    }
+    if (mappedStatus === 'under_contract') {
+      return Number(transaction.contractPrice || transaction.dealPrice || transaction.listPrice || 0);
+    }
+    return Number(transaction.listPrice || transaction.price || 0);
+  }
+  
+  // Get agent production/transactions from ReZen
+  app.get("/api/rezen/production", async (req, res) => {
+    try {
+      const { agentId, startDate, endDate } = req.query as Record<string, string>;
+      
+      if (!agentId) {
+        res.status(400).json({ error: "agentId is required" });
+        return;
+      }
+      
+      const cacheKey = `rezen_${agentId}_${startDate || 'default'}_${endDate || 'default'}`;
+      const cached = rezenCache.get(cacheKey);
+      if (cached && Date.now() - cached.timestamp < REZEN_CACHE_TTL) {
+        console.log(`[ReZen] Cache hit for ${cacheKey}`);
+        res.json(cached.data);
+        return;
+      }
+      
+      console.log(`[ReZen] Fetching production for agent ${agentId}`);
+      
+      // Fetch transactions for the agent
+      // Using the participant endpoint to get transactions by user/agent
+      const transactions = await rezenApiRequest(`/transactions/participant/${agentId}/current`);
+      
+      // Process and aggregate transactions
+      const production = {
+        buyer: {
+          active: { count: 0, volume: 0 },
+          underContract: { count: 0, volume: 0 },
+          closed: { count: 0, volume: 0 },
+        },
+        seller: {
+          active: { count: 0, volume: 0 },
+          underContract: { count: 0, volume: 0 },
+          closed: { count: 0, volume: 0 },
+        },
+        totals: {
+          active: { count: 0, volume: 0 },
+          underContract: { count: 0, volume: 0 },
+          closed: { count: 0, volume: 0 },
+        },
+        transactions: [] as any[],
+        dataSource: 'ReZen API',
+        fetchedAt: new Date().toISOString(),
+      };
+      
+      // Handle array or object response
+      const txList = Array.isArray(transactions) ? transactions : transactions?.transactions || [];
+      
+      for (const tx of txList) {
+        const status = mapRezenStatus(tx.lifecycleState || tx.status || tx.transactionStatus || '');
+        const side = mapRezenSide(tx);
+        const volume = getRezenVolume(tx, tx.lifecycleState || tx.status || '');
+        
+        // Filter by date if provided
+        if (startDate || endDate) {
+          const txDate = new Date(tx.closingDate || tx.createdAt || tx.contractDate);
+          if (startDate && txDate < new Date(startDate)) continue;
+          if (endDate && txDate > new Date(endDate)) continue;
+        }
+        
+        // Update totals
+        if (status === 'active') {
+          production.totals.active.count++;
+          production.totals.active.volume += volume;
+          if (side === 'buyer') {
+            production.buyer.active.count++;
+            production.buyer.active.volume += volume;
+          } else if (side === 'seller') {
+            production.seller.active.count++;
+            production.seller.active.volume += volume;
+          }
+        } else if (status === 'under_contract') {
+          production.totals.underContract.count++;
+          production.totals.underContract.volume += volume;
+          if (side === 'buyer') {
+            production.buyer.underContract.count++;
+            production.buyer.underContract.volume += volume;
+          } else if (side === 'seller') {
+            production.seller.underContract.count++;
+            production.seller.underContract.volume += volume;
+          }
+        } else if (status === 'closed') {
+          production.totals.closed.count++;
+          production.totals.closed.volume += volume;
+          if (side === 'buyer') {
+            production.buyer.closed.count++;
+            production.buyer.closed.volume += volume;
+          } else if (side === 'seller') {
+            production.seller.closed.count++;
+            production.seller.closed.volume += volume;
+          }
+        }
+        
+        // Store transaction summary
+        production.transactions.push({
+          id: tx.id || tx.transactionId,
+          address: tx.address?.fullAddress || tx.propertyAddress || `${tx.address?.streetAddress || ''} ${tx.address?.city || ''}`.trim(),
+          status: status,
+          side: side,
+          volume: volume,
+          closingDate: tx.closingDate || tx.contractDate,
+          type: tx.transactionType,
+        });
+      }
+      
+      // Cache the result
+      rezenCache.set(cacheKey, { data: production, timestamp: Date.now() });
+      
+      console.log(`[ReZen] Production: ${production.totals.closed.count} closed, ${production.totals.underContract.count} under contract, ${production.totals.active.count} active`);
+      
+      res.json(production);
+    } catch (error: any) {
+      console.error('[ReZen] Production fetch error:', error.message);
+      res.status(500).json({ 
+        error: 'Failed to fetch production data', 
+        details: error.message,
+        note: process.env.REZEN_API_KEY ? 'API key configured' : 'API key not configured'
+      });
+    }
+  });
+  
+  // ReZen API status check
+  app.get("/api/rezen/status", async (req, res) => {
+    try {
+      const configured = !!process.env.REZEN_API_KEY;
+      res.json({ 
+        configured, 
+        status: configured ? 'ready' : 'not_configured',
+        message: configured ? 'ReZen API key is configured' : 'REZEN_API_KEY environment variable not set'
+      });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+  
+  // ============================================================
+  // Follow Up Boss (FUB) API Routes - Calendar & Leads
+  // ============================================================
+  
+  // Simple in-memory cache for FUB data
+  const fubCache = new Map<string, { data: any; timestamp: number }>();
+  const FUB_CACHE_TTL = 3 * 60 * 1000; // 3 minutes
+  
+  // FUB API client helper
+  async function fubApiRequest(endpoint: string, options: RequestInit = {}) {
+    const apiKey = process.env.FUB_API_KEY;
+    if (!apiKey) {
+      throw new Error('FUB_API_KEY not configured');
+    }
+    
+    const baseUrl = 'https://api.followupboss.com/v1';
+    // FUB uses Basic auth with API key as username and empty password
+    const authToken = Buffer.from(`${apiKey}:`).toString('base64');
+    
+    const response = await fetch(`${baseUrl}${endpoint}`, {
+      ...options,
+      headers: {
+        'Authorization': `Basic ${authToken}`,
+        'Content-Type': 'application/json',
+        ...options.headers,
+      },
+    });
+    
+    if (!response.ok) {
+      throw new Error(`FUB API error: ${response.status} ${response.statusText}`);
+    }
+    
+    return response.json();
+  }
+  
+  // Get calendar events from FUB for a specific agent
+  app.get("/api/fub/calendar", async (req, res) => {
+    try {
+      const { agentId, start, end, userId } = req.query as Record<string, string>;
+      
+      // Use agentId or userId (FUB uses userId)
+      const fubUserId = agentId || userId;
+      
+      console.log(`[FUB Calendar] Fetching events - agentId: ${fubUserId}, start: ${start}, end: ${end}`);
+      
+      const cacheKey = `fub_calendar_${fubUserId || 'all'}_${start || 'default'}_${end || 'default'}`;
+      const cached = fubCache.get(cacheKey);
+      if (cached && Date.now() - cached.timestamp < FUB_CACHE_TTL) {
+        console.log(`[FUB Calendar] Cache hit for ${cacheKey}`);
+        res.json(cached.data);
+        return;
+      }
+      
+      // Build query params
+      const params = new URLSearchParams();
+      if (fubUserId) params.append('assignedTo', fubUserId);
+      if (start) params.append('start', start);
+      if (end) params.append('end', end);
+      params.append('limit', '100');
+      
+      // Try events endpoint first, fall back to tasks if needed
+      let events: any[] = [];
+      let tasks: any[] = [];
+      
+      try {
+        const eventsResponse = await fubApiRequest(`/events?${params.toString()}`);
+        events = eventsResponse?.events || eventsResponse || [];
+      } catch (e: any) {
+        console.log(`[FUB Calendar] Events endpoint failed: ${e.message}`);
+      }
+      
+      try {
+        const tasksResponse = await fubApiRequest(`/tasks?${params.toString()}`);
+        tasks = tasksResponse?.tasks || tasksResponse || [];
+      } catch (e: any) {
+        console.log(`[FUB Calendar] Tasks endpoint failed: ${e.message}`);
+      }
+      
+      // Combine and format
+      const calendarItems = [
+        ...events.map((e: any) => ({
+          id: e.id,
+          type: 'event',
+          title: e.title || e.name || 'Event',
+          description: e.description || e.notes,
+          start: e.startDate || e.start || e.dueDate,
+          end: e.endDate || e.end,
+          allDay: e.allDay || false,
+          assignedTo: e.assignedTo || e.userId,
+          contact: e.person?.name || e.personName || null,
+          contactId: e.personId || e.person?.id,
+        })),
+        ...tasks.map((t: any) => ({
+          id: t.id,
+          type: 'task',
+          title: t.title || t.name || 'Task',
+          description: t.description || t.notes,
+          start: t.dueDate || t.due,
+          end: null,
+          allDay: true,
+          assignedTo: t.assignedTo || t.userId,
+          contact: t.person?.name || t.personName || null,
+          contactId: t.personId || t.person?.id,
+          completed: t.completed || t.isCompleted || false,
+        })),
+      ].sort((a, b) => new Date(a.start || 0).getTime() - new Date(b.start || 0).getTime());
+      
+      const result = {
+        items: calendarItems,
+        count: calendarItems.length,
+        dataSource: 'Follow Up Boss',
+        agentId: fubUserId || 'all',
+        dateRange: { start, end },
+        fetchedAt: new Date().toISOString(),
+      };
+      
+      fubCache.set(cacheKey, { data: result, timestamp: Date.now() });
+      
+      console.log(`[FUB Calendar] Fetched ${calendarItems.length} items for agent ${fubUserId || 'all'}`);
+      
+      res.json(result);
+    } catch (error: any) {
+      console.error('[FUB Calendar] Fetch error:', error.message);
+      res.status(500).json({ 
+        error: 'Failed to fetch calendar data', 
+        details: error.message,
+        note: process.env.FUB_API_KEY ? 'API key configured' : 'API key not configured'
+      });
+    }
+  });
+  
+  // Get leads from FUB for a specific agent
+  app.get("/api/fub/leads", async (req, res) => {
+    try {
+      const { agentId, userId, limit = '50' } = req.query as Record<string, string>;
+      
+      const fubUserId = agentId || userId;
+      
+      console.log(`[FUB Leads] Fetching leads - agentId: ${fubUserId}, limit: ${limit}`);
+      
+      const cacheKey = `fub_leads_${fubUserId || 'all'}_${limit}`;
+      const cached = fubCache.get(cacheKey);
+      if (cached && Date.now() - cached.timestamp < FUB_CACHE_TTL) {
+        console.log(`[FUB Leads] Cache hit for ${cacheKey}`);
+        res.json(cached.data);
+        return;
+      }
+      
+      // Build query params
+      const params = new URLSearchParams();
+      if (fubUserId) params.append('assignedTo', fubUserId);
+      params.append('limit', limit);
+      params.append('sort', '-created');  // Most recent first
+      
+      const response = await fubApiRequest(`/people?${params.toString()}`);
+      const people = response?.people || response || [];
+      
+      // Format leads
+      const leads = people.map((p: any) => ({
+        id: p.id,
+        name: `${p.firstName || ''} ${p.lastName || ''}`.trim() || p.name || 'Unknown',
+        email: p.emails?.[0]?.value || p.email,
+        phone: p.phones?.[0]?.value || p.phone,
+        source: p.source?.name || p.sourceId || null,
+        stage: p.stage?.name || p.stageId || null,
+        assignedTo: p.assignedTo || p.userId,
+        createdAt: p.created || p.createdAt,
+        lastActivity: p.lastActivity || p.updated,
+        tags: p.tags || [],
+      }));
+      
+      const result = {
+        leads,
+        count: leads.length,
+        dataSource: 'Follow Up Boss',
+        agentId: fubUserId || 'all',
+        fetchedAt: new Date().toISOString(),
+      };
+      
+      fubCache.set(cacheKey, { data: result, timestamp: Date.now() });
+      
+      console.log(`[FUB Leads] Fetched ${leads.length} leads for agent ${fubUserId || 'all'}`);
+      
+      res.json(result);
+    } catch (error: any) {
+      console.error('[FUB Leads] Fetch error:', error.message);
+      res.status(500).json({ 
+        error: 'Failed to fetch leads data', 
+        details: error.message,
+        note: process.env.FUB_API_KEY ? 'API key configured' : 'API key not configured'
+      });
+    }
+  });
+  
+  // FUB API status check
+  app.get("/api/fub/status", async (req, res) => {
+    try {
+      const configured = !!process.env.FUB_API_KEY;
+      res.json({ 
+        configured, 
+        status: configured ? 'ready' : 'not_configured',
+        message: configured ? 'FUB API key is configured' : 'FUB_API_KEY environment variable not set'
+      });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+  
+  // Get FUB users (agents) list
+  app.get("/api/fub/users", async (req, res) => {
+    try {
+      const cacheKey = 'fub_users';
+      const cached = fubCache.get(cacheKey);
+      if (cached && Date.now() - cached.timestamp < FUB_CACHE_TTL * 2) {
+        res.json(cached.data);
+        return;
+      }
+      
+      const response = await fubApiRequest('/users');
+      const users = response?.users || response || [];
+      
+      const result = {
+        users: users.map((u: any) => ({
+          id: u.id,
+          name: `${u.firstName || ''} ${u.lastName || ''}`.trim() || u.name,
+          email: u.email,
+          role: u.role,
+          active: u.isActive !== false,
+        })),
+        count: users.length,
+        dataSource: 'Follow Up Boss',
+        fetchedAt: new Date().toISOString(),
+      };
+      
+      fubCache.set(cacheKey, { data: result, timestamp: Date.now() });
+      
+      res.json(result);
+    } catch (error: any) {
+      console.error('[FUB Users] Fetch error:', error.message);
+      res.status(500).json({ error: error.message });
     }
   });
 
