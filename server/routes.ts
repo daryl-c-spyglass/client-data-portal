@@ -1065,6 +1065,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       console.log(`[Polygon Search] Searching within boundary with ${statuses?.length || 1} status(es)`);
+      console.log(`[Polygon Search] Boundary has ${boundary[0]?.length || 0} points:`, JSON.stringify(boundary[0]?.slice(0, 3)));
       
       const repliersClient = getRepliersClient();
       if (!repliersClient) {
@@ -1150,11 +1151,41 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
       
-      // Apply rental filtering and limit
+      // Apply rental filtering
       const filteredResults = filterOutRentals(allResults);
-      const finalResults = filteredResults.slice(0, limit);
       
-      console.log(`[Polygon Search] Returning ${finalResults.length} properties`);
+      // Apply client-side point-in-polygon filtering as a fallback
+      // in case the Repliers API didn't properly filter by boundary
+      // Boundary coordinates are in [longitude, latitude] format (GeoJSON standard)
+      const polygonFilteredResults = filteredResults.filter((property: any) => {
+        if (!property.latitude || !property.longitude) return false;
+        const lat = parseFloat(String(property.latitude));
+        const lng = parseFloat(String(property.longitude));
+        if (isNaN(lat) || isNaN(lng)) return false;
+        
+        // Check if point is inside polygon using ray casting algorithm
+        // Ring coordinates are [lng, lat] so xi=lng, yi=lat
+        const ring = boundary[0];
+        if (!ring || ring.length < 3) return true; // No valid polygon, keep all
+        
+        let inside = false;
+        for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+          // ring[i] = [longitude, latitude]
+          const lngI = ring[i][0], latI = ring[i][1];
+          const lngJ = ring[j][0], latJ = ring[j][1];
+          
+          // Ray casting: check if horizontal ray from point crosses edge
+          const intersect = ((latI > lat) !== (latJ > lat)) &&
+            (lng < (lngJ - lngI) * (lat - latI) / (latJ - latI) + lngI);
+          if (intersect) inside = !inside;
+        }
+        
+        return inside;
+      });
+      
+      const finalResults = polygonFilteredResults.slice(0, limit);
+      
+      console.log(`[Polygon Search] Pre-filter: ${allResults.length}, Post-rental-filter: ${filteredResults.length}, Post-polygon-filter: ${polygonFilteredResults.length}, Returning: ${finalResults.length}`);
       
       res.json({
         properties: finalResults,

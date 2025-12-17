@@ -370,6 +370,8 @@ export default function BuyerSearch() {
   const [mapStatusActive, setMapStatusActive] = useState(true);
   const [mapStatusUnderContract, setMapStatusUnderContract] = useState(false);
   const [mapStatusClosed, setMapStatusClosed] = useState(false);
+  const [mapCurrentPage, setMapCurrentPage] = useState(0);
+  const mapPageSize = 50;
   
   // Floating card state
   const [floatingCardOpen, setFloatingCardOpen] = useState(false);
@@ -880,6 +882,7 @@ export default function BuyerSearch() {
       });
       const data = await response.json();
       setMapSearchResults(data.properties || []);
+      setMapCurrentPage(0);
     } catch (err) {
       console.error('Polygon search error:', err);
       setMapSearchResults([]);
@@ -928,22 +931,6 @@ export default function BuyerSearch() {
                 {activeFiltersCount}
               </Badge>
             )}
-          </Button>
-          <Button
-            variant={viewMode === 'list' ? 'default' : 'outline'}
-            onClick={() => setViewMode('list')}
-            data-testid="button-list-view"
-          >
-            <List className="w-4 h-4 mr-2" />
-            List
-          </Button>
-          <Button
-            variant={viewMode === 'map' ? 'default' : 'outline'}
-            onClick={() => setViewMode('map')}
-            data-testid="button-map-view"
-          >
-            <MapIcon className="w-4 h-4 mr-2" />
-            Map
           </Button>
           <Button
             variant="outline"
@@ -1121,6 +1108,93 @@ export default function BuyerSearch() {
                     </SelectContent>
                   </Select>
                 </div>
+
+                <Separator />
+
+                {/* Map/List Search Mode Toggle */}
+                <div className="space-y-3">
+                  <Label className="text-base font-semibold">Search Mode</Label>
+                  <div className="flex gap-2">
+                    <Button
+                      variant={viewMode === 'list' ? 'default' : 'outline'}
+                      size="sm"
+                      onClick={() => setViewMode('list')}
+                      data-testid="button-filter-list-mode"
+                      className="flex-1"
+                    >
+                      <List className="w-4 h-4 mr-2" />
+                      List Search
+                    </Button>
+                    <Button
+                      variant={viewMode === 'map' ? 'default' : 'outline'}
+                      size="sm"
+                      onClick={() => {
+                        setViewMode('map');
+                        setMapCurrentPage(0);
+                      }}
+                      data-testid="button-filter-map-mode"
+                      className="flex-1"
+                    >
+                      <MapIcon className="w-4 h-4 mr-2" />
+                      Map Search
+                    </Button>
+                  </div>
+                </div>
+
+                {/* Polygon Map Search - Only shows when map mode is active */}
+                {viewMode === 'map' && (
+                  <div className="space-y-4">
+                    {/* Map Status Filters */}
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between">
+                        <Label htmlFor="map-filter-active" className="text-sm">Active</Label>
+                        <Switch
+                          id="map-filter-active"
+                          checked={mapStatusActive}
+                          onCheckedChange={(checked) => {
+                            setMapStatusActive(checked);
+                            setMapCurrentPage(0);
+                          }}
+                          data-testid="switch-filter-map-active"
+                        />
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <Label htmlFor="map-filter-uc" className="text-sm">Under Contract</Label>
+                        <Switch
+                          id="map-filter-uc"
+                          checked={mapStatusUnderContract}
+                          onCheckedChange={(checked) => {
+                            setMapStatusUnderContract(checked);
+                            setMapCurrentPage(0);
+                          }}
+                          data-testid="switch-filter-map-uc"
+                        />
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <Label htmlFor="map-filter-closed" className="text-sm">Sold/Closed</Label>
+                        <Switch
+                          id="map-filter-closed"
+                          checked={mapStatusClosed}
+                          onCheckedChange={(checked) => {
+                            setMapStatusClosed(checked);
+                            setMapCurrentPage(0);
+                          }}
+                          data-testid="switch-filter-map-closed"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Polygon Map */}
+                    <PolygonMapSearch
+                      onSearch={handlePolygonSearch}
+                      onClear={handleClearPolygonSearch}
+                      isLoading={isMapSearching}
+                      resultCount={mapSearchResults.length}
+                    />
+                  </div>
+                )}
+
+                <Separator />
 
                 {/* Contingency */}
                 <div className="space-y-3">
@@ -3010,12 +3084,17 @@ export default function BuyerSearch() {
                   )}
                 </CardTitle>
                 <CardDescription>
-                  {totalCount > 0 
-                    ? `Found ${totalCount.toLocaleString()} properties (showing ${properties.length} on page ${currentPage + 1})`
-                    : searchTrigger === 0
-                      ? 'Click "Search Properties" to search'
-                      : 'No properties found - try adjusting filters'
-                  }
+                  {viewMode === 'map' ? (
+                    mapSearchResults.length > 0 
+                      ? `Found ${mapSearchResults.length} properties in selected area (showing ${Math.min(mapPageSize, mapSearchResults.length - mapCurrentPage * mapPageSize)} on page ${mapCurrentPage + 1})`
+                      : 'Draw a polygon on the map and click "Search Area" to find properties'
+                  ) : (
+                    totalCount > 0 
+                      ? `Found ${totalCount.toLocaleString()} properties (showing ${properties.length} on page ${currentPage + 1})`
+                      : searchTrigger === 0
+                        ? 'Click "Search Properties" to search'
+                        : 'No properties found - try adjusting filters'
+                  )}
                 </CardDescription>
               </div>
               {activeFiltersCount > 0 && (
@@ -3043,71 +3122,63 @@ export default function BuyerSearch() {
           </CardHeader>
           <CardContent>
             {viewMode === 'map' ? (
-              <div className="space-y-6">
-                {/* Status Filter for Map Search (separate from list filters) */}
-                <div className="flex flex-wrap gap-4 items-center">
-                  <Label className="text-sm font-medium">Status:</Label>
-                  <div className="flex items-center space-x-2">
-                    <Switch
-                      id="map-status-active"
-                      checked={mapStatusActive}
-                      onCheckedChange={(checked) => setMapStatusActive(checked)}
-                      data-testid="switch-map-status-active"
-                    />
-                    <label htmlFor="map-status-active" className="text-sm cursor-pointer">Active</label>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <Switch
-                      id="map-status-under-contract"
-                      checked={mapStatusUnderContract}
-                      onCheckedChange={(checked) => setMapStatusUnderContract(checked)}
-                      data-testid="switch-map-status-uc"
-                    />
-                    <label htmlFor="map-status-under-contract" className="text-sm cursor-pointer">Under Contract</label>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <Switch
-                      id="map-status-closed"
-                      checked={mapStatusClosed}
-                      onCheckedChange={(checked) => setMapStatusClosed(checked)}
-                      data-testid="switch-map-status-closed"
-                    />
-                    <label htmlFor="map-status-closed" className="text-sm cursor-pointer">Sold/Closed</label>
-                  </div>
+              isMapSearching ? (
+                <div className="text-center py-12 text-muted-foreground">
+                  Searching properties in area...
                 </div>
-
-                {/* Polygon Map Search */}
-                <PolygonMapSearch
-                  onSearch={handlePolygonSearch}
-                  onClear={handleClearPolygonSearch}
-                  isLoading={isMapSearching}
-                  resultCount={mapSearchResults.length}
-                />
-
-                {/* Map Search Results */}
-                {mapSearchResults.length > 0 && (
-                  <div className="space-y-4">
-                    <div className="flex items-center justify-between">
-                      <h3 className="font-semibold">Properties in Selected Area</h3>
-                      <Badge variant="secondary">{mapSearchResults.length} found</Badge>
-                    </div>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      {mapSearchResults.map((property: any) => {
-                        const propertyId = property.listingId || property.id;
-                        const media = property.photos?.length ? convertPhotosToMedia(property.photos, propertyId) : [];
-                        return (
-                          <PropertyCard 
-                            key={property.id} 
-                            property={property}
-                            media={media}
-                            onClick={() => handlePropertyClick(property, property.photos || [])}
-                          />
-                        );
-                      })}
-                    </div>
+              ) : mapSearchResults.length > 0 ? (
+                <>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {mapSearchResults
+                      .slice(mapCurrentPage * mapPageSize, (mapCurrentPage + 1) * mapPageSize)
+                      .map((property: any) => {
+                      const propertyId = property.listingId || property.id;
+                      const media = property.photos?.length ? convertPhotosToMedia(property.photos, propertyId) : [];
+                      return (
+                        <PropertyCard 
+                          key={property.id} 
+                          property={property}
+                          media={media}
+                          onClick={() => handlePropertyClick(property, property.photos || [])}
+                          onAddToCart={() => {
+                            console.log('Add to selection:', property.id);
+                          }}
+                        />
+                      );
+                    })}
                   </div>
-                )}
-              </div>
+                  {/* Map Pagination */}
+                  {mapSearchResults.length > mapPageSize && (
+                    <div className="flex items-center justify-center gap-4 mt-6 pt-6 border-t">
+                      <Button
+                        variant="outline"
+                        onClick={() => setMapCurrentPage(p => Math.max(0, p - 1))}
+                        disabled={mapCurrentPage === 0}
+                        data-testid="button-map-prev-page"
+                      >
+                        Previous
+                      </Button>
+                      <span className="text-sm text-muted-foreground">
+                        Page {mapCurrentPage + 1} of {Math.ceil(mapSearchResults.length / mapPageSize)}
+                      </span>
+                      <Button
+                        variant="outline"
+                        onClick={() => setMapCurrentPage(p => p + 1)}
+                        disabled={(mapCurrentPage + 1) * mapPageSize >= mapSearchResults.length}
+                        data-testid="button-map-next-page"
+                      >
+                        Next
+                      </Button>
+                    </div>
+                  )}
+                </>
+              ) : (
+                <div className="text-center py-12 text-muted-foreground">
+                  <MapIcon className="w-12 h-12 mx-auto mb-4 opacity-50" />
+                  <p>Draw a search area on the map in the filters panel</p>
+                  <p className="text-sm mt-2">Use the polygon tool to outline your target area, then click "Search Area"</p>
+                </div>
+              )
             ) : isLoading ? (
               <div className="text-center py-12 text-muted-foreground">
                 Searching properties...
@@ -3124,6 +3195,9 @@ export default function BuyerSearch() {
                           property={property}
                           media={media}
                           onClick={() => handlePropertyClick(property, property.photos || [])}
+                          onAddToCart={() => {
+                            console.log('Add to selection:', property.id);
+                          }}
                         />
                       );
                     })}
