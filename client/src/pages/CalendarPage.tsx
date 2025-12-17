@@ -1,14 +1,17 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { Calendar, Clock, User, CheckCircle2, Circle, AlertCircle, RefreshCw, ChevronDown, ChevronRight, Bug } from "lucide-react";
-import { format, startOfMonth, endOfMonth, addMonths, parseISO } from "date-fns";
+import { Calendar, Clock, User, CheckCircle2, Circle, AlertCircle, RefreshCw, ChevronDown, ChevronRight, Bug, List, Grid3X3, ArrowDownUp } from "lucide-react";
+import { format, startOfMonth, endOfMonth, addMonths, addWeeks, parseISO, startOfWeek, endOfWeek, eachDayOfInterval, isSameMonth, isSameDay, isToday } from "date-fns";
+
+type SortOption = "newest" | "oldest" | "az" | "za";
+type ViewMode = "list" | "month" | "week";
 
 interface CalendarItem {
   id: string;
@@ -52,6 +55,12 @@ interface UsersData {
   users: FubUser[];
   count: number;
 }
+
+// LocalStorage keys
+const STORAGE_KEYS = {
+  sortOption: "calendar-sort-option",
+  viewMode: "calendar-view-mode",
+};
 
 function CalendarItemCard({ item }: { item: CalendarItem }) {
   const isTask = item.type === "task";
@@ -109,6 +118,203 @@ function CalendarItemCard({ item }: { item: CalendarItem }) {
             </div>
           )}
         </div>
+      </div>
+    </div>
+  );
+}
+
+function CalendarGridItem({ item }: { item: CalendarItem }) {
+  const isTask = item.type === "task";
+  const isCompleted = item.completed;
+  
+  return (
+    <div 
+      className={`text-xs p-1 rounded truncate cursor-pointer hover-elevate ${
+        isTask 
+          ? isCompleted 
+            ? "bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 line-through opacity-60" 
+            : "bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300"
+          : "bg-primary/10 text-primary"
+      }`}
+      title={`${item.title}${item.start && !item.allDay ? ` - ${format(parseISO(item.start), "h:mm a")}` : ""}`}
+      data-testid={`grid-item-${item.id}`}
+    >
+      {!item.allDay && item.start && (
+        <span className="font-medium mr-1">{format(parseISO(item.start), "h:mm")}</span>
+      )}
+      {item.title}
+    </div>
+  );
+}
+
+function MonthCalendarGrid({ 
+  items, 
+  currentMonth 
+}: { 
+  items: CalendarItem[]; 
+  currentMonth: Date;
+}) {
+  const monthStart = startOfMonth(currentMonth);
+  const monthEnd = endOfMonth(currentMonth);
+  const calendarStart = startOfWeek(monthStart, { weekStartsOn: 0 });
+  const calendarEnd = endOfWeek(monthEnd, { weekStartsOn: 0 });
+  
+  const days = eachDayOfInterval({ start: calendarStart, end: calendarEnd });
+  const weeks: Date[][] = [];
+  
+  for (let i = 0; i < days.length; i += 7) {
+    weeks.push(days.slice(i, i + 7));
+  }
+  
+  const itemsByDate = useMemo(() => {
+    const map: Record<string, CalendarItem[]> = {};
+    for (const item of items) {
+      if (!item.start) continue;
+      const dateKey = format(parseISO(item.start), "yyyy-MM-dd");
+      if (!map[dateKey]) map[dateKey] = [];
+      map[dateKey].push(item);
+    }
+    // Sort items within each day by time
+    for (const key of Object.keys(map)) {
+      map[key].sort((a, b) => {
+        if (!a.start) return 1;
+        if (!b.start) return -1;
+        return new Date(a.start).getTime() - new Date(b.start).getTime();
+      });
+    }
+    return map;
+  }, [items]);
+  
+  const weekDays = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+  
+  return (
+    <div className="border rounded-lg overflow-hidden">
+      {/* Header row */}
+      <div className="grid grid-cols-7 bg-muted">
+        {weekDays.map((day) => (
+          <div key={day} className="p-2 text-center text-sm font-medium border-b">
+            {day}
+          </div>
+        ))}
+      </div>
+      
+      {/* Calendar weeks */}
+      {weeks.map((week, weekIdx) => (
+        <div key={weekIdx} className="grid grid-cols-7">
+          {week.map((day) => {
+            const dateKey = format(day, "yyyy-MM-dd");
+            const dayItems = itemsByDate[dateKey] || [];
+            const isCurrentMonth = isSameMonth(day, currentMonth);
+            const isDayToday = isToday(day);
+            
+            return (
+              <div 
+                key={dateKey}
+                className={`min-h-[100px] p-1 border-b border-r ${
+                  !isCurrentMonth ? "bg-muted/30" : ""
+                } ${isDayToday ? "bg-primary/5" : ""}`}
+                data-testid={`calendar-cell-${dateKey}`}
+              >
+                <div className={`text-sm font-medium mb-1 ${
+                  !isCurrentMonth ? "text-muted-foreground" : ""
+                } ${isDayToday ? "text-primary" : ""}`}>
+                  {format(day, "d")}
+                </div>
+                <div className="space-y-0.5 overflow-hidden">
+                  {dayItems.slice(0, 3).map((item) => (
+                    <CalendarGridItem key={item.id} item={item} />
+                  ))}
+                  {dayItems.length > 3 && (
+                    <div className="text-xs text-muted-foreground pl-1">
+                      +{dayItems.length - 3} more
+                    </div>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function WeekCalendarGrid({ 
+  items, 
+  weekDate 
+}: { 
+  items: CalendarItem[]; 
+  weekDate: Date;
+}) {
+  // Show week containing the specified date
+  const weekStart = startOfWeek(weekDate, { weekStartsOn: 0 });
+  const weekEnd = endOfWeek(weekDate, { weekStartsOn: 0 });
+  const days = eachDayOfInterval({ start: weekStart, end: weekEnd });
+  
+  const itemsByDate = useMemo(() => {
+    const map: Record<string, CalendarItem[]> = {};
+    for (const item of items) {
+      if (!item.start) continue;
+      const dateKey = format(parseISO(item.start), "yyyy-MM-dd");
+      if (!map[dateKey]) map[dateKey] = [];
+      map[dateKey].push(item);
+    }
+    for (const key of Object.keys(map)) {
+      map[key].sort((a, b) => {
+        if (!a.start) return 1;
+        if (!b.start) return -1;
+        return new Date(a.start).getTime() - new Date(b.start).getTime();
+      });
+    }
+    return map;
+  }, [items]);
+  
+  return (
+    <div className="border rounded-lg overflow-hidden">
+      {/* Header row */}
+      <div className="grid grid-cols-7 bg-muted">
+        {days.map((day) => {
+          const isDayToday = isToday(day);
+          return (
+            <div 
+              key={format(day, "yyyy-MM-dd")} 
+              className={`p-2 text-center border-b ${isDayToday ? "bg-primary/10" : ""}`}
+            >
+              <div className="text-xs text-muted-foreground">{format(day, "EEE")}</div>
+              <div className={`text-lg font-semibold ${isDayToday ? "text-primary" : ""}`}>
+                {format(day, "d")}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+      
+      {/* Week content */}
+      <div className="grid grid-cols-7">
+        {days.map((day) => {
+          const dateKey = format(day, "yyyy-MM-dd");
+          const dayItems = itemsByDate[dateKey] || [];
+          const isDayToday = isToday(day);
+          
+          return (
+            <div 
+              key={dateKey}
+              className={`min-h-[300px] p-2 border-r ${isDayToday ? "bg-primary/5" : ""}`}
+              data-testid={`week-cell-${dateKey}`}
+            >
+              <div className="space-y-1">
+                {dayItems.map((item) => (
+                  <CalendarGridItem key={item.id} item={item} />
+                ))}
+                {dayItems.length === 0 && (
+                  <div className="text-xs text-muted-foreground text-center pt-4">
+                    No items
+                  </div>
+                )}
+              </div>
+            </div>
+          );
+        })}
       </div>
     </div>
   );
@@ -173,16 +379,95 @@ function DebugPanel({ calendarData, startDate, endDate }: { calendarData: Calend
 export default function CalendarPage() {
   const [selectedUserId, setSelectedUserId] = useState<string>("all");
   const [monthOffset, setMonthOffset] = useState(0);
+  const [weekOffset, setWeekOffset] = useState(0);
+  
+  // Initialize from localStorage
+  const [sortOption, setSortOption] = useState<SortOption>(() => {
+    if (typeof window !== "undefined") {
+      const saved = localStorage.getItem(STORAGE_KEYS.sortOption);
+      if (saved && ["newest", "oldest", "az", "za"].includes(saved)) {
+        return saved as SortOption;
+      }
+    }
+    return "newest";
+  });
+  
+  const [viewMode, setViewMode] = useState<ViewMode>(() => {
+    if (typeof window !== "undefined") {
+      const saved = localStorage.getItem(STORAGE_KEYS.viewMode);
+      if (saved && ["list", "month", "week"].includes(saved)) {
+        return saved as ViewMode;
+      }
+    }
+    return "list";
+  });
+  
+  // Persist to localStorage
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEYS.sortOption, sortOption);
+  }, [sortOption]);
+  
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEYS.viewMode, viewMode);
+  }, [viewMode]);
   
   const currentMonth = addMonths(new Date(), monthOffset);
-  const startDate = format(startOfMonth(currentMonth), "yyyy-MM-dd");
-  const endDate = format(endOfMonth(currentMonth), "yyyy-MM-dd");
+  const currentWeek = addWeeks(new Date(), weekOffset);
+  
+  // Compute date range based on view mode for API fetching
+  const { startDate, endDate } = useMemo(() => {
+    if (viewMode === "week") {
+      const weekStart = startOfWeek(currentWeek, { weekStartsOn: 0 });
+      const weekEnd = endOfWeek(currentWeek, { weekStartsOn: 0 });
+      return {
+        startDate: format(weekStart, "yyyy-MM-dd"),
+        endDate: format(weekEnd, "yyyy-MM-dd"),
+      };
+    }
+    // For list and month views, fetch the whole month
+    return {
+      startDate: format(startOfMonth(currentMonth), "yyyy-MM-dd"),
+      endDate: format(endOfMonth(currentMonth), "yyyy-MM-dd"),
+    };
+  }, [viewMode, currentMonth, currentWeek]);
+  
+  // Navigation handlers based on view mode
+  const handlePrev = () => {
+    if (viewMode === "week") {
+      setWeekOffset(w => w - 1);
+    } else {
+      setMonthOffset(m => m - 1);
+    }
+  };
+  
+  const handleNext = () => {
+    if (viewMode === "week") {
+      setWeekOffset(w => w + 1);
+    } else {
+      setMonthOffset(m => m + 1);
+    }
+  };
+  
+  const handleToday = () => {
+    setMonthOffset(0);
+    setWeekOffset(0);
+  };
+  
+  // Get navigation label based on view mode
+  const getNavigationLabel = () => {
+    if (viewMode === "week") {
+      const weekStart = startOfWeek(currentWeek, { weekStartsOn: 0 });
+      const weekEnd = endOfWeek(currentWeek, { weekStartsOn: 0 });
+      return `${format(weekStart, "MMM d")} - ${format(weekEnd, "MMM d, yyyy")}`;
+    }
+    return format(currentMonth, "MMM yyyy");
+  };
   
   const { data: statusData, isLoading: statusLoading } = useQuery<{ configured: boolean; status: string; message: string }>({
     queryKey: ["/api/fub/status"],
   });
   
-  const { data: usersData, isLoading: usersLoading } = useQuery<UsersData>({
+  const { data: usersData } = useQuery<UsersData>({
     queryKey: ["/api/fub/users"],
     enabled: statusData?.configured === true,
   });
@@ -224,12 +509,41 @@ export default function CalendarPage() {
   const isConfigured = statusData?.configured === true;
   const isStatusChecking = statusLoading || statusData === undefined;
   
-  const groupedItems = useMemo(() => {
-    if (!calendarData?.items) return {};
+  // Sort items based on selected sort option
+  const sortedItems = useMemo(() => {
+    if (!calendarData?.items) return [];
     
+    const items = [...calendarData.items];
+    
+    // Separate items with and without start dates
+    const withDate = items.filter(item => item.start);
+    const withoutDate = items.filter(item => !item.start);
+    
+    switch (sortOption) {
+      case "newest":
+        withDate.sort((a, b) => new Date(b.start).getTime() - new Date(a.start).getTime());
+        break;
+      case "oldest":
+        withDate.sort((a, b) => new Date(a.start).getTime() - new Date(b.start).getTime());
+        break;
+      case "az":
+        withDate.sort((a, b) => (a.title || "").trim().toLowerCase().localeCompare((b.title || "").trim().toLowerCase()));
+        withoutDate.sort((a, b) => (a.title || "").trim().toLowerCase().localeCompare((b.title || "").trim().toLowerCase()));
+        break;
+      case "za":
+        withDate.sort((a, b) => (b.title || "").trim().toLowerCase().localeCompare((a.title || "").trim().toLowerCase()));
+        withoutDate.sort((a, b) => (b.title || "").trim().toLowerCase().localeCompare((a.title || "").trim().toLowerCase()));
+        break;
+    }
+    
+    return [...withDate, ...withoutDate];
+  }, [calendarData?.items, sortOption]);
+  
+  // Group items by date for list view
+  const groupedItems = useMemo(() => {
     const groups: Record<string, CalendarItem[]> = {};
     
-    for (const item of calendarData.items) {
+    for (const item of sortedItems) {
       if (!item.start) continue;
       const dateKey = format(parseISO(item.start), "yyyy-MM-dd");
       if (!groups[dateKey]) {
@@ -239,22 +553,39 @@ export default function CalendarPage() {
     }
     
     return groups;
-  }, [calendarData?.items]);
+  }, [sortedItems]);
   
-  const sortedDates = Object.keys(groupedItems).sort();
+  // Sort dates based on sort option
+  const sortedDates = useMemo(() => {
+    const dates = Object.keys(groupedItems);
+    if (sortOption === "oldest") {
+      return dates.sort();
+    }
+    // For newest, az, za - show newest dates first
+    return dates.sort().reverse();
+  }, [groupedItems, sortOption]);
+  
+  const sortLabels: Record<SortOption, string> = {
+    newest: "Newest → Oldest",
+    oldest: "Oldest → Newest",
+    az: "A → Z",
+    za: "Z → A",
+  };
   
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between flex-wrap gap-4">
         <div>
           <h1 className="text-2xl font-bold" data-testid="text-page-title">Calendar</h1>
           <p className="text-muted-foreground">Events and tasks from Follow Up Boss</p>
         </div>
-        {calendarData && (
-          <Badge variant="outline" className="text-xs">
-            Data from: {calendarData.dataSource}
-          </Badge>
-        )}
+        <div className="flex items-center gap-2">
+          {calendarData && (
+            <Badge variant="outline" className="text-xs">
+              Data from: {calendarData.dataSource}
+            </Badge>
+          )}
+        </div>
       </div>
       
       {isStatusChecking && (
@@ -290,7 +621,8 @@ export default function CalendarPage() {
           <CardTitle className="text-lg">Filters</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4">
+            {/* Agent Filter */}
             <div className="space-y-2">
               <Label>Agent</Label>
               <Select value={selectedUserId} onValueChange={setSelectedUserId}>
@@ -307,34 +639,92 @@ export default function CalendarPage() {
                 </SelectContent>
               </Select>
             </div>
+            
+            {/* Period Navigation */}
             <div className="space-y-2">
-              <Label>Month</Label>
+              <Label>{viewMode === "week" ? "Week" : "Month"}</Label>
               <div className="flex items-center gap-2">
                 <Button 
                   variant="outline" 
                   size="sm"
-                  onClick={() => setMonthOffset(m => m - 1)}
-                  data-testid="button-prev-month"
+                  onClick={handlePrev}
+                  data-testid="button-prev"
                 >
                   ←
                 </Button>
-                <span className="flex-1 text-center font-medium">
-                  {format(currentMonth, "MMMM yyyy")}
+                <span className="flex-1 text-center font-medium text-sm">
+                  {getNavigationLabel()}
                 </span>
                 <Button 
                   variant="outline" 
                   size="sm"
-                  onClick={() => setMonthOffset(m => m + 1)}
-                  data-testid="button-next-month"
+                  onClick={handleNext}
+                  data-testid="button-next"
                 >
                   →
                 </Button>
               </div>
             </div>
-            <div className="flex items-end col-span-2 gap-2">
+            
+            {/* Sort Dropdown */}
+            <div className="space-y-2">
+              <Label>Sort</Label>
+              <Select value={sortOption} onValueChange={(v) => setSortOption(v as SortOption)}>
+                <SelectTrigger data-testid="select-sort">
+                  <ArrowDownUp className="h-4 w-4 mr-2" />
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="newest">Newest → Oldest</SelectItem>
+                  <SelectItem value="oldest">Oldest → Newest</SelectItem>
+                  <SelectItem value="az">A → Z</SelectItem>
+                  <SelectItem value="za">Z → A</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            
+            {/* View Toggle */}
+            <div className="space-y-2">
+              <Label>View</Label>
+              <div className="flex items-center gap-1">
+                <Button
+                  variant={viewMode === "list" ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => setViewMode("list")}
+                  data-testid="button-view-list"
+                  className="flex-1"
+                >
+                  <List className="h-4 w-4 mr-1" />
+                  List
+                </Button>
+                <Button
+                  variant={viewMode === "month" ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => setViewMode("month")}
+                  data-testid="button-view-month"
+                  className="flex-1"
+                >
+                  <Grid3X3 className="h-4 w-4 mr-1" />
+                  Month
+                </Button>
+                <Button
+                  variant={viewMode === "week" ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => setViewMode("week")}
+                  data-testid="button-view-week"
+                  className="flex-1"
+                >
+                  <Calendar className="h-4 w-4 mr-1" />
+                  Week
+                </Button>
+              </div>
+            </div>
+            
+            {/* Action Buttons */}
+            <div className="flex items-end gap-2 lg:col-span-2">
               <Button 
                 variant="outline"
-                onClick={() => setMonthOffset(0)}
+                onClick={handleToday}
                 data-testid="button-today"
               >
                 Today
@@ -356,19 +746,36 @@ export default function CalendarPage() {
         <DebugPanel calendarData={calendarData} startDate={startDate} endDate={endDate} />
       )}
       
+      {/* Loading State */}
       {isLoading && (
         <div className="space-y-4">
-          {[1, 2, 3].map((i) => (
-            <Card key={i}>
-              <CardContent className="py-4">
-                <Skeleton className="h-5 w-48 mb-2" />
-                <Skeleton className="h-4 w-32" />
-              </CardContent>
-            </Card>
-          ))}
+          {viewMode === "list" ? (
+            [1, 2, 3].map((i) => (
+              <Card key={i}>
+                <CardContent className="py-4">
+                  <Skeleton className="h-5 w-48 mb-2" />
+                  <Skeleton className="h-4 w-32" />
+                </CardContent>
+              </Card>
+            ))
+          ) : (
+            <div className="border rounded-lg p-4">
+              <div className="grid grid-cols-7 gap-2 mb-4">
+                {[1, 2, 3, 4, 5, 6, 7].map((i) => (
+                  <Skeleton key={i} className="h-6 w-full" />
+                ))}
+              </div>
+              <div className="grid grid-cols-7 gap-2">
+                {Array.from({ length: 35 }).map((_, i) => (
+                  <Skeleton key={i} className="h-24 w-full" />
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       )}
       
+      {/* Error State */}
       {error && (
         <Card className="border-destructive">
           <CardContent className="py-4 space-y-3">
@@ -394,20 +801,23 @@ export default function CalendarPage() {
         </Card>
       )}
       
+      {/* Calendar Content */}
       {calendarData && !isLoading && (
         <>
           {calendarData.items.length === 0 ? (
             <Card>
               <CardContent className="py-8 text-center text-muted-foreground">
                 <Calendar className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                <p>No events or tasks found for {format(currentMonth, "MMMM yyyy")}</p>
+                <p>No items found for this period</p>
+                <p className="text-sm mt-1">{format(currentMonth, "MMMM yyyy")}</p>
               </CardContent>
             </Card>
-          ) : (
+          ) : viewMode === "list" ? (
+            /* List View */
             <div className="space-y-6">
               {sortedDates.map((dateKey) => (
                 <div key={dateKey}>
-                  <h2 className="text-lg font-semibold mb-3 sticky top-0 bg-background py-2">
+                  <h2 className="text-lg font-semibold mb-3 sticky top-0 bg-background py-2 z-10">
                     {format(parseISO(dateKey), "EEEE, MMMM d, yyyy")}
                   </h2>
                   <div className="space-y-2">
@@ -418,6 +828,12 @@ export default function CalendarPage() {
                 </div>
               ))}
             </div>
+          ) : viewMode === "month" ? (
+            /* Month Grid View */
+            <MonthCalendarGrid items={sortedItems} currentMonth={currentMonth} />
+          ) : (
+            /* Week Grid View */
+            <WeekCalendarGrid items={sortedItems} weekDate={currentWeek} />
           )}
         </>
       )}

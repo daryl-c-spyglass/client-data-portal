@@ -1,0 +1,118 @@
+Replit Agent Prompt — Calendar UI: Default Newest→Oldest + Sort Options + View Toggle (List vs Calendar Grid)
+
+We need enhancements to the Calendar section UI.
+
+Goals
+
+Default sorting for Calendar items should be Newest → Oldest.
+
+Add a Sort dropdown with options:
+
+Newest → Oldest (default)
+
+Oldest → Newest
+
+A → Z (by title)
+
+Z → A (by title)
+
+Add a View toggle so the user can switch between:
+
+List view (current list)
+
+Calendar grid view similar to Google Calendar (Month / Week / Day options)
+
+Requirements
+A) Sorting behavior (applies to List view)
+
+By default, when Calendar data loads, order items by date/time descending (newest first).
+
+Sort dropdown must re-order the displayed items without re-fetching (client-side sorting is fine).
+
+Sorting definitions:
+
+Newest → Oldest: eventStart descending
+
+Oldest → Newest: eventStart ascending
+
+A → Z: normalize title (trim + lowercase) and sort ascending
+
+Z → A: same, descending
+
+If some items do not have a start time, place them at the bottom consistently.
+
+B) Add Sort UI controls (like Google Calendar style)
+
+Add a dropdown near existing filters (Agent, Month navigation, Today, Refresh).
+
+Label it “Sort” with the options above.
+
+Persist the selection in local storage so it stays consistent per user.
+
+C) Add View Toggle (List vs Calendar Grid)
+
+Add a control near the top right similar to Google Calendar:
+
+View: Month / Week / Day + List
+
+Default view: List (unless you think Calendar grid should be default—keep List as default for now).
+
+Persist the last selected view in local storage.
+
+D) Calendar Grid View implementation
+
+Implement a basic calendar grid for:
+
+Month view (required)
+
+Week view (optional but preferred)
+
+Day view (optional)
+
+Use the same calendar items that already load from FUB.
+
+Display items in the correct date cell by start date.
+
+Clicking an item should open the existing event/task details panel (or a simple modal if none exists).
+
+E) Data model assumptions
+
+Calendar items should be normalized into a single list with fields like:
+
+id
+
+title
+
+startAt (ISO)
+
+endAt (ISO or null)
+
+type (task/appointment/event)
+
+agentId / assignedUserId (if applicable)
+
+Sorting and rendering should use these normalized fields.
+
+F) UX details
+
+Keep the existing Filters section intact.
+
+When switching views, keep the same selected month/day and agent filter.
+
+Provide empty states:
+
+“No items found for this period”
+
+Provide loading skeletons for both views.
+
+Deliverables
+
+Provide exact file paths changed.
+
+Confirm default sort is Newest → Oldest.
+
+Confirm sort dropdown works.
+
+Confirm view toggle works (List + Month grid at minimum).
+
+Keep styling consistent with the current Mission Control UI.
