@@ -845,21 +845,21 @@ export default function CalendarPage() {
     enabled: statusData?.configured === true,
   });
   
-  // Build proper query params URL for calendar API
-  const calendarUrl = useMemo(() => {
-    const params = new URLSearchParams();
-    if (selectedUserId && selectedUserId !== "all") {
-      params.append("agentId", selectedUserId);
-    }
-    params.append("start", startDate);
-    params.append("end", endDate);
-    return `/api/fub/calendar?${params.toString()}`;
-  }, [selectedUserId, startDate, endDate]);
-
   const { data: calendarData, isLoading, error, refetch } = useQuery<CalendarData>({
     queryKey: ["/api/fub/calendar", selectedUserId, startDate, endDate],
-    queryFn: async () => {
-      const res = await fetch(calendarUrl, { credentials: "include" });
+    queryFn: async ({ queryKey }) => {
+      // Build URL inside queryFn to avoid stale closure issues
+      const [, userId, start, end] = queryKey as [string, string, string, string];
+      const params = new URLSearchParams();
+      // Only add agentId if it's a non-empty, non-"all" value
+      if (userId && userId !== "all" && userId.trim() !== "") {
+        params.append("agentId", userId);
+      }
+      params.append("start", start);
+      params.append("end", end);
+      const url = `/api/fub/calendar?${params.toString()}`;
+      
+      const res = await fetch(url, { credentials: "include" });
       
       // Check content-type before parsing
       const contentType = res.headers.get("content-type") || "";

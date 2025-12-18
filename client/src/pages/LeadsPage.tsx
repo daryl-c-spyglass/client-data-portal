@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useState, useEffect, useRef, useCallback } from "react";
+import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -8,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { UserCircle, Mail, Phone, Tag, Clock, AlertCircle, RefreshCw, Search } from "lucide-react";
+import { UserCircle, Mail, Phone, Tag, Clock, AlertCircle, RefreshCw, Search, ArrowDownUp, Loader2 } from "lucide-react";
 import { format, parseISO, formatDistanceToNow } from "date-fns";
 
 interface Lead {
@@ -27,6 +27,10 @@ interface Lead {
 interface LeadsData {
   leads: Lead[];
   count: number;
+  totalCount: number;
+  hasMore: boolean;
+  offset: number;
+  limit: number;
   dataSource: string;
   agentId: string;
   fetchedAt: string;
@@ -44,6 +48,8 @@ interface UsersData {
   users: FubUser[];
   count: number;
 }
+
+type SortOption = "az" | "za";
 
 function getInitials(name: string): string {
   return name
@@ -130,9 +136,14 @@ function LeadCard({ lead }: { lead: Lead }) {
   );
 }
 
+const LEADS_PER_PAGE = 50;
+
 export default function LeadsPage() {
   const [selectedUserId, setSelectedUserId] = useState<string>("all");
   const [searchQuery, setSearchQuery] = useState("");
+  const [sortOption, setSortOption] = useState<SortOption>("az");
+  
+  const loadMoreRef = useRef<HTMLDivElement>(null);
   
   const { data: statusData, isLoading: statusLoading } = useQuery<{ configured: boolean; status: string; message: string }>({
     queryKey: ["/api/fub/status"],
@@ -143,15 +154,68 @@ export default function LeadsPage() {
     enabled: statusData?.configured === true,
   });
   
-  const { data: leadsData, isLoading, error, refetch } = useQuery<LeadsData>({
+  // Use infinite query for pagination
+  const {
+    data: leadsData,
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
+    isLoading,
+    error,
+    refetch,
+  } = useInfiniteQuery<LeadsData>({
     queryKey: ["/api/fub/leads", selectedUserId === "all" ? "" : selectedUserId],
+    queryFn: async ({ pageParam = 0 }) => {
+      const params = new URLSearchParams();
+      if (selectedUserId && selectedUserId !== "all") {
+        params.append("agentId", selectedUserId);
+      }
+      params.append("limit", String(LEADS_PER_PAGE));
+      params.append("offset", String(pageParam));
+      
+      const res = await fetch(`/api/fub/leads?${params.toString()}`, {
+        credentials: "include",
+      });
+      if (!res.ok) {
+        throw new Error("Failed to fetch leads");
+      }
+      return res.json();
+    },
+    getNextPageParam: (lastPage) => {
+      // Check if there are more leads based on multiple possible indicators
+      if (lastPage.hasMore) {
+        return lastPage.offset + lastPage.limit;
+      }
+      // Fallback: if we got a full page, there might be more
+      if (lastPage.count === lastPage.limit) {
+        return lastPage.offset + lastPage.limit;
+      }
+      return undefined;
+    },
+    initialPageParam: 0,
     enabled: statusData?.configured === true,
+  });
+  
+  // Combine all pages of leads and sort client-side
+  const allLeads = leadsData?.pages.flatMap((page) => page.leads) || [];
+  const totalCount = leadsData?.pages[0]?.totalCount || allLeads.length;
+  
+  // Sort leads client-side based on sort option
+  const sortedLeads = [...allLeads].sort((a, b) => {
+    const nameA = (a.name || "").toLowerCase();
+    const nameB = (b.name || "").toLowerCase();
+    if (sortOption === "az") {
+      return nameA.localeCompare(nameB);
+    } else {
+      return nameB.localeCompare(nameA);
+    }
   });
   
   const isConfigured = statusData?.configured === true;
   const isStatusChecking = statusLoading || statusData === undefined;
   
-  const filteredLeads = leadsData?.leads.filter((lead) => {
+  // Filter leads by search query (client-side filtering on already loaded and sorted data)
+  const filteredLeads = sortedLeads.filter((lead) => {
     if (!searchQuery) return true;
     const query = searchQuery.toLowerCase();
     return (
@@ -160,7 +224,28 @@ export default function LeadsPage() {
       lead.phone?.includes(query) ||
       lead.source?.toLowerCase().includes(query)
     );
-  }) || [];
+  });
+  
+  // Infinite scroll observer
+  const handleObserver = useCallback((entries: IntersectionObserverEntry[]) => {
+    const target = entries[0];
+    if (target.isIntersecting && hasNextPage && !isFetchingNextPage) {
+      fetchNextPage();
+    }
+  }, [fetchNextPage, hasNextPage, isFetchingNextPage]);
+  
+  useEffect(() => {
+    const option = {
+      root: null,
+      rootMargin: "100px",
+      threshold: 0,
+    };
+    const observer = new IntersectionObserver(handleObserver, option);
+    if (loadMoreRef.current) observer.observe(loadMoreRef.current);
+    return () => {
+      if (loadMoreRef.current) observer.unobserve(loadMoreRef.current);
+    };
+  }, [handleObserver]);
   
   return (
     <div className="space-y-6">
@@ -169,9 +254,9 @@ export default function LeadsPage() {
           <h1 className="text-2xl font-bold" data-testid="text-page-title">Leads</h1>
           <p className="text-muted-foreground">People and contacts from Follow Up Boss</p>
         </div>
-        {leadsData && (
+        {leadsData?.pages[0] && (
           <Badge variant="outline" className="text-xs">
-            Data from: {leadsData.dataSource}
+            Data from: {leadsData.pages[0].dataSource}
           </Badge>
         )}
       </div>
@@ -209,7 +294,7 @@ export default function LeadsPage() {
           <CardTitle className="text-lg">Filters</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
             <div className="space-y-2">
               <Label>Assigned Agent</Label>
               <Select value={selectedUserId} onValueChange={setSelectedUserId}>
@@ -223,6 +308,19 @@ export default function LeadsPage() {
                       {user.name || user.email}
                     </SelectItem>
                   ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>Sort by Name</Label>
+              <Select value={sortOption} onValueChange={(v) => setSortOption(v as SortOption)}>
+                <SelectTrigger data-testid="select-sort">
+                  <ArrowDownUp className="h-4 w-4 mr-2 shrink-0" />
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="az">A → Z</SelectItem>
+                  <SelectItem value="za">Z → A</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -254,15 +352,19 @@ export default function LeadsPage() {
         </CardContent>
       </Card>
       
-      {process.env.NODE_ENV === "development" && leadsData && (
+      {process.env.NODE_ENV === "development" && leadsData?.pages[0] && (
         <Card className="bg-muted/50">
           <CardHeader className="py-2">
             <CardTitle className="text-sm">Debug Info</CardTitle>
           </CardHeader>
           <CardContent className="py-2 text-xs font-mono">
-            <p>Agent ID: {leadsData.agentId || "all"}</p>
-            <p>Leads Returned: {leadsData.count}</p>
-            <p>Fetched At: {leadsData.fetchedAt}</p>
+            <p>Agent ID: {leadsData.pages[0].agentId || "all"}</p>
+            <p>Total Leads: {totalCount}</p>
+            <p>Loaded: {allLeads.length}</p>
+            <p>Pages: {leadsData.pages.length}</p>
+            <p>Has More: {hasNextPage ? "Yes" : "No"}</p>
+            <p>Sort: {sortOption}</p>
+            <p>Fetched At: {leadsData.pages[0].fetchedAt}</p>
           </CardContent>
         </Card>
       )}
@@ -300,7 +402,8 @@ export default function LeadsPage() {
         <>
           <div className="flex items-center justify-between">
             <p className="text-sm text-muted-foreground">
-              Showing {filteredLeads.length} of {leadsData.count} leads
+              Showing {filteredLeads.length} of {totalCount} leads
+              {hasNextPage && !searchQuery && " (scroll for more)"}
             </p>
           </div>
           
@@ -320,6 +423,24 @@ export default function LeadsPage() {
               {filteredLeads.map((lead) => (
                 <LeadCard key={lead.id} lead={lead} />
               ))}
+              
+              {/* Infinite scroll trigger */}
+              <div ref={loadMoreRef} className="h-4" />
+              
+              {/* Loading indicator at bottom */}
+              {isFetchingNextPage && (
+                <div className="flex items-center justify-center py-4 gap-2 text-muted-foreground">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  <span className="text-sm">Loading more leads...</span>
+                </div>
+              )}
+              
+              {/* End of list indicator */}
+              {!hasNextPage && allLeads.length > 0 && !searchQuery && (
+                <div className="text-center py-4 text-sm text-muted-foreground">
+                  All {totalCount} leads loaded
+                </div>
+              )}
             </div>
           )}
         </>

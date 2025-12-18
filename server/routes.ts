@@ -4745,16 +4745,18 @@ This email was sent by ${senderName} (${senderEmail}) via the MLS Grid IDX Platf
     }
   });
   
-  // Get leads from FUB for a specific agent
+  // Get leads from FUB for a specific agent with pagination support
   app.get("/api/fub/leads", async (req, res) => {
     try {
-      const { agentId, userId, limit = '50' } = req.query as Record<string, string>;
+      const { agentId, userId, limit = '50', offset = '0' } = req.query as Record<string, string>;
       
       const fubUserId = agentId || userId;
+      const limitNum = Math.min(parseInt(limit) || 50, 100);
+      const offsetNum = parseInt(offset) || 0;
       
-      console.log(`[FUB Leads] Fetching leads - agentId: ${fubUserId}, limit: ${limit}`);
+      console.log(`[FUB Leads] Fetching leads - agentId: ${fubUserId}, limit: ${limitNum}, offset: ${offsetNum}`);
       
-      const cacheKey = `fub_leads_${fubUserId || 'all'}_${limit}`;
+      const cacheKey = `fub_leads_${fubUserId || 'all'}_${limitNum}_${offsetNum}`;
       const cached = fubCache.get(cacheKey);
       if (cached && Date.now() - cached.timestamp < FUB_CACHE_TTL) {
         console.log(`[FUB Leads] Cache hit for ${cacheKey}`);
@@ -4762,14 +4764,18 @@ This email was sent by ${senderName} (${senderEmail}) via the MLS Grid IDX Platf
         return;
       }
       
-      // Build query params
+      // Build query params - FUB API supports offset and limit
       const params = new URLSearchParams();
       if (fubUserId) params.append('assignedTo', fubUserId);
-      params.append('limit', limit);
-      params.append('sort', '-created');  // Most recent first
+      params.append('limit', String(limitNum));
+      params.append('offset', String(offsetNum));
+      // FUB API sorts by 'created' or '-created' (date), we'll sort by name client-side
+      params.append('sort', '-created');  // Fetch most recent first, then sort client-side
       
       const { data: response } = await fubApiRequest(`/people?${params.toString()}`);
       const people = response?.people || [];
+      // FUB returns metadata in different ways, check multiple locations
+      const totalCount = response?._metadata?.total || response?.total || response?._pagination?.total || people.length;
       
       // Format leads
       const leads = people.map((p: any) => ({
@@ -4788,6 +4794,10 @@ This email was sent by ${senderName} (${senderEmail}) via the MLS Grid IDX Platf
       const result = {
         leads,
         count: leads.length,
+        totalCount,
+        hasMore: offsetNum + leads.length < totalCount,
+        offset: offsetNum,
+        limit: limitNum,
         dataSource: 'Follow Up Boss',
         agentId: fubUserId || 'all',
         fetchedAt: new Date().toISOString(),
@@ -4795,7 +4805,7 @@ This email was sent by ${senderName} (${senderEmail}) via the MLS Grid IDX Platf
       
       fubCache.set(cacheKey, { data: result, timestamp: Date.now() });
       
-      console.log(`[FUB Leads] Fetched ${leads.length} leads for agent ${fubUserId || 'all'}`);
+      console.log(`[FUB Leads] Fetched ${leads.length} leads (offset: ${offsetNum}, total: ${totalCount}) for agent ${fubUserId || 'all'}`);
       
       res.json(result);
     } catch (error: any) {

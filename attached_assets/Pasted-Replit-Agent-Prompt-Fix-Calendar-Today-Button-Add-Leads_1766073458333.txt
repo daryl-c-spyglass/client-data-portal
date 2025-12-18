@@ -1,0 +1,102 @@
+Replit Agent Prompt — Fix Calendar “Today” Button + Add Leads Name Filter (A–Z / Z–A + Infinite Scroll)
+
+You are working in the existing Mission Control web app.
+
+1) Calendar Section — “Today” Button is not working (FIX)
+Issue
+
+Clicking the Today button does not jump the calendar back to today/current period.
+
+Requirements
+
+Make Today work in all view modes:
+
+Month view → jump to the current month and highlight today
+
+Week view → jump to the week containing today
+
+Day view → jump to today
+
+List view → reset the internal anchor date to today and reload the visible range
+
+Keep existing filters (Agent), sort selection, and view mode unchanged.
+
+After clicking Today, refresh the calendar data for the new visible date range.
+
+Implementation guidance
+
+Use a single source of truth date state such as anchorDate.
+
+On Today click: setAnchorDate(new Date())
+
+Recompute the date range from anchorDate depending on the active view mode.
+
+Ensure the UI month label updates correctly (e.g., Dec 2025 → current month).
+
+Acceptance test
+
+Navigate to another month (e.g., Dec 2025), click Today → returns to current month/week/day depending on view.
+
+2) Leads Section — Add “Lead Name” filter with sorting (A–Z default, Z–A option) + show ALL names on scroll
+Goal
+
+Create a filter in the Leads section that lets users filter/sort by Lead Name:
+
+Default sort: A → Z
+
+Add option: Z → A
+
+Ensure all leads names load as the user scrolls to the bottom (no limited list).
+
+Requirements
+A) UI
+
+Add a “Lead Name” sorting control (dropdown or toggle) with:
+
+A → Z (default)
+
+Z → A
+
+Default should load and display leads alphabetically by name.
+
+B) Data behavior
+
+Ensure the results include all leads, not just the first page:
+
+Implement infinite scroll or “Load more” that triggers automatically when the user reaches the bottom.
+
+Continue fetching the next page until there are no more results.
+
+Sorting must remain consistent across pages:
+
+Either:
+
+Fetch all pages first, then sort client-side (only if total size is reasonable), OR
+
+If the API supports server-side sort by name, use it consistently with pagination.
+
+C) Technical requirements
+
+Do not break existing lead filters (assigned agent, status, etc.)
+
+Avoid duplicate records when loading more pages.
+
+Add a loading indicator at bottom while fetching more.
+
+Add empty state if no leads match.
+
+Acceptance tests
+
+Leads list initially shows names in A–Z.
+
+Switching to Z–A reorders results correctly.
+
+Scrolling to the bottom loads more leads until all are shown (no “missing names”).
+
+Deliverables
+
+Provide the exact file paths changed.
+
+Confirm Today works in Calendar.
+
+Confirm Leads name sorting works and infinite scroll loads the full dataset.
