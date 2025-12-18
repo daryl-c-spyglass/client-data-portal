@@ -5,6 +5,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/AppSidebar";
+import { ChatAssistant } from "@/components/ChatAssistant";
 import { LeadGateProvider } from "@/contexts/LeadGateContext";
 import { SelectedPropertyProvider } from "@/contexts/SelectedPropertyContext";
 import NotFound from "@/pages/not-found";
@@ -96,6 +97,7 @@ export default function App() {
           </Switch>
           </SelectedPropertyProvider>
         </LeadGateProvider>
+        <ChatAssistant />
         <Toaster />
       </TooltipProvider>
     </QueryClientProvider>

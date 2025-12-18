@@ -42,3 +42,6 @@ waitForPort = 5000
 
 [userenv.shared]
 HOMEREVIEW_API_URL = "https://95f0a894-8940-4717-a771-851029450d05-00-3octfev6njpgb.spock.replit.dev"
+
+[agent]
+integrations = ["javascript_openai:1.0.0"]

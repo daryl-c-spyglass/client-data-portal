@@ -4965,6 +4965,44 @@ This email was sent by ${senderName} (${senderEmail}) via the MLS Grid IDX Platf
     }
   });
 
+  // AI Chat Assistant endpoint
+  app.post("/api/chat", async (req, res) => {
+    try {
+      const { getChatResponse, isOpenAIConfigured } = await import("./openai-client");
+      
+      if (!isOpenAIConfigured()) {
+        res.status(503).json({ 
+          error: "AI assistant is not configured. Please add your OpenAI API key.",
+          configured: false
+        });
+        return;
+      }
+
+      const { messages, propertyContext } = req.body;
+      
+      if (!messages || !Array.isArray(messages) || messages.length === 0) {
+        res.status(400).json({ error: "Messages array is required" });
+        return;
+      }
+
+      const response = await getChatResponse(messages, propertyContext);
+      res.json(response);
+    } catch (error: any) {
+      console.error("[AI Chat] Error:", error.message);
+      res.status(500).json({ error: "Failed to get AI response. Please try again." });
+    }
+  });
+
+  // AI Chat status endpoint
+  app.get("/api/chat/status", async (req, res) => {
+    try {
+      const { isOpenAIConfigured } = await import("./openai-client");
+      res.json({ configured: isOpenAIConfigured() });
+    } catch (error) {
+      res.json({ configured: false });
+    }
+  });
+
   const httpServer = createServer(app);
 
   return httpServer;
