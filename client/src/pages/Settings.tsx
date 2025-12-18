@@ -10,8 +10,18 @@ import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
+import { 
+  PRICE_FORMAT_OPTIONS,
+  AREA_UNIT_OPTIONS,
+  DATE_FORMAT_OPTIONS,
+  DEFAULT_PREFERENCES,
+  type PriceFormat,
+  type AreaUnit,
+  type DateFormatType,
+} from "@/lib/formatters";
 import { 
   Settings as SettingsIcon, 
   User, 
@@ -25,7 +35,8 @@ import {
   RefreshCw,
   Copy,
   Check,
-  ExternalLink
+  ExternalLink,
+  RotateCcw
 } from "lucide-react";
 
 const leadGateSchema = z.object({
@@ -46,6 +57,16 @@ interface LeadGateSettings {
   updatedAt: string;
 }
 
+interface DisplayPreferencesData {
+  id: string;
+  priceFormat: PriceFormat;
+  areaUnit: AreaUnit;
+  dateFormat: DateFormatType;
+  includeAgentBranding: boolean;
+  includeMarketStats: boolean;
+  updatedAt: string;
+}
+
 export default function Settings() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -53,6 +74,95 @@ export default function Settings() {
   const [copied, setCopied] = useState(false);
   const [embedWidth, setEmbedWidth] = useState("600");
   const [embedHeight, setEmbedHeight] = useState("800");
+  
+  // Display preferences state
+  const [displayPrefs, setDisplayPrefs] = useState<{
+    priceFormat: PriceFormat;
+    areaUnit: AreaUnit;
+    dateFormat: DateFormatType;
+    includeAgentBranding: boolean;
+    includeMarketStats: boolean;
+  }>({
+    priceFormat: 'commas',
+    areaUnit: 'sqft',
+    dateFormat: 'MM/DD/YYYY',
+    includeAgentBranding: true,
+    includeMarketStats: true,
+  });
+  const [originalPrefs, setOriginalPrefs] = useState(displayPrefs);
+  const [hasDisplayChanges, setHasDisplayChanges] = useState(false);
+
+  // Fetch display preferences
+  const { data: displayPreferencesData, isLoading: isLoadingDisplayPrefs } = useQuery<DisplayPreferencesData>({
+    queryKey: ["/api/display-preferences"],
+    enabled: activeTab === "display",
+  });
+
+  // Update local state when preferences are fetched
+  useEffect(() => {
+    if (displayPreferencesData) {
+      const prefs = {
+        priceFormat: displayPreferencesData.priceFormat,
+        areaUnit: displayPreferencesData.areaUnit,
+        dateFormat: displayPreferencesData.dateFormat,
+        includeAgentBranding: displayPreferencesData.includeAgentBranding,
+        includeMarketStats: displayPreferencesData.includeMarketStats,
+      };
+      setDisplayPrefs(prefs);
+      setOriginalPrefs(prefs);
+      setHasDisplayChanges(false);
+    }
+  }, [displayPreferencesData]);
+
+  // Track changes
+  useEffect(() => {
+    const changed = 
+      displayPrefs.priceFormat !== originalPrefs.priceFormat ||
+      displayPrefs.areaUnit !== originalPrefs.areaUnit ||
+      displayPrefs.dateFormat !== originalPrefs.dateFormat ||
+      displayPrefs.includeAgentBranding !== originalPrefs.includeAgentBranding ||
+      displayPrefs.includeMarketStats !== originalPrefs.includeMarketStats;
+    setHasDisplayChanges(changed);
+  }, [displayPrefs, originalPrefs]);
+
+  // Save display preferences mutation
+  const saveDisplayPrefsMutation = useMutation({
+    mutationFn: async () => {
+      const response = await apiRequest("PUT", "/api/display-preferences", displayPrefs);
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || "Failed to save preferences");
+      }
+      return response.json();
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/display-preferences"] });
+      setOriginalPrefs(displayPrefs);
+      setHasDisplayChanges(false);
+      toast({
+        title: "Preferences saved",
+        description: "Display preferences have been updated successfully.",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Reset display preferences to defaults
+  const handleResetDisplayPrefs = () => {
+    setDisplayPrefs({
+      priceFormat: DEFAULT_PREFERENCES.priceFormat,
+      areaUnit: DEFAULT_PREFERENCES.areaUnit,
+      dateFormat: DEFAULT_PREFERENCES.dateFormat,
+      includeAgentBranding: DEFAULT_PREFERENCES.includeAgentBranding,
+      includeMarketStats: DEFAULT_PREFERENCES.includeMarketStats,
+    });
+  };
 
   const { data: leadGateSettings, isLoading: isLoadingLeadGate } = useQuery<LeadGateSettings>({
     queryKey: ["/api/lead-gate/settings"],
@@ -440,27 +550,83 @@ export default function Settings() {
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="flex items-center justify-between p-4 border rounded-lg">
-                <div>
-                  <p className="font-medium">Price Format</p>
-                  <p className="text-sm text-muted-foreground">How prices are displayed</p>
+              {isLoadingDisplayPrefs ? (
+                <div className="flex items-center justify-center py-8">
+                  <RefreshCw className="w-6 h-6 animate-spin text-muted-foreground" />
                 </div>
-                <Badge variant="secondary">$1,234,567</Badge>
-              </div>
-              <div className="flex items-center justify-between p-4 border rounded-lg">
-                <div>
-                  <p className="font-medium">Area Units</p>
-                  <p className="text-sm text-muted-foreground">Square footage display</p>
-                </div>
-                <Badge variant="secondary">sq ft</Badge>
-              </div>
-              <div className="flex items-center justify-between p-4 border rounded-lg">
-                <div>
-                  <p className="font-medium">Date Format</p>
-                  <p className="text-sm text-muted-foreground">How dates are displayed</p>
-                </div>
-                <Badge variant="secondary">MMM d, yyyy</Badge>
-              </div>
+              ) : (
+                <>
+                  <div className="flex items-center justify-between p-4 border rounded-lg flex-wrap gap-2">
+                    <div>
+                      <p className="font-medium">Price Format</p>
+                      <p className="text-sm text-muted-foreground">How prices are displayed</p>
+                    </div>
+                    <Select
+                      value={displayPrefs.priceFormat}
+                      onValueChange={(value: PriceFormat) => 
+                        setDisplayPrefs(prev => ({ ...prev, priceFormat: value }))
+                      }
+                    >
+                      <SelectTrigger className="w-[180px]" data-testid="select-price-format">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {PRICE_FORMAT_OPTIONS.map(option => (
+                          <SelectItem key={option.value} value={option.value}>
+                            {option.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="flex items-center justify-between p-4 border rounded-lg flex-wrap gap-2">
+                    <div>
+                      <p className="font-medium">Area Units</p>
+                      <p className="text-sm text-muted-foreground">Square footage display</p>
+                    </div>
+                    <Select
+                      value={displayPrefs.areaUnit}
+                      onValueChange={(value: AreaUnit) => 
+                        setDisplayPrefs(prev => ({ ...prev, areaUnit: value }))
+                      }
+                    >
+                      <SelectTrigger className="w-[180px]" data-testid="select-area-unit">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {AREA_UNIT_OPTIONS.map(option => (
+                          <SelectItem key={option.value} value={option.value}>
+                            {option.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="flex items-center justify-between p-4 border rounded-lg flex-wrap gap-2">
+                    <div>
+                      <p className="font-medium">Date Format</p>
+                      <p className="text-sm text-muted-foreground">How dates are displayed</p>
+                    </div>
+                    <Select
+                      value={displayPrefs.dateFormat}
+                      onValueChange={(value: DateFormatType) => 
+                        setDisplayPrefs(prev => ({ ...prev, dateFormat: value }))
+                      }
+                    >
+                      <SelectTrigger className="w-[180px]" data-testid="select-date-format">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {DATE_FORMAT_OPTIONS.map(option => (
+                          <SelectItem key={option.value} value={option.value}>
+                            {option.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </>
+              )}
             </CardContent>
           </Card>
 
@@ -472,19 +638,56 @@ export default function Settings() {
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="flex items-center justify-between p-4 border rounded-lg">
+              <div className="flex items-center justify-between p-4 border rounded-lg flex-wrap gap-2">
                 <div>
                   <p className="font-medium">Include Agent Branding</p>
                   <p className="text-sm text-muted-foreground">Show your info on shared reports</p>
                 </div>
-                <Switch defaultChecked data-testid="switch-branding" />
+                <Switch 
+                  checked={displayPrefs.includeAgentBranding}
+                  onCheckedChange={(checked) => 
+                    setDisplayPrefs(prev => ({ ...prev, includeAgentBranding: checked }))
+                  }
+                  data-testid="switch-branding" 
+                />
               </div>
-              <div className="flex items-center justify-between p-4 border rounded-lg">
+              <div className="flex items-center justify-between p-4 border rounded-lg flex-wrap gap-2">
                 <div>
                   <p className="font-medium">Include Market Stats</p>
                   <p className="text-sm text-muted-foreground">Show market analysis by default</p>
                 </div>
-                <Switch defaultChecked data-testid="switch-market-stats" />
+                <Switch 
+                  checked={displayPrefs.includeMarketStats}
+                  onCheckedChange={(checked) => 
+                    setDisplayPrefs(prev => ({ ...prev, includeMarketStats: checked }))
+                  }
+                  data-testid="switch-market-stats" 
+                />
+              </div>
+              
+              <div className="flex gap-2 pt-4">
+                <Button
+                  onClick={() => saveDisplayPrefsMutation.mutate()}
+                  disabled={!hasDisplayChanges || saveDisplayPrefsMutation.isPending}
+                  data-testid="button-save-display-prefs"
+                >
+                  {saveDisplayPrefsMutation.isPending ? (
+                    <>
+                      <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                      Saving...
+                    </>
+                  ) : (
+                    'Save Preferences'
+                  )}
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={handleResetDisplayPrefs}
+                  data-testid="button-reset-display-prefs"
+                >
+                  <RotateCcw className="w-4 h-4 mr-2" />
+                  Reset to Defaults
+                </Button>
               </div>
             </CardContent>
           </Card>

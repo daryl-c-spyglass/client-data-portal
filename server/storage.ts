@@ -12,6 +12,8 @@ import {
   type LeadGateSettings,
   type InsertLeadGateSettings,
   type UpdateLeadGateSettings,
+  type DisplayPreferences,
+  type UpdateDisplayPreferences,
   type SearchCriteria,
   type PropertyStatistics,
   type TimelineDataPoint,
@@ -23,6 +25,7 @@ import {
   cmas,
   sellerUpdates,
   leadGateSettings,
+  displayPreferences,
   users
 } from "@shared/schema";
 import { randomUUID } from "crypto";
@@ -108,6 +111,10 @@ export interface IStorage {
   // Lead Gate Settings operations
   getLeadGateSettings(): Promise<LeadGateSettings | undefined>;
   updateLeadGateSettings(settings: UpdateLeadGateSettings): Promise<LeadGateSettings>;
+  
+  // Display Preferences operations
+  getDisplayPreferences(): Promise<DisplayPreferences | undefined>;
+  updateDisplayPreferences(preferences: UpdateDisplayPreferences): Promise<DisplayPreferences>;
   
   // Autocomplete operations (optimized)
   getAutocompleteCities(search: string, limit?: number): Promise<{ value: string; count: number }[]>;
@@ -679,6 +686,34 @@ export class MemStorage implements IStorage {
       };
     }
     return this.leadGateSettings;
+  }
+  
+  // Display Preferences operations (in-memory implementation)
+  private displayPrefs: DisplayPreferences | undefined = undefined;
+
+  async getDisplayPreferences(): Promise<DisplayPreferences | undefined> {
+    return this.displayPrefs;
+  }
+
+  async updateDisplayPreferences(prefs: UpdateDisplayPreferences): Promise<DisplayPreferences> {
+    if (!this.displayPrefs) {
+      this.displayPrefs = {
+        id: randomUUID(),
+        priceFormat: prefs.priceFormat ?? 'commas',
+        areaUnit: prefs.areaUnit ?? 'sqft',
+        dateFormat: prefs.dateFormat ?? 'MM/DD/YYYY',
+        includeAgentBranding: prefs.includeAgentBranding ?? true,
+        includeMarketStats: prefs.includeMarketStats ?? true,
+        updatedAt: new Date(),
+      };
+    } else {
+      this.displayPrefs = {
+        ...this.displayPrefs,
+        ...prefs,
+        updatedAt: new Date(),
+      };
+    }
+    return this.displayPrefs;
   }
   
   // Autocomplete operations (in-memory implementation)
@@ -1401,6 +1436,35 @@ export class DbStorage implements IStorage {
       const result = await this.db.update(leadGateSettings)
         .set({ ...settings, updatedAt: new Date() })
         .where(eq(leadGateSettings.id, existing.id))
+        .returning();
+      return result[0];
+    }
+  }
+  
+  // Display Preferences operations
+  async getDisplayPreferences(): Promise<DisplayPreferences | undefined> {
+    const result = await this.db.select().from(displayPreferences).limit(1);
+    return result[0];
+  }
+
+  async updateDisplayPreferences(prefs: UpdateDisplayPreferences): Promise<DisplayPreferences> {
+    const existing = await this.getDisplayPreferences();
+    
+    if (!existing) {
+      // Create new preferences with defaults
+      const result = await this.db.insert(displayPreferences).values({
+        priceFormat: prefs.priceFormat ?? 'commas',
+        areaUnit: prefs.areaUnit ?? 'sqft',
+        dateFormat: prefs.dateFormat ?? 'MM/DD/YYYY',
+        includeAgentBranding: prefs.includeAgentBranding ?? true,
+        includeMarketStats: prefs.includeMarketStats ?? true,
+      }).returning();
+      return result[0];
+    } else {
+      // Update existing preferences
+      const result = await this.db.update(displayPreferences)
+        .set({ ...prefs, updatedAt: new Date() })
+        .where(eq(displayPreferences.id, existing.id))
         .returning();
       return result[0];
     }

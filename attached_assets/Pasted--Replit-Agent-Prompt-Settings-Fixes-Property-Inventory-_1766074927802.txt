@@ -1,0 +1,138 @@
+## Replit Agent Prompt — Settings Fixes + Property Inventory Consistency
+
+You are working in our existing IDX/CMA web app. We need to fix Settings issues and ensure property inventory is consistent across the app.
+
+---
+
+# 1) Verify Property Inventory is Integrated Across Sections (App-Wide)
+
+### Goal
+
+Ensure the **same property inventory source + logic** is used consistently across all sections (Buyer Search, CMA, Saved/Selected properties, Share URLs, PDFs, etc.) so counts/results don’t mismatch.
+
+### Requirements
+
+* Identify where inventory data comes from (Repliers / MLS Grid / cached DB, etc.) and where it’s queried.
+* Verify the same:
+
+  * filters (status, property type, beds/baths/price, etc.)
+  * pagination
+  * sorting
+  * field mapping (photos, address, price, sqft)
+    are applied consistently across all sections.
+* Fix any cases where one page uses a different source, different status mapping, or different query params causing mismatches.
+
+### Deliverables
+
+* Short note: which inventory source is the “single source of truth”
+* List pages/routes that were updated to align
+
+---
+
+# 2) Settings Section — Data Sync returns “Sync failed” (FIX)
+
+### Goal
+
+Fix the **Data Sync** option so it runs successfully or returns a clear, actionable error.
+
+### Requirements
+
+1. Locate Settings → Data Sync UI and the backend route it calls.
+2. Determine why it fails:
+
+   * wrong endpoint URL
+   * missing auth/env vars
+   * server exception
+   * timeout / rate limit
+   * incorrect payload
+3. Implement:
+
+   * Better server-side logging (no secrets)
+   * Proper error responses with status codes
+   * Retry-safe behavior if applicable
+4. UI should display:
+
+   * “Sync in progress…” while running
+   * success confirmation (timestamp of last sync)
+   * readable error message if it fails (not generic “sync failed”)
+
+### Acceptance test
+
+* Clicking Data Sync completes successfully (or provides specific error like “Missing API key” instead of generic failure).
+
+---
+
+# 3) Settings Section — Display Preferences (Fix + Add Options + Save/Reset)
+
+### Goal
+
+Create a working **Display Preferences** panel with user-selectable formatting options and functioning **Save** + **Reset**.
+
+### Preferences to add
+
+1. **Price Format**
+
+   * Example options:
+
+     * `$1,234,567` (commas)
+     * `$1.23M` (abbreviated)
+     * `1,234,567 USD` (suffix)
+2. **Area Units**
+
+   * `sq ft`
+   * `sq m`
+   * `acres` (optional)
+3. **Date Formats**
+
+   * `MM/DD/YYYY`
+   * `DD/MM/YYYY`
+   * `YYYY-MM-DD`
+
+### Save behavior
+
+* Save preferences per user (persist in DB or user profile store).
+* Apply preferences across the app:
+
+  * listings cards
+  * CMA results
+  * reports (if applicable)
+  * share URLs and PDFs where formatting is shown
+
+### Reset behavior
+
+* Reset returns to default values:
+
+  * Price: `$1,234,567`
+  * Area: `sq ft`
+  * Date: `MM/DD/YYYY`
+* Reset should update UI immediately and persist defaults if user confirms.
+
+### UI requirements
+
+* Add **Save** button (enabled only when changes exist)
+* Add **Reset** button
+* Add success toast/feedback on save
+* Add error feedback on failure
+
+### Implementation guidance
+
+* Create a central formatting utility (e.g. `formatPrice`, `formatArea`, `formatDate`) that reads user preferences from a single preferences store/context.
+* Ensure server-rendered/shared pages also use these preferences where applicable.
+
+### Acceptance tests
+
+* Change preferences → Save → refresh page → settings persist
+* Preferences are reflected across listings + CMA + share views
+* Reset returns everything to defaults and persists
+
+---
+
+# Deliverables
+
+* File paths changed (Settings UI + backend routes + formatting utilities)
+* Confirm:
+
+  * Data Sync works and gives clear status messages
+  * Display Preferences Save/Reset works
+  * Formatting is applied consistently across the app
+  * Property inventory is consistent across sections

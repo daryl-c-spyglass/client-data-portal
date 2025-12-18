@@ -2300,8 +2300,71 @@ This email was sent by ${senderName} (${senderEmail}) via the MLS Grid IDX Platf
     }
   });
 
+  // Display Preferences endpoints
+  app.get("/api/display-preferences", async (req, res) => {
+    try {
+      let preferences = await storage.getDisplayPreferences();
+      
+      // If no preferences exist, create a row with defaults
+      if (!preferences) {
+        preferences = await storage.updateDisplayPreferences({
+          priceFormat: 'commas',
+          areaUnit: 'sqft',
+          dateFormat: 'MM/DD/YYYY',
+          includeAgentBranding: true,
+          includeMarketStats: true,
+        });
+      }
+      
+      res.json(preferences);
+    } catch (error) {
+      console.error('Error fetching display preferences:', error);
+      res.status(500).json({ error: 'Failed to fetch display preferences' });
+    }
+  });
+
+  app.put("/api/display-preferences", async (req, res) => {
+    try {
+      const { priceFormat, areaUnit, dateFormat, includeAgentBranding, includeMarketStats } = req.body;
+      
+      // Validate inputs
+      const validPriceFormats = ['commas', 'abbreviated', 'suffix'];
+      const validAreaUnits = ['sqft', 'sqm', 'acres'];
+      const validDateFormats = ['MM/DD/YYYY', 'DD/MM/YYYY', 'YYYY-MM-DD'];
+      
+      if (priceFormat && !validPriceFormats.includes(priceFormat)) {
+        res.status(400).json({ error: 'Invalid price format' });
+        return;
+      }
+      if (areaUnit && !validAreaUnits.includes(areaUnit)) {
+        res.status(400).json({ error: 'Invalid area unit' });
+        return;
+      }
+      if (dateFormat && !validDateFormats.includes(dateFormat)) {
+        res.status(400).json({ error: 'Invalid date format' });
+        return;
+      }
+      
+      // Build update object with only defined values
+      const updates: Record<string, any> = {};
+      if (priceFormat !== undefined) updates.priceFormat = priceFormat;
+      if (areaUnit !== undefined) updates.areaUnit = areaUnit;
+      if (dateFormat !== undefined) updates.dateFormat = dateFormat;
+      if (includeAgentBranding !== undefined) updates.includeAgentBranding = includeAgentBranding;
+      if (includeMarketStats !== undefined) updates.includeMarketStats = includeMarketStats;
+      
+      const preferences = await storage.updateDisplayPreferences(updates);
+      
+      res.json(preferences);
+    } catch (error) {
+      console.error('Error updating display preferences:', error);
+      res.status(500).json({ error: 'Failed to update display preferences' });
+    }
+  });
+
   // Repliers/MLS Grid sync endpoint - triggers manual sync for active and sold data
-  app.post("/api/sync", requireAuth, async (req, res) => {
+  // Note: No auth required for single-agent tool
+  app.post("/api/sync", async (req, res) => {
     try {
       console.log('🔄 Manual data sync triggered by user');
       

@@ -280,6 +280,32 @@ export const insertSyncMetadataSchema = createInsertSchema(syncMetadata).omit({
 export type InsertSyncMetadata = z.infer<typeof insertSyncMetadataSchema>;
 export type SyncMetadata = typeof syncMetadata.$inferSelect;
 
+// Display Preferences Schema - User preferences for formatting data display
+export const displayPreferences = pgTable("display_preferences", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  priceFormat: text("price_format").notNull().default("commas"), // 'commas' ($1,234,567), 'abbreviated' ($1.23M), 'suffix' (1,234,567 USD)
+  areaUnit: text("area_unit").notNull().default("sqft"), // 'sqft', 'sqm', 'acres'
+  dateFormat: text("date_format").notNull().default("MM/DD/YYYY"), // 'MM/DD/YYYY', 'DD/MM/YYYY', 'YYYY-MM-DD'
+  includeAgentBranding: boolean("include_agent_branding").notNull().default(true),
+  includeMarketStats: boolean("include_market_stats").notNull().default(true),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+export const insertDisplayPreferencesSchema = createInsertSchema(displayPreferences).omit({ 
+  id: true, 
+  updatedAt: true 
+});
+export const updateDisplayPreferencesSchema = z.object({
+  priceFormat: z.enum(['commas', 'abbreviated', 'suffix']).optional(),
+  areaUnit: z.enum(['sqft', 'sqm', 'acres']).optional(),
+  dateFormat: z.enum(['MM/DD/YYYY', 'DD/MM/YYYY', 'YYYY-MM-DD']).optional(),
+  includeAgentBranding: z.boolean().optional(),
+  includeMarketStats: z.boolean().optional(),
+});
+export type InsertDisplayPreferences = z.infer<typeof insertDisplayPreferencesSchema>;
+export type UpdateDisplayPreferences = z.infer<typeof updateDisplayPreferencesSchema>;
+export type DisplayPreferences = typeof displayPreferences.$inferSelect;
+
 // Lead Gate Settings Schema - Configure registration wall for property viewing
 export const leadGateSettings = pgTable("lead_gate_settings", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
