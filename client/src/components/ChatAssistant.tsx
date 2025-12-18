@@ -116,18 +116,19 @@ export function ChatAssistant({ propertyContext }: ChatAssistantProps) {
 
   return (
     <>
-      <Button
-        onClick={() => setIsOpen(true)}
-        size="icon"
-        className="fixed bottom-6 right-6 h-14 w-14 rounded-full shadow-lg z-50"
-        data-testid="button-chat-open"
-      >
-        <MessageCircle className="h-6 w-6" />
-      </Button>
+      {!isOpen && (
+        <Button
+          onClick={() => setIsOpen(true)}
+          className="fixed bottom-6 right-6 h-14 w-14 rounded-full shadow-xl z-[9999] bg-primary hover:bg-primary/90"
+          data-testid="button-chat-open"
+        >
+          <MessageCircle className="h-6 w-6" />
+        </Button>
+      )}
 
       {isOpen && (
         <div 
-          className="fixed bottom-6 right-6 w-96 h-[32rem] bg-background border rounded-lg shadow-xl z-50 flex flex-col overflow-hidden"
+          className="fixed bottom-6 right-6 w-96 h-[32rem] bg-background border rounded-lg shadow-xl z-[9999] flex flex-col overflow-hidden"
           data-testid="dialog-chat"
         >
           <div className="flex items-center justify-between p-4 border-b bg-primary text-primary-foreground">
