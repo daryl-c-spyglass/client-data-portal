@@ -1,6 +1,7 @@
 import { useRef, useEffect, useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { MessageCircle, Send, X, Bot, User, Loader2, AlertCircle } from "lucide-react";
+import { useLocation } from "wouter";
+import { MessageCircle, Send, X, Bot, User, Loader2, AlertCircle, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -9,10 +10,22 @@ import { cn } from "@/lib/utils";
 import { apiRequest } from "@/lib/queryClient";
 import { useChat } from "@/contexts/ChatContext";
 
+interface SearchCriteria {
+  location?: string;
+  propertyType?: string;
+  beds?: number;
+  baths?: number;
+  minSqft?: number;
+  minPrice?: number;
+  maxPrice?: number;
+}
+
 interface ChatMessage {
   role: "user" | "assistant";
   content: string;
   suggestAgent?: boolean;
+  readyToSearch?: boolean;
+  searchCriteria?: SearchCriteria;
   timestamp: Date;
 }
 
@@ -33,8 +46,10 @@ interface ChatAssistantProps {
 
 export function ChatAssistant({ propertyContext }: ChatAssistantProps) {
   const { isOpen, openChat, closeChat } = useChat();
+  const [, setLocation] = useLocation();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [inputValue, setInputValue] = useState("");
+  const [pendingSearch, setPendingSearch] = useState<SearchCriteria | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -70,10 +85,16 @@ export function ChatAssistant({ propertyContext }: ChatAssistantProps) {
           role: "assistant", 
           content: data.message, 
           suggestAgent: data.suggestAgent,
+          readyToSearch: data.readyToSearch,
+          searchCriteria: data.searchCriteria,
           timestamp: new Date() 
         },
       ]);
       setInputValue("");
+      
+      if (data.readyToSearch && data.searchCriteria) {
+        setPendingSearch(data.searchCriteria);
+      }
     },
     onError: (error: Error, userMessage) => {
       setMessages(prev => [
@@ -111,6 +132,28 @@ export function ChatAssistant({ propertyContext }: ChatAssistantProps) {
       e.preventDefault();
       handleSend();
     }
+  };
+
+  const initiateSearch = (criteria: SearchCriteria) => {
+    const params = new URLSearchParams();
+    
+    if (criteria.location) {
+      if (/^\d{5}$/.test(criteria.location)) {
+        params.set("postalCode", criteria.location);
+      } else {
+        params.set("city", criteria.location);
+      }
+    }
+    if (criteria.propertyType) params.set("propertySubType", criteria.propertyType);
+    if (criteria.beds) params.set("bedsMin", criteria.beds.toString());
+    if (criteria.baths) params.set("bathsMin", criteria.baths.toString());
+    if (criteria.minSqft) params.set("sqftMin", criteria.minSqft.toString());
+    if (criteria.minPrice) params.set("priceMin", criteria.minPrice.toString());
+    if (criteria.maxPrice) params.set("priceMax", criteria.maxPrice.toString());
+    
+    closeChat();
+    setPendingSearch(null);
+    setLocation(`/buyer-search?${params.toString()}`);
   };
 
   const isConfigured = chatStatus?.configured ?? false;
@@ -195,6 +238,17 @@ export function ChatAssistant({ propertyContext }: ChatAssistantProps) {
                           )}
                         >
                           <p className="text-sm whitespace-pre-wrap">{msg.content}</p>
+                          {msg.readyToSearch && msg.searchCriteria && (
+                            <Button
+                              size="sm"
+                              className="mt-2 gap-1"
+                              onClick={() => initiateSearch(msg.searchCriteria!)}
+                              data-testid="button-search-now"
+                            >
+                              <Search className="h-3 w-3" />
+                              Search Now
+                            </Button>
+                          )}
                           {msg.suggestAgent && (
                             <Badge 
                               variant="secondary" 

@@ -347,23 +347,55 @@ interface HomeReviewResponse {
   source: string;
 }
 
+function parseUrlParams(): SearchFilters | null {
+  if (typeof window === 'undefined') return null;
+  const params = new URLSearchParams(window.location.search);
+  if (params.toString() === '') return null;
+  
+  const filters: SearchFilters = { statusActive: true };
+  
+  if (params.get('postalCode')) filters.postalCode = params.get('postalCode')!;
+  if (params.get('city')) filters.city = params.get('city')!;
+  if (params.get('propertySubType')) filters.propertySubType = params.get('propertySubType')!;
+  if (params.get('bedsMin')) filters.minBeds = parseInt(params.get('bedsMin')!, 10);
+  if (params.get('bathsMin')) filters.minTotalBaths = parseInt(params.get('bathsMin')!, 10);
+  if (params.get('sqftMin')) filters.minLivingArea = parseInt(params.get('sqftMin')!, 10);
+  if (params.get('priceMin')) filters.minPrice = parseInt(params.get('priceMin')!, 10);
+  if (params.get('priceMax')) filters.maxPrice = parseInt(params.get('priceMax')!, 10);
+  
+  return filters;
+}
+
 export default function BuyerSearch() {
   const [, setLocation] = useLocation();
   const { setSelectedProperty, searchState, setSearchState } = useSelectedProperty();
   
-  const [filters, setFilters] = useState<SearchFilters>(() => 
-    searchState?.filters || { statusActive: true }
-  );
+  const [filters, setFilters] = useState<SearchFilters>(() => {
+    const urlFilters = parseUrlParams();
+    if (urlFilters) return urlFilters;
+    return searchState?.filters || { statusActive: true };
+  });
   const [activeFiltersCount, setActiveFiltersCount] = useState(() => 
     searchState?.searchTriggered ? Object.keys(searchState.filters || {}).filter(k => !k.endsWith('Mode') && searchState.filters[k]).length : 1
   );
   const [showFilters, setShowFilters] = useState(true);
   const [viewMode, setViewMode] = useState<'list' | 'map'>('list');
   const [currentPage, setCurrentPage] = useState(0);
-  const [searchTrigger, setSearchTrigger] = useState(() => 
-    searchState?.searchTriggered ? 1 : 0
-  );
+  const [searchTrigger, setSearchTrigger] = useState(() => {
+    const urlFilters = parseUrlParams();
+    if (urlFilters) return 1;
+    return searchState?.searchTriggered ? 1 : 0;
+  });
   const pageSize = 50;
+  
+  // Auto-trigger search when URL params are present
+  useEffect(() => {
+    const urlFilters = parseUrlParams();
+    if (urlFilters) {
+      setActiveFiltersCount(Object.keys(urlFilters).filter(k => !k.endsWith('Mode') && urlFilters[k as keyof SearchFilters]).length);
+      window.history.replaceState({}, '', window.location.pathname);
+    }
+  }, []);
   
   // Polygon map search state (separate from list filters)
   const [mapSearchResults, setMapSearchResults] = useState<Property[]>([]);

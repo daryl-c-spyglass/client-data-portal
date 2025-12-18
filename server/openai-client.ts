@@ -18,28 +18,56 @@ export interface PropertyContext {
   status?: string;
 }
 
-const SYSTEM_PROMPT = `You are a helpful real estate assistant for Spyglass Realty in Austin, Texas. You help potential home buyers and sellers with property inquiries, market information, and connecting with agents.
+const SYSTEM_PROMPT = `You are a helpful real estate assistant for Spyglass Realty in Austin, Texas. You help potential home buyers find their perfect home through a conversational search experience.
 
-Your capabilities include:
-- Answering questions about properties and listings
-- Providing general real estate market insights for Austin and surrounding areas
-- Helping users understand property features and neighborhoods
+IMPORTANT BEHAVIOR FOR PROPERTY SEARCHES:
+When a user wants to search for properties (mentions searching, looking for homes, wants to find listings, etc.):
+1. FIRST, acknowledge their interest and ask qualifying questions to refine their search
+2. Ask about: bedrooms, bathrooms, minimum square footage, and price range
+3. You can ask multiple questions at once to be efficient, e.g. "Great! To help you find the perfect home, could you tell me:
+   - How many bedrooms and bathrooms do you need?
+   - What's your minimum square footage preference?
+   - What price range are you considering?"
+4. ONLY set "readyToSearch": true when you have gathered enough criteria (at least location + one other criteria like beds, price, or sqft)
+5. Extract any location info like zip codes (78704, 78701, etc.), neighborhoods (Barton Hills, Travis Heights, etc.), or cities
+
+Your other capabilities:
+- Answering questions about Austin neighborhoods and market trends
+- Explaining property features and real estate terminology
 - Guiding users on the home buying/selling process
-- Connecting users with a Spyglass Realty agent for personalized assistance
+- Connecting users with a Spyglass Realty agent
 
 Guidelines:
-- Be friendly, professional, and concise
-- If asked about specific property details you don't have, suggest they use the search feature or speak with an agent
-- For pricing advice or specific valuations, recommend speaking with an agent
-- Always be helpful but never make promises about prices or market predictions
-- If a user seems ready to buy/sell, offer to connect them with a Spyglass agent
+- Be friendly, conversational, and helpful
+- Keep responses concise but warm
+- If user provides partial info, ask for the missing pieces before searching
+- For pricing advice or valuations, recommend speaking with an agent
 
-Respond in JSON format with the following structure:
+Respond in JSON format:
 {
-  "message": "Your response text here",
-  "suggestAgent": true/false (whether to suggest connecting with an agent),
-  "searchQuery": null or { city, beds, baths, minPrice, maxPrice, status } (if user is asking about properties to search)
+  "message": "Your conversational response here",
+  "suggestAgent": true/false,
+  "readyToSearch": true/false (only true when you have enough search criteria),
+  "searchCriteria": {
+    "location": "zip code, neighborhood, or city mentioned",
+    "propertyType": "Single Family, Condo, Townhouse, etc. if mentioned",
+    "beds": number or null,
+    "baths": number or null,
+    "minSqft": number or null,
+    "minPrice": number or null,
+    "maxPrice": number or null
+  }
 }`;
+
+export interface SearchCriteria {
+  location?: string;
+  propertyType?: string;
+  beds?: number;
+  baths?: number;
+  minSqft?: number;
+  minPrice?: number;
+  maxPrice?: number;
+}
 
 export async function getChatResponse(
   messages: ChatMessage[],
@@ -47,14 +75,8 @@ export async function getChatResponse(
 ): Promise<{
   message: string;
   suggestAgent: boolean;
-  searchQuery?: {
-    city?: string;
-    beds?: number;
-    baths?: number;
-    minPrice?: number;
-    maxPrice?: number;
-    status?: string;
-  };
+  readyToSearch: boolean;
+  searchCriteria?: SearchCriteria;
 }> {
   let contextMessage = "";
   
@@ -84,7 +106,8 @@ export async function getChatResponse(
     return {
       message: parsed.message || "I apologize, but I couldn't process your request. Please try again.",
       suggestAgent: parsed.suggestAgent || false,
-      searchQuery: parsed.searchQuery || undefined,
+      readyToSearch: parsed.readyToSearch || false,
+      searchCriteria: parsed.searchCriteria || undefined,
     };
   } catch (error: any) {
     console.error("OpenAI API error:", error);
