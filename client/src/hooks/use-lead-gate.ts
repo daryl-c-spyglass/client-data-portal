@@ -40,7 +40,7 @@ export function useLeadGate() {
 
   const trackViewMutation = useMutation({
     mutationFn: async (): Promise<TrackViewResponse> => {
-      const response = await apiRequest("POST", "/api/lead-gate/track-view", {});
+      const response = await apiRequest("/api/lead-gate/track-view", "POST", {});
       return response.json();
     },
     onSuccess: (data) => {

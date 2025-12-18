@@ -128,7 +128,7 @@ export default function Settings() {
   // Save display preferences mutation
   const saveDisplayPrefsMutation = useMutation({
     mutationFn: async () => {
-      const response = await apiRequest("PUT", "/api/display-preferences", displayPrefs);
+      const response = await apiRequest("/api/display-preferences", "PUT", displayPrefs);
       if (!response.ok) {
         const error = await response.json();
         throw new Error(error.error || "Failed to save preferences");
@@ -181,7 +181,7 @@ export default function Settings() {
 
   const updateLeadGateMutation = useMutation({
     mutationFn: async (data: LeadGateFormData) => {
-      const response = await apiRequest("PUT", "/api/lead-gate/settings", data);
+      const response = await apiRequest("/api/lead-gate/settings", "PUT", data);
       if (!response.ok) {
         const error = await response.json();
         throw new Error(error.error || "Failed to update settings");
@@ -207,7 +207,7 @@ export default function Settings() {
 
   const syncMutation = useMutation({
     mutationFn: async () => {
-      const response = await apiRequest("POST", "/api/sync");
+      const response = await apiRequest("/api/sync", "POST");
       if (!response.ok) {
         const error = await response.json();
         throw new Error(error.error || "Failed to trigger sync");

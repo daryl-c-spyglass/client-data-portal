@@ -45,7 +45,7 @@ export function LeadGateModal({ open, onClose, onSuccess }: LeadGateModalProps) 
 
   const registerMutation = useMutation({
     mutationFn: async (data: RegisterFormData) => {
-      const response = await apiRequest("POST", "/api/auth/register", {
+      const response = await apiRequest("/api/auth/register", "POST", {
         ...data,
         role: "buyer",
       });
@@ -56,7 +56,7 @@ export function LeadGateModal({ open, onClose, onSuccess }: LeadGateModalProps) 
       return response.json();
     },
     onSuccess: async (user) => {
-      await apiRequest("POST", "/api/auth/login", {
+      await apiRequest("/api/auth/login", "POST", {
         email: form.getValues("email"),
         password: form.getValues("passwordHash"),
       });
