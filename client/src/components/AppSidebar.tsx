@@ -1,4 +1,4 @@
-import { Home, Search, FileText, Users, Settings, BarChart3, Mail, Filter, Calendar, TrendingUp, UserCircle } from "lucide-react";
+import { Home, Search, FileText, Users, Settings, BarChart3, Mail, Filter, Calendar, TrendingUp, UserCircle, MessageCircle } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import {
   Sidebar,
@@ -10,7 +10,10 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
   SidebarHeader,
+  SidebarFooter,
 } from "@/components/ui/sidebar";
+import { Button } from "@/components/ui/button";
+import { useChat } from "@/contexts/ChatContext";
 import spyglassLogo from "@assets/Large_Logo_1765233192587.jpeg";
 
 const menuItems = [
@@ -91,6 +94,7 @@ const calendarItems = [
 
 export function AppSidebar() {
   const [location] = useLocation();
+  const { openChat } = useChat();
 
   return (
     <Sidebar>
@@ -168,6 +172,16 @@ export function AppSidebar() {
           </SidebarGroupContent>
         </SidebarGroup>
       </SidebarContent>
+      <SidebarFooter className="p-4">
+        <Button 
+          onClick={openChat}
+          className="w-full gap-2"
+          data-testid="button-ai-assistant"
+        >
+          <MessageCircle className="w-4 h-4" />
+          AI Assistant
+        </Button>
+      </SidebarFooter>
     </Sidebar>
   );
 }

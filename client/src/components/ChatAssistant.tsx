@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react";
+import { useRef, useEffect, useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { MessageCircle, Send, X, Bot, User, Loader2, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -7,6 +7,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { apiRequest } from "@/lib/queryClient";
+import { useChat } from "@/contexts/ChatContext";
 
 interface ChatMessage {
   role: "user" | "assistant";
@@ -31,7 +32,7 @@ interface ChatAssistantProps {
 }
 
 export function ChatAssistant({ propertyContext }: ChatAssistantProps) {
-  const [isOpen, setIsOpen] = useState(false);
+  const { isOpen, openChat, closeChat } = useChat();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [inputValue, setInputValue] = useState("");
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -118,7 +119,7 @@ export function ChatAssistant({ propertyContext }: ChatAssistantProps) {
     <>
       {!isOpen && (
         <Button
-          onClick={() => setIsOpen(true)}
+          onClick={openChat}
           className="fixed bottom-6 right-6 h-14 w-14 rounded-full shadow-xl z-[9999] bg-primary hover:bg-primary/90"
           data-testid="button-chat-open"
         >
@@ -139,7 +140,7 @@ export function ChatAssistant({ propertyContext }: ChatAssistantProps) {
             <Button
               variant="ghost"
               size="icon"
-              onClick={() => setIsOpen(false)}
+              onClick={closeChat}
               className="text-primary-foreground hover:bg-primary-foreground/20"
               data-testid="button-chat-close"
             >

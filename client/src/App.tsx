@@ -8,6 +8,7 @@ import { AppSidebar } from "@/components/AppSidebar";
 import { ChatAssistant } from "@/components/ChatAssistant";
 import { LeadGateProvider } from "@/contexts/LeadGateContext";
 import { SelectedPropertyProvider } from "@/contexts/SelectedPropertyContext";
+import { ChatProvider } from "@/contexts/ChatContext";
 import NotFound from "@/pages/not-found";
 import Dashboard from "@/pages/Dashboard";
 import Properties from "@/pages/Properties";
@@ -64,41 +65,43 @@ export default function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
-        <LeadGateProvider>
-          <SelectedPropertyProvider>
-            <Switch>
-            {/* Embed route without sidebar */}
-            <Route path="/embed/seller-update" component={SellerUpdateEmbed} />
-            
-            {/* Public shared CMA view without sidebar */}
-            <Route path="/share/cma/:token" component={SharedCMAView} />
-            
-            {/* All other routes with sidebar */}
-            <Route>
-              <SidebarProvider style={style as React.CSSProperties}>
-                <div className="flex h-screen w-full">
-                  <AppSidebar />
-                  <div className="flex flex-col flex-1 overflow-hidden">
-                    <header className="flex items-center justify-between p-4 border-b bg-background">
-                      <SidebarTrigger data-testid="button-sidebar-toggle" />
-                      <div className="text-sm text-muted-foreground">
-                        MLS Grid IDX Platform
+        <ChatProvider>
+          <LeadGateProvider>
+            <SelectedPropertyProvider>
+              <Switch>
+                {/* Embed route without sidebar */}
+                <Route path="/embed/seller-update" component={SellerUpdateEmbed} />
+                
+                {/* Public shared CMA view without sidebar */}
+                <Route path="/share/cma/:token" component={SharedCMAView} />
+                
+                {/* All other routes with sidebar */}
+                <Route>
+                  <SidebarProvider style={style as React.CSSProperties}>
+                    <div className="flex h-screen w-full">
+                      <AppSidebar />
+                      <div className="flex flex-col flex-1 overflow-hidden">
+                        <header className="flex items-center justify-between p-4 border-b bg-background">
+                          <SidebarTrigger data-testid="button-sidebar-toggle" />
+                          <div className="text-sm text-muted-foreground">
+                            MLS Grid IDX Platform
+                          </div>
+                        </header>
+                        <main className="flex-1 overflow-auto p-6">
+                          <div className="max-w-7xl mx-auto">
+                            <Router />
+                          </div>
+                        </main>
                       </div>
-                    </header>
-                    <main className="flex-1 overflow-auto p-6">
-                      <div className="max-w-7xl mx-auto">
-                        <Router />
-                      </div>
-                    </main>
-                  </div>
-                </div>
-              </SidebarProvider>
-            </Route>
-          </Switch>
-          </SelectedPropertyProvider>
-        </LeadGateProvider>
-        <ChatAssistant />
-        <Toaster />
+                    </div>
+                  </SidebarProvider>
+                </Route>
+              </Switch>
+            </SelectedPropertyProvider>
+          </LeadGateProvider>
+          <ChatAssistant />
+          <Toaster />
+        </ChatProvider>
       </TooltipProvider>
     </QueryClientProvider>
   );
