@@ -58,9 +58,9 @@ export default function InventoryAudit() {
     refetch();
   };
 
-  const filteredSubtypes = audit?.subtypes.filter(s => 
+  const filteredSubtypes = audit?.subtypes?.filter(s => 
     s.name.toLowerCase().includes(subtypeSearch.toLowerCase())
-  ) || [];
+  ) ?? [];
 
   const formatNumber = (num: number) => num.toLocaleString();
 
@@ -107,7 +107,7 @@ export default function InventoryAudit() {
           </Button>
         </div>
 
-        {audit?.diagnostics?.warnings && audit.diagnostics.warnings.length > 0 && (
+        {(audit?.diagnostics?.warnings?.length ?? 0) > 0 && (
           <Card className="border-yellow-500/50 bg-yellow-500/5">
             <CardHeader className="pb-2">
               <CardTitle className="text-lg flex items-center gap-2 text-yellow-600 dark:text-yellow-400">
@@ -117,7 +117,7 @@ export default function InventoryAudit() {
             </CardHeader>
             <CardContent>
               <ul className="space-y-1 text-sm">
-                {audit.diagnostics.warnings.map((warning, i) => (
+                {audit?.diagnostics?.warnings?.map((warning, i) => (
                   <li key={i} className="flex items-start gap-2">
                     <AlertCircle className="h-4 w-4 mt-0.5 flex-shrink-0 text-yellow-600" />
                     {warning}
@@ -128,7 +128,7 @@ export default function InventoryAudit() {
           </Card>
         )}
 
-        {audit?.diagnostics?.errors && audit.diagnostics.errors.length > 0 && (
+        {(audit?.diagnostics?.errors?.length ?? 0) > 0 && (
           <Card className="border-red-500/50 bg-red-500/5">
             <CardHeader className="pb-2">
               <CardTitle className="text-lg flex items-center gap-2 text-red-600 dark:text-red-400">
@@ -138,7 +138,7 @@ export default function InventoryAudit() {
             </CardHeader>
             <CardContent>
               <ul className="space-y-1 text-sm">
-                {audit.diagnostics.errors.map((error, i) => (
+                {audit?.diagnostics?.errors?.map((error, i) => (
                   <li key={i} className="flex items-start gap-2">
                     <XCircle className="h-4 w-4 mt-0.5 flex-shrink-0 text-red-600" />
                     {error}
@@ -299,7 +299,7 @@ export default function InventoryAudit() {
                       </tr>
                     </thead>
                     <tbody>
-                      {audit?.subtypes.map((subtype) => (
+                      {audit?.subtypes?.map((subtype) => (
                         <tr key={subtype.name} className="border-b last:border-0">
                           <td className="p-2">{subtype.name}</td>
                           <td className="text-right p-2">
@@ -351,7 +351,7 @@ export default function InventoryAudit() {
                   </div>
                 </div>
 
-                {audit?.unknowns?.samples && audit.unknowns.samples.length > 0 && (
+                {(audit?.unknowns?.samples?.length ?? 0) > 0 && (
                   <div>
                     <h4 className="font-medium mb-2">Sample Records</h4>
                     <div className="overflow-x-auto">
@@ -364,7 +364,7 @@ export default function InventoryAudit() {
                           </tr>
                         </thead>
                         <tbody>
-                          {audit.unknowns.samples.map((sample, i) => (
+                          {audit?.unknowns?.samples?.map((sample, i) => (
                             <tr key={i} className="border-b last:border-0">
                               <td className="p-2 font-mono text-xs">{sample.id}</td>
                               <td className="p-2">
