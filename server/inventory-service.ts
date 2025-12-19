@@ -419,8 +419,8 @@ export async function getInventoryAudit(): Promise<InventoryAudit> {
   const errors: string[] = [];
   const warnings: string[] = [];
   
-  // Get current inventory data
-  const inventory = await getUnifiedInventory(true);
+  // Get current inventory data - use cache to prevent memory issues
+  const inventory = await getUnifiedInventory(false);
   
   // Check configuration status
   const repliersClient = getRepliersClient();
@@ -545,7 +545,7 @@ export async function getInventoryDebugData(): Promise<{
     issues: string[];
   };
 }> {
-  const inventory = await getUnifiedInventory(true); // Force refresh
+  const inventory = await getUnifiedInventory(false); // Use cache to prevent memory issues
   
   const issues: string[] = [];
   
