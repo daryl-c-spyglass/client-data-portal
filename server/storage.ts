@@ -68,6 +68,7 @@ export interface IStorage {
   getPropertyCount(): Promise<number>;
   getClosedPropertyCount(): Promise<number>;
   getClosedPropertyCountsBySubtype(): Promise<Record<string, number>>;
+  getPropertiesForAudit(limit: number): Promise<Array<{ id: number; listingId: string | null; standardStatus: string | null; propertySubType: string | null }>>;
   
   // Media operations
   getMedia(id: string): Promise<Media | undefined>;
@@ -349,6 +350,17 @@ export class MemStorage implements IStorage {
     });
     
     return counts;
+  }
+
+  async getPropertiesForAudit(limit: number): Promise<Array<{ id: number; listingId: string | null; standardStatus: string | null; propertySubType: string | null }>> {
+    return Array.from(this.properties.values())
+      .slice(0, limit)
+      .map(p => ({
+        id: typeof p.id === 'string' ? parseInt(p.id, 10) : p.id,
+        listingId: p.listingId || null,
+        standardStatus: p.standardStatus || null,
+        propertySubType: p.propertySubType || null,
+      }));
   }
 
   async searchProperties(filters: {
@@ -1127,6 +1139,26 @@ export class DbStorage implements IStorage {
     });
     
     return counts;
+  }
+
+  async getPropertiesForAudit(limit: number): Promise<Array<{ id: number; listingId: string | null; standardStatus: string | null; propertySubType: string | null }>> {
+    const result = await this.db
+      .select({
+        id: properties.id,
+        listingId: properties.listingId,
+        standardStatus: properties.standardStatus,
+        propertySubType: properties.propertySubType,
+      })
+      .from(properties)
+      .where(eq(properties.mlgCanView, true))
+      .limit(limit);
+    
+    return result.map(p => ({
+      id: parseInt(p.id, 10) || 0,
+      listingId: p.listingId,
+      standardStatus: p.standardStatus,
+      propertySubType: p.propertySubType,
+    }));
   }
 
   async searchProperties(filters: {

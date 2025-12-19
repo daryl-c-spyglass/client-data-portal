@@ -1,0 +1,99 @@
+## Replit Agent Prompt — Audit Property Inventory Status + Subtype Categories (Dashboard Counts)
+
+You are working in our IDX/CMA web app. We need to **verify and audit the current property inventory** so the Dashboard counts (Total / Active / Under Contract / Sold) are correct and we also understand the **Property Subtype** categories being used across the app.
+
+### Goal
+
+Create an **Inventory Audit** that reports:
+
+1. Current property counts by **Status**
+2. Current property counts by **Property Subtype**
+3. A **cross-tab** view: Status × Subtype (so we can validate what’s driving Dashboard totals)
+
+This should help explain why the Dashboard is showing totals like **44,558 total, 0 active, 0 under contract, 44,558 sold**.
+
+---
+
+# 1) Confirm data source and status mapping
+
+### Requirements
+
+* Identify the single source of truth currently used for inventory (Repliers / MLS Grid / DB cache, etc.).
+* Locate where “status” is mapped in the code (e.g., `Active`, `Under Contract`, `Sold/Closed`).
+* Confirm if the app is using:
+
+  * listing status field directly, or
+  * a derived mapping function.
+* Output a short note in code comments or a README about which field(s) are used and what values are expected.
+
+---
+
+# 2) Build an Inventory Audit endpoint (server-side)
+
+Create a backend route like:
+
+* `GET /api/inventory/audit`
+
+### Response requirements
+
+Return JSON that includes:
+
+* `source`: which provider is used
+* `generatedAt`: timestamp
+* `totals`:
+
+  * total count
+  * count by status (Active / Under Contract / Sold/Closed + any others)
+* `subtypes`:
+
+  * counts by property subtype (top 50)
+* `statusBySubtype`:
+
+  * cross-tab counts (Status → Subtype → count)
+* `unknowns`:
+
+  * count of records missing status or subtype
+  * sample of up to 20 records (ids + status/subtype fields only) for debugging
+
+### Performance
+
+* Use aggregation/group-by queries if inventory is stored in DB.
+* If inventory is fetched from an external API, use a cached dataset (do not pull 40k+ live every request).
+* Add caching to this endpoint (e.g., 5–15 min).
+
+---
+
+# 3) Add a simple Admin UI page (optional but preferred)
+
+Add a page like:
+
+* `/inventory-audit`
+
+### UI requirements
+
+* Show:
+
+  * Status counts table
+  * Subtype counts table (sortable)
+  * Status × Subtype table (collapsed by default)
+* Add filters:
+
+  * search subtype name
+  * toggle include/exclude “unknown” values
+
+---
+
+# 4) Acceptance tests
+
+* The audit output clearly shows why Dashboard status totals might be wrong (e.g., all records coming in as “Sold” because of status mapping).
+* We can identify the top Property Subtypes in inventory and how many exist in each status.
+
+---
+
+# Deliverables
+
+* File paths changed/added
+* The `/api/inventory/audit` JSON example output
+* Short explanation of current status and subtype field mapping used by the app
+
+---

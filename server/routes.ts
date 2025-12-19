@@ -5,7 +5,7 @@ import { createMLSGridClient } from "./mlsgrid-client";
 import { triggerManualSync } from "./mlsgrid-sync";
 import { getHomeReviewClient, mapHomeReviewPropertyToSchema, type PropertySearchParams } from "./homereview-client";
 import { initRepliersClient, getRepliersClient, isRepliersConfigured } from "./repliers-client";
-import { getUnifiedInventory, getInventoryDebugData } from "./inventory-service";
+import { getUnifiedInventory, getInventoryDebugData, getInventoryAudit } from "./inventory-service";
 import { geocodeAddress, geocodeProperties, isMapboxConfigured } from "./mapbox-geocoding";
 import { searchCriteriaSchema, insertCmaSchema, insertUserSchema, insertSellerUpdateSchema, updateSellerUpdateSchema, updateLeadGateSettingsSchema, isLikelyRentalProperty, filterOutRentalProperties } from "@shared/schema";
 import { findMatchingProperties, calculateMarketSummary } from "./seller-update-service";
@@ -3557,6 +3557,17 @@ This email was sent by ${senderName} (${senderEmail}) via the MLS Grid IDX Platf
     } catch (error: any) {
       console.error("Inventory debug error:", error.message);
       res.status(500).json({ error: "Failed to load inventory debug data" });
+    }
+  });
+  
+  // Comprehensive inventory audit endpoint
+  app.get("/api/inventory/audit", async (req, res) => {
+    try {
+      const auditData = await getInventoryAudit();
+      res.json(auditData);
+    } catch (error: any) {
+      console.error("Inventory audit error:", error.message);
+      res.status(500).json({ error: "Failed to load inventory audit data" });
     }
   });
   

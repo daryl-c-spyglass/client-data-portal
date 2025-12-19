@@ -29,6 +29,7 @@ import SharedCMAView from "@/pages/SharedCMAView";
 import MissionControl from "@/pages/MissionControl";
 import CalendarPage from "@/pages/CalendarPage";
 import LeadsPage from "@/pages/LeadsPage";
+import InventoryAudit from "@/pages/InventoryAudit";
 
 function Router() {
   return (
@@ -50,6 +51,7 @@ function Router() {
       <Route path="/reports/mission-control" component={MissionControl} />
       <Route path="/calendar" component={CalendarPage} />
       <Route path="/leads" component={LeadsPage} />
+      <Route path="/inventory-audit" component={InventoryAudit} />
       <Route component={NotFound} />
     </Switch>
   );

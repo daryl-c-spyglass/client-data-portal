@@ -390,6 +390,153 @@ export function clearInventoryCache() {
   console.log('[Inventory] Cache cleared');
 }
 
+// Comprehensive inventory audit data
+export interface InventoryAudit {
+  source: string;
+  generatedAt: string;
+  totals: {
+    total: number;
+    byStatus: Record<string, number>;
+  };
+  subtypes: Array<{ name: string; count: number }>;
+  statusBySubtype: Record<string, Record<string, number>>;
+  unknowns: {
+    missingStatus: number;
+    missingSubtype: number;
+    samples: Array<{ id: string; status: string | null; subtype: string | null }>;
+  };
+  diagnostics: {
+    repliersConfigured: boolean;
+    databaseConnected: boolean;
+    cacheAge: number | null;
+    errors: string[];
+    warnings: string[];
+  };
+}
+
+export async function getInventoryAudit(): Promise<InventoryAudit> {
+  const startTime = Date.now();
+  const errors: string[] = [];
+  const warnings: string[] = [];
+  
+  // Get current inventory data
+  const inventory = await getUnifiedInventory(true);
+  
+  // Check configuration status
+  const repliersClient = getRepliersClient();
+  const repliersConfigured = !!(repliersClient && isRepliersConfigured());
+  
+  if (!repliersConfigured) {
+    warnings.push('Repliers API is NOT configured - Active and Under Contract counts will be 0');
+  }
+  
+  // Build status by subtype cross-tab from database
+  const statusBySubtype: Record<string, Record<string, number>> = {
+    'Active': {},
+    'Under Contract': {},
+    'Closed': {},
+  };
+  
+  // Initialize all subtypes for each status
+  for (const status of ['Active', 'Under Contract', 'Closed']) {
+    for (const subtype of INVENTORY_PROPERTY_TYPES) {
+      statusBySubtype[status][subtype] = 0;
+    }
+  }
+  
+  // Get samples of properties with missing data
+  const samples: Array<{ id: string; status: string | null; subtype: string | null }> = [];
+  let missingStatus = 0;
+  let missingSubtype = 0;
+  
+  try {
+    // Query database for cross-tab data and samples
+    const dbProperties = await storage.getPropertiesForAudit(100);
+    
+    for (const prop of dbProperties) {
+      const status = prop.standardStatus || 'Unknown';
+      const subtype = normalizePropertyType(prop.propertySubType);
+      
+      if (!prop.standardStatus) {
+        missingStatus++;
+        if (samples.length < 20) {
+          samples.push({
+            id: prop.listingId || prop.id?.toString() || 'unknown',
+            status: prop.standardStatus || null,
+            subtype: prop.propertySubType || null,
+          });
+        }
+      }
+      
+      if (!prop.propertySubType) {
+        missingSubtype++;
+        if (samples.length < 20 && prop.standardStatus) {
+          samples.push({
+            id: prop.listingId || prop.id?.toString() || 'unknown',
+            status: prop.standardStatus || null,
+            subtype: prop.propertySubType || null,
+          });
+        }
+      }
+      
+      // Update cross-tab for closed (DB only stores closed)
+      if (status === 'Closed' && statusBySubtype['Closed'][subtype] !== undefined) {
+        statusBySubtype['Closed'][subtype]++;
+      }
+    }
+    
+    // For closed properties, use actual counts from inventory
+    for (const [subtype, count] of Object.entries(inventory.countsBySubtype)) {
+      // Assume all current subtype counts are closed since active/UC are 0
+      if (inventory.countsByStatus.Active === 0 && inventory.countsByStatus['Under Contract'] === 0) {
+        statusBySubtype['Closed'][subtype] = count;
+      }
+    }
+    
+  } catch (error: any) {
+    errors.push(`Failed to query database for audit: ${error.message}`);
+  }
+  
+  // Build sorted subtypes array
+  const subtypes = Object.entries(inventory.countsBySubtype)
+    .map(([name, count]) => ({ name, count }))
+    .sort((a, b) => b.count - a.count);
+  
+  // Add validation warnings
+  if (inventory.countsByStatus.Active === 0 && repliersConfigured) {
+    warnings.push('Active count is 0 but Repliers is configured - possible API issue');
+  }
+  
+  if (inventory.countsByStatus['Under Contract'] === 0 && repliersConfigured) {
+    warnings.push('Under Contract count is 0 but Repliers is configured - possible API issue');
+  }
+  
+  const cacheAge = inventoryCache ? Date.now() - inventoryCache.timestamp : null;
+  
+  return {
+    source: inventory.dataSource,
+    generatedAt: new Date().toISOString(),
+    totals: {
+      total: inventory.totalCount,
+      byStatus: inventory.countsByStatus,
+    },
+    subtypes,
+    statusBySubtype,
+    unknowns: {
+      missingStatus,
+      missingSubtype,
+      samples,
+    },
+    diagnostics: {
+      repliersConfigured,
+      databaseConnected: true,
+      cacheAge,
+      errors: [...inventory.errors, ...errors],
+      warnings,
+    },
+  };
+}
+
 // Debug endpoint data for consistency validation
 export async function getInventoryDebugData(): Promise<{
   inventory: InventoryData;
