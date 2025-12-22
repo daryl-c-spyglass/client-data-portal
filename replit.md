@@ -52,6 +52,15 @@ The UI incorporates Spyglass Realty branding with an orange primary color scheme
     - `GET /api/debug/listings/dedupe-report?size=100` - Dedupe diagnostics
     - `GET /api/debug/listings/canonical?status=Active&city=Austin&limit=50` - Filtered canonical listings
 
+- **AI Assistant**: Conversational property search assistant powered by OpenAI GPT-4o
+  - **Provider**: OpenAI Chat Completions API with JSON response mode
+  - **Files**: `server/openai-client.ts` (backend), `client/src/components/ChatAssistant.tsx` (frontend)
+  - **Voice Input**: Browser Web Speech API (client-side, not Whisper)
+  - **Scope**: Property search only - explicitly scoped to IDX search functionality
+  - **Capabilities**: Search criteria extraction, slot-filling conversation, neighborhood Q&A
+  - **Limitations**: Cannot create CMAs, schedule showings, or provide valuations - redirects users to appropriate platform tools
+  - **Endpoints**: `POST /api/chat`, `GET /api/chat/status`
+
 ### Feature Specifications
 
 - **IDX Platform**: Comprehensive property browsing, search, and filtering capabilities.
