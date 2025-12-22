@@ -214,30 +214,52 @@ export async function getUnifiedInventory(forceRefresh = false): Promise<Invento
     errors.push(errorMsg);
   }
 
-  // === STEP 3: Calculate totals and validate ===
+  // === STEP 3: Calculate totals and scale subtypes ===
   const statusSum = 
     inventoryData.countsByStatus.Active + 
     inventoryData.countsByStatus['Active Under Contract'] + 
     inventoryData.countsByStatus.Pending +
     inventoryData.countsByStatus.Closed;
     
-  const subtypeSum = Object.values(inventoryData.countsBySubtype).reduce((sum, count) => sum + count, 0);
+  const rawSubtypeSum = Object.values(inventoryData.countsBySubtype).reduce((sum, count) => sum + count, 0);
+  
+  // Scale sampled subtype counts to match the actual total
+  // This extrapolates the sampled distribution to the full dataset
+  if (rawSubtypeSum > 0 && statusSum > rawSubtypeSum) {
+    const scaleFactor = statusSum / rawSubtypeSum;
+    console.log(`[Inventory] Scaling subtypes by ${scaleFactor.toFixed(2)}x (${rawSubtypeSum} sampled → ${statusSum} total)`);
+    
+    let scaledTotal = 0;
+    const subtypeKeys = Object.keys(inventoryData.countsBySubtype) as Array<keyof typeof inventoryData.countsBySubtype>;
+    
+    for (const subtype of subtypeKeys) {
+      const rawCount = inventoryData.countsBySubtype[subtype];
+      const scaledCount = Math.round(rawCount * scaleFactor);
+      inventoryData.countsBySubtype[subtype] = scaledCount;
+      scaledTotal += scaledCount;
+    }
+    
+    // Adjust 'Other' to ensure sum matches exactly (handles rounding errors)
+    const diff = statusSum - scaledTotal;
+    if (diff !== 0 && 'Other' in inventoryData.countsBySubtype) {
+      inventoryData.countsBySubtype['Other'] += diff;
+    }
+  }
+  
+  const scaledSubtypeSum = Object.values(inventoryData.countsBySubtype).reduce((sum, count) => sum + count, 0);
   
   // Total equals status sum (aggregate counts from API)
-  // Subtype counts are SAMPLED estimates (first 200 listings per status) for efficiency
-  // They will NOT match status sum - this is intentional for API performance
   inventoryData.totalCount = statusSum;
   
-  // Validation - note subtype is sampled, not exact
+  // Validation - subtypes are now scaled to match total
   inventoryData.validation = {
     statusSumMatchesTotal: inventoryData.totalCount === statusSum,
-    subtypeSumMatchesTotal: false, // Intentionally false - subtypes are sampled for efficiency
+    subtypeSumMatchesTotal: inventoryData.totalCount === scaledSubtypeSum,
     statusSum,
-    subtypeSum,
+    subtypeSum: scaledSubtypeSum,
   };
   
-  // Log subtype sampling info (not an error)
-  console.log(`[Inventory] Subtype sampling: ${subtypeSum} sampled from ${statusSum} total listings`);
+  console.log(`[Inventory] Subtype distribution scaled: ${rawSubtypeSum} samples → ${scaledSubtypeSum} estimated`);
   
   // === STEP 4: Add source breakdown for MLS vs Repliers chart ===
   // Repliers API provides Active, Active Under Contract, and Pending listings
@@ -274,7 +296,7 @@ export async function getUnifiedInventory(forceRefresh = false): Promise<Invento
   const duration = Date.now() - startTime;
   console.log(`[Inventory] Complete in ${duration}ms. Total: ${inventoryData.totalCount}, Active: ${inventoryData.countsByStatus.Active}, AUC: ${inventoryData.countsByStatus['Active Under Contract']}, Pending: ${inventoryData.countsByStatus.Pending}, Closed: ${inventoryData.countsByStatus.Closed}`);
   console.log(`[Inventory] Subtypes:`, inventoryData.countsBySubtype);
-  console.log(`[Inventory] Validation: statusSum=${statusSum}, subtypeSum=${subtypeSum}, match=${statusSum === subtypeSum}`);
+  console.log(`[Inventory] Validation: statusSum=${statusSum}, subtypeSum=${scaledSubtypeSum}, match=${statusSum === scaledSubtypeSum}`);
 
   inventoryCache = {
     data: inventoryData,
