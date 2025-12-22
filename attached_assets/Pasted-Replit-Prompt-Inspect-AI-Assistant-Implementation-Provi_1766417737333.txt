@@ -1,0 +1,187 @@
+Replit Prompt: Inspect AI Assistant Implementation (Provider, Capabilities, Scope)
+
+You are working in an existing web app that includes an AI Assistant feature (supports property search and voice dictation). Before adding new functionality, we need to inspect and document the current implementation.
+
+Objective
+
+Determine:
+
+What powers the AI Assistant today (OpenAI, other LLM, rules-based logic, or hybrid)
+
+How it currently works
+
+What it is capable of vs not capable of
+
+Where and how we should safely extend it (e.g., CMA creation)
+
+Phase 1 — Locate the AI Assistant Code (Required)
+
+Search the repo for:
+
+assistant
+
+ai
+
+chat
+
+voice
+
+speech
+
+openai
+
+gpt
+
+llm
+
+completion
+
+transcription
+
+whisper
+
+speech-to-text
+
+any .env variables referencing AI providers
+
+Identify:
+
+Frontend components related to the assistant
+
+Backend/API routes handling assistant logic
+
+Any service/client files related to AI or NLP
+
+List all relevant files before changing anything.
+
+Phase 2 — Identify the AI Provider (Critical)
+
+Determine which of the following applies:
+
+OpenAI (Chat Completions, Assistants API, or other)
+
+Third-party LLM (Anthropic, Azure OpenAI, etc.)
+
+Replit AI / Ghostwriter APIs
+
+Rules-based logic (no LLM)
+
+Hybrid (LLM + deterministic logic)
+
+Specifically check:
+
+API client imports
+
+HTTP calls to external AI endpoints
+
+Environment variables (e.g. OPENAI_API_KEY, ANTHROPIC_API_KEY)
+
+Any SDK usage
+
+Document:
+
+Provider name
+
+Model (if applicable)
+
+How prompts are constructed (static vs dynamic)
+
+Where responses are parsed
+
+Phase 3 — Current Capability Assessment
+
+From the code, determine what the assistant currently does:
+
+Property search only?
+
+Voice → text only?
+
+Does it:
+
+understand intent?
+
+maintain conversational state?
+
+call internal APIs (IDX search)?
+
+return structured data or just text?
+
+Answer explicitly:
+
+Is this a chatbot or a command interface?
+
+Is it stateless or stateful?
+
+Is it safe/deterministic enough to drive business actions (like CMA creation)?
+
+Phase 4 — Extension Readiness Check (CMA Use Case)
+
+Evaluate whether the current assistant can support:
+
+Intent detection (e.g. “pull a CMA for Barton Hills”)
+
+Slot filling (asking follow-up questions)
+
+Triggering internal workflows (create CMA record)
+
+Identify:
+
+What’s missing
+
+What can be reused
+
+What should NOT be added yet
+
+Do NOT implement CMA logic yet — this is analysis only.
+
+Phase 5 — Output Required
+
+When finished, provide a clear summary:
+
+AI Provider
+
+What it is
+
+Where it’s configured
+
+Current Assistant Architecture
+
+Components involved
+
+Data flow (voice → text → search → response)
+
+Current Limitations
+
+What it cannot do safely today
+
+Recommendation
+
+Keep assistant scoped to IDX search only, OR
+
+Extend with guided CMA flow
+
+Whether an LLM upgrade/change is needed
+
+No UI or behavior changes should be made during this task.
+
+Acceptance Criteria
+
+We know exactly what AI technology is being used
+
+We know where to extend or constrain behavior
+
+No assumptions are made without code confirmation
+
+No production logic is modified
+
+Now inspect the codebase and report findings.
+
+Why this prompt works
+
+It removes guesswork
+
+It prevents accidental overengineering
+
+It gives you a factual basis before responding to the client
+
+It keeps scope tight (analysis only)
