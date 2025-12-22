@@ -179,8 +179,6 @@ interface SearchFilters {
   cityMode?: string;
   subdivision?: string;
   subdivisionMode?: string;
-  neighborhood?: string;
-  neighborhoodMode?: string;
   
   // Address
   streetNumber?: string;
@@ -541,10 +539,6 @@ export default function BuyerSearch() {
       filters.subdivision.split(',').map(s => s.trim()).filter(s => s).forEach(s => params.append('subdivisions', s));
       if (filters.subdivisionMode) params.set('subdivisionMode', filters.subdivisionMode);
     }
-    if (filters.neighborhood) {
-      filters.neighborhood.split(',').map(n => n.trim()).filter(n => n).forEach(n => params.append('neighborhoods', n));
-      if (filters.neighborhoodMode) params.set('neighborhoodMode', filters.neighborhoodMode);
-    }
     if (filters.postalCode) {
       filters.postalCode.split(',').map(z => z.trim()).filter(z => z).forEach(z => params.append('postalCodes', z));
     }
@@ -597,12 +591,6 @@ export default function BuyerSearch() {
     if (filters.subdivision) {
       filters.subdivision.split(',').map(s => s.trim()).filter(s => s).forEach(s => params.append('subdivisions', s));
       if (filters.subdivisionMode) params.set('subdivisionMode', filters.subdivisionMode);
-    }
-    
-    // Location - Neighborhoods (comma-separated to array)
-    if (filters.neighborhood) {
-      filters.neighborhood.split(',').map(n => n.trim()).filter(n => n).forEach(n => params.append('neighborhoods', n));
-      if (filters.neighborhoodMode) params.set('neighborhoodMode', filters.neighborhoodMode);
     }
     
     // Location - Postal Codes (comma-separated to array)
@@ -674,17 +662,10 @@ export default function BuyerSearch() {
       const zips = filters.postalCode.split(',').map(z => z.trim()).filter(z => z);
       if (zips.length > 0) params.set('postalCode', zips[0]);
     }
-    // For Repliers API, both subdivision and neighborhood map to the 'neighborhood' field
-    // Combine both filters if present
-    const subdivisionsList = filters.subdivision 
-      ? filters.subdivision.split(',').map(s => s.trim()).filter(s => s) 
-      : [];
-    const neighborhoodsList = filters.neighborhood 
-      ? filters.neighborhood.split(',').map(n => n.trim()).filter(n => n) 
-      : [];
-    const allNeighborhoodValues = [...subdivisionsList, ...neighborhoodsList];
-    if (allNeighborhoodValues.length > 0) {
-      params.set('neighborhood', allNeighborhoodValues[0]); // Repliers only takes single value
+    // Subdivision filter - maps to 'subdivision' parameter for local filtering
+    if (filters.subdivision) {
+      const subdivisions = filters.subdivision.split(',').map(s => s.trim()).filter(s => s);
+      if (subdivisions.length > 0) params.set('subdivision', subdivisions[0]);
     }
     
     // Property type - map to Repliers class values (residential, condo, commercial)

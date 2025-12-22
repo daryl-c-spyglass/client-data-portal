@@ -155,7 +155,6 @@ interface InitialCMAData {
   searchCriteria?: {
     city?: string;
     subdivision?: string;
-    neighborhood?: string;
     zipCode?: string;
     minBeds?: string;
     minPrice?: string;

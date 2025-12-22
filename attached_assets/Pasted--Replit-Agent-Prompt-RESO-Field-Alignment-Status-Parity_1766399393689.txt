@@ -1,0 +1,105 @@
+## Replit Agent Prompt — RESO Field Alignment + Status Parity (Remove Neighborhood, Use Subdivision, Match MLS Statuses)
+
+You are working in our IDX/CMA/Client Data Portal web app. We need to align searches and filters to **RESO-compliant fields** and ensure listing **statuses match MLS exactly**, to eliminate mismatched counts and missing listings.
+
+---
+
+# 1) Remove “Neighborhood” everywhere (Buyer Search + CMA + Client Data Portal)
+
+### Requirements
+
+* Remove the **Neighborhood** filter field from:
+
+  * Buyer Search
+  * CMA search
+  * Client Data Portal search/filters
+* Ensure the UI, query builders, and backend requests do not reference Neighborhood at all.
+* If any saved searches or URLs contain `neighborhood=...`, ignore it safely (do not break the page).
+
+### Acceptance test
+
+* No page shows a Neighborhood filter.
+* No backend request includes Neighborhood.
+
+---
+
+# 2) Replace Neighborhood with RESO-compliant “Subdivision” (and align other fields)
+
+### Requirements
+
+* Add/confirm **Subdivision** filter is available and used instead.
+* Audit search fields to ensure they use RESO-friendly equivalents:
+
+  * City
+  * Subdivision
+  * Postal Code / Zip
+  * Property Type
+  * Beds / Baths
+  * Price
+  * SqFt / Living Area
+  * Lot Size
+  * Year Built
+  * Status
+* Update the query builder so it uses the correct field names expected by our inventory provider (Repliers/MLS) for these RESO fields.
+
+### Acceptance test
+
+* Filtering by Subdivision returns expected results and matches MLS behavior more closely.
+
+---
+
+# 3) Status handling: Match MLS exactly (no normalization that hides listings)
+
+### Requirements
+
+* Update status logic so the app displays and filters using **MLS-native statuses** (as-is).
+* Do NOT collapse, rename, or simplify statuses in a way that changes results.
+* Ensure that statuses like:
+
+  * `AU` (Active Under Contract)
+  * `Pending`
+  * `Active`
+  * `Closed/Sold`
+    are handled and displayed correctly, and included when expected.
+
+### Implementation guidance
+
+* Centralize status mapping into a single module, e.g. `statusMapping.ts`.
+* Support both:
+
+  * raw code (e.g., `AU`)
+  * display label (e.g., “Active Under Contract”)
+* When showing Status in UI, display the MLS label or the best human-readable label without changing the meaning.
+
+### Acceptance tests
+
+* Listings with `AU` appear in results when filters should include them.
+* Dashboard counts do not show everything as Closed unless that is truly what the data says.
+
+---
+
+# 4) Ensure consistency across sections (Buyer Search, CMA, Client Data Portal, Dashboard counts)
+
+### Requirements
+
+* Confirm that the same filter logic/status logic is shared across:
+
+  * Buyer Search results
+  * CMA results
+  * Client Data Portal search
+  * Dashboard summary counts (Active/Under Contract/Sold)
+* Remove any separate “status buckets” logic that conflicts with MLS-native values, unless explicitly required.
+
+### Acceptance tests
+
+* Same criteria in MLS vs app returns similar matching results (e.g., MLS 10 vs app 10, not 7).
+* Counts in dashboard correspond to the inventory returned by the same query rules.
+
+---
+
+# Deliverables
+
+* List file paths changed
+* Confirm Neighborhood removed and Subdivision used
+* Confirm statuses match MLS (including AU and Pending)
+* Provide a brief note describing the final status mapping approach used in code
