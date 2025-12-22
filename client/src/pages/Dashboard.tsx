@@ -969,7 +969,7 @@ export default function Dashboard() {
                           <Info className="w-4 h-4 text-muted-foreground cursor-help" />
                         </TooltipTrigger>
                         <TooltipContent>
-                          <p>Active + Under Contract (from Repliers) + Sold (from database)</p>
+                          <p>Active + Active Under Contract (from Repliers) + Closed (from database)</p>
                         </TooltipContent>
                       </Tooltip>
                     </CardHeader>
@@ -992,7 +992,7 @@ export default function Dashboard() {
                             </p>
                             <p className="flex items-center gap-1">
                               <span className="w-2 h-2 rounded-full bg-slate-500"></span>
-                              {(inventorySummary?.countsByStatus?.['Closed'] ?? stats?.totalClosedProperties ?? 0).toLocaleString()} Sold
+                              {(inventorySummary?.countsByStatus?.['Closed'] ?? stats?.totalClosedProperties ?? 0).toLocaleString()} Closed
                             </p>
                           </div>
                         </>
@@ -1342,7 +1342,7 @@ export default function Dashboard() {
                         <Clock className="w-5 h-5" />
                         {domAnalytics && domAnalytics.length > 0 && domAnalytics[0].count > 0 
                           ? 'Days on Market Analytics' 
-                          : 'Recent Sold/Closed'}
+                          : 'Recently Closed'}
                         {!domAnalytics?.length && recentSoldData?.personalized && (
                           <Badge variant="secondary" className="text-xs">Personalized</Badge>
                         )}

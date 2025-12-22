@@ -357,7 +357,7 @@ export function CMAReport({
             </div>
             <div className="pt-2 border-t">
               <p className="text-xs text-muted-foreground italic">
-                This analysis is based on {activeProperties.length} active, {underContractProperties.length} under contract, and {soldProperties.length} sold/closed properties in your selection.
+                This analysis is based on {activeProperties.length} Active, {underContractProperties.length} Active Under Contract, and {soldProperties.length} Closed properties in your selection.
               </p>
             </div>
           </CardContent>
@@ -618,7 +618,7 @@ export function CMAReport({
                         </div>
                         <div className="flex flex-wrap gap-x-3 text-xs text-muted-foreground mt-1">
                           {(property as any).listDate && <span>Listed: {new Date((property as any).listDate).toLocaleDateString()}</span>}
-                          {isSold && property.closeDate && <span>Sold: {new Date(property.closeDate).toLocaleDateString()}</span>}
+                          {isSold && property.closeDate && <span>Closed: {new Date(property.closeDate).toLocaleDateString()}</span>}
                         </div>
                       </div>
                     </div>
@@ -638,9 +638,9 @@ export function CMAReport({
               <Tabs value={activeListingTab} onValueChange={setActiveListingTab}>
                 <TabsList>
                   <TabsTrigger value="all" data-testid="subtab-all">All ({allProperties.length})</TabsTrigger>
-                  <TabsTrigger value="sold" data-testid="subtab-sold">Sold ({soldProperties.length})</TabsTrigger>
+                  <TabsTrigger value="sold" data-testid="subtab-sold">Closed ({soldProperties.length})</TabsTrigger>
                   <TabsTrigger value="under-contract" data-testid="subtab-under-contract">
-                    Under Contract ({underContractProperties.length})
+                    AUC ({underContractProperties.length})
                   </TabsTrigger>
                   <TabsTrigger value="active" data-testid="subtab-active">Active ({activeProperties.length})</TabsTrigger>
                 </TabsList>
@@ -700,7 +700,7 @@ export function CMAReport({
                 <CardHeader className="pb-2">
                   <CardTitle className="text-base">
                     {activeListingTab === 'all' ? 'All Properties' :
-                     activeListingTab === 'sold' ? 'Sold Properties' :
+                     activeListingTab === 'sold' ? 'Closed Properties' :
                      activeListingTab === 'under-contract' ? 'Active Under Contract' : 'Active Listings'} - Price Low to High
                   </CardTitle>
                 </CardHeader>
@@ -782,7 +782,7 @@ export function CMAReport({
                                   {pricePerSqft && <span>${pricePerSqft.toFixed(0)}/sqft</span>}
                                 </div>
                                 <div className="flex flex-wrap gap-x-3 text-xs text-muted-foreground mt-1">
-                                  {isSold && property.closeDate && <span>Sold: {new Date(property.closeDate).toLocaleDateString()}</span>}
+                                  {isSold && property.closeDate && <span>Closed: {new Date(property.closeDate).toLocaleDateString()}</span>}
                                   {!isSold && property.daysOnMarket !== null && property.daysOnMarket !== undefined && <span>{property.daysOnMarket} DOM</span>}
                                   {property.propertySubType && <span>{property.propertySubType}</span>}
                                 </div>
@@ -822,7 +822,7 @@ export function CMAReport({
                       <div className="flex items-center gap-1">
                         <span className="text-lg">🏠</span>
                         <div className="w-2 h-2 rounded-sm bg-gray-500"></div>
-                        <span>Sold</span>
+                        <span>Closed</span>
                       </div>
                     </div>
                   </div>
@@ -1020,13 +1020,13 @@ export function CMAReport({
                         <div className="text-2xl font-bold text-primary">
                           {medianSoldPrice > 0 ? `$${medianSoldPrice.toLocaleString()}` : 'N/A'}
                         </div>
-                        <div className="text-sm text-muted-foreground">Median Sold Price</div>
+                        <div className="text-sm text-muted-foreground">Median Close Price</div>
                       </div>
                       <div className="text-center p-3 bg-background rounded-lg border">
                         <div className="text-2xl font-bold">
                           {avgDOMSold > 0 ? `${Math.round(avgDOMSold)} days` : 'N/A'}
                         </div>
-                        <div className="text-sm text-muted-foreground">Avg Days on Market (Sold)</div>
+                        <div className="text-sm text-muted-foreground">Avg Days on Market (Closed)</div>
                       </div>
                       <div className="text-center p-3 bg-background rounded-lg border">
                         <div className="text-2xl font-bold">
@@ -1041,7 +1041,7 @@ export function CMAReport({
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div className="flex items-center justify-between p-3 bg-background rounded-lg border">
                           <div>
-                            <div className="text-sm text-muted-foreground">YoY Avg Sold Price</div>
+                            <div className="text-sm text-muted-foreground">YoY Avg Close Price</div>
                             <div className="text-xs text-muted-foreground/70">vs prior 12 months</div>
                           </div>
                           <div className={`text-xl font-bold flex items-center gap-1 ${
@@ -1060,7 +1060,7 @@ export function CMAReport({
                         </div>
                         <div className="flex items-center justify-between p-3 bg-background rounded-lg border">
                           <div>
-                            <div className="text-sm text-muted-foreground">YoY Median Sold Price</div>
+                            <div className="text-sm text-muted-foreground">YoY Median Close Price</div>
                             <div className="text-xs text-muted-foreground/70">vs prior 12 months</div>
                           </div>
                           <div className={`text-xl font-bold flex items-center gap-1 ${
@@ -1177,11 +1177,11 @@ export function CMAReport({
                                     <span className={`font-medium ${statusColor}`}>{data.status}</span>
                                   </p>
                                   <p className="flex justify-between gap-4">
-                                    <span>{data.status === 'Closed' ? 'Sold Price:' : 'List Price:'}</span>
+                                    <span>{data.status === 'Closed' ? 'Close Price:' : 'List Price:'}</span>
                                     <span className="font-medium text-foreground">${Number(data.price).toLocaleString()}</span>
                                   </p>
                                   <p className="flex justify-between gap-4">
-                                    <span>{data.status === 'Closed' ? 'Sold Date:' : 'List Date:'}</span>
+                                    <span>{data.status === 'Closed' ? 'Close Date:' : 'List Date:'}</span>
                                     <span className="font-medium text-foreground">{new Date(data.date).toLocaleDateString()}</span>
                                   </p>
                                   {data.status === 'Closed' && data.daysOnMarket != null && (
@@ -1422,7 +1422,7 @@ export function CMAReport({
               </div>
               <div className="pt-2 border-t">
                 <p className="text-xs text-muted-foreground italic">
-                  This analysis is based on {activeProperties.length} active, {underContractProperties.length} under contract, and {soldProperties.length} sold/closed properties in your selection.
+                  This analysis is based on {activeProperties.length} Active, {underContractProperties.length} Active Under Contract, and {soldProperties.length} Closed properties in your selection.
                 </p>
               </div>
             </CardContent>
@@ -1539,7 +1539,7 @@ export function CMAReport({
                       <div className="flex items-center gap-1">
                         <span className="text-lg">🏠</span>
                         <div className="w-2 h-2 rounded-sm bg-gray-500"></div>
-                        <span>Sold</span>
+                        <span>Closed</span>
                       </div>
                     </div>
                   </div>
@@ -1752,13 +1752,13 @@ export function CMAReport({
               },
               {
                 key: 'sold',
-                label: 'Sold/Closed',
+                label: 'Closed',
                 properties: soldProperties,
                 borderClass: 'border-red-200 dark:border-red-800',
                 bgClass: 'bg-red-50 dark:bg-red-950/30',
                 dotClass: 'bg-red-500',
                 titleClass: 'text-red-700 dark:text-red-400',
-                emptyText: 'No sold/closed listings in this CMA',
+                emptyText: 'No closed listings in this CMA',
                 isSold: true
               }
             ];
@@ -1812,7 +1812,7 @@ export function CMAReport({
                                 <span>{property.bathroomsTotalInteger || 0} baths</span>
                                 {property.livingArea && <span>{Number(property.livingArea).toLocaleString()} sqft</span>}
                                 {pricePerSqft && <span>${pricePerSqft.toFixed(0)}/sqft</span>}
-                                {section.isSold && property.closeDate && <span>Sold: {new Date(property.closeDate).toLocaleDateString()}</span>}
+                                {section.isSold && property.closeDate && <span>Closed: {new Date(property.closeDate).toLocaleDateString()}</span>}
                                 {!section.isSold && property.daysOnMarket && <span>{property.daysOnMarket} DOM</span>}
                               </div>
                               <p className="text-xs text-muted-foreground">{property.propertySubType || property.propertyType}</p>
@@ -2002,7 +2002,7 @@ export function CMAReport({
                 )}
                 {floatingCardProperty.standardStatus === 'Closed' && floatingCardProperty.closeDate && (
                   <div className="flex justify-between">
-                    <span className="text-muted-foreground">Sold Date</span>
+                    <span className="text-muted-foreground">Close Date</span>
                     <span className="font-medium">{new Date(floatingCardProperty.closeDate).toLocaleDateString()}</span>
                   </div>
                 )}

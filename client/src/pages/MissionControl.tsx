@@ -114,7 +114,7 @@ function SideBreakdown({ title, data }: {
         {data.underContract.count > 0 && (
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <Badge variant="outline" className="bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200">Under Contract</Badge>
+              <Badge variant="outline" className="bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200">Active Under Contract</Badge>
               <span className="text-sm">{data.underContract.count} pending</span>
             </div>
             <span className="font-medium">{formatVolume(data.underContract.volume)}</span>

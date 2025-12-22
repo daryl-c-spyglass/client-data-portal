@@ -32,7 +32,14 @@ The UI incorporates Spyglass Realty branding with an orange primary color scheme
 - **Location Data**: Neighborhood information is derived from boundary polygon resolution using lat/lng coordinates, distinct from subdivision data provided by MLS listings.
 - **Caching**: In-memory caches are used for frequently accessed data from external APIs (e.g., FUB, ReZen) to reduce load and improve performance.
 - **Rate Limiting**: A built-in rate limiter manages external API requests to comply with usage policies.
-- **Property Status Handling**: Comprehensive logic for handling various listing statuses (Active, Pending, Closed, Under Contract) from different data sources, including `standardStatus` and `lastStatus` fields.
+- **Property Status Handling**: All user-facing status labels strictly follow the RESO Data Dictionary 4-status hierarchy:
+  - **Active**: Properties currently on the market
+  - **Active Under Contract**: Properties with accepted offers still showing (abbreviated "AUC" in compact UI contexts like tabs/legends)
+  - **Pending**: Properties with accepted offers no longer showing
+  - **Closed**: Completed sales (never displayed as "Sold" in UI)
+  - Internal variable names may use legacy terms like `soldProperties` but UI labels always use canonical RESO values
+  - Helper function `getStandardStatusLabel()` in `shared/statusMapping.ts` provides canonical label mapping
+  - "Close Date" and "Close Price" are used instead of "Sold Date" and "Sold Price"
 
 ### Feature Specifications
 

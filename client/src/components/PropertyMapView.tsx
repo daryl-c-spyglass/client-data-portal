@@ -353,11 +353,11 @@ export function PropertyMapView({ properties, onPropertyClick, isLoading }: Prop
             </div>
             <div className="flex items-center gap-2">
               <div className="w-3 h-3 rounded-full bg-amber-500"></div>
-              <span>Under Contract</span>
+              <span>AUC</span>
             </div>
             <div className="flex items-center gap-2">
               <div className="w-3 h-3 rounded-full bg-gray-500"></div>
-              <span>Closed/Other</span>
+              <span>Closed</span>
             </div>
           </div>
         </Card>

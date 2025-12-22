@@ -485,7 +485,7 @@ export default function Settings() {
                   </div>
                   <div>
                     <p className="font-medium">MLS Grid API</p>
-                    <p className="text-xs text-muted-foreground">Sold/Closed listings from Austin Board of REALTORS</p>
+                    <p className="text-xs text-muted-foreground">Closed listings from Austin Board of REALTORS</p>
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
@@ -510,12 +510,12 @@ export default function Settings() {
                     <p className="font-medium">Repliers API</p>
                     <p className="text-xs text-muted-foreground">
                       {repliersCapabilities 
-                        ? `Active: ${repliersCapabilities.active ? '✓' : '✗'}, Under Contract: ${repliersCapabilities.underContract ? '✓' : '✗'}, Sold: ${repliersCapabilities.sold ? '✓' : '✗ (not enabled)'}`
-                        : 'Active/Under Contract listings with photos'}
+                        ? `Active: ${repliersCapabilities.active ? '✓' : '✗'}, AUC: ${repliersCapabilities.underContract ? '✓' : '✗'}, Closed: ${repliersCapabilities.sold ? '✓' : '✗ (not enabled)'}`
+                        : 'Active/AUC listings with photos'}
                     </p>
                     {repliersCapabilities && !repliersCapabilities.sold && (
                       <p className="text-xs text-amber-600 dark:text-amber-400 mt-1">
-                        Sold data requires Repliers to enable it for your feed
+                        Closed data requires Repliers to enable it for your feed
                       </p>
                     )}
                   </div>

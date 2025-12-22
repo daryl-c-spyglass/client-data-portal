@@ -132,10 +132,10 @@ export function PropertyResults({
                 {statusGroups.pending.length} Pending
               </TabsTrigger>
               <TabsTrigger value="under-contract" data-testid="tab-under-contract">
-                {statusGroups.underContract.length} Under Contract
+                {statusGroups.underContract.length} AUC
               </TabsTrigger>
               <TabsTrigger value="closed" data-testid="tab-closed">
-                {statusGroups.closed.length} Closed (Sold)
+                {statusGroups.closed.length} Closed
               </TabsTrigger>
             </TabsList>
           </Tabs>
@@ -165,7 +165,7 @@ export function PropertyResults({
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="status">Active - Pending - Closed</SelectItem>
+              <SelectItem value="status">Active - AUC - Pending - Closed</SelectItem>
               <SelectItem value="price-asc">Price: Low to High</SelectItem>
               <SelectItem value="price-desc">Price: High to Low</SelectItem>
               <SelectItem value="date-new">Newest First</SelectItem>

@@ -368,8 +368,8 @@ export function PropertyDetail({
                     <div>
                       <h4 className="font-semibold mb-2">Sale Information</h4>
                       <ul className="space-y-1 text-sm text-muted-foreground">
-                        {property.closePrice && <li>Sold Price: ${Number(property.closePrice).toLocaleString()}</li>}
-                        {property.closeDate && <li>Sold Date: {new Date(property.closeDate).toLocaleDateString()}</li>}
+                        {property.closePrice && <li>Close Price: ${Number(property.closePrice).toLocaleString()}</li>}
+                        {property.closeDate && <li>Close Date: {new Date(property.closeDate).toLocaleDateString()}</li>}
                         {property.closePrice && property.listPrice && (
                           <li>Sale/List Ratio: {((Number(property.closePrice) / Number(property.listPrice)) * 100).toFixed(1)}%</li>
                         )}

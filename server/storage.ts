@@ -1088,10 +1088,7 @@ export class DbStorage implements IStorage {
       .from(properties)
       .where(and(
         eq(properties.mlgCanView, true),
-        or(
-          eq(properties.standardStatus, 'Closed'),
-          eq(properties.standardStatus, 'Sold')
-        )
+        eq(properties.standardStatus, 'Closed')
       ));
     return result[0]?.count || 0;
   }
@@ -1106,10 +1103,7 @@ export class DbStorage implements IStorage {
       .from(properties)
       .where(and(
         eq(properties.mlgCanView, true),
-        or(
-          eq(properties.standardStatus, 'Closed'),
-          eq(properties.standardStatus, 'Sold')
-        )
+        eq(properties.standardStatus, 'Closed')
       ));
     
     const counts: Record<string, number> = {

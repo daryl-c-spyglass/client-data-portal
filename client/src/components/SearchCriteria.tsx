@@ -286,10 +286,10 @@ export function SearchCriteriaForm({ onSearch, initialCriteria = {} }: SearchCri
               </Popover>
             </div>
           </div>
-          {/* Sold Date Quick Filters */}
+          {/* Close Date Quick Filters */}
           <div className="space-y-1 pt-2">
             <div className="flex items-center justify-between">
-              <Label className="text-xs text-muted-foreground">Quick Filters (Sold Date)</Label>
+              <Label className="text-xs text-muted-foreground">Quick Filters (Close Date)</Label>
               {(criteria.dateRange?.from || criteria.dateRange?.to) && (
                 <Button
                   type="button"

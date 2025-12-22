@@ -338,7 +338,7 @@ export default function SharedCMAView() {
             </div>
             <div className="pt-2 border-t">
               <p className="text-xs text-muted-foreground italic">
-                This analysis is based on {activeProperties.length} active, {underContractProperties.length} under contract, and {soldProperties.length} sold/closed properties in your selection.
+                This analysis is based on {activeProperties.length} Active, {underContractProperties.length} Active Under Contract, and {soldProperties.length} Closed properties in your selection.
               </p>
             </div>
           </CardContent>
@@ -352,7 +352,7 @@ export default function SharedCMAView() {
             </CardTitle>
             <CardDescription>
               {soldProperties.length > 0 && (
-                <Badge variant="secondary" className="mr-2">{soldProperties.length} Sold</Badge>
+                <Badge variant="secondary" className="mr-2">{soldProperties.length} Closed</Badge>
               )}
               {activeProperties.length > 0 && (
                 <Badge variant="default">{activeProperties.length} Active</Badge>
@@ -431,7 +431,7 @@ export default function SharedCMAView() {
                         </div>
                         {property.closeDate && (
                           <div>
-                            <span className="text-muted-foreground">Sold:</span>
+                            <span className="text-muted-foreground">Closed:</span>
                             <span className="ml-2 font-medium">{new Date(property.closeDate).toLocaleDateString()}</span>
                           </div>
                         )}

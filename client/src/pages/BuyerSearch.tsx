@@ -1059,10 +1059,10 @@ export default function BuyerSearch() {
                     </div>
                   </div>
                   
-                  {/* Sold Date Quick Filters */}
+                  {/* Close Date Quick Filters */}
                   <div className="space-y-2">
                     <div className="flex items-center justify-between">
-                      <Label className="text-xs text-muted-foreground">Sold Date Quick Filters</Label>
+                      <Label className="text-xs text-muted-foreground">Close Date Quick Filters</Label>
                       {(filters.dateRangeFrom || filters.dateRangeTo) && (
                         <Button
                           type="button"
@@ -1188,7 +1188,7 @@ export default function BuyerSearch() {
                         />
                       </div>
                       <div className="flex items-center justify-between">
-                        <Label htmlFor="map-filter-uc" className="text-sm">Under Contract</Label>
+                        <Label htmlFor="map-filter-uc" className="text-sm">Active Under Contract</Label>
                         <Switch
                           id="map-filter-uc"
                           checked={mapStatusUnderContract}
@@ -1200,7 +1200,7 @@ export default function BuyerSearch() {
                         />
                       </div>
                       <div className="flex items-center justify-between">
-                        <Label htmlFor="map-filter-closed" className="text-sm">Sold/Closed</Label>
+                        <Label htmlFor="map-filter-closed" className="text-sm">Closed</Label>
                         <Switch
                           id="map-filter-closed"
                           checked={mapStatusClosed}

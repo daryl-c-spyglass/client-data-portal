@@ -203,7 +203,7 @@ export function NeighborhoodReview({ neighborhoodName, city, months = 6 }: Neigh
           />
           <StatCard
             icon={TrendingUp}
-            label="Recently Sold"
+            label="Recently Closed"
             value={stats.soldCount}
             subValue={stats.avgSoldPrice ? `Avg ${formatPrice(stats.avgSoldPrice)}` : undefined}
           />
@@ -222,7 +222,7 @@ export function NeighborhoodReview({ neighborhoodName, city, months = 6 }: Neigh
             </span>
             {stats.medianSoldPrice && (
               <span className="text-sm text-muted-foreground ml-4">
-                Median Sold: {formatPrice(stats.medianSoldPrice)}
+                Median Close: {formatPrice(stats.medianSoldPrice)}
               </span>
             )}
           </div>
@@ -310,7 +310,7 @@ export function NeighborhoodReview({ neighborhoodName, city, months = 6 }: Neigh
             </div>
             <div className="flex items-center gap-1">
               <div className="w-3 h-3 rounded-full bg-gray-500"></div>
-              <span>Sold ({listings.sold.length})</span>
+              <span>Closed ({listings.sold.length})</span>
             </div>
           </div>
         )}

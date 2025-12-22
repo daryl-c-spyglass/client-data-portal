@@ -224,7 +224,7 @@ export function CMABuilder({ onCreateCMA, initialData }: CMABuilderProps) {
       const statusMap: Record<string, string> = {
         'active': 'Active',
         'under_contract': 'Active Under Contract',
-        'closed': 'Sold/Closed'
+        'closed': 'Closed'
       };
       const formattedStatuses = searchStatuses.map(s => statusMap[s] || s).join('/');
       parts.push(formattedStatuses);
@@ -473,7 +473,7 @@ export function CMABuilder({ onCreateCMA, initialData }: CMABuilderProps) {
     const statusLabels = searchStatuses.map(s => {
       if (s === 'active') return 'Active';
       if (s === 'under_contract') return 'Active Under Contract';
-      if (s === 'closed') return 'Sold/Closed';
+      if (s === 'closed') return 'Closed';
       return s;
     }).join(' & ');
     
@@ -749,7 +749,7 @@ export function CMABuilder({ onCreateCMA, initialData }: CMABuilderProps) {
                     onCheckedChange={() => toggleStatus("under_contract")}
                     data-testid="checkbox-status-under-contract"
                   />
-                  <label htmlFor="status-under-contract" className="text-sm cursor-pointer">Under Contract</label>
+                  <label htmlFor="status-under-contract" className="text-sm cursor-pointer">Active Under Contract</label>
                 </div>
                 <div className="flex items-center space-x-2">
                   <Checkbox 
@@ -758,12 +758,12 @@ export function CMABuilder({ onCreateCMA, initialData }: CMABuilderProps) {
                     onCheckedChange={() => toggleStatus("closed")}
                     data-testid="checkbox-status-closed"
                   />
-                  <label htmlFor="status-closed" className="text-sm cursor-pointer">Sold/Closed</label>
+                  <label htmlFor="status-closed" className="text-sm cursor-pointer">Closed</label>
                 </div>
               </div>
               <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-4">
                 <div className="space-y-2">
-                  <Label>Sold Date</Label>
+                  <Label>Close Date</Label>
                   <Select value={searchSoldDays} onValueChange={setSearchSoldDays}>
                     <SelectTrigger data-testid="select-sold-days">
                       <SelectValue placeholder="Any" />
@@ -1008,7 +1008,7 @@ export function CMABuilder({ onCreateCMA, initialData }: CMABuilderProps) {
                       onCheckedChange={() => toggleStatus("under_contract")}
                       data-testid="checkbox-map-status-uc"
                     />
-                    <label htmlFor="map-status-under-contract" className="text-sm cursor-pointer">Under Contract</label>
+                    <label htmlFor="map-status-under-contract" className="text-sm cursor-pointer">Active Under Contract</label>
                   </div>
                   <div className="flex items-center space-x-2">
                     <Checkbox 
@@ -1017,12 +1017,12 @@ export function CMABuilder({ onCreateCMA, initialData }: CMABuilderProps) {
                       onCheckedChange={() => toggleStatus("closed")}
                       data-testid="checkbox-map-status-closed"
                     />
-                    <label htmlFor="map-status-closed" className="text-sm cursor-pointer">Sold/Closed</label>
+                    <label htmlFor="map-status-closed" className="text-sm cursor-pointer">Closed</label>
                   </div>
                 </div>
                 <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-4">
                   <div className="space-y-2">
-                    <Label>Sold Date</Label>
+                    <Label>Close Date</Label>
                     <Select value={searchSoldDays} onValueChange={setSearchSoldDays}>
                       <SelectTrigger data-testid="select-map-sold-days">
                         <SelectValue placeholder="Any" />
@@ -1434,7 +1434,7 @@ export function CMABuilder({ onCreateCMA, initialData }: CMABuilderProps) {
                 // Get status badge styling
                 const getStatusBadge = () => {
                   if (property.standardStatus === 'Closed') {
-                    return <Badge variant="secondary" className="flex-shrink-0">Sold</Badge>;
+                    return <Badge variant="secondary" className="flex-shrink-0">Closed</Badge>;
                   } else if (property.standardStatus === 'Active') {
                     return <Badge variant="default" className="flex-shrink-0 bg-green-600 hover:bg-green-600">Active</Badge>;
                   } else if (property.standardStatus === 'Active Under Contract') {
@@ -1502,7 +1502,7 @@ export function CMABuilder({ onCreateCMA, initialData }: CMABuilderProps) {
                         <div className="flex flex-wrap gap-x-2 gap-y-1 text-xs text-muted-foreground">
                           {listingDate && <span>Listed: {listingDate}</span>}
                           {property.standardStatus === 'Closed' && property.closeDate && (
-                            <span>• Sold: {new Date(property.closeDate).toLocaleDateString()}</span>
+                            <span>• Closed: {new Date(property.closeDate).toLocaleDateString()}</span>
                           )}
                         </div>
                         
@@ -1638,11 +1638,11 @@ export function CMABuilder({ onCreateCMA, initialData }: CMABuilderProps) {
                         )}
                       </div>
                       {selectedProperty.standardStatus === 'Closed' ? (
-                        <Badge variant="secondary" className="text-base px-3 py-1">Sold</Badge>
+                        <Badge variant="secondary" className="text-base px-3 py-1">Closed</Badge>
                       ) : selectedProperty.standardStatus === 'Active' ? (
                         <Badge className="bg-green-600 hover:bg-green-600 text-base px-3 py-1">Active</Badge>
                       ) : (
-                        <Badge className="bg-amber-500 hover:bg-amber-500 text-base px-3 py-1">Under Contract</Badge>
+                        <Badge className="bg-amber-500 hover:bg-amber-500 text-base px-3 py-1">Active Under Contract</Badge>
                       )}
                     </div>
                     
@@ -1676,7 +1676,7 @@ export function CMABuilder({ onCreateCMA, initialData }: CMABuilderProps) {
                       )}
                       {selectedProperty.standardStatus === 'Closed' && selectedProperty.closeDate && (
                         <div>
-                          <span className="text-muted-foreground">Sold: </span>
+                          <span className="text-muted-foreground">Closed: </span>
                           <span className="font-medium">{new Date(selectedProperty.closeDate).toLocaleDateString()}</span>
                         </div>
                       )}
