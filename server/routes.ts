@@ -453,15 +453,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
 
         const needsServerSideFiltering = minLotAcres || maxLotAcres || stories || minYearBuilt || maxYearBuilt;
-        const effectiveLimit = (subdivision || needsServerSideFiltering) ? Math.min(parsedLimit * 10, 200) : parsedLimit;
+        // CRITICAL: When subdivision filter is needed, DON'T pass it to API (API does exact match)
+        // Instead, fetch more results and filter locally for partial matches like "Barton Hills Sec 03A"
+        const needsLocalSubdivisionFilter = !!subdivision;
+        const effectiveLimit = (needsLocalSubdivisionFilter || needsServerSideFiltering) ? 200 : parsedLimit;
         
         // Build search params - add type=Sale for Closed to exclude leased rentals
-        // Use subdivision parameter (not neighborhood) - this matches MLS Subdivision field
+        // DO NOT pass subdivision to API - it does exact match which misses "Barton Hills Sec 03A" etc.
+        // We'll filter locally with partial/contains matching
         const searchParams: any = {
           standardStatus: repliersStatus,  // RESO-compliant: Active, Pending, Closed
           postalCode: postalCode,
           city: city,
-          subdivision: subdivision,  // Use subdivision parameter (MLS Subdivision field)
+          // REMOVED: subdivision - API does exact match, we need partial match locally
           minPrice: minPrice ? parseInt(minPrice, 10) : undefined,
           maxPrice: maxPrice ? parseInt(maxPrice, 10) : undefined,
           minBeds: bedsMin ? parseInt(bedsMin, 10) : undefined,
@@ -485,13 +489,48 @@ export async function registerRoutes(app: Express): Promise<Server> {
         console.log(`\n📊 [CMA Search Diagnostic] ===================================`);
         console.log(`   Status requested: ${repliersStatus}`);
         console.log(`   Repliers API params: ${JSON.stringify(cleanParams, null, 2)}`);
-        console.log(`   NOTE: Using "subdivision" param (MLS Subdivision field)`);
+        if (subdivision) {
+          console.log(`   NOTE: Subdivision filter applied LOCALLY (API does exact match only)`);
+          console.log(`   Local subdivision filter: "${subdivision}"`);
+        }
         console.log(`   =============================================================\n`);
         
         const response = await repliersClient.searchListings(searchParams);
         
+        // SUPPLEMENTARY FETCH: Catch properties with missing sqft data
+        // When sqft filters are used, do a second larger fetch WITHOUT sqft filters
+        // to find properties that might have null/missing sqft values (like 2400 Rockingham Cir)
+        let supplementaryListings: any[] = [];
+        if ((minSqft || maxSqft) && subdivision) {
+          try {
+            const noSqftParams = { ...searchParams };
+            delete noSqftParams.minSqft;
+            delete noSqftParams.maxSqft;
+            noSqftParams.resultsPerPage = 200; // Larger batch to catch more missing sqft properties
+            const supplementaryResponse = await repliersClient.searchListings(noSqftParams);
+            supplementaryListings = (supplementaryResponse.listings || []).filter((l: any) => {
+              // Only keep listings that have NO sqft data (would be missed by main query)
+              const sqft = l.details?.sqft || l.livingArea;
+              return sqft === null || sqft === undefined || sqft === 0 || sqft === '';
+            });
+            if (supplementaryListings.length > 0) {
+              console.log(`📦 [Supplementary Fetch] Found ${supplementaryListings.length} properties with missing sqft data`);
+              // Log sample for debugging
+              supplementaryListings.slice(0, 5).forEach((l: any) => {
+                const addr = l.address || {};
+                console.log(`   - ${addr.streetNumber} ${addr.streetName} (neighborhood: ${addr.neighborhood || 'N/A'})`);
+              });
+            }
+          } catch (e) {
+            // Ignore supplementary fetch errors
+          }
+        }
+        
+        // Combine main and supplementary results
+        const allListings = [...(response.listings || []), ...supplementaryListings];
+        
         // Log detailed results
-        const listings = response.listings || [];
+        const listings = allListings;
         console.log(`📊 [CMA Search Results] Status: ${repliersStatus}`);
         console.log(`   Total returned: ${listings.length}`);
         if (listings.length > 0 && listings.length <= 20) {
@@ -506,7 +545,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           console.log(`   (Too many listings to show details)`);
         }
 
-        return (response.listings || []).map((listing: any) => {
+        return allListings.map((listing: any) => {
           const addr = listing.address || {};
           const details = listing.details || {};
           const map = listing.map || {};
@@ -853,13 +892,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
             });
           }
         }
+        // CRITICAL: Include properties WITHOUT sqft data (null/undefined livingArea)
+        // This ensures properties like 2400 Rockingham Cir (no sqft in Repliers) are not excluded
         if (minSqft) {
           const min = parseInt(minSqft, 10);
-          filtered = filtered.filter(p => p.livingArea !== null && p.livingArea >= min);
+          filtered = filtered.filter(p => p.livingArea === null || p.livingArea === undefined || p.livingArea >= min);
         }
         if (maxSqft) {
           const max = parseInt(maxSqft, 10);
-          filtered = filtered.filter(p => p.livingArea !== null && p.livingArea <= max);
+          filtered = filtered.filter(p => p.livingArea === null || p.livingArea === undefined || p.livingArea <= max);
         }
         
         return filtered;
