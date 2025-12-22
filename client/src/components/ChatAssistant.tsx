@@ -294,25 +294,33 @@ export function ChatAssistant({ propertyContext }: ChatAssistantProps) {
       )}
 
       {isOpen && (
-        <div 
-          className="fixed bottom-6 right-6 w-96 h-[32rem] bg-background border rounded-lg shadow-xl z-[9999] flex flex-col overflow-hidden"
-          data-testid="dialog-chat"
-        >
-          <div className="flex items-center justify-between p-4 border-b bg-primary text-primary-foreground">
-            <div className="flex items-center gap-2">
-              <Bot className="h-5 w-5" />
-              <span className="font-semibold">Spyglass Assistant</span>
+        <>
+          {/* Mobile backdrop overlay - tap to close */}
+          <div 
+            className="fixed inset-0 bg-black/50 z-[9998] md:hidden"
+            onClick={closeChat}
+            data-testid="backdrop-chat-close"
+          />
+          
+          <div 
+            className="fixed inset-4 md:inset-auto md:bottom-6 md:right-6 md:w-96 md:h-[32rem] bg-background border rounded-lg shadow-xl z-[9999] flex flex-col overflow-hidden"
+            data-testid="dialog-chat"
+          >
+            <div className="flex items-center justify-between p-3 md:p-4 border-b bg-primary text-primary-foreground">
+              <div className="flex items-center gap-2">
+                <Bot className="h-5 w-5" />
+                <span className="font-semibold">Spyglass Assistant</span>
+              </div>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={closeChat}
+                className="text-primary-foreground hover:bg-primary-foreground/20 h-10 w-10 md:h-9 md:w-9"
+                data-testid="button-chat-close"
+              >
+                <X className="h-5 w-5 md:h-4 md:w-4" />
+              </Button>
             </div>
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={closeChat}
-              className="text-primary-foreground hover:bg-primary-foreground/20"
-              data-testid="button-chat-close"
-            >
-              <X className="h-4 w-4" />
-            </Button>
-          </div>
 
           {!isConfigured ? (
             <div className="flex-1 flex items-center justify-center p-6 text-center">
@@ -439,7 +447,8 @@ export function ChatAssistant({ propertyContext }: ChatAssistantProps) {
               </div>
             </>
           )}
-        </div>
+          </div>
+        </>
       )}
     </>
   );
