@@ -1,0 +1,124 @@
+Replit Prompt: Add Animated “Line Pagination” Indicator to Marketing Insights Carousel
+
+In the Dashboard → Marketing Insights section, we have a carousel of charts. I want a minimal line-style pagination indicator like the highlighted yellow area in the screenshot: multiple thin lines representing slides, where the active line is filled/animated and updates interactively when the carousel changes slides.
+
+Requirements
+
+Line indicator UI
+
+Display a horizontal row of thin pill/lines centered under the carousel (or aligned with existing nav).
+
+One line per slide.
+
+Inactive lines: low-contrast neutral (e.g., gray with opacity).
+
+Active line: higher contrast (e.g., black/primary) and optionally slightly longer.
+
+Interactive animation
+
+When the carousel moves to the next/prev slide (by arrows, swipe/drag, dots, or programmatic change), the active line updates immediately.
+
+Animate the active line “fill”:
+
+Either a left-to-right fill animation
+
+Or smooth transition of width/opacity on the active line
+
+Use CSS transitions; avoid heavy animation libs unless already used.
+
+Clickable
+
+Clicking a line jumps to that slide.
+
+Add accessible labels: aria-label="Go to slide 2".
+
+Works with dynamic slides
+
+The indicator count should come from the number of marketing insight charts rendered (do not hardcode number of slides).
+
+No regressions
+
+Must not break existing carousel controls.
+
+Must stay in sync even when filters change (if slides/data re-render).
+
+Implementation Instructions (must follow)
+Step 1: Identify carousel implementation
+
+Locate the Marketing Insights carousel component. Determine whether it uses:
+
+shadcn/ui Carousel (Embla)
+
+Swiper
+
+a custom scroll-snap carousel
+Then implement the indicator using the carousel’s active index state.
+
+Step 2: Add activeIndex state + slide count
+
+Ensure the carousel exposes:
+
+current slide index (activeIndex)
+
+slide count (slides.length)
+
+a method to scrollTo(index)
+
+Step 3: Create a reusable indicator component
+
+Create a component like:
+
+MarketingCarouselIndicator
+Props:
+
+count: number
+
+activeIndex: number
+
+onSelect: (index: number) => void
+
+optional progress?: number if you support fill animation per slide
+
+Step 4: Add the line styles
+
+Use Tailwind (if available) or CSS module:
+
+Container: flex gap-2 justify-center items-center
+
+Each line: h-[3px] rounded-full transition-all duration-300
+
+Inactive: bg-gray-300/60 w-10
+
+Active: bg-gray-900 w-14 (or same width but higher opacity)
+
+Optional (recommended): “fill” effect inside the active line:
+
+Outer track: gray
+
+Inner fill: black, animate width from 0→100% when slide becomes active
+
+Step 5: Wire up click-to-slide
+
+Clicking a line should scroll to that slide using the carousel API.
+
+Output Required
+
+When done, show:
+
+Files changed
+
+Where activeIndex is derived
+
+How indicator stays synced to slide changes
+
+Confirm lines are clickable + animated
+
+Now implement this in the Marketing Insights dashboard section.
+
+If you’re using shadcn/ui Carousel (Embla)…
+
+Use Embla’s on('select') to track active index, and emblaApi.scrollTo(i) when clicking a line indicator.
+
+If you’re using scroll-snap…
+
+Compute active index on scroll using IntersectionObserver or scroll position and set state accordingly.

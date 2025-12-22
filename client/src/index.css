@@ -638,3 +638,17 @@
     page-break-before: auto;
   }
 }
+
+/* Carousel indicator fill animation */
+@keyframes indicator-fill {
+  from {
+    width: 0%;
+  }
+  to {
+    width: 100%;
+  }
+}
+
+.animate-indicator-fill {
+  animation: indicator-fill 400ms ease-out forwards;
+}

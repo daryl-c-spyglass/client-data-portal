@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
@@ -10,6 +10,7 @@ import {
   CarouselItem,
   CarouselNext,
   CarouselPrevious,
+  type CarouselApi,
 } from "@/components/ui/carousel";
 import {
   BarChart,
@@ -89,6 +90,44 @@ const CHART_SLIDES: ChartSlide[] = [
   },
 ];
 
+// Line indicator component for carousel pagination
+interface CarouselIndicatorProps {
+  count: number;
+  activeIndex: number;
+  onSelect: (index: number) => void;
+}
+
+function CarouselIndicator({ count, activeIndex, onSelect }: CarouselIndicatorProps) {
+  return (
+    <div className="flex gap-2 justify-center items-center mt-4" role="tablist">
+      {Array.from({ length: count }).map((_, index) => (
+        <button
+          key={index}
+          onClick={() => onSelect(index)}
+          className={`
+            h-[3px] rounded-full transition-all duration-300 ease-out
+            ${index === activeIndex 
+              ? 'w-10 bg-foreground' 
+              : 'w-6 bg-muted-foreground/40 hover:bg-muted-foreground/60'
+            }
+          `}
+          role="tab"
+          aria-selected={index === activeIndex}
+          aria-label={`Go to slide ${index + 1}`}
+          data-testid={`indicator-slide-${index}`}
+        >
+          {index === activeIndex && (
+            <span 
+              className="block h-full bg-primary rounded-full animate-indicator-fill"
+              style={{ animationDuration: '400ms' }}
+            />
+          )}
+        </button>
+      ))}
+    </div>
+  );
+}
+
 export function MarketingInsightsCarousel({
   listingsByMonth,
   priceDistribution,
@@ -97,6 +136,34 @@ export function MarketingInsightsCarousel({
   lastUpdatedAt,
 }: MarketingInsightsCarouselProps) {
   const [zoomedChart, setZoomedChart] = useState<string | null>(null);
+  const [carouselApi, setCarouselApi] = useState<CarouselApi>();
+  const [activeIndex, setActiveIndex] = useState(0);
+  
+  // Sync carousel state with active index
+  useEffect(() => {
+    if (!carouselApi) return;
+    
+    const onSelect = () => {
+      setActiveIndex(carouselApi.selectedScrollSnap());
+    };
+    
+    // Set initial index
+    setActiveIndex(carouselApi.selectedScrollSnap());
+    
+    // Listen to select events
+    carouselApi.on('select', onSelect);
+    carouselApi.on('reInit', onSelect);
+    
+    return () => {
+      carouselApi?.off('select', onSelect);
+      carouselApi?.off('reInit', onSelect);
+    };
+  }, [carouselApi]);
+  
+  // Handle indicator click
+  const handleIndicatorSelect = useCallback((index: number) => {
+    carouselApi?.scrollTo(index);
+  }, [carouselApi]);
 
   const sourceBreakdownData = useMemo(() => {
     if (!sourceBreakdown) return [];
@@ -348,6 +415,7 @@ export function MarketingInsightsCarousel({
               align: "start",
               loop: true,
             }}
+            setApi={setCarouselApi}
             className="w-full"
           >
             <CarouselContent>
@@ -393,6 +461,12 @@ export function MarketingInsightsCarousel({
             <CarouselPrevious className="left-2" data-testid="button-carousel-prev" />
             <CarouselNext className="right-2" data-testid="button-carousel-next" />
           </Carousel>
+          
+          <CarouselIndicator
+            count={CHART_SLIDES.length}
+            activeIndex={activeIndex}
+            onSelect={handleIndicatorSelect}
+          />
         </CardContent>
       </Card>
 
