@@ -5070,6 +5070,110 @@ This email was sent by ${senderName} (${senderEmail}) via the MLS Grid IDX Platf
     }
   });
 
+  // ========================================
+  // DEBUG ENDPOINTS - Canonical Data Layer
+  // ========================================
+  
+  // Debug: Get sample listings from Repliers with raw fields
+  app.get("/api/debug/listings/sample", async (req, res) => {
+    try {
+      const { CanonicalListingService } = await import("./data/listings");
+      const count = parseInt(req.query.count as string) || 25;
+      const includeRaw = req.query.raw !== 'false';
+      
+      const result = await CanonicalListingService.getSampleListings(count, includeRaw);
+      
+      res.json({
+        success: true,
+        ...result,
+        usage: {
+          description: "Sample listings from Repliers API with optional raw fields",
+          params: {
+            count: "Number of samples (default: 25)",
+            raw: "Include raw fields (default: true)",
+          },
+        },
+      });
+    } catch (error: any) {
+      console.error("[Debug] Sample listings error:", error.message);
+      res.status(500).json({ 
+        success: false, 
+        error: error.message,
+        stack: process.env.NODE_ENV === 'development' ? error.stack : undefined,
+      });
+    }
+  });
+  
+  // Debug: Get dedupe report showing potential duplicates
+  app.get("/api/debug/listings/dedupe-report", async (req, res) => {
+    try {
+      const { CanonicalListingService } = await import("./data/listings");
+      const sampleSize = parseInt(req.query.size as string) || 100;
+      
+      const report = await CanonicalListingService.getDedupeReport(sampleSize);
+      
+      res.json({
+        success: true,
+        report,
+        usage: {
+          description: "Dedupe diagnostics showing duplicate detection across sources",
+          params: {
+            size: "Sample size to analyze (default: 100)",
+          },
+        },
+      });
+    } catch (error: any) {
+      console.error("[Debug] Dedupe report error:", error.message);
+      res.status(500).json({ 
+        success: false, 
+        error: error.message,
+      });
+    }
+  });
+  
+  // Debug: Fetch canonical listings with filters
+  app.get("/api/debug/listings/canonical", async (req, res) => {
+    try {
+      const { CanonicalListingService } = await import("./data/listings");
+      
+      const params = {
+        standardStatus: req.query.status as string,
+        city: req.query.city as string,
+        subdivision: req.query.subdivision as string,
+        limit: parseInt(req.query.limit as string) || 50,
+        includeRaw: req.query.raw === 'true',
+        sources: req.query.sources ? (req.query.sources as string).split(',') as any : undefined,
+      };
+      
+      const result = await CanonicalListingService.fetchListings(params);
+      
+      res.json({
+        success: true,
+        listings: result.listings,
+        total: result.total,
+        dedupeStats: result.dedupeStats,
+        errors: result.errors,
+        usage: {
+          description: "Fetch canonical listings with deduplication",
+          params: {
+            status: "Filter by standardStatus (Active, Closed, etc.)",
+            city: "Filter by city",
+            subdivision: "Filter by subdivision",
+            limit: "Max results (default: 50)",
+            raw: "Include raw fields (default: false)",
+            sources: "Comma-separated sources (REPLIERS,DATABASE)",
+          },
+        },
+      });
+    } catch (error: any) {
+      console.error("[Debug] Canonical listings error:", error.message);
+      res.status(500).json({ 
+        success: false, 
+        error: error.message,
+      });
+    }
+  });
+
   const httpServer = createServer(app);
 
   return httpServer;

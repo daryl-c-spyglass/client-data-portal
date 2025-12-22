@@ -40,6 +40,17 @@ The UI incorporates Spyglass Realty branding with an orange primary color scheme
   - Internal variable names may use legacy terms like `soldProperties` but UI labels always use canonical RESO values
   - Helper function `getStandardStatusLabel()` in `shared/statusMapping.ts` provides canonical label mapping
   - "Close Date" and "Close Price" are used instead of "Sold Date" and "Sold Price"
+- **Canonical Data Layer**: Unified listings data layer that merges MLS and Repliers feeds with deterministic deduplication
+  - **Types**: `shared/canonical-listing.ts` - `CanonicalListing` interface, `DataSource` enum, address normalization helpers
+  - **Service**: `server/data/listings/canonical-listing-service.ts` - `CanonicalListingService` with dedupe pipeline
+  - **Mapper**: `server/data/listings/repliers-mapper.ts` - Transforms Repliers API data to canonical format with raw field support
+  - **Dedupe Priority**: mlsNumber > listingId > addressKey (normalized street+unit+zip) > lat/lng proximity (50m)
+  - **Source Priority for Merging**: MLS > REPLIERS > DATABASE
+  - **Address Normalization**: Handles street suffix variations (Street→st, Avenue→ave, Lane→ln, etc.)
+  - **Debug Endpoints**:
+    - `GET /api/debug/listings/sample?count=25&raw=true` - Sample listings with raw fields
+    - `GET /api/debug/listings/dedupe-report?size=100` - Dedupe diagnostics
+    - `GET /api/debug/listings/canonical?status=Active&city=Austin&limit=50` - Filtered canonical listings
 
 ### Feature Specifications
 

@@ -1,0 +1,244 @@
+Replit Prompt: Align Entire App to Unified Data Source Layer (MLS + Repliers + Raw Fields) + App-Wide Canonical Model
+
+We are updating our web app to properly incorporate Repliers as a first-class data source and use raw MLS / RESO fields when needed. This is not just a dashboard change—all sections of the app that depend on listing/property data must be aligned to the same unified data pipeline.
+
+Goal
+
+Implement a single, canonical “Listings Data Layer” that:
+
+Fetches and merges MLS + Repliers inventory
+
+Dedupes deterministically across sources
+
+Normalizes statuses into the canonical RESO-aligned set
+
+Provides consistent fields (price, beds/baths, sqft, address, subdivision, etc.)
+
+Uses Repliers raw fields as a fallback for MLS-specific fields (subdivision/neighborhood/status validation)
+
+Feeds every UI section from the same canonical source (no page-by-page special logic)
+
+Phase 1 — Repo Discovery (Required)
+
+Identify all app areas that consume listing/property data:
+
+Dashboard KPIs (Total Properties, etc.)
+
+Marketing Insights charts
+
+Search results
+
+Listing cards
+
+Listing detail page
+
+Saved searches / favorites
+
+CMA flows (Add to CMA)
+
+Exports (CSV) if present
+
+Find all current data fetching + mapping paths:
+
+MLS API client/hooks
+
+Repliers API client/hooks
+
+Any stores (Redux/Zustand/Context)
+
+Any ad-hoc transforms inside components
+
+List the files/components involved before editing.
+
+Phase 2 — Create a Single Canonical Data Layer (Must Do)
+
+Create a dedicated module responsible for all listing data normalization and merging. Use the closest existing structure, but preferred is:
+
+src/data/listings/
+
+sources/mls.ts
+
+sources/repliers.ts
+
+normalize/standardStatus.ts
+
+normalize/addresses.ts
+
+normalize/listingMapper.ts
+
+merge/dedupe.ts
+
+index.ts (exports unified API)
+
+Canonical Listing Model
+
+Define a canonical object the UI will use everywhere, e.g.:
+
+type ListingSource = "MLS" | "REPLIERS";
+
+type CanonicalListing = {
+  id: string;                 // deterministic canonical id
+  sourceIds: { mls?: string; repliers?: string };
+  source: ListingSource[];    // supports merged/duplicate sources
+  standardStatus: string;     // normalized
+  listPrice?: number;
+  soldPrice?: number;
+  address: {
+    line1: string;
+    city: string;
+    state: string;
+    postalCode: string;
+    unit?: string;
+    normalizedKey: string;
+  };
+  beds?: number;
+  baths?: number;
+  livingAreaSqft?: number;
+  yearBuilt?: number;
+  subdivision?: string;
+  neighborhood?: string;
+  mlsNumber?: string;
+  raw?: { repliers?: any };   // optional, kept out of UI by default
+};
+
+Phase 3 — Status Normalization (App-Wide)
+
+Re-use / create ONE helper:
+
+normalizeStandardStatus(raw: string | null | undefined): string
+
+Canonical statuses must include at least:
+
+Active
+
+Active Under Contract
+
+Pending
+
+Closed
+
+And include other statuses if the app supports them (Expired/Withdrawn/Canceled). Do not hardcode per-page. Ensure:
+
+“Under Contract” never appears → becomes “Active Under Contract”
+
+“Sold” never appears → becomes “Closed”
+
+Filtering/grouping uses normalized statuses everywhere.
+
+Phase 4 — Deterministic Dedupe (App-Wide)
+
+Implement one dedupe function used globally:
+Priority match:
+
+Strong IDs (mlsNumber / listingId / sourceListingId)
+
+propertyId
+
+normalized address key (street + unit + city + state + postal)
+
+When duplicates occur:
+
+Merge sources into one canonical listing
+
+Keep both source IDs
+
+Prefer MLS for media if it’s richer, otherwise Repliers
+
+Do NOT double-count in totals.
+
+Phase 5 — Repliers Raw Field Support (Centralized)
+
+When using Repliers:
+
+Support fields=raw in the source fetch
+
+Keep raw stored only in the canonical layer (not passed directly into UI components)
+
+Use raw fields to populate canonical fields ONLY when needed:
+
+subdivision (raw.SubdivisionName or equivalent)
+
+neighborhood fallback (if available)
+
+status validation / edge cases (optional)
+
+Provide a “safe accessor” utility that checks raw keys without crashing if missing.
+
+Phase 6 — Replace Ad-hoc Data Logic Across the App (Critical)
+
+Update every UI section that consumes listing data so it uses the canonical data layer.
+This includes:
+
+Total Properties (must include MLS + Repliers, deduped)
+
+Marketing Insights charts (must use canonical inventory + normalized statuses)
+
+Search, list pages, and listing details
+
+Favorites/Saved/CMA actions that reference listing objects
+
+No component should compute status labels or totals independently anymore.
+
+Phase 7 — Add a Sample Data “Discovery Mode” for Testing (Required)
+
+Because this is a data-source change, implement a safe testing path:
+
+Option A (Preferred): a dev-only route:
+
+/api/debug/repliers-sample
+
+Fetch 10–25 Repliers listings using fields=raw
+
+Save sanitized snapshot to /data/repliers-sample.json
+
+Option B: a script:
+
+scripts/repliersSample.ts
+
+Then add a small README/dev note:
+
+how to run it
+
+where the sample output is saved
+
+what fields were found consistently
+
+This sample data is used to validate:
+
+raw fields exist as expected
+
+status normalization works
+
+subdivision/neighborhood mapping works
+
+dedupe logic works
+
+Phase 8 — Acceptance Criteria
+
+“Total Properties” includes MLS + Repliers and does not double-count duplicates.
+
+No UI shows “Sold” or “Under Contract”.
+
+Marketing Insights status breakdown includes all statuses present (normalized).
+
+Listing detail page fields (Subdivision/Neighborhood/etc.) are consistently populated when possible.
+
+All listing-consuming sections pull from the unified canonical layer (no one-off transforms inside components).
+
+Debug sample tooling exists and can be run without impacting production behavior.
+
+Output Required
+
+When complete, provide:
+
+Files added/modified
+
+Description of the canonical data layer entrypoints (how UI consumes it)
+
+Proof: where Total Properties now includes Repliers
+
+Proof: where status normalization is applied globally
+
+How to run the sample discovery/testing mode
+
+Now implement this end-to-end with minimal disruption to existing UI.
