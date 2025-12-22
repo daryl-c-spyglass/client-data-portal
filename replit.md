@@ -75,6 +75,22 @@ The UI incorporates Spyglass Realty branding with an orange primary color scheme
     - `GET /api/chat/status` - Check if OpenAI is configured
     - `POST /api/cma/draft` - Create CMA draft from AI-collected criteria
 
+- **AI Search Assistant**: "Describe your ideal home" natural language search in Buyer Search
+  - **Pipeline**: User Prompt → Repliers NLP → OpenAI Sanitizer → Apply to Filters UI → Run Search
+  - **Backend Routes**:
+    - `POST /api/repliers/nlp` - Proxy to Repliers NLP API, returns structured response
+    - `POST /api/ai/sanitize-repliers-nlp` - OpenAI sanitizer with RESO-compliant validation
+  - **Sanitization Rules** (enforced server-side):
+    - Strip `neighborhood` param (we use Subdivision instead) with warning
+    - Validate subdivision against known list (case-insensitive exact match only)
+    - Normalize status to RESO standardStatus (Active, Active Under Contract, Pending, Closed)
+    - Validate property types against allowed list
+  - **Frontend**: Text area panel in Buyer Search filters, Apply/Clear buttons
+  - **Error Handling**: 406 error for non-property searches with friendly message
+  - **Files**:
+    - `server/routes.ts` - Both NLP and sanitizer routes
+    - `client/src/pages/BuyerSearch.tsx` - UI panel and `handleAiDescribe()` function
+
 - **AI Image Search**: Visual similarity ranking for property listings powered by Repliers AI
   - **Reference**: https://help.repliers.com/en/article/ai-image-search-implementation-guide-mx30ji/
   - **Backend**: `POST /api/repliers/image-search` endpoint with validation, `RepliersClient.imageSearch()` method

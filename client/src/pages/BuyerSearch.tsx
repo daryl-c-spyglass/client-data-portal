@@ -950,9 +950,10 @@ export default function BuyerSearch() {
       
       const sanitized = await sanitizeResponse.json();
       
-      // Step 3: Apply filters to UI
+      // Step 3: Merge sanitized filters with existing filters (preserve user selections)
       const newFilters: SearchFilters = { ...filters };
       
+      // Apply AI-extracted filters on top of existing
       if (sanitized.filters.city) newFilters.city = sanitized.filters.city;
       if (sanitized.filters.subdivision) newFilters.subdivision = sanitized.filters.subdivision;
       if (sanitized.filters.postalCode) newFilters.postalCode = sanitized.filters.postalCode;
@@ -962,16 +963,25 @@ export default function BuyerSearch() {
       if (sanitized.filters.minPrice) newFilters.minPrice = sanitized.filters.minPrice;
       if (sanitized.filters.maxPrice) newFilters.maxPrice = sanitized.filters.maxPrice;
       
-      // Apply status
-      if (sanitized.filters.standardStatus) {
-        newFilters.statusActive = sanitized.filters.standardStatus === 'Active';
-        newFilters.statusUnderContract = sanitized.filters.standardStatus === 'Active Under Contract' || sanitized.filters.standardStatus === 'Pending';
-        newFilters.statusClosed = sanitized.filters.standardStatus === 'Closed';
-      }
+      // Apply RESO status - reset status toggles and set based on sanitized value
+      // Clear existing status selections first
+      newFilters.statusActive = false;
+      newFilters.statusUnderContract = false;
+      newFilters.statusClosed = false;
       
-      // Update keywords if present
-      if (sanitized.filters.keywords) {
-        newFilters.lotFeatures = sanitized.filters.keywords;
+      const status = sanitized.filters.standardStatus;
+      if (status === 'Active') {
+        newFilters.statusActive = true;
+      } else if (status === 'Active Under Contract') {
+        newFilters.statusUnderContract = true;
+      } else if (status === 'Pending') {
+        // Pending maps to Under Contract toggle in our UI (closest match)
+        newFilters.statusUnderContract = true;
+      } else if (status === 'Closed') {
+        newFilters.statusClosed = true;
+      } else {
+        // No status specified - default to Active
+        newFilters.statusActive = true;
       }
       
       setFilters(newFilters);

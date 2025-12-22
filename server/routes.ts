@@ -3436,26 +3436,81 @@ OUTPUT JSON:
         return;
       }
       
-      // Ensure required fields exist
+      // SERVER-SIDE VALIDATION - enforce rules even if OpenAI doesn't
+      const warnings: string[] = [...(sanitizedResult.warnings || [])];
+      const filters = sanitizedResult.filters || {};
+      
+      // Rule 1: FORCEFULLY strip neighborhood from both original params AND sanitized response
+      if (parsedParams.neighborhood || filters.neighborhood) {
+        delete filters.neighborhood; // Forcefully remove from response
+        if (!warnings.includes("Neighborhood removed (we use Subdivision instead).")) {
+          warnings.push("Neighborhood removed (we use Subdivision instead).");
+        }
+      }
+      
+      // Rule 2: Validate subdivision against known list (case-insensitive exact match)
+      let validatedSubdivision = '';
+      if (filters.subdivision) {
+        const subdivisionLower = filters.subdivision.toLowerCase();
+        const matchedSubdiv = validSubdivisions.find(s => s.toLowerCase() === subdivisionLower);
+        if (matchedSubdiv) {
+          validatedSubdivision = matchedSubdiv;
+        } else {
+          warnings.push(`Subdivision "${filters.subdivision}" not matched - please select manually.`);
+        }
+      }
+      
+      // Rule 3: Normalize status to RESO standardStatus only
+      let normalizedStatus = '';
+      const statusRaw = (filters.standardStatus || '').toLowerCase().trim();
+      if (statusRaw === 'active') {
+        normalizedStatus = 'Active';
+      } else if (statusRaw === 'active under contract' || statusRaw === 'activeundercontract' || statusRaw === 'under contract') {
+        normalizedStatus = 'Active Under Contract';
+      } else if (statusRaw === 'pending') {
+        normalizedStatus = 'Pending';
+      } else if (statusRaw === 'closed' || statusRaw === 'sold') {
+        normalizedStatus = 'Closed';
+      }
+      
+      // Rule 4: Validate property type against expanded RESO-compliant list
+      const validPropertyTypes = [
+        'Single Family', 'Condo', 'Townhouse', 'Land', 'Multi-Family', 'Residential',
+        'Duplex', 'Triplex', 'Quadruplex', 'Farm', 'Ranch', 'Manufactured Home', 
+        'Mobile Home', 'Apartment', 'Commercial', 'Industrial', 'Vacant Land',
+        'Acreage', 'Lots/Land'
+      ];
+      let validatedPropertyType = '';
+      if (filters.propertyType) {
+        const ptLower = filters.propertyType.toLowerCase();
+        const matchedPt = validPropertyTypes.find(pt => pt.toLowerCase() === ptLower);
+        if (matchedPt) {
+          validatedPropertyType = matchedPt;
+        } else {
+          warnings.push(`Property type "${filters.propertyType}" not recognized - please select manually.`);
+        }
+      }
+      
+      // Build final validated result
       const result = {
         filters: {
-          city: sanitizedResult.filters?.city || '',
-          subdivision: sanitizedResult.filters?.subdivision || '',
-          postalCode: sanitizedResult.filters?.postalCode || '',
-          propertyType: sanitizedResult.filters?.propertyType || '',
-          minBeds: Number(sanitizedResult.filters?.minBeds) || 0,
-          minBaths: Number(sanitizedResult.filters?.minBaths) || 0,
-          minPrice: Number(sanitizedResult.filters?.minPrice) || 0,
-          maxPrice: Number(sanitizedResult.filters?.maxPrice) || 0,
-          standardStatus: sanitizedResult.filters?.standardStatus || '',
-          keywords: sanitizedResult.filters?.keywords || '',
+          city: filters.city || '',
+          subdivision: validatedSubdivision,
+          postalCode: filters.postalCode || '',
+          propertyType: validatedPropertyType,
+          minBeds: Number(filters.minBeds) || 0,
+          minBaths: Number(filters.minBaths) || 0,
+          minPrice: Number(filters.minPrice) || 0,
+          maxPrice: Number(filters.maxPrice) || 0,
+          standardStatus: normalizedStatus,
+          keywords: filters.keywords || '',
         },
         sanitizedSummary: sanitizedResult.sanitizedSummary || 'Searching for properties...',
-        warnings: sanitizedResult.warnings || [],
+        warnings,
         imageSearchItems: repliersRequestBody?.imageSearchItems || null,
       };
       
-      console.log('✅ [AI Sanitizer] Result:', JSON.stringify(result.filters));
+      console.log('✅ [AI Sanitizer] Validated result:', JSON.stringify(result.filters));
       res.json(result);
       
     } catch (error: any) {
