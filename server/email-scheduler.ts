@@ -245,14 +245,15 @@ export async function processScheduledEmails(): Promise<EmailSendResult[]> {
 export function startEmailScheduler(): void {
   console.log('🚀 [Email Scheduler] Starting email scheduler...');
   
-  // Skip immediate processing in development to prevent memory issues
+  // Skip all scheduled processing in development to prevent memory issues
   const isDev = process.env.NODE_ENV === 'development';
-  if (!isDev) {
-    // Run immediately on startup only in production
-    processScheduledEmails().catch(console.error);
-  } else {
-    console.log('⏭️ [Email Scheduler] Skipping immediate processing in development mode');
+  if (isDev) {
+    console.log('⏭️ [Email Scheduler] Skipping email scheduler in development mode (use manual trigger for testing)');
+    return;
   }
+
+  // Run immediately on startup in production
+  processScheduledEmails().catch(console.error);
 
   // Then run every hour
   const HOUR_IN_MS = 60 * 60 * 1000;
