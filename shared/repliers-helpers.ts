@@ -64,42 +64,74 @@ export function normalizeRepliersClass(classValue: string | undefined | null): R
 
 /**
  * Valid normalized status values used throughout the application.
+ * Matches MLS/ACTRIS status categories exactly:
+ * - Active: Properties available for sale
+ * - Active Under Contract: Properties with accepted offer, still showing
+ * - Pending: Properties with accepted offer, no longer showing
+ * - Closed: Sold properties
  */
-export type NormalizedStatus = 'Active' | 'Under Contract' | 'Closed';
+export type NormalizedStatus = 'Active' | 'Active Under Contract' | 'Pending' | 'Closed';
 
 /**
- * Normalize property status to one of three standard values.
+ * Normalize property status to one of four MLS-standard values.
  * This ensures consistent status handling across all modules.
+ * 
+ * CRITICAL: Uses lastStatus field when available for accurate AU/Pending distinction.
  * 
  * Mapping:
  * - Active: A, Active
- * - Under Contract: U, P, Under Contract, Pending, Active Under Contract, Contingent
- * - Closed: S, Closed, Sold
+ * - Active Under Contract: AU, Act (when status=U), Active Under Contract
+ * - Pending: P, Pnd, Pending (when not AU)
+ * - Closed: S, Sld, Lsd, Closed, Sold
  */
-export function normalizeStatus(status: string | null | undefined): NormalizedStatus {
+export function normalizeStatus(status: string | null | undefined, lastStatus?: string | null): NormalizedStatus {
   if (!status) return 'Active';
   
   const normalized = status.trim();
+  const lastNormalized = lastStatus?.trim();
   
+  // PRIORITY 1: Check lastStatus for definitive status (Repliers API detail)
+  if (lastNormalized) {
+    // Closed/Sold statuses
+    if (lastNormalized === 'Sld' || lastNormalized === 'Lsd') {
+      return 'Closed';
+    }
+    // Active Under Contract (AU or Act when status is U)
+    if (lastNormalized === 'AU' || lastNormalized === 'Act') {
+      // If status is U (unavailable) and lastStatus is Act, it's Active Under Contract
+      if (normalized === 'U' && lastNormalized === 'Act') {
+        return 'Active Under Contract';
+      }
+      if (lastNormalized === 'AU') {
+        return 'Active Under Contract';
+      }
+    }
+    // Pending
+    if (lastNormalized === 'Pnd' || lastNormalized === 'P') {
+      return 'Pending';
+    }
+  }
+  
+  // PRIORITY 2: Map by status field
   const statusMap: Record<string, NormalizedStatus> = {
     // Single-letter codes from Repliers API
     'A': 'Active',
-    'U': 'Under Contract',
-    'P': 'Under Contract', // Pending treated as Under Contract
+    'U': 'Pending', // Default U to Pending if no lastStatus override
+    'P': 'Pending',
     'S': 'Closed',
     
-    // Full status strings
+    // Full status strings (standardStatus field)
     'Active': 'Active',
-    'Under Contract': 'Under Contract',
-    'Pending': 'Under Contract',
-    'Active Under Contract': 'Under Contract',
-    'Active Under Contract - Showing': 'Under Contract',
-    'Contingent': 'Under Contract',
+    'Active Under Contract': 'Active Under Contract',
+    'Active Under Contract - Showing': 'Active Under Contract',
+    'Under Contract': 'Pending', // Generic "Under Contract" maps to Pending
+    'Pending': 'Pending',
+    'Contingent': 'Pending',
     'Closed': 'Closed',
     'Sold': 'Closed',
     
     // Other statuses (normalize to appropriate bucket)
-    'Expired': 'Closed', // For counting purposes
+    'Expired': 'Closed',
     'Withdrawn': 'Closed',
     'Cancelled': 'Closed',
     'Terminated': 'Closed',
@@ -113,6 +145,18 @@ export function normalizeStatus(status: string | null | undefined): NormalizedSt
 }
 
 /**
+ * Legacy 3-status normalization for backward compatibility.
+ * Use normalizeStatus() for new code.
+ */
+export function normalizeStatusLegacy(status: string | null | undefined): 'Active' | 'Under Contract' | 'Closed' {
+  const normalized = normalizeStatus(status);
+  if (normalized === 'Active Under Contract' || normalized === 'Pending') {
+    return 'Under Contract';
+  }
+  return normalized;
+}
+
+/**
  * Check if a status represents a closed/sold property.
  */
 export function isClosedStatus(status: string | null | undefined): boolean {
@@ -120,10 +164,11 @@ export function isClosedStatus(status: string | null | undefined): boolean {
 }
 
 /**
- * Check if a status represents an under contract property.
+ * Check if a status represents an under contract property (Active Under Contract or Pending).
  */
-export function isUnderContractStatus(status: string | null | undefined): boolean {
-  return normalizeStatus(status) === 'Under Contract';
+export function isUnderContractStatus(status: string | null | undefined, lastStatus?: string | null): boolean {
+  const normalized = normalizeStatus(status, lastStatus);
+  return normalized === 'Active Under Contract' || normalized === 'Pending';
 }
 
 // ============================================================================
@@ -285,8 +330,8 @@ export function computeDOM(property: {
     if (property.daysOnMarket != null) {
       daysOnMarket = Number(property.daysOnMarket);
     }
-  } else if (status === 'Under Contract') {
-    // Under Contract: Track both active days and UC days
+  } else if (status === 'Active Under Contract' || status === 'Pending') {
+    // Under Contract (AU or Pending): Track both active days and UC days
     if (ucDate) {
       daysUnderContract = Math.floor((now.getTime() - ucDate.getTime()) / (1000 * 60 * 60 * 24));
     }

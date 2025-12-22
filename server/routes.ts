@@ -518,49 +518,48 @@ export async function registerRoutes(app: Express): Promise<Server> {
             addr.unitNumber ? `#${addr.unitNumber}` : null,
           ].filter(Boolean).join(' ');
 
-          // Comprehensive status mapping - handles both single-letter codes and full strings
-          // CRITICAL: Check lastStatus first for sold properties, as Repliers returns status="U" for sold listings
+          // MLS-aligned 4-status mapping: Active, Active Under Contract, Pending, Closed
+          // CRITICAL: Use lastStatus field to accurately detect AU vs Pending
           const lastStatus = listing.lastStatus || '';
-          const lastStatusMap: Record<string, string> = {
-            'Sld': 'Closed',  // Sold
-            'Lsd': 'Closed',  // Leased (if type=sale was not filtered)
-          };
-          
-          const statusMap: Record<string, string> = {
-            // Single-letter codes from Repliers API
-            'A': 'Active',
-            'U': 'Under Contract',
-            'S': 'Closed',
-            'P': 'Pending',
-            'X': 'Expired',
-            'W': 'Withdrawn',
-            'C': 'Cancelled',
-            'T': 'Terminated',
-            // Full status strings that Repliers may return
-            'Active': 'Active',
-            'Active Under Contract': 'Under Contract',  // CRITICAL: Map to Under Contract, NOT Active
-            'Under Contract': 'Under Contract',
-            'Pending': 'Under Contract',  // Treat Pending as Under Contract for CMA purposes
-            'Sold': 'Closed',
-            'Closed': 'Closed',
-            'Expired': 'Expired',
-            'Cancelled': 'Cancelled',
-            'Withdrawn': 'Withdrawn',
-            'Terminated': 'Terminated',
-          };
-          
           const rawStatus = listing.status || listing.standardStatus || 'Active';
-          // CRITICAL: If lastStatus indicates sold (Sld), override the status mapping to Closed
-          // This handles Repliers returning status="U" with lastStatus="Sld" for sold properties
+          
+          // Determine mapped status using lastStatus priority (matches MLS exactly)
           let mappedStatus: string;
-          if (lastStatusMap[lastStatus]) {
-            mappedStatus = lastStatusMap[lastStatus];
+          
+          // PRIORITY 1: Check lastStatus for definitive status detection
+          if (lastStatus === 'Sld' || lastStatus === 'Lsd') {
+            mappedStatus = 'Closed';
+          } else if (lastStatus === 'AU' || (rawStatus === 'U' && lastStatus === 'Act')) {
+            // Active Under Contract: lastStatus=AU, or status=U with lastStatus=Act
+            mappedStatus = 'Active Under Contract';
+          } else if (lastStatus === 'Pnd' || lastStatus === 'P') {
+            mappedStatus = 'Pending';
           } else {
-            mappedStatus = statusMap[rawStatus] || rawStatus;
+            // PRIORITY 2: Fall back to status/standardStatus mapping
+            const statusMap: Record<string, string> = {
+              // Single-letter codes from Repliers API
+              'A': 'Active',
+              'U': 'Pending',  // Default U to Pending if no lastStatus override
+              'S': 'Closed',
+              'P': 'Pending',
+              // Full status strings (standardStatus field)
+              'Active': 'Active',
+              'Active Under Contract': 'Active Under Contract',
+              'Active Under Contract - Showing': 'Active Under Contract',
+              'Under Contract': 'Pending',  // Generic UC maps to Pending
+              'Pending': 'Pending',
+              'Sold': 'Closed',
+              'Closed': 'Closed',
+              'Expired': 'Closed',
+              'Cancelled': 'Closed',
+              'Withdrawn': 'Closed',
+              'Terminated': 'Closed',
+            };
+            mappedStatus = statusMap[rawStatus] || 'Active';
           }
           
-          // Log status mapping for debugging
-          if (lastStatus === 'Sld' || lastStatus === 'Lsd') {
+          // Log status mapping for AU/Pending/Closed detection debugging
+          if (lastStatus && (lastStatus === 'AU' || lastStatus === 'Act' || lastStatus === 'Pnd' || lastStatus === 'Sld' || lastStatus === 'Lsd')) {
             console.log(`📋 Status mapping: status="${rawStatus}", lastStatus="${lastStatus}" → "${mappedStatus}" for ${listing.mlsNumber || 'unknown MLS#'}`);
           }
 
