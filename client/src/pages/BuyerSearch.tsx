@@ -140,7 +140,10 @@ import {
   Home,
   ExternalLink,
   Loader2,
+  Sparkles,
+  Wand2,
 } from "lucide-react";
+import { Textarea } from "@/components/ui/textarea";
 import { PropertyCard } from "@/components/PropertyCard";
 import { PropertyMapView } from "@/components/PropertyMapView";
 import { PolygonMapSearch } from "@/components/PolygonMapSearch";
@@ -413,6 +416,14 @@ export default function BuyerSearch() {
   const [isVisualSearching, setIsVisualSearching] = useState(false);
   const [visualMatchPage, setVisualMatchPage] = useState(0);
   const [visualMatchTotal, setVisualMatchTotal] = useState(0);
+  
+  // AI Assistant "Describe your ideal home" state
+  const [aiPrompt, setAiPrompt] = useState('');
+  const [aiSanitizedSummary, setAiSanitizedSummary] = useState('');
+  const [aiWarnings, setAiWarnings] = useState<string[]>([]);
+  const [aiImageSearchItems, setAiImageSearchItems] = useState<ImageSearchItem[] | null>(null);
+  const [isAiProcessing, setIsAiProcessing] = useState(false);
+  const [aiError, setAiError] = useState('');
   
   // Floating card state
   const [floatingCardOpen, setFloatingCardOpen] = useState(false);
@@ -888,6 +899,110 @@ export default function BuyerSearch() {
     setCurrentPage(0);
     setSearchTrigger(prev => prev + 1);
   };
+  
+  // AI Assistant "Describe your ideal home" handler
+  const handleAiDescribe = async () => {
+    if (!aiPrompt.trim()) return;
+    
+    setIsAiProcessing(true);
+    setAiError('');
+    setAiSanitizedSummary('');
+    setAiWarnings([]);
+    setAiImageSearchItems(null);
+    
+    try {
+      // Step 1: Call Repliers NLP
+      const nlpResponse = await fetch('/api/repliers/nlp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ prompt: aiPrompt }),
+      });
+      
+      // Handle 406 - not a property search
+      if (nlpResponse.status === 406) {
+        const errorData = await nlpResponse.json();
+        setAiError(errorData.error || "That doesn't look like a property search. Try including location, price, beds, etc.");
+        setIsAiProcessing(false);
+        return;
+      }
+      
+      if (!nlpResponse.ok) {
+        throw new Error('Failed to process your description');
+      }
+      
+      const nlpData = await nlpResponse.json();
+      
+      // Step 2: Call OpenAI Sanitizer
+      const sanitizeResponse = await fetch('/api/ai/sanitize-repliers-nlp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userPrompt: aiPrompt,
+          repliersRequestUrl: nlpData.repliersRequestUrl,
+          repliersRequestBody: nlpData.repliersRequestBody,
+          repliersSummary: nlpData.repliersSummary,
+        }),
+      });
+      
+      if (!sanitizeResponse.ok) {
+        throw new Error('Failed to interpret your search');
+      }
+      
+      const sanitized = await sanitizeResponse.json();
+      
+      // Step 3: Apply filters to UI
+      const newFilters: SearchFilters = { ...filters };
+      
+      if (sanitized.filters.city) newFilters.city = sanitized.filters.city;
+      if (sanitized.filters.subdivision) newFilters.subdivision = sanitized.filters.subdivision;
+      if (sanitized.filters.postalCode) newFilters.postalCode = sanitized.filters.postalCode;
+      if (sanitized.filters.propertyType) newFilters.propertySubType = sanitized.filters.propertyType;
+      if (sanitized.filters.minBeds) newFilters.minBeds = sanitized.filters.minBeds;
+      if (sanitized.filters.minBaths) newFilters.minTotalBaths = sanitized.filters.minBaths;
+      if (sanitized.filters.minPrice) newFilters.minPrice = sanitized.filters.minPrice;
+      if (sanitized.filters.maxPrice) newFilters.maxPrice = sanitized.filters.maxPrice;
+      
+      // Apply status
+      if (sanitized.filters.standardStatus) {
+        newFilters.statusActive = sanitized.filters.standardStatus === 'Active';
+        newFilters.statusUnderContract = sanitized.filters.standardStatus === 'Active Under Contract' || sanitized.filters.standardStatus === 'Pending';
+        newFilters.statusClosed = sanitized.filters.standardStatus === 'Closed';
+      }
+      
+      // Update keywords if present
+      if (sanitized.filters.keywords) {
+        newFilters.lotFeatures = sanitized.filters.keywords;
+      }
+      
+      setFilters(newFilters);
+      setActiveFiltersCount(Object.values(newFilters).filter(v => v !== undefined && v !== '' && v !== null && v !== false).length);
+      
+      // Store results
+      setAiSanitizedSummary(sanitized.sanitizedSummary);
+      setAiWarnings(sanitized.warnings || []);
+      setAiImageSearchItems(sanitized.imageSearchItems);
+      
+      // Step 4: Trigger search
+      setCurrentPage(0);
+      setSearchTrigger(prev => prev + 1);
+      
+    } catch (error: any) {
+      console.error('AI describe error:', error);
+      setAiError(error.message || 'Failed to process your description');
+    } finally {
+      setIsAiProcessing(false);
+    }
+  };
+  
+  // Clear AI Assistant state
+  const clearAiAssistant = () => {
+    setAiPrompt('');
+    setAiSanitizedSummary('');
+    setAiWarnings([]);
+    setAiImageSearchItems(null);
+    setAiError('');
+    clearAllFilters();
+  };
 
   // Visual Match AI search handler
   const handleVisualSearch = async () => {
@@ -1066,6 +1181,89 @@ export default function BuyerSearch() {
             </CardHeader>
             <CardContent className="max-h-[calc(100vh-280px)] overflow-y-auto">
               <div className="space-y-6">
+                {/* AI Assistant - Describe your ideal home */}
+                <div className="space-y-3">
+                  <Label className="text-base font-semibold flex items-center gap-2">
+                    <Wand2 className="w-4 h-4 text-primary" />
+                    Describe Your Ideal Home
+                  </Label>
+                  <Textarea
+                    placeholder="e.g., 3 bed home in Austin under 800k with pool"
+                    value={aiPrompt}
+                    onChange={(e) => setAiPrompt(e.target.value)}
+                    className="min-h-[80px] resize-none"
+                    data-testid="textarea-ai-prompt"
+                  />
+                  <div className="flex gap-2">
+                    <Button
+                      onClick={handleAiDescribe}
+                      disabled={!aiPrompt.trim() || isAiProcessing}
+                      className="flex-1"
+                      data-testid="button-ai-apply"
+                    >
+                      {isAiProcessing ? (
+                        <>
+                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                          Processing...
+                        </>
+                      ) : (
+                        <>
+                          <Sparkles className="w-4 h-4 mr-2" />
+                          Apply
+                        </>
+                      )}
+                    </Button>
+                    {(aiPrompt || aiSanitizedSummary) && (
+                      <Button
+                        variant="outline"
+                        onClick={clearAiAssistant}
+                        data-testid="button-ai-clear"
+                      >
+                        <X className="w-4 h-4" />
+                      </Button>
+                    )}
+                  </div>
+                  
+                  {/* AI Error */}
+                  {aiError && (
+                    <div className="p-3 rounded-md bg-destructive/10 border border-destructive/20 text-sm">
+                      <div className="flex items-start gap-2">
+                        <AlertCircle className="w-4 h-4 text-destructive mt-0.5 flex-shrink-0" />
+                        <span className="text-destructive">{aiError}</span>
+                      </div>
+                    </div>
+                  )}
+                  
+                  {/* AI Interpreted Summary */}
+                  {aiSanitizedSummary && (
+                    <div className="p-3 rounded-md bg-primary/5 border border-primary/20 text-sm">
+                      <span className="text-muted-foreground">I interpreted this as: </span>
+                      <span className="font-medium">{aiSanitizedSummary}</span>
+                    </div>
+                  )}
+                  
+                  {/* AI Warnings */}
+                  {aiWarnings.length > 0 && (
+                    <div className="space-y-1">
+                      {aiWarnings.map((warning, i) => (
+                        <div key={i} className="text-xs text-muted-foreground flex items-start gap-1">
+                          <AlertCircle className="w-3 h-3 mt-0.5 flex-shrink-0" />
+                          {warning}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  
+                  {/* Visual preferences note */}
+                  {aiImageSearchItems && aiImageSearchItems.length > 0 && (
+                    <div className="text-xs text-muted-foreground">
+                      Visual preferences detected (optional) - use Visual Match for image-based search.
+                    </div>
+                  )}
+                </div>
+
+                <Separator />
+                
                 {/* Status */}
                 <div className="space-y-3">
                   <Label className="text-base font-semibold">Status</Label>
