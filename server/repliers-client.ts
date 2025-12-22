@@ -26,6 +26,7 @@ interface ListingsSearchParams {
   city?: string;
   postalCode?: string;
   neighborhood?: string;
+  subdivision?: string;  // MLS Subdivision field - distinct from neighborhood
   minLat?: number;
   maxLat?: number;
   minLng?: number;
@@ -371,6 +372,7 @@ class RepliersClient {
     if (params.city) queryParams.append('city', params.city);
     if (params.postalCode) queryParams.append('zip', params.postalCode);
     if (params.neighborhood) queryParams.append('neighborhood', params.neighborhood);
+    if (params.subdivision) queryParams.append('subdivision', params.subdivision);
     if (params.minLat) queryParams.append('minLat', params.minLat.toString());
     if (params.maxLat) queryParams.append('maxLat', params.maxLat.toString());
     if (params.minLng) queryParams.append('minLng', params.minLng.toString());

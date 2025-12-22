@@ -456,11 +456,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const effectiveLimit = (subdivision || needsServerSideFiltering) ? Math.min(parsedLimit * 10, 200) : parsedLimit;
         
         // Build search params - add type=Sale for Closed to exclude leased rentals
+        // Use subdivision parameter (not neighborhood) - this matches MLS Subdivision field
         const searchParams: any = {
           standardStatus: repliersStatus,  // RESO-compliant: Active, Pending, Closed
           postalCode: postalCode,
           city: city,
-          neighborhood: subdivision,  // Maps to Repliers "neighborhood" field
+          subdivision: subdivision,  // Use subdivision parameter (MLS Subdivision field)
           minPrice: minPrice ? parseInt(minPrice, 10) : undefined,
           maxPrice: maxPrice ? parseInt(maxPrice, 10) : undefined,
           minBeds: bedsMin ? parseInt(bedsMin, 10) : undefined,
@@ -484,7 +485,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         console.log(`\n📊 [CMA Search Diagnostic] ===================================`);
         console.log(`   Status requested: ${repliersStatus}`);
         console.log(`   Repliers API params: ${JSON.stringify(cleanParams, null, 2)}`);
-        console.log(`   NOTE: "neighborhood" param is how we send subdivision to Repliers`);
+        console.log(`   NOTE: Using "subdivision" param (MLS Subdivision field)`);
         console.log(`   =============================================================\n`);
         
         const response = await repliersClient.searchListings(searchParams);
