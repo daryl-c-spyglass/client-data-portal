@@ -397,7 +397,7 @@ export default function SharedCMAView() {
                           </p>
                         </div>
                         <Badge variant={property.standardStatus === 'Closed' ? 'secondary' : 'default'}>
-                          {property.standardStatus === 'Closed' ? 'Sold' : property.standardStatus}
+                          {property.standardStatus}
                         </Badge>
                       </div>
                       <Separator className="my-2" />

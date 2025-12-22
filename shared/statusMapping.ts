@@ -165,6 +165,21 @@ export function apiValueToRepliersStatus(apiValue: string): string {
 }
 
 /**
+ * Get the canonical RESO display label for a status.
+ * IMPORTANT: Returns only canonical values - never "Sold" or "Under Contract".
+ * Use this for all user-facing status labels.
+ */
+export function getStandardStatusLabel(status: string | null | undefined): 'Active' | 'Active Under Contract' | 'Pending' | 'Closed' | '' {
+  if (!status) return '';
+  const normalized = normalizeStatus(status);
+  if (normalized === STATUS_CODES.ACTIVE) return 'Active';
+  if (normalized === STATUS_CODES.ACTIVE_UNDER_CONTRACT) return 'Active Under Contract';
+  if (normalized === STATUS_CODES.PENDING) return 'Pending';
+  if (normalized === STATUS_CODES.CLOSED) return 'Closed';
+  return '';
+}
+
+/**
  * Get the display color classes for a status
  */
 export function getStatusColors(status: string): { bg: string; text: string; border?: string } {

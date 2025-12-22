@@ -314,7 +314,7 @@ export class MemStorage implements IStorage {
 
   async getClosedPropertyCount(): Promise<number> {
     return Array.from(this.properties.values()).filter(p => 
-      p.mlgCanView && (p.standardStatus === 'Closed' || p.standardStatus === 'Sold')
+      p.mlgCanView && p.standardStatus === 'Closed'
     ).length;
   }
 
@@ -329,7 +329,7 @@ export class MemStorage implements IStorage {
     };
     
     const closedProperties = Array.from(this.properties.values()).filter(p => 
-      p.mlgCanView && (p.standardStatus === 'Closed' || p.standardStatus === 'Sold')
+      p.mlgCanView && p.standardStatus === 'Closed'
     );
     
     closedProperties.forEach(p => {

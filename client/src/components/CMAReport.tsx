@@ -603,7 +603,7 @@ export function CMAReport({
                         <div className="flex items-start justify-between gap-2 flex-wrap">
                           <p className="font-semibold text-sm truncate max-w-[200px]">{property.unparsedAddress}</p>
                           <Badge variant="outline" className={`${status.bg} ${status.text} text-xs flex-shrink-0`}>
-                            {property.standardStatus === 'Closed' ? 'Sold' : property.standardStatus}
+                            {property.standardStatus}
                           </Badge>
                         </div>
                         {(property.propertySubType || property.propertyType) && (
@@ -771,7 +771,7 @@ export function CMAReport({
                                 <div className="flex items-start justify-between gap-2 flex-wrap">
                                   <p className="font-semibold text-sm truncate max-w-[200px]">{property.unparsedAddress}</p>
                                   <Badge variant="outline" className={`${status.bg} ${status.text} text-xs flex-shrink-0`}>
-                                    {property.standardStatus === 'Closed' ? 'Sold' : property.standardStatus}
+                                    {property.standardStatus}
                                   </Badge>
                                 </div>
                                 <p className="text-xl font-bold text-primary">${price.toLocaleString()}</p>
@@ -876,7 +876,7 @@ export function CMAReport({
                           {propertiesWithCoords.map((property) => {
                             const price = property.closePrice || property.listPrice || 0;
                             const status = property.standardStatus || 'Active';
-                            const isSold = status === 'Closed' || status === 'Sold';
+                            const isClosed = status === 'Closed';
                             
                             return (
                               <Marker
@@ -889,7 +889,7 @@ export function CMAReport({
                                     <p className="font-semibold text-sm">{property.unparsedAddress}</p>
                                     <p className="text-lg font-bold text-primary">${Number(price).toLocaleString()}</p>
                                     <Badge variant="outline" className="text-xs mt-1">
-                                      {isSold ? 'Sold' : status}
+                                      {status}
                                     </Badge>
                                     <div className="flex flex-wrap gap-2 text-xs text-muted-foreground mt-2">
                                       <span>{property.bedroomsTotal || 0} beds</span>
@@ -1581,8 +1581,8 @@ export function CMAReport({
                           />
                           {propertiesWithCoords.map((property) => {
                             const status = property.standardStatus || 'Active';
-                            const isSold = status === 'Closed' || status === 'Sold';
-                            const price = isSold 
+                            const isClosed = status === 'Closed';
+                            const price = isClosed 
                               ? (property.closePrice ? Number(property.closePrice) : (property.listPrice ? Number(property.listPrice) : 0))
                               : (property.listPrice ? Number(property.listPrice) : 0);
                             
@@ -1597,7 +1597,7 @@ export function CMAReport({
                                     <p className="font-semibold text-sm">{property.unparsedAddress}</p>
                                     <p className="text-lg font-bold text-primary">${Number(price).toLocaleString()}</p>
                                     <Badge variant="outline" className="text-xs mt-1">
-                                      {isSold ? 'Sold' : status}
+                                      {status}
                                     </Badge>
                                   </div>
                                 </Popup>

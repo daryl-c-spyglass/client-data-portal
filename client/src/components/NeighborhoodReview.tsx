@@ -273,7 +273,7 @@ export function NeighborhoodReview({ neighborhoodName, city, months = 6 }: Neigh
                         <p className="font-semibold text-sm">{property.unparsedAddress || property.address}</p>
                         <p className="text-lg font-bold text-primary">{formatPrice(Number(price))}</p>
                         <Badge variant="outline" className="text-xs mt-1">
-                          {status === 'Closed' ? 'Sold' : status}
+                          {status}
                         </Badge>
                         <div className="flex flex-wrap gap-2 text-xs text-muted-foreground mt-2">
                           <span>{property.bedroomsTotal || property.beds || 0} beds</span>

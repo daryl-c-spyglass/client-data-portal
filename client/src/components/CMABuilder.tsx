@@ -556,7 +556,7 @@ export function CMABuilder({ onCreateCMA, initialData }: CMABuilderProps) {
 
   const getPriceLabel = (property: Property) => {
     if (property.standardStatus === 'Closed' && property.closePrice) {
-      return 'Sold';
+      return 'Closed';
     }
     return 'List';
   };

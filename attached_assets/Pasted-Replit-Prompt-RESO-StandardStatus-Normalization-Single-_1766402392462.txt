@@ -1,0 +1,220 @@
+Replit Prompt: RESO StandardStatus Normalization (Single Helper) — Active / AUC / Pending / Closed (Sold→Closed)
+
+You are working in an existing codebase that processes and displays listing statuses. We must comply with RESO StandardStatus conventions. Implement a single canonical normalization helper and eliminate non-canonical labels and buckets.
+
+Canonical RESO StandardStatus values we will support
+
+Active
+
+Active Under Contract
+
+Pending
+
+Closed
+
+Notes (RESO):
+
+Closed has synonyms such as Sold (i.e., “Sold” should normalize to Closed). 
+ddwiki.reso.org
+
+StandardStatus is intended to represent a listing’s contract state (e.g., Active, Active Under Contract, Pending, Closed). 
+ddwiki.reso.org
++1
+
+Phase 1 — Repo Scan (Required, before edits)
+
+Search the repo and list every file/line where any of these appear:
+
+"Sold", "sold"
+
+"Closed", "closed"
+
+"Under Contract", "under contract", "U/C", "UC"
+
+"Pending", "pending"
+
+"Active Under Contract"
+
+standardStatus, StandardStatus, mlsStatus, listingStatus, status, reso
+
+Identify status touchpoints:
+
+inbound parsing/mapping from API payloads
+
+UI rendering (badges, cards, tables, detail pages)
+
+filtering/grouping/sorting logic
+
+exports (CSV/downloads), analytics, saved searches
+
+Phase 2 — Create ONE shared canonical helper (Single Source of Truth)
+
+Create or update a shared utility (use the closest equivalent location in this repo; preferred path shown):
+
+src/utils/standardStatus.ts (or utils/standardStatus.*)
+
+Implement these functions (adapt types to the project language):
+
+normalizeStandardStatus(raw: string | null | undefined): "Active" | "Active Under Contract" | "Pending" | "Closed" | ""
+
+Rules:
+
+Trim whitespace, collapse internal whitespace, and case-normalize for comparison.
+
+Normalize synonyms to canonical values:
+
+Active Under Contract
+
+Under Contract
+
+U/C
+
+UC
+
+Active Under Contract (any casing)
+
+→ Active Under Contract
+
+Closed
+
+Sold
+
+Closed
+
+Closed Sale
+
+SOLD
+
+CLOSED (any casing/spacing)
+
+→ Closed
+
+Pending
+
+Pending
+
+Offer Accepted
+
+OA (if present in repo)
+
+P (if present in repo)
+
+Under Contract MUST NOT map to Pending unless the codebase already treats it that way; instead, keep it as Active Under Contract (RESO pattern)
+
+→ Pending
+
+Active
+
+Active
+
+For Sale (if present in repo)
+
+A (if present in repo)
+
+→ Active
+
+If raw is empty/unknown, return "" (empty string) to avoid inventing a status.
+
+getStandardStatusLabel(status: string | null | undefined): string
+
+Returns the display label for the normalized status.
+
+Must return exactly one of:
+
+Active
+
+Active Under Contract
+
+Pending
+
+Closed
+
+"" for unknown
+
+Optional helpers (if it reduces duplication)
+
+isClosed(raw): boolean
+
+isActiveUnderContract(raw): boolean
+
+Phase 3 — Apply Minimal Targeted Changes Everywhere
+
+Update ONLY the files found in Phase 1 so that:
+
+No UI ever displays “Sold” or “Under Contract”
+
+“Sold” must never appear as a bucket/label; show Closed
+
+“Under Contract” must never appear; show Active Under Contract
+
+All comparisons and filter/grouping logic uses the helper
+Replace any code like:
+
+status === "Sold"
+
+status === "Under Contract"
+
+includes("Sold")
+
+case "Sold":
+
+with normalized logic:
+
+normalizeStandardStatus(status) === "Closed"
+
+normalizeStandardStatus(status) === "Active Under Contract"
+
+Filters must not split into duplicate buckets
+
+No separate “Sold” and “Closed”
+
+No separate “Under Contract” and “Active Under Contract”
+Ensure the filter options list only the canonical values.
+
+Exports/CSV/API mapping layer
+
+If exporting standardStatus, export canonical (Closed, not Sold)
+
+If exporting a separate “displayStatus”, it must still never emit Sold or Under Contract
+
+Phase 4 — Tests / Fixtures (If present)
+
+Add unit tests for normalizeStandardStatus():
+
+"Sold" → "Closed"
+
+"Closed Sale" → "Closed"
+
+" under contract " → "Active Under Contract"
+
+"UC" → "Active Under Contract"
+
+"PENDING" → "Pending"
+
+"ACTIVE" → "Active"
+
+Update fixtures so UI snapshots don’t include “Sold” or “Under Contract”.
+
+Acceptance Criteria
+
+Repo-wide search for literal strings "Sold" and "Under Contract" returns 0 results in production code (tests/fixtures should be updated too).
+
+UI shows only: Active, Active Under Contract, Pending, Closed.
+
+Filtering/grouping produces only those 4 buckets; no duplicates.
+
+Export/API outputs canonical values for StandardStatus.
+
+Output Required
+
+When complete, provide:
+
+List of files modified
+
+For each file: what changed and why
+
+Confirmation that “Sold” and “Under Contract” no longer render anywhere
+
+Tests added/updated and how to run them
+
+Now perform Phase 1–Phase 4 with minimal changes and implement end-to-end canonical RESO StandardStatus normalization.
