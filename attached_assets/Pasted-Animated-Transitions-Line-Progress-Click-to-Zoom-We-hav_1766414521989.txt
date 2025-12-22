@@ -1,0 +1,90 @@
+Animated Transitions + Line Progress + Click-to-Zoom)
+
+We have a Dashboard section called Marketing Insights with multiple graphs/charts. Implement a Slider Revolution-style interactive experience:
+
+Goals
+
+Marketing Insights must be a carousel of chart “slides”.
+
+Add a thin line pagination/progress indicator (multiple small lines, one per slide) that animates and changes as slides change.
+
+Add smooth slide transitions (fade/slide/scale with easing).
+
+Make each chart clickable to open an expanded floating card (modal) where users can view/zoom the chart and read supporting metrics.
+
+Required UX Behaviors
+A) Carousel behavior
+
+Supports next/prev arrows, swipe/drag (if applicable), and clicking pagination lines.
+
+Tracks activeIndex and slideCount from the rendered slides (no hardcoding).
+
+B) Line pagination / progress indicator (like the thin lines in the screenshot)
+
+Render a horizontal row of thin rounded lines under the carousel.
+
+One line per slide.
+
+Inactive line: muted gray track.
+
+Active line: darker primary fill.
+
+Animate active line:
+
+On slide change, reset the fill to 0% then animate to 100% over 300–600ms (or match your transition duration).
+
+Click any line → jump to that slide.
+
+Add a11y: aria-label="Go to insight slide X".
+
+C) Slide transitions
+
+On slide change: animate the slide content in using one of:
+
+fade + slight translateY
+
+fade + slight scale
+
+Use CSS transitions or Framer Motion if already installed.
+
+Keep motion subtle and performant (no heavy effects that slow charts).
+
+D) Click-to-zoom floating card modal
+
+Clicking a chart slide opens a modal overlay:
+
+Large chart (expanded)
+
+Title + subtitle (date range / filters if available)
+
+Breakdown metrics (totals, MLS vs Repliers if relevant)
+
+Close button + ESC + click outside to close
+
+The expanded view should reuse the same chart component with a prop like variant="expanded" for size/tooling changes.
+
+Implementation constraints
+
+Do not break existing data filtering logic.
+
+Do not hardcode the slide count; derive from the list of insight cards.
+
+Ensure the indicator stays in sync even when data changes (filters, re-render).
+
+If the project uses shadcn/ui:
+
+Use Carousel (Embla) and Dialog.
+
+If not, implement a minimal carousel with scroll snapping + state tracking.
+
+Deliverables
+
+List all files modified
+
+Explain how activeIndex is tracked
+
+Confirm the line indicator is animated + clickable
+
+Confirm modal opens from any slide and supports zoom/expanded info
+
+Now implement these enhancements end-to-end in the Marketing Insights section.

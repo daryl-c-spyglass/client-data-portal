@@ -90,7 +90,7 @@ const CHART_SLIDES: ChartSlide[] = [
   },
 ];
 
-// Line indicator component for carousel pagination
+// Line indicator component for carousel pagination with animated fill
 interface CarouselIndicatorProps {
   count: number;
   activeIndex: number;
@@ -100,30 +100,34 @@ interface CarouselIndicatorProps {
 function CarouselIndicator({ count, activeIndex, onSelect }: CarouselIndicatorProps) {
   return (
     <div className="flex gap-2 justify-center items-center mt-4" role="tablist">
-      {Array.from({ length: count }).map((_, index) => (
-        <button
-          key={index}
-          onClick={() => onSelect(index)}
-          className={`
-            h-[3px] rounded-full transition-all duration-300 ease-out
-            ${index === activeIndex 
-              ? 'w-10 bg-foreground' 
-              : 'w-6 bg-muted-foreground/40 hover:bg-muted-foreground/60'
-            }
-          `}
-          role="tab"
-          aria-selected={index === activeIndex}
-          aria-label={`Go to slide ${index + 1}`}
-          data-testid={`indicator-slide-${index}`}
-        >
-          {index === activeIndex && (
-            <span 
-              className="block h-full bg-primary rounded-full animate-indicator-fill"
-              style={{ animationDuration: '400ms' }}
-            />
-          )}
-        </button>
-      ))}
+      {Array.from({ length: count }).map((_, index) => {
+        const isActive = index === activeIndex;
+        return (
+          <button
+            key={index}
+            onClick={() => onSelect(index)}
+            className={`
+              relative h-[4px] rounded-full transition-all duration-300 ease-out overflow-hidden
+              ${isActive ? 'w-12' : 'w-6 hover:w-8'}
+              bg-muted-foreground/20
+            `}
+            role="tab"
+            aria-selected={isActive}
+            aria-label={`Go to insight slide ${index + 1}`}
+            data-testid={`indicator-slide-${index}`}
+          >
+            {isActive && (
+              <span 
+                key={`fill-${activeIndex}`}
+                className="absolute inset-0 bg-primary rounded-full animate-indicator-fill"
+              />
+            )}
+            {!isActive && (
+              <span className="absolute inset-0 bg-muted-foreground/40 rounded-full hover:bg-muted-foreground/60 transition-colors" />
+            )}
+          </button>
+        );
+      })}
     </div>
   );
 }
@@ -419,11 +423,13 @@ export function MarketingInsightsCarousel({
             className="w-full"
           >
             <CarouselContent>
-              {CHART_SLIDES.map((slide) => (
+              {CHART_SLIDES.map((slide, index) => (
                 <CarouselItem key={slide.id} className="md:basis-1/2 lg:basis-1/2">
-                  <div className="p-1">
+                  <div 
+                    className={`p-1 ${index === activeIndex ? 'animate-slide-fade-in' : ''}`}
+                  >
                     <Card 
-                      className="cursor-pointer hover-elevate transition-all"
+                      className="cursor-pointer chart-card-interactive hover-elevate"
                       onClick={() => setZoomedChart(slide.id)}
                       data-testid={`chart-${slide.id}`}
                     >
@@ -472,49 +478,62 @@ export function MarketingInsightsCarousel({
 
       <Dialog open={!!zoomedChart} onOpenChange={() => setZoomedChart(null)}>
         <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-          {zoomedChart && (
-            <>
-              <DialogHeader>
-                <DialogTitle className="flex items-center gap-2">
-                  {CHART_SLIDES.find(s => s.id === zoomedChart)?.icon && (
-                    <span className="text-primary">
-                      {(() => {
-                        const Icon = CHART_SLIDES.find(s => s.id === zoomedChart)?.icon;
-                        return Icon ? <Icon className="w-5 h-5" /> : null;
-                      })()}
-                    </span>
-                  )}
-                  {CHART_SLIDES.find(s => s.id === zoomedChart)?.title}
-                </DialogTitle>
-                <DialogDescription>
-                  {CHART_SLIDES.find(s => s.id === zoomedChart)?.description}
-                </DialogDescription>
-              </DialogHeader>
-              
-              <div className="space-y-4">
-                <div className="h-[400px]">
-                  {renderChartContent(zoomedChart, true)}
-                </div>
-                
-                {getChartMetrics(zoomedChart) && (
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4 pt-4 border-t">
-                    {Object.entries(getChartMetrics(zoomedChart) || {}).map(([label, value]) => (
-                      <div key={label} className="text-center">
-                        <p className="text-2xl font-bold">{value}</p>
-                        <p className="text-xs text-muted-foreground">{label}</p>
-                      </div>
-                    ))}
+          {zoomedChart && (() => {
+            const currentSlide = CHART_SLIDES.find(s => s.id === zoomedChart);
+            const metrics = getChartMetrics(zoomedChart);
+            return (
+              <>
+                <DialogHeader>
+                  <div className="flex items-center justify-between gap-2 flex-wrap">
+                    <DialogTitle className="flex items-center gap-2">
+                      {currentSlide?.icon && (
+                        <span className="text-primary">
+                          <currentSlide.icon className="w-5 h-5" />
+                        </span>
+                      )}
+                      {currentSlide?.title}
+                    </DialogTitle>
+                    <div className="flex gap-2">
+                      <Badge variant="outline" className="text-xs gap-1">
+                        <Cloud className="w-3 h-3" />
+                        Repliers API
+                      </Badge>
+                      <Badge variant="secondary" className="text-xs gap-1">
+                        <Database className="w-3 h-3" />
+                        Database
+                      </Badge>
+                    </div>
                   </div>
-                )}
+                  <DialogDescription>
+                    {currentSlide?.description}
+                  </DialogDescription>
+                </DialogHeader>
                 
-                {lastUpdatedAt && (
-                  <p className="text-xs text-muted-foreground text-center pt-2 border-t">
-                    Data refreshed: {new Date(lastUpdatedAt).toLocaleString()}
-                  </p>
-                )}
-              </div>
-            </>
-          )}
+                <div className="space-y-4">
+                  <div className="h-[400px] animate-slide-fade-in">
+                    {renderChartContent(zoomedChart, true)}
+                  </div>
+                  
+                  {metrics && (
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 pt-4 border-t">
+                      {Object.entries(metrics).map(([label, value]) => (
+                        <div key={label} className="text-center p-3 rounded-lg bg-muted/50">
+                          <p className="text-2xl font-bold text-primary">{value}</p>
+                          <p className="text-xs text-muted-foreground">{label}</p>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  
+                  {lastUpdatedAt && (
+                    <p className="text-xs text-muted-foreground text-center pt-2 border-t">
+                      Data refreshed: {new Date(lastUpdatedAt).toLocaleString()}
+                    </p>
+                  )}
+                </div>
+              </>
+            );
+          })()}
         </DialogContent>
       </Dialog>
     </>
