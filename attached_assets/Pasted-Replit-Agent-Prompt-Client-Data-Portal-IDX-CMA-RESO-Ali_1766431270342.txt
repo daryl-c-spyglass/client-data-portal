@@ -1,0 +1,284 @@
+Replit Agent Prompt — Client Data Portal + IDX/CMA
+RESO Alignment, Repliers Query Standards, Status Parity, Counts, Polygon Search, QA
+
+(with Official Repliers KB References)
+
+You are working in an IDX / CMA / Client Data Portal app integrated with Repliers for ACTRIS. The app currently has mismatches vs MLS (incorrect counts, missing listings, confusing filters). Your job is to fix these issues by enforcing RESO-compliant querying, consistent status handling, and correct inventory aggregation, then validate parity with MLS.
+
+PRIMARY GOALS
+
+Match MLS results and counts as closely as possible
+
+Use RESO-compliant fields and statuses consistently
+
+Eliminate confusing or non-standard filters
+
+Ensure counts, filters, and polygon searches are accurate
+
+Provide a clean foundation for dashboards, CMA, and analytics
+
+1) Environment & API Wiring (BLOCKER CHECK)
+
+Confirm REPLIERS_API_KEY exists and is read server-side only
+
+All Repliers requests must be made from backend routes
+
+Add dev-only logging:
+
+endpoint called
+
+query params (no secrets)
+
+response status
+
+total results returned
+
+If API key is missing or invalid:
+
+return a clear error (REPLIERS_API_KEY not configured), not silent zeros
+
+2) Canonical Status Strategy (MANDATORY)
+Rule
+
+Use RESO standardStatus ONLY. Do not mix with status or lastStatus.
+
+Implementation
+
+All searches, filters, counts, dashboards must use:
+
+standardStatus
+
+Never include status=A/U or lastStatus in the same request when using standardStatus.
+
+Display
+
+Show MLS-style labels exactly:
+
+Active
+
+Active Under Contract
+
+Pending
+
+Closed
+
+(others allowed if returned, but do not rename)
+
+Dashboard buckets
+
+Active → standardStatus=Active
+
+Under Contract → standardStatus IN (Active Under Contract, Pending)
+
+Sold → standardStatus=Closed
+
+3) Remove Neighborhood, Use Subdivision (RESO Compliance)
+Requirements
+
+Remove Neighborhood filter from:
+
+Client Data Portal
+
+Buyer Search
+
+CMA
+
+Do not query or filter by Neighborhood anywhere
+
+Replace with Subdivision (RESO-compliant)
+
+If legacy URLs include neighborhood=..., ignore safely
+
+4) Canonical Filter Field Alignment
+
+Ensure all filters use stable, RESO-friendly fields:
+
+City
+
+Subdivision
+
+Postal Code
+
+Property Type
+
+Beds / Baths
+
+Price
+
+Square Footage
+
+Lot Size
+
+Year Built
+
+Stories
+
+Status (standardStatus)
+
+Remove or refactor any non-RESO aliases.
+
+5) Correct Counts & Filters Using Aggregates
+Requirements
+
+Use Repliers aggregate queries to:
+
+Drive Dashboard counts
+
+Populate filter dropdowns (Subdivision, Status, Property Type, City)
+
+Do NOT derive totals from paginated listing results
+
+Ensure:
+
+“Found X” matches aggregate totals
+
+Pagination matches displayed records
+
+6) Polygon Search (Map) — Correct Implementation
+Rules
+
+Polygon defines geographic boundary only
+
+Polygon searches MUST be combined with:
+
+standardStatus
+
+price, beds, baths, property type, etc.
+
+Never run polygon queries alone
+
+Implementation
+
+Use Repliers map parameter with valid GeoJSON
+
+Ensure:
+
+total count reflects polygon + filters
+
+listings displayed are inside polygon
+
+results actually render (no empty UI with non-zero counts)
+
+7) Results Rendering & UX Integrity
+
+Listings must render after every search
+
+“Found X / Showing Y” must be accurate
+
+Pagination must work
+
+Empty states must show “No results found” (not blank UI)
+
+Add button / selection behavior must remain functional (if applicable)
+
+8) Listing Identity (Stability)
+
+Use Repliers listing id as primary key if stable
+
+Store mlsNumber as secondary reference
+
+If needed, use (resource + mlsNumber) to ensure uniqueness
+
+9) Dev-Only Status Inspector (REQUIRED FOR DEBUGGING)
+
+Add a dev-only toggle (non-production) that displays per listing:
+
+standardStatus
+
+legacy fields (if available): status, lastStatus
+
+subdivision, city, postal code
+
+listing identifier
+
+Purpose: diagnose MLS vs app mismatches quickly.
+
+10) QA Parity Validation (MLS vs App)
+Minimum test cases
+
+Active only
+
+Active Under Contract only
+
+Pending only
+
+Closed only
+
+Under Contract bucket (AUC + Pending)
+
+Subdivision filter
+
+City + Zip filter
+
+Beds/Baths/Price filter
+
+SqFt / Year Built / Stories (CMA)
+
+Polygon search + filters
+
+Pass condition
+
+App counts and listings match MLS results (or differences are explainable via permissions)
+
+No listings missing due to field or status misalignment
+
+11) Deliverables
+
+List all files changed + paths
+
+Confirm:
+
+standardStatus is the only status filter used
+
+Neighborhood removed everywhere
+
+Subdivision works correctly
+
+Dashboard counts are accurate
+
+Polygon searches respect filters
+
+Results and pagination render correctly
+
+Brief summary explaining:
+
+final status strategy
+
+how counts are calculated
+
+any remaining known MLS differences (if unavoidable)
+
+12) Reference — Official Repliers KB Resources (USE THESE)
+
+Replit should reference the following official documentation while implementing:
+
+Status & Filtering
+
+Filtering Listings by Status (status vs lastStatus vs standardStatus)
+https://help.repliers.com/en/article/filtering-listings-by-status-16fc4yd/
+
+Aggregates & Counts
+
+Using Aggregates to Determine Distinct Values for Filters and Parameters
+https://help.repliers.com/en/article/using-aggregates-to-determine-distinct-values-for-filters-and-parameters
+
+Polygon / Map Searches
+
+Filtering Listings Geo-Spatially Using the map Parameter
+https://help.repliers.com/en/article/filtering-listings-geo-spatially-using-the-map-parameter
+
+Handling Detailed GeoJSON Polygons in Repliers API Requests
+https://help.repliers.com/en/article/handling-detailed-geojson-polygons-in-repliers-api-requests
+
+Map Performance
+
+Map Clustering Implementation Guide
+https://help.repliers.com/en/article/map-clustering-implementation-guide
+
+Search & Debugging
+
+Searching Listings by Address
+https://help.repliers.com/en/article/searching-listings-by-address
+
+How to Search Listings Using Keywords
+https://help.repliers.com/en/article/how-to-search-listings-using-keywords

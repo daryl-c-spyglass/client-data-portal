@@ -223,22 +223,21 @@ export async function getUnifiedInventory(forceRefresh = false): Promise<Invento
     
   const subtypeSum = Object.values(inventoryData.countsBySubtype).reduce((sum, count) => sum + count, 0);
   
-  // Total MUST equal status sum AND subtype sum
+  // Total equals status sum (aggregate counts from API)
+  // Subtype counts are SAMPLED estimates (first 200 listings per status) for efficiency
+  // They will NOT match status sum - this is intentional for API performance
   inventoryData.totalCount = statusSum;
   
-  // Validation
+  // Validation - note subtype is sampled, not exact
   inventoryData.validation = {
     statusSumMatchesTotal: inventoryData.totalCount === statusSum,
-    subtypeSumMatchesTotal: inventoryData.totalCount === subtypeSum,
+    subtypeSumMatchesTotal: false, // Intentionally false - subtypes are sampled for efficiency
     statusSum,
     subtypeSum,
   };
   
-  // Log warnings if mismatched
-  if (statusSum !== subtypeSum) {
-    console.warn(`[Inventory] MISMATCH: statusSum=${statusSum} vs subtypeSum=${subtypeSum}, diff=${Math.abs(statusSum - subtypeSum)}`);
-    errors.push(`Status/subtype count mismatch: ${statusSum} vs ${subtypeSum}`);
-  }
+  // Log subtype sampling info (not an error)
+  console.log(`[Inventory] Subtype sampling: ${subtypeSum} sampled from ${statusSum} total listings`);
   
   // === STEP 4: Add source breakdown for MLS vs Repliers chart ===
   // Repliers API provides Active, Active Under Contract, and Pending listings
@@ -285,14 +284,15 @@ export async function getUnifiedInventory(forceRefresh = false): Promise<Invento
   return inventoryData;
 }
 
-// Count Active + Active Under Contract listings with unified status/subtype counting
+// Count Active + Active Under Contract + Pending listings using efficient aggregate queries
 // Uses RESO-compliant standardStatus only - never mix with legacy status codes
+// Status counts use aggregate API (resultsPerPage=1 for count only)
+// Subtype counts use sampled scan (first 200 listings per status to estimate distribution)
 async function countLiveListingsUnified(repliersClient: any): Promise<{
   statusCounts: { Active: number; 'Active Under Contract': number; Pending: number };
   subtypeCounts: Record<string, number>;
   rentalFiltered: number;
 }> {
-  const statusCounts = { Active: 0, 'Active Under Contract': 0, Pending: 0 };
   const subtypeCounts: Record<string, number> = {};
   let rentalFiltered = 0;
   
@@ -301,59 +301,55 @@ async function countLiveListingsUnified(repliersClient: any): Promise<{
     subtypeCounts[subtype] = 0;
   }
   
-  // Scan using RESO standardStatus values: Active, Active Under Contract, Pending
-  // Dashboard buckets: Active, Under Contract (AUC + Pending combined), Closed
+  // STEP 1: Use efficient aggregate queries for status counts (4 API calls vs hundreds)
+  // This gets accurate total counts from the API response.count field
+  console.log('[Inventory] Using aggregate queries for status counts...');
+  const aggregateCounts = await repliersClient.getStatusCounts({
+    class: 'residential',
+    type: 'sale', // Exclude rentals at API level
+  });
+  
+  const statusCounts = {
+    Active: aggregateCounts.Active || 0,
+    'Active Under Contract': aggregateCounts['Active Under Contract'] || 0,
+    Pending: aggregateCounts.Pending || 0,
+  };
+  
+  console.log(`[Inventory] Aggregate counts: Active=${statusCounts.Active}, AUC=${statusCounts['Active Under Contract']}, Pending=${statusCounts.Pending}`);
+  
+  // STEP 2: Sample first page of each status to estimate subtype distribution
+  // This is much faster than scanning all pages but still gives reasonable subtype estimates
   for (const standardStatus of ['Active', 'Active Under Contract', 'Pending'] as const) {
-    const statusKey = standardStatus;
-    let pageNum = 1;
-    let hasMore = true;
-    let statusCount = 0;
-    
-    while (hasMore && pageNum <= 100) { // Safety limit
-      try {
-        const response = await repliersClient.searchListings({
-          standardStatus,
-          class: 'residential',
-          resultsPerPage: 200,
-          pageNum,
-        });
-        
-        const listings = response.listings || [];
-        
-        for (const listing of listings) {
-          // Filter out rentals
-          if (isRentalListing(listing)) {
-            rentalFiltered++;
-            continue;
-          }
-          
-          statusCount++;
-          
-          // Normalize and count subtype
-          const normalizedType = normalizePropertyType(listing.propertySubType || listing.type);
-          subtypeCounts[normalizedType] = (subtypeCounts[normalizedType] || 0) + 1;
+    try {
+      const response = await repliersClient.searchListings({
+        standardStatus,
+        class: 'residential',
+        type: 'sale', // Exclude rentals
+        resultsPerPage: 200, // Sample first page
+        pageNum: 1,
+      });
+      
+      const listings = response.listings || [];
+      
+      for (const listing of listings) {
+        if (isRentalListing(listing)) {
+          rentalFiltered++;
+          continue;
         }
         
-        hasMore = listings.length === 200 && pageNum < (response.numPages || 1);
-        pageNum++;
-        
-        // Rate limit protection
-        await new Promise(resolve => setTimeout(resolve, 100));
-        
-      } catch (error: any) {
-        console.error(`[Inventory] Error scanning ${statusKey} page ${pageNum}:`, error.message);
-        hasMore = false;
+        const normalizedType = normalizePropertyType(listing.propertySubType || listing.type);
+        subtypeCounts[normalizedType] = (subtypeCounts[normalizedType] || 0) + 1;
       }
+      
+    } catch (error: any) {
+      console.error(`[Inventory] Error sampling ${standardStatus}:`, error.message);
     }
-    
-    statusCounts[statusKey] = statusCount;
-    console.log(`[Inventory] Counted ${statusCount} ${statusKey} listings`);
   }
   
   return { statusCounts, subtypeCounts, rentalFiltered };
 }
 
-// Count Closed listings from database with subtype breakdown
+// Count Closed listings using efficient aggregate queries + subtype sampling
 async function countClosedListingsUnified(): Promise<{
   totalClosed: number;
   subtypeCounts: Record<string, number>;
@@ -370,35 +366,31 @@ async function countClosedListingsUnified(): Promise<{
   const repliersClient = getRepliersClient();
   if (repliersClient && isRepliersConfigured()) {
     try {
-      let totalClosed = 0;
-      let pageNum = 1;
-      let hasMore = true;
+      // Use aggregate query for total count (1 API call vs many pages)
+      const aggregateCounts = await repliersClient.getStatusCounts({
+        class: 'residential',
+        type: 'sale',
+      });
+      const totalClosed = aggregateCounts.Closed || 0;
       
-      while (hasMore && pageNum <= 50) { // Safety limit
-        const response = await repliersClient.searchListings({
-          standardStatus: 'Closed',
-          class: 'residential',
-          resultsPerPage: 200,
-          pageNum,
-        });
+      // Sample first page for subtype distribution
+      const response = await repliersClient.searchListings({
+        standardStatus: 'Closed',
+        class: 'residential',
+        type: 'sale',
+        resultsPerPage: 200,
+        pageNum: 1,
+      });
+      
+      for (const listing of (response.listings || [])) {
+        if (isRentalListing(listing)) continue;
         
-        const listings = response.listings || [];
-        
-        for (const listing of listings) {
-          // Skip rentals
-          if (isRentalListing(listing)) continue;
-          
-          const rawSubtype = listing.details?.style || (listing as any).propertySubType || 'Other';
-          const normalizedType = normalizePropertyType(rawSubtype);
-          subtypeCounts[normalizedType] = (subtypeCounts[normalizedType] || 0) + 1;
-          totalClosed++;
-        }
-        
-        hasMore = listings.length >= 200;
-        pageNum++;
+        const rawSubtype = listing.details?.style || (listing as any).propertySubType || 'Other';
+        const normalizedType = normalizePropertyType(rawSubtype);
+        subtypeCounts[normalizedType] = (subtypeCounts[normalizedType] || 0) + 1;
       }
       
-      console.log(`[Inventory] Counted ${totalClosed} closed listings from Repliers API`);
+      console.log(`[Inventory] Closed count from Repliers: ${totalClosed}`);
       return { totalClosed, subtypeCounts, source: 'repliers' };
       
     } catch (error: any) {

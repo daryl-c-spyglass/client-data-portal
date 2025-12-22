@@ -32,6 +32,13 @@ The UI incorporates Spyglass Realty branding with an orange primary color scheme
 - **Location Data**: Neighborhood information is derived from boundary polygon resolution using lat/lng coordinates, distinct from subdivision data provided by MLS listings.
 - **Caching**: In-memory caches are used for frequently accessed data from external APIs (e.g., FUB, ReZen) to reduce load and improve performance.
 - **Rate Limiting**: A built-in rate limiter manages external API requests to comply with usage policies.
+- **Inventory Service**: Efficient aggregate-based counting using RESO standardStatus (Active, Active Under Contract, Pending, Closed)
+  - Uses `resultsPerPage=1` API calls to get accurate counts from response metadata (4 API calls vs hundreds)
+  - Samples first page of each status for subtype distribution estimates
+  - 5-minute cache TTL to balance freshness with API efficiency
+  - Fallback to database for Closed listings when Repliers is unavailable
+  - Dashboard "Under Contract" metric = Active Under Contract + Pending combined
+  - Error messages surface when REPLIERS_API_KEY is not configured
 - **Property Status Handling**: All user-facing status labels strictly follow the RESO Data Dictionary 4-status hierarchy:
   - **Active**: Properties currently on the market
   - **Active Under Contract**: Properties with accepted offers still showing (abbreviated "AUC" in compact UI contexts like tabs/legends)
@@ -77,7 +84,8 @@ The UI incorporates Spyglass Realty branding with an orange primary color scheme
 - **Settings Page**: Centralized management for agent profile, data sync, display preferences, embed codes, and lead capture configuration.
 - **Market Insights**: Year-over-Year price comparisons and neighborhood-level market statistics.
 - **Property Detail Page**: Enhanced property details with neighborhood reviews, boundary maps, and consistent data display.
-- **Search Enhancements**: Autocomplete for cities, zip codes, subdivisions, elementary schools, and separate filters for neighborhoods and subdivisions in CMA and buyer searches.
+- **Search Enhancements**: Autocomplete for cities, zip codes, subdivisions, elementary schools, and separate filters for subdivisions in CMA and buyer searches.
+- **Dev Tools**: Status Inspector component (`StatusInspectorToggle`) available on Properties page in development mode for debugging MLS parity issues. Shows standardStatus, legacy status fields, and raw API values per listing.
 
 ## External Dependencies
 

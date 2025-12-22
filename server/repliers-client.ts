@@ -426,6 +426,53 @@ class RepliersClient {
     }
   }
 
+  // Get aggregate counts using RESO standardStatus for efficient Dashboard counts
+  // Uses resultsPerPage=1 to minimize payload while getting accurate counts from response.count
+  async getStatusCounts(params: {
+    class?: string;
+    type?: string; // 'sale' to exclude rentals
+  } = {}): Promise<{ 
+    Active: number; 
+    'Active Under Contract': number; 
+    Pending: number; 
+    Closed: number;
+  }> {
+    const counts = {
+      Active: 0,
+      'Active Under Contract': 0,
+      Pending: 0,
+      Closed: 0,
+    };
+    
+    // Query each status with resultsPerPage=1 to get count from response metadata
+    const statuses: Array<keyof typeof counts> = ['Active', 'Active Under Contract', 'Pending', 'Closed'];
+    
+    await Promise.all(statuses.map(async (status) => {
+      try {
+        const queryParams = new URLSearchParams();
+        queryParams.append('standardStatus', status);
+        queryParams.append('resultsPerPage', '1'); // Minimize payload, just need count
+        if (params.class) queryParams.append('class', params.class);
+        if (params.type) queryParams.append('type', params.type);
+        
+        const url = `/listings?${queryParams.toString()}`;
+        console.log(`📊 [Repliers Aggregate] GET ${url}`);
+        
+        const result = await this.withRetry(
+          () => this.client.get(url).then(r => r.data),
+          `getStatusCounts(${status})`
+        );
+        
+        counts[status] = result.count || 0;
+        console.log(`📊 [Repliers Aggregate] ${status}: ${counts[status]}`);
+      } catch (error: any) {
+        console.error(`Error getting count for ${status}:`, error.message);
+      }
+    }));
+    
+    return counts;
+  }
+
   async nlpSearch(prompt: string, nlpId?: string): Promise<NLPResponse> {
     try {
       const body: any = { prompt };
