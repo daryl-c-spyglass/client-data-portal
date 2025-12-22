@@ -3276,6 +3276,8 @@ This email was sent by ${senderName} (${senderEmail}) via the MLS Grid IDX Platf
     }
   });
 
+  // Repliers NLP proxy - converts natural language to search URL
+  // Returns structured response for sanitizer pipeline
   app.post("/api/repliers/nlp", async (req, res) => {
     try {
       const client = getRepliersClient();
@@ -3292,10 +3294,173 @@ This email was sent by ${senderName} (${senderEmail}) via the MLS Grid IDX Platf
       }
 
       const result = await client.nlpSearch(prompt, nlpId);
-      res.json(result);
+      
+      // Handle 406 errors gracefully
+      if (result.status === 'error' && result.errorCode === 406) {
+        res.status(406).json({ 
+          error: result.errorMessage,
+          repliersRequestUrl: '',
+          repliersRequestBody: null,
+          repliersSummary: '',
+          nlpId: result.nlpId || nlpId || '',
+        });
+        return;
+      }
+      
+      // Handle other errors
+      if (result.status === 'error') {
+        res.status(result.errorCode || 500).json({ 
+          error: result.errorMessage || 'NLP search failed',
+        });
+        return;
+      }
+      
+      // Return structured response for sanitizer pipeline
+      res.json({
+        repliersRequestUrl: result.url || '',
+        repliersRequestBody: result.requestBody || null,
+        repliersSummary: result.summary || '',
+        nlpId: result.nlpId || '',
+      });
     } catch (error: any) {
       console.error("Repliers NLP error:", error.message);
       res.status(500).json({ error: "Failed to perform NLP search" });
+    }
+  });
+  
+  // OpenAI Sanitizer/Normalizer for Repliers NLP output
+  // Converts NLP URL to our filter schema + safe summary
+  app.post("/api/ai/sanitize-repliers-nlp", async (req, res) => {
+    try {
+      const { userPrompt, repliersRequestUrl, repliersRequestBody, repliersSummary } = req.body;
+      
+      if (!userPrompt) {
+        res.status(400).json({ error: "userPrompt is required" });
+        return;
+      }
+      
+      // Parse the Repliers URL to extract params
+      let parsedParams: Record<string, string> = {};
+      try {
+        if (repliersRequestUrl) {
+          const url = new URL(repliersRequestUrl, 'https://api.repliers.io');
+          parsedParams = Object.fromEntries(url.searchParams.entries());
+        }
+      } catch (e) {
+        console.warn('Failed to parse Repliers URL:', e);
+      }
+      
+      // Fetch valid subdivisions for matching (use city if available)
+      let validSubdivisions: string[] = [];
+      try {
+        const cityFromParams = parsedParams.city || '';
+        const results = await storage.getAutocompleteSubdivisions('', 500); // Get all subdivisions
+        validSubdivisions = results.map(r => r.value);
+      } catch (e) {
+        console.warn('Failed to fetch subdivisions:', e);
+      }
+      
+      // Build sanitization prompt for OpenAI
+      const sanitizePrompt = `You are a RESO-compliant real estate search filter sanitizer.
+
+INPUT:
+- User prompt: "${userPrompt}"
+- Repliers NLP URL params: ${JSON.stringify(parsedParams)}
+- Repliers summary: "${repliersSummary || ''}"
+- Available subdivisions for matching: ${validSubdivisions.slice(0, 100).join(', ')}${validSubdivisions.length > 100 ? '...' : ''}
+
+TASK:
+Convert the NLP output to our internal filter schema. Apply these MANDATORY RULES:
+
+1. STRIP NEIGHBORHOOD: If there's a "neighborhood" param, REMOVE it and add a warning. We use Subdivision instead.
+
+2. MATCH SUBDIVISION SAFELY: 
+   - Only set "subdivision" if it EXACTLY matches (case-insensitive) one from the valid list.
+   - If no exact match, leave it blank and add warning: "Subdivision not matched - please select manually."
+
+3. ENFORCE standardStatus ONLY:
+   - Convert status terms to RESO standardStatus: Active, Active Under Contract, Pending, Closed
+   - "active" → "Active"
+   - "under contract" or "pending" → "Pending" 
+   - "sold" or "closed" → "Closed"
+   - Drop any "status" or "lastStatus" params and use only standardStatus.
+
+4. DROP UNSUPPORTED PARAMS:
+   - We support: city, subdivision, postalCode, propertyType, minBeds, minBaths, minPrice, maxPrice, standardStatus, keywords
+   - Drop any other params and add a warning.
+
+5. CREATE SANITIZED SUMMARY:
+   - Write a friendly summary of what the search will find.
+   - Keep it concise (1-2 sentences).
+
+OUTPUT JSON:
+{
+  "filters": {
+    "city": "string or empty",
+    "subdivision": "string or empty", 
+    "postalCode": "string or empty",
+    "propertyType": "Single Family|Condo|Townhouse|Land|Multi-Family or empty",
+    "minBeds": number or 0,
+    "minBaths": number or 0,
+    "minPrice": number or 0,
+    "maxPrice": number or 0,
+    "standardStatus": "Active|Active Under Contract|Pending|Closed or empty",
+    "keywords": "string or empty"
+  },
+  "sanitizedSummary": "Friendly summary of the search",
+  "warnings": ["array of warning strings"]
+}`;
+
+      // Call OpenAI
+      const openai = await import("openai");
+      const client = new openai.default({ apiKey: process.env.OPENAI_API_KEY });
+      
+      const completion = await client.chat.completions.create({
+        model: "gpt-4o",
+        messages: [
+          { role: "system", content: "You are a RESO-compliant filter sanitizer. Always respond with valid JSON only." },
+          { role: "user", content: sanitizePrompt }
+        ],
+        response_format: { type: "json_object" },
+        temperature: 0.1,
+      });
+      
+      const responseText = completion.choices[0]?.message?.content || '{}';
+      let sanitizedResult;
+      
+      try {
+        sanitizedResult = JSON.parse(responseText);
+      } catch (e) {
+        console.error('Failed to parse OpenAI response:', responseText);
+        res.status(500).json({ error: "Failed to parse sanitizer response" });
+        return;
+      }
+      
+      // Ensure required fields exist
+      const result = {
+        filters: {
+          city: sanitizedResult.filters?.city || '',
+          subdivision: sanitizedResult.filters?.subdivision || '',
+          postalCode: sanitizedResult.filters?.postalCode || '',
+          propertyType: sanitizedResult.filters?.propertyType || '',
+          minBeds: Number(sanitizedResult.filters?.minBeds) || 0,
+          minBaths: Number(sanitizedResult.filters?.minBaths) || 0,
+          minPrice: Number(sanitizedResult.filters?.minPrice) || 0,
+          maxPrice: Number(sanitizedResult.filters?.maxPrice) || 0,
+          standardStatus: sanitizedResult.filters?.standardStatus || '',
+          keywords: sanitizedResult.filters?.keywords || '',
+        },
+        sanitizedSummary: sanitizedResult.sanitizedSummary || 'Searching for properties...',
+        warnings: sanitizedResult.warnings || [],
+        imageSearchItems: repliersRequestBody?.imageSearchItems || null,
+      };
+      
+      console.log('✅ [AI Sanitizer] Result:', JSON.stringify(result.filters));
+      res.json(result);
+      
+    } catch (error: any) {
+      console.error("AI Sanitizer error:", error.message);
+      res.status(500).json({ error: "Failed to sanitize search filters" });
     }
   });
 

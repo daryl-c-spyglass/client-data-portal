@@ -1,0 +1,218 @@
+Replit Agent Prompt — Buyer Search AI Assistant (Option A)
+Repliers NLP → OpenAI Sanitizer/Normalizer → Apply to Existing Filters (RESO-safe)
+
+You are working in our IDX web app. We already use OpenAI and we integrate Repliers. Implement a “Describe your ideal home” AI Assistant in Buyer Search using this pipeline:
+
+User Prompt → Repliers NLP → OpenAI Sanitizer/Normalizer → Apply to existing filters UI → Run our normal search
+
+This must be RESO-compliant and must not reintroduce Neighborhood.
+
+0) Feature UX (Buyer Search)
+
+Add a panel above/near existing filters:
+
+Label: Describe your ideal home
+
+Input: multi-line text
+
+Button: Apply
+
+After Apply, show:
+
+I interpreted this as: <sanitizedSummary>
+
+Optional warnings list (small text)
+
+Add a Clear button to reset prompt + AI summary and restore default filters.
+
+Important: Filters UI remains the source of truth. AI populates filters; user can edit them.
+
+1) Backend Routes (server-side only)
+1.1 Repliers NLP proxy
+
+Create:
+
+POST /api/repliers/nlp
+
+Input:
+
+{ "prompt": "string", "nlpId": "string (optional)" }
+
+
+Behavior:
+
+Call POST https://api.repliers.io/nlp with Repliers API key (server-side).
+
+Return:
+
+{
+  "repliersRequestUrl": "string",
+  "repliersRequestBody": { "imageSearchItems": [] } | null,
+  "repliersSummary": "string",
+  "nlpId": "string"
+}
+
+
+Error handling:
+
+If Repliers returns 406 → return 406 with a friendly message like:
+“That doesn’t look like a property search. Try including location, price, beds, etc.”
+
+If auth fails or key missing → return 500 with actionable message.
+
+1.2 OpenAI Sanitizer/Normalizer route
+
+Create:
+
+POST /api/ai/sanitize-repliers-nlp
+
+Input:
+
+{
+  "userPrompt": "string",
+  "repliersRequestUrl": "string",
+  "repliersRequestBody": { "imageSearchItems": [] } | null,
+  "repliersSummary": "string"
+}
+
+
+Behavior:
+
+Use OpenAI server-side to convert Repliers NLP output into our internal filter schema + safe summary.
+
+Output must be:
+
+{
+  "filters": {
+    "city": "string?",
+    "subdivision": "string?",
+    "postalCode": "string?",
+    "propertyType": "string?",
+    "minBeds": 0,
+    "minBaths": 0,
+    "minPrice": 0,
+    "maxPrice": 0,
+    "standardStatus": "Active|Active Under Contract|Pending|Closed|...",
+    "keywords": "string?"
+  },
+  "sanitizedSummary": "string",
+  "warnings": ["string", "..."]
+}
+
+Mandatory sanitization rules
+
+The sanitizer MUST enforce these rules every time:
+
+Strip neighborhood
+
+If repliersRequestUrl contains neighborhood=..., remove it.
+
+Add warning: “Neighborhood removed (we use Subdivision instead).”
+
+Prefer subdivision safely
+
+Only set filters.subdivision if it matches a known subdivision list (case-insensitive).
+
+If no match, leave it blank and add warning:
+“Subdivision not confidently matched—please select manually.”
+
+Enforce standardStatus only
+
+If repliersRequestUrl contains status= or lastStatus=, strip them.
+
+Convert user intent to standardStatus when possible:
+
+“active” → Active
+
+“under contract” → Active Under Contract or Pending (prefer Under Contract bucket logic if we have one)
+
+“pending” → Pending
+
+“sold/closed” → Closed
+
+Drop unsupported params
+
+If NLP produced params we don’t support, drop them and add a warning.
+
+Do not execute the Repliers NLP URL directly
+
+This route only returns filters + summary. The app will run our normal search via our existing query builder.
+
+2) Subdivision Options Source (for safe matching)
+
+To safely match subdivisions, the sanitizer route needs a list of valid subdivisions.
+
+Implement/Reuse one of:
+
+GET /api/repliers/aggregates/subdivisions?city=... (preferred)
+
+Or use your existing cached filter options store
+
+The sanitizer can:
+
+fetch subdivision list for the selected/parsed city (if any)
+
+attempt a case-insensitive exact match first
+
+optional: starts-with match (only if unique)
+
+3) Frontend Wiring (Buyer Search)
+
+On Apply click:
+
+Call /api/repliers/nlp with {prompt, nlpId?}
+
+Call /api/ai/sanitize-repliers-nlp with NLP outputs
+
+Apply returned filters into existing filter state (single source of truth)
+
+Display sanitizedSummary + warnings
+
+Trigger existing search using the app’s normal query builder (GET listings or existing server route)
+
+Persist (optional):
+
+store last prompt + sanitizedSummary in localStorage for the session
+
+Clear button:
+
+clears prompt, summary, warnings, and resets filters to defaults
+
+4) Handling Repliers NLP imageSearchItems (v1 scope)
+
+If repliersRequestBody.imageSearchItems is present:
+
+Store it in state but do not auto-run AI Image Search unless our app already supports it.
+
+Show a small note: “Visual preferences detected (optional).”
+(We can integrate image search later.)
+
+5) Acceptance Tests
+
+Prompt: “3 bed home in Austin under 800k with pool”
+
+filters update + summary shown + results load
+
+Prompt includes neighborhood: “in the Annex”
+
+neighborhood stripped + warning shown + no crash
+
+Prompt mentions statuses: “Active under contract”
+
+becomes standardStatus=Active Under Contract (no status/lastStatus usage)
+
+Prompt is irrelevant: “why is the sky blue”
+
+shows friendly message (406 handling)
+
+Deliverables
+
+List file paths changed
+
+Confirm OpenAI + Repliers calls are server-side only
+
+Confirm sanitization rules are enforced
+
+Confirm filters UI updates and search runs normally
+
+Provide a short note on how subdivision matching works (exact/unique match only)

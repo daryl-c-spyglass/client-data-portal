@@ -128,10 +128,21 @@ interface LocationsWithBoundaryResponse {
   count: number;
 }
 
-interface NLPResponse {
+// NLP Response includes URL, request body (for imageSearchItems), and summary
+export interface NLPResponse {
   url: string;
   nlpId: string;
   summary?: string;
+  requestBody?: {
+    imageSearchItems?: ImageSearchItem[];
+  };
+}
+
+// Extended response for the sanitizer pipeline
+export interface NLPExtendedResponse extends NLPResponse {
+  status: 'success' | 'error';
+  errorMessage?: string;
+  errorCode?: number;
 }
 
 // AI Image Search types - used for visual similarity ranking
@@ -540,16 +551,44 @@ class RepliersClient {
     }
   }
 
-  async nlpSearch(prompt: string, nlpId?: string): Promise<NLPResponse> {
+  async nlpSearch(prompt: string, nlpId?: string): Promise<NLPExtendedResponse> {
     try {
       const body: any = { prompt };
       if (nlpId) body.nlpId = nlpId;
       
+      console.log(`🔍 [Repliers NLP] Prompt: "${prompt.substring(0, 50)}..."`);
       const response = await this.client.post('/nlp', body);
-      return response.data;
+      
+      console.log(`✅ [Repliers NLP] Success - URL: ${response.data.url?.substring(0, 60)}...`);
+      return {
+        ...response.data,
+        status: 'success' as const,
+      };
     } catch (error: any) {
-      console.error('Repliers NLP search error:', error.response?.data || error.message);
-      throw new Error(`Failed to perform NLP search: ${error.message}`);
+      const status = error.response?.status;
+      const errorData = error.response?.data;
+      
+      console.error(`❌ [Repliers NLP] Error ${status}:`, errorData || error.message);
+      
+      // Return structured error instead of throwing for 406 (Not Acceptable)
+      if (status === 406) {
+        return {
+          url: '',
+          nlpId: nlpId || '',
+          status: 'error',
+          errorCode: 406,
+          errorMessage: "That doesn't look like a property search. Try including location, price, beds, etc.",
+        };
+      }
+      
+      // For other errors, return structured error
+      return {
+        url: '',
+        nlpId: nlpId || '',
+        status: 'error',
+        errorCode: status || 500,
+        errorMessage: error.message || 'Failed to perform NLP search',
+      };
     }
   }
 
