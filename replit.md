@@ -52,14 +52,21 @@ The UI incorporates Spyglass Realty branding with an orange primary color scheme
     - `GET /api/debug/listings/dedupe-report?size=100` - Dedupe diagnostics
     - `GET /api/debug/listings/canonical?status=Active&city=Austin&limit=50` - Filtered canonical listings
 
-- **AI Assistant**: Conversational property search assistant powered by OpenAI GPT-4o
+- **AI Assistant**: Conversational property search and CMA intake assistant powered by OpenAI GPT-4o
   - **Provider**: OpenAI Chat Completions API with JSON response mode
   - **Files**: `server/openai-client.ts` (backend), `client/src/components/ChatAssistant.tsx` (frontend)
   - **Voice Input**: Browser Web Speech API (client-side, not Whisper)
-  - **Scope**: Property search only - explicitly scoped to IDX search functionality
-  - **Capabilities**: Search criteria extraction, slot-filling conversation, neighborhood Q&A
-  - **Limitations**: Cannot create CMAs, schedule showings, or provide valuations - redirects users to appropriate platform tools
-  - **Endpoints**: `POST /api/chat`, `GET /api/chat/status`
+  - **Intent Detection**: Automatically detects user intent as `IDX_SEARCH`, `CMA_INTAKE`, or `OTHER`
+  - **Capabilities**:
+    - Property search criteria extraction with slot-filling conversation
+    - CMA intake with guided questions (area → sqft range → year built range → stories)
+    - Neighborhood Q&A and real estate guidance
+  - **CMA Intake Flow**: Collects criteria conversationally, requires explicit user confirmation via "Create Draft" button before creating
+  - **Safety**: Never auto-creates CMAs; requires user confirmation; validates input ranges
+  - **Endpoints**: 
+    - `POST /api/chat` - Main chat endpoint with intent detection
+    - `GET /api/chat/status` - Check if OpenAI is configured
+    - `POST /api/cma/draft` - Create CMA draft from AI-collected criteria
 
 ### Feature Specifications
 

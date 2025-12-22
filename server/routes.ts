@@ -5070,6 +5070,71 @@ This email was sent by ${senderName} (${senderEmail}) via the MLS Grid IDX Platf
     }
   });
 
+  // CMA Draft endpoint - creates a draft CMA from AI-collected criteria
+  app.post("/api/cma/draft", async (req, res) => {
+    try {
+      const { area, sqftMin, sqftMax, yearBuiltMin, yearBuiltMax, stories } = req.body;
+
+      // Validate required field
+      if (!area || typeof area !== "string" || area.trim().length === 0) {
+        res.status(400).json({ error: "Area is required (neighborhood, zip code, or subdivision)" });
+        return;
+      }
+
+      // Validate numeric ranges
+      if (sqftMin !== undefined && sqftMax !== undefined && sqftMin > sqftMax) {
+        res.status(400).json({ error: "Minimum square footage cannot be greater than maximum" });
+        return;
+      }
+      if (yearBuiltMin !== undefined && yearBuiltMax !== undefined && yearBuiltMin > yearBuiltMax) {
+        res.status(400).json({ error: "Minimum year built cannot be greater than maximum" });
+        return;
+      }
+
+      // Validate stories
+      if (stories !== undefined && stories !== "any" && ![1, 2, 3].includes(stories)) {
+        res.status(400).json({ error: "Stories must be 1, 2, 3, or 'any'" });
+        return;
+      }
+
+      // Build search criteria object
+      const searchCriteria = {
+        area: area.trim(),
+        sqftMin: sqftMin || null,
+        sqftMax: sqftMax || null,
+        yearBuiltMin: yearBuiltMin || null,
+        yearBuiltMax: yearBuiltMax || null,
+        stories: stories || null,
+        createdVia: "ai_assistant",
+      };
+
+      // Get user ID if authenticated
+      const user = req.user as any;
+      const userId = user?.id || null;
+
+      // Create draft CMA record
+      const draftName = `CMA Draft - ${area.trim()}`;
+      const cmaData = {
+        name: draftName,
+        userId,
+        comparablePropertyIds: [],
+        searchCriteria,
+        notes: "Draft created via AI Assistant. Add subject property and comparables to complete.",
+      };
+
+      const cma = await storage.createCma(cmaData);
+      
+      res.status(201).json({
+        draftId: cma.id,
+        url: `/cma/${cma.id}`,
+        message: `CMA draft created for ${area.trim()}`,
+      });
+    } catch (error: any) {
+      console.error("[CMA Draft] Error:", error.message);
+      res.status(500).json({ error: "Failed to create CMA draft" });
+    }
+  });
+
   // ========================================
   // DEBUG ENDPOINTS - Canonical Data Layer
   // ========================================

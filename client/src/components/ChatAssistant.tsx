@@ -1,7 +1,7 @@
 import { useRef, useEffect, useState, useCallback } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { useLocation } from "wouter";
-import { MessageCircle, Send, X, Bot, User, Loader2, AlertCircle, Search, Mic, MicOff } from "lucide-react";
+import { MessageCircle, Send, X, Bot, User, Loader2, AlertCircle, Search, Mic, MicOff, FileText } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -9,6 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { apiRequest } from "@/lib/queryClient";
 import { useChat } from "@/contexts/ChatContext";
+import { useToast } from "@/hooks/use-toast";
 
 interface SearchCriteria {
   location?: string;
@@ -20,12 +21,26 @@ interface SearchCriteria {
   maxPrice?: number;
 }
 
+interface CmaCriteria {
+  area: string;
+  sqftMin?: number;
+  sqftMax?: number;
+  yearBuiltMin?: number;
+  yearBuiltMax?: number;
+  stories?: 1 | 2 | 3 | "any";
+}
+
+type ChatIntent = "IDX_SEARCH" | "CMA_INTAKE" | "OTHER";
+
 interface ChatMessage {
   role: "user" | "assistant";
   content: string;
+  intent?: ChatIntent;
   suggestAgent?: boolean;
   readyToSearch?: boolean;
   searchCriteria?: SearchCriteria;
+  readyToCreateCmaDraft?: boolean;
+  cmaCriteria?: CmaCriteria;
   timestamp: Date;
 }
 
@@ -105,9 +120,11 @@ declare global {
 export function ChatAssistant({ propertyContext }: ChatAssistantProps) {
   const { isOpen, openChat, closeChat } = useChat();
   const [, setLocation] = useLocation();
+  const { toast } = useToast();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [inputValue, setInputValue] = useState("");
   const [pendingSearch, setPendingSearch] = useState<SearchCriteria | null>(null);
+  const [pendingCmaDraft, setPendingCmaDraft] = useState<CmaCriteria | null>(null);
   const [isListening, setIsListening] = useState(false);
   const [speechSupported, setSpeechSupported] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -206,10 +223,13 @@ export function ChatAssistant({ propertyContext }: ChatAssistantProps) {
         { role: "user", content: userMessage, timestamp: new Date() },
         { 
           role: "assistant", 
-          content: data.message, 
+          content: data.message,
+          intent: data.intent,
           suggestAgent: data.suggestAgent,
           readyToSearch: data.readyToSearch,
           searchCriteria: data.searchCriteria,
+          readyToCreateCmaDraft: data.readyToCreateCmaDraft,
+          cmaCriteria: data.cmaCriteria,
           timestamp: new Date() 
         },
       ]);
@@ -217,6 +237,9 @@ export function ChatAssistant({ propertyContext }: ChatAssistantProps) {
       
       if (data.readyToSearch && data.searchCriteria) {
         setPendingSearch(data.searchCriteria);
+      }
+      if (data.readyToCreateCmaDraft && data.cmaCriteria) {
+        setPendingCmaDraft(data.cmaCriteria);
       }
     },
     onError: (error: Error, userMessage) => {
@@ -231,6 +254,59 @@ export function ChatAssistant({ propertyContext }: ChatAssistantProps) {
       ]);
     },
   });
+
+  const createCmaDraftMutation = useMutation({
+    mutationFn: async (criteria: CmaCriteria) => {
+      const response = await apiRequest("/api/cma/draft", "POST", criteria);
+      
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || "Failed to create CMA draft");
+      }
+      
+      return response.json();
+    },
+    onSuccess: (data) => {
+      setPendingCmaDraft(null);
+      setMessages(prev => [
+        ...prev,
+        { 
+          role: "assistant", 
+          content: `Great! I've created your CMA draft for ${data.message?.replace("CMA draft created for ", "") || "the selected area"}. You can now add your subject property and select comparables.`,
+          timestamp: new Date() 
+        },
+      ]);
+      toast({
+        title: "CMA Draft Created",
+        description: "Navigating to your new CMA draft...",
+      });
+      closeChat();
+      setLocation(data.url);
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleCreateCmaDraft = (criteria: CmaCriteria) => {
+    createCmaDraftMutation.mutate(criteria);
+  };
+
+  const handleCancelCmaDraft = () => {
+    setPendingCmaDraft(null);
+    setMessages(prev => [
+      ...prev,
+      { 
+        role: "assistant", 
+        content: "No problem! Let me know if you'd like to start over or need anything else.",
+        timestamp: new Date() 
+      },
+    ]);
+  };
 
   useEffect(() => {
     if (scrollRef.current) {
@@ -379,6 +455,33 @@ export function ChatAssistant({ propertyContext }: ChatAssistantProps) {
                               <Search className="h-3 w-3" />
                               Search Now
                             </Button>
+                          )}
+                          {msg.readyToCreateCmaDraft && msg.cmaCriteria && (
+                            <div className="flex gap-2 mt-2">
+                              <Button
+                                size="sm"
+                                className="gap-1"
+                                onClick={() => handleCreateCmaDraft(msg.cmaCriteria!)}
+                                disabled={createCmaDraftMutation.isPending}
+                                data-testid="button-create-cma-draft"
+                              >
+                                {createCmaDraftMutation.isPending ? (
+                                  <Loader2 className="h-3 w-3 animate-spin" />
+                                ) : (
+                                  <FileText className="h-3 w-3" />
+                                )}
+                                Create Draft
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={handleCancelCmaDraft}
+                                disabled={createCmaDraftMutation.isPending}
+                                data-testid="button-cancel-cma-draft"
+                              >
+                                Cancel
+                              </Button>
+                            </div>
                           )}
                           {msg.suggestAgent && (
                             <Badge 
