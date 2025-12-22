@@ -200,7 +200,6 @@ export function CMABuilder({ onCreateCMA, initialData }: CMABuilderProps) {
   
   const [searchCity, setSearchCity] = useState(sc.city || "");
   const [searchSubdivision, setSearchSubdivision] = useState(sc.subdivision || "");
-  const [searchNeighborhood, setSearchNeighborhood] = useState(sc.neighborhood || "");
   const [searchZipCode, setSearchZipCode] = useState(sc.zipCode || "");
   const [searchMinBeds, setSearchMinBeds] = useState(sc.minBeds || "");
   const [searchMinPrice, setSearchMinPrice] = useState(sc.minPrice || "");
@@ -297,7 +296,6 @@ export function CMABuilder({ onCreateCMA, initialData }: CMABuilderProps) {
     setComparables([]);
     setSearchCity("");
     setSearchSubdivision("");
-    setSearchNeighborhood("");
     setSearchZipCode("");
     setSearchMinBeds("");
     setSearchMinPrice("");
@@ -320,7 +318,6 @@ export function CMABuilder({ onCreateCMA, initialData }: CMABuilderProps) {
   const clearFilters = () => {
     setSearchCity("");
     setSearchSubdivision("");
-    setSearchNeighborhood("");
     setSearchZipCode("");
     setSearchMinBeds("");
     setSearchMinPrice("");
@@ -348,7 +345,6 @@ export function CMABuilder({ onCreateCMA, initialData }: CMABuilderProps) {
     }
     if (searchCity) params.set('city', searchCity.trim());
     if (searchSubdivision) params.set('subdivision', searchSubdivision.trim());
-    if (searchNeighborhood) params.set('neighborhood', searchNeighborhood.trim());
     if (searchZipCode) params.set('postalCode', searchZipCode.trim());
     if (searchMinBeds && searchMinBeds !== 'any') params.set('bedsMin', searchMinBeds);
     if (searchMinPrice && searchMinPrice !== 'any') params.set('minPrice', searchMinPrice);
@@ -518,7 +514,6 @@ export function CMABuilder({ onCreateCMA, initialData }: CMABuilderProps) {
       const searchCriteria = {
         city: searchCity,
         subdivision: searchSubdivision,
-        neighborhood: searchNeighborhood,
         zipCode: searchZipCode,
         minBeds: searchMinBeds,
         minPrice: searchMinPrice,
@@ -646,17 +641,6 @@ export function CMABuilder({ onCreateCMA, initialData }: CMABuilderProps) {
                     endpoint="/api/autocomplete/subdivisions"
                     testId="input-search-subdivision"
                     name="subdivision"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label>Neighborhood</Label>
-                  <AutocompleteInput
-                    placeholder="e.g., Circle C"
-                    value={searchNeighborhood}
-                    onChange={setSearchNeighborhood}
-                    endpoint="/api/autocomplete/neighborhoods"
-                    testId="input-search-neighborhood"
-                    name="neighborhood"
                   />
                 </div>
                 <div className="space-y-2">
@@ -916,17 +900,6 @@ export function CMABuilder({ onCreateCMA, initialData }: CMABuilderProps) {
                       endpoint="/api/autocomplete/subdivisions"
                       testId="input-map-search-subdivision"
                       name="map-subdivision"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Neighborhood</Label>
-                    <AutocompleteInput
-                      placeholder="e.g., Circle C"
-                      value={searchNeighborhood}
-                      onChange={setSearchNeighborhood}
-                      endpoint="/api/autocomplete/neighborhoods"
-                      testId="input-map-search-neighborhood"
-                      name="map-neighborhood"
                     />
                   </div>
                   <div className="space-y-2">

@@ -1377,33 +1377,6 @@ export default function BuyerSearch() {
                   </RadioGroup>
                 </div>
 
-                {/* Neighborhoods */}
-                <div className="space-y-3">
-                  <Label className="text-base font-semibold">Neighborhoods</Label>
-                  <AutocompleteInput
-                    placeholder="Start typing neighborhood..."
-                    value={filters.neighborhood || ''}
-                    onChange={(value) => updateFilter('neighborhood', value || undefined)}
-                    endpoint="/api/autocomplete/neighborhoods"
-                    testId="input-neighborhood"
-                  />
-                  <RadioGroup
-                    value={filters.neighborhoodMode || 'OR'}
-                    onValueChange={(value) => updateFilter('neighborhoodMode', value)}
-                  >
-                    <div className="flex gap-6">
-                      <div className="flex items-center space-x-2">
-                        <RadioGroupItem value="OR" id="neighborhood-or" />
-                        <Label htmlFor="neighborhood-or" className="font-normal">OR</Label>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <RadioGroupItem value="Not" id="neighborhood-not" />
-                        <Label htmlFor="neighborhood-not" className="font-normal">Not</Label>
-                      </div>
-                    </div>
-                  </RadioGroup>
-                </div>
-
                 {/* Cities */}
                 <div className="space-y-3">
                   <Label className="text-base font-semibold">Cities</Label>

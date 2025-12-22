@@ -519,15 +519,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
           ].filter(Boolean).join(' ');
 
           // MLS-aligned 4-status mapping: Active, Active Under Contract, Pending, Closed
-          // CRITICAL: Use lastStatus field to accurately detect AU vs Pending
+          // CRITICAL: Use standardStatus first (for API-filtered results), then lastStatus for fine-tuning
           const lastStatus = listing.lastStatus || '';
-          const rawStatus = listing.status || listing.standardStatus || 'Active';
+          const rawStatus = listing.status || '';
+          const standardStatus = listing.standardStatus || '';
           
-          // Determine mapped status using lastStatus priority (matches MLS exactly)
+          // Determine mapped status - prioritize standardStatus when it's a full RESO string
           let mappedStatus: string;
           
+          // PRIORITY 0: If standardStatus is explicitly set to a full RESO value, use it directly
+          if (standardStatus === 'Active Under Contract' || standardStatus.includes('Active Under Contract')) {
+            mappedStatus = 'Active Under Contract';
+          } else if (standardStatus === 'Pending') {
+            mappedStatus = 'Pending';
+          } else if (standardStatus === 'Active') {
+            mappedStatus = 'Active';
+          } else if (standardStatus === 'Closed' || standardStatus === 'Sold') {
+            mappedStatus = 'Closed';
+          }
           // PRIORITY 1: Check lastStatus for definitive status detection
-          if (lastStatus === 'Sld' || lastStatus === 'Lsd') {
+          else if (lastStatus === 'Sld' || lastStatus === 'Lsd') {
             mappedStatus = 'Closed';
           } else if (lastStatus === 'AU' || (rawStatus === 'U' && lastStatus === 'Act')) {
             // Active Under Contract: lastStatus=AU, or status=U with lastStatus=Act
@@ -535,32 +546,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
           } else if (lastStatus === 'Pnd' || lastStatus === 'P') {
             mappedStatus = 'Pending';
           } else {
-            // PRIORITY 2: Fall back to status/standardStatus mapping
+            // PRIORITY 2: Fall back to status field mapping
             const statusMap: Record<string, string> = {
               // Single-letter codes from Repliers API
               'A': 'Active',
               'U': 'Pending',  // Default U to Pending if no lastStatus override
               'S': 'Closed',
               'P': 'Pending',
-              // Full status strings (standardStatus field)
-              'Active': 'Active',
-              'Active Under Contract': 'Active Under Contract',
-              'Active Under Contract - Showing': 'Active Under Contract',
-              'Under Contract': 'Pending',  // Generic UC maps to Pending
-              'Pending': 'Pending',
-              'Sold': 'Closed',
-              'Closed': 'Closed',
-              'Expired': 'Closed',
-              'Cancelled': 'Closed',
-              'Withdrawn': 'Closed',
-              'Terminated': 'Closed',
             };
             mappedStatus = statusMap[rawStatus] || 'Active';
           }
           
-          // Log status mapping for AU/Pending/Closed detection debugging
-          if (lastStatus && (lastStatus === 'AU' || lastStatus === 'Act' || lastStatus === 'Pnd' || lastStatus === 'Sld' || lastStatus === 'Lsd')) {
-            console.log(`📋 Status mapping: status="${rawStatus}", lastStatus="${lastStatus}" → "${mappedStatus}" for ${listing.mlsNumber || 'unknown MLS#'}`);
+          // Log status mapping for debugging
+          if (standardStatus.includes('Under Contract') || lastStatus === 'AU' || lastStatus === 'Act') {
+            console.log(`📋 AU Status mapping: standardStatus="${standardStatus}", status="${rawStatus}", lastStatus="${lastStatus}" → "${mappedStatus}" for ${listing.mlsNumber || 'unknown MLS#'}`);
           }
 
           const toNumber = (val: any): number | null => {
@@ -875,11 +874,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
           // RESO-compliant: standardStatus=Active
           fetchPromises.push(fetchFromRepliers('Active').then(results => ({ results, expectedStatus: 'Active' })));
         } else if (statusType === 'under_contract') {
-          // RESO-compliant: standardStatus=Pending (covers Active Under Contract, Pending, Under Contract)
-          fetchPromises.push(fetchFromRepliers('Pending').then(results => ({ results, expectedStatus: 'Under Contract' })));
+          // RESO-compliant: Query BOTH Active Under Contract AND Pending statuses
+          // This ensures we capture all under-contract properties (AU and Pending)
+          fetchPromises.push(fetchFromRepliers('Active Under Contract').then(results => ({ results, expectedStatus: 'Active Under Contract' })));
+          fetchPromises.push(fetchFromRepliers('Pending').then(results => ({ results, expectedStatus: 'Pending' })));
         } else if (statusType === 'pending') {
-          // Pending is treated as Under Contract - use standardStatus=Pending
-          fetchPromises.push(fetchFromRepliers('Pending').then(results => ({ results, expectedStatus: 'Under Contract' })));
+          // Pending only - use standardStatus=Pending
+          fetchPromises.push(fetchFromRepliers('Pending').then(results => ({ results, expectedStatus: 'Pending' })));
         } else if (statusType === 'closed' || statusType === 'sold') {
           // RESO-compliant: standardStatus=Closed for sold/closed listings
           // Per Repliers: ClosedDate → soldDate, ClosePrice → soldPrice
@@ -913,8 +914,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
           if (expected === 'closed') {
             return propertyStatus === 'closed' || propertyStatus === 'sold';
           }
-          if (expected === 'under contract') {
-            return propertyStatus === 'under contract' || propertyStatus === 'pending';
+          if (expected === 'under contract' || expected === 'active under contract' || expected === 'pending') {
+            // Accept all under-contract variants as valid matches
+            return propertyStatus === 'under contract' || 
+                   propertyStatus === 'active under contract' || 
+                   propertyStatus === 'pending';
           }
           return propertyStatus === expected;
         });
