@@ -3597,6 +3597,7 @@ This email was sent by ${senderName} (${senderEmail}) via the MLS Grid IDX Platf
         validation: inventory.validation,
         errors: inventory.errors,
         isPartialData: inventory.isPartialData,
+        sourceBreakdown: inventory.sourceBreakdown,
       });
     } catch (error: any) {
       console.error("Inventory summary error:", error.message);

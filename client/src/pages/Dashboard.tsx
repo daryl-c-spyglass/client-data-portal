@@ -42,6 +42,7 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import type { Cma, Property } from "@shared/schema";
 import { formatPropertyType } from "@/lib/property-type-utils";
+import { MarketingInsightsCarousel } from "@/components/MarketingInsightsCarousel";
 import {
   LineChart,
   Line,
@@ -109,6 +110,22 @@ interface InventorySummary {
   };
   errors?: string[];
   isPartialData?: boolean;
+  sourceBreakdown?: {
+    repliers: {
+      Active: number;
+      'Active Under Contract': number;
+      Pending: number;
+      Closed: number;
+      total: number;
+    };
+    database: {
+      Active: number;
+      'Active Under Contract': number;
+      Pending: number;
+      Closed: number;
+      total: number;
+    };
+  };
 }
 
 interface DomAnalytics {
@@ -1189,107 +1206,13 @@ export default function Dashboard() {
           case 'marketInsights':
             return (
               <div key="marketInsights" className="space-y-6">
-                <div className="flex items-center gap-2">
-                  <BarChart3 className="w-6 h-6 text-primary" />
-                  <h2 className="text-2xl font-bold">Market Insights</h2>
-                </div>
-
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                  <Card>
-                    <CardHeader>
-                      <CardTitle className="text-lg">Market Activity (Last 12 Months)</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      {listingsLoading ? (
-                        <Skeleton className="h-64 w-full" />
-                      ) : listingsByMonth.length > 0 ? (
-                        <ResponsiveContainer width="100%" height={280}>
-                          <LineChart data={listingsByMonth.map(item => ({
-                            ...item,
-                            monthLabel: new Date(item.month + '-01').toLocaleDateString('en-US', { month: 'short', year: '2-digit' })
-                          }))}>
-                            <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-                            <XAxis 
-                              dataKey="monthLabel" 
-                              tick={{ fontSize: 12 }}
-                              className="text-muted-foreground"
-                            />
-                            <YAxis tick={{ fontSize: 12 }} className="text-muted-foreground" />
-                            <RechartsTooltip 
-                              contentStyle={{ 
-                                backgroundColor: 'hsl(var(--card))', 
-                                border: '1px solid hsl(var(--border))',
-                                borderRadius: '8px'
-                              }} 
-                            />
-                            <Legend />
-                            <Line 
-                              type="monotone" 
-                              dataKey="active" 
-                              stroke="hsl(var(--primary))" 
-                              strokeWidth={2}
-                              name="New Listings"
-                              dot={{ fill: 'hsl(var(--primary))' }}
-                            />
-                            <Line 
-                              type="monotone" 
-                              dataKey="closed" 
-                              stroke="hsl(142, 76%, 36%)" 
-                              strokeWidth={2}
-                              name="Closed Sales"
-                              dot={{ fill: 'hsl(142, 76%, 36%)' }}
-                            />
-                          </LineChart>
-                        </ResponsiveContainer>
-                      ) : (
-                        <div className="h-64 flex items-center justify-center text-muted-foreground">
-                          No data available
-                        </div>
-                      )}
-                    </CardContent>
-                  </Card>
-
-                  <Card>
-                    <CardHeader>
-                      <CardTitle className="text-lg">Price Distribution (Active Listings)</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      {priceLoading ? (
-                        <Skeleton className="h-64 w-full" />
-                      ) : priceDistribution.length > 0 ? (
-                        <ResponsiveContainer width="100%" height={280}>
-                          <BarChart data={priceDistribution}>
-                            <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-                            <XAxis 
-                              dataKey="range" 
-                              tick={{ fontSize: 11 }}
-                              className="text-muted-foreground"
-                            />
-                            <YAxis tick={{ fontSize: 12 }} className="text-muted-foreground" />
-                            <RechartsTooltip 
-                              contentStyle={{ 
-                                backgroundColor: 'hsl(var(--card))', 
-                                border: '1px solid hsl(var(--border))',
-                                borderRadius: '8px'
-                              }}
-                              formatter={(value: number) => [value.toLocaleString(), 'Properties']}
-                            />
-                            <Bar 
-                              dataKey="count" 
-                              fill="hsl(var(--primary))" 
-                              radius={[4, 4, 0, 0]}
-                              name="Properties"
-                            />
-                          </BarChart>
-                        </ResponsiveContainer>
-                      ) : (
-                        <div className="h-64 flex items-center justify-center text-muted-foreground">
-                          No data available
-                        </div>
-                      )}
-                    </CardContent>
-                  </Card>
-                </div>
+                <MarketingInsightsCarousel
+                  listingsByMonth={listingsByMonth}
+                  priceDistribution={priceDistribution}
+                  sourceBreakdown={inventorySummary?.sourceBreakdown}
+                  isLoading={listingsLoading || priceLoading || inventoryLoading}
+                  lastUpdatedAt={inventorySummary?.lastUpdatedAt}
+                />
                 
                 {/* Property Inventory by Subtype and DOM Analytics */}
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">

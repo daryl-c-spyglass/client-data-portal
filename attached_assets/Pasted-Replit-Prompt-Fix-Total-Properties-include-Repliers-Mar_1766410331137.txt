@@ -1,0 +1,196 @@
+Replit Prompt: Fix Total Properties (include Repliers) + Marketing Insights MLS vs Repliers Chart (All Statuses) + Carousel + Click-to-Zoom Floating Card
+
+You are working in an existing real estate listings analytics UI that currently shows “Total Properties” and a “Marketing Insights” section with graphs/charts. The “Total Properties” count currently does not include data from Repliers (it only reflects MLS or other source). Fix this and enhance Marketing Insights.
+
+Core requirements
+1) Fix “Total Properties” to include Repliers
+Goal
+
+“Total Properties” must include all properties from MLS + all properties from Repliers (deduped if needed). This must be consistent across:
+
+dashboard summary counts
+
+marketing insights totals
+
+filters/status breakdowns
+
+any “inventory” widgets
+
+Implementation steps (must do)
+
+Locate where “Total Properties” is computed (search repo for: Total Properties, totalProperties, total_count, inventory, summary, kpi, stats).
+
+Identify the data sources used:
+
+MLS feed (whatever current source is)
+
+Repliers feed (where it exists in code)
+
+Ensure the final list of properties includes Repliers:
+
+If the app already fetches Repliers listings, ensure those are included in the aggregation.
+
+If Repliers fetch exists but is excluded from totals, fix the aggregator.
+
+Deduping rules (deterministic):
+
+Prefer stable identifiers if present (priority order):
+
+listingId / mlsNumber / sourceListingId
+
+propertyId
+
+normalized full address (street + city + state/province + postalCode) + optional unit
+
+If duplicates exist across sources, count once, but keep source attribution for “MLS vs Repliers” breakdown.
+
+Deliverable: “Total Properties” now reflects combined inventory.
+
+2) Add Marketing Insights graph: “Inventory by Status — MLS vs Repliers” (includes ALL statuses)
+Goal
+
+In Marketing Insights, add a useful chart showing inventory counts by StandardStatus, split by source (MLS vs Repliers), and it must include all statuses present in the dataset.
+
+Status handling requirement
+
+Use the existing canonical status normalization helper you implemented earlier (RESO-aligned), so both sources map into the same buckets:
+
+Active
+
+Active Under Contract
+
+Pending
+
+Closed
+Plus: include any other statuses currently supported by the app (e.g., Expired/Withdrawn/Canceled) if they exist in this codebase. Do NOT drop statuses; include them all.
+
+Chart requirements
+
+Chart title: Inventory by Status (MLS vs Repliers)
+
+Must compare sources:
+
+MLS count per status
+
+Repliers count per status
+
+Recommended chart type:
+
+Stacked bar chart by status (bars = statuses, stacks = MLS + Repliers)
+
+OR grouped bar chart if stacked is not readable
+
+Show totals:
+
+status totals (MLS + Repliers)
+
+legend for sources
+
+Tooltips:
+
+On hover, show MLS count, Repliers count, total count for that status
+
+Data model expectation
+
+You must compute a dataset shaped like:
+
+[
+  { status: "Active", mls: 123, repliers: 45, total: 168 },
+  ...
+]
+
+3) Make ALL Marketing Insights charts a carousel
+Goal
+
+Marketing Insights should become a carousel of charts/cards instead of a vertical list/grid.
+
+Carousel requirements
+
+Each slide is a chart card (existing charts + the new “MLS vs Repliers” chart).
+
+Provide navigation:
+
+previous/next buttons
+
+optional dots indicator
+
+Keyboard accessible (left/right arrows) if the project has an accessibility pattern; otherwise implement minimal accessibility (button labels, focus states).
+
+Implementation guidance:
+
+If this project uses shadcn/ui:
+
+Use Carousel component if available.
+
+If not:
+
+Implement a minimal carousel with horizontal scroll snapping + buttons controlling scroll.
+
+4) Make charts clickable → open floating card modal for zoom + details
+Goal
+
+Clicking any chart slide should open a floating card (modal overlay) showing:
+
+enlarged chart (bigger height/width)
+
+chart title
+
+supporting metrics (e.g., totals, date range, last refresh timestamp if available)
+
+close button + ESC to close
+
+click outside to close
+
+Implementation guidance:
+
+If shadcn/ui exists:
+
+Use Dialog for modal, Card inside it.
+
+Otherwise:
+
+Implement a simple modal overlay with fixed positioning and focus handling.
+
+“Zoom” behavior
+
+In modal, render the same chart component with a variant="expanded" prop to increase size and show richer tooltips/legend if needed.
+
+5) Output expectations
+
+When done, provide:
+
+Files modified (list)
+
+What changed in each file and why
+
+Proof that Total Properties includes Repliers (show the code path)
+
+Screenshot-equivalent description of the new carousel behavior and click-to-zoom flow
+
+Any new reusable helpers added (e.g., dedupe, status normalization reuse, aggregation functions)
+
+Repo discovery instructions (do this first)
+
+Before editing, identify:
+
+framework (Next.js/React/Vue/etc.)
+
+charting library (Recharts/Chart.js/ECharts/etc.)
+
+existing Marketing Insights components
+
+where Repliers data is fetched/stored (API client, hooks, store, etc.)
+
+Then implement with minimal, production-safe changes.
+
+Notes / Constraints
+
+Do not remove existing insights; convert them into carousel slides.
+
+Do not hardcode statuses; derive unique statuses from normalized listing data and include all.
+
+Ensure “MLS vs Repliers” chart updates when filters change (if Marketing Insights is filter-driven).
+
+Keep performance reasonable: aggregate once (memoize) and reuse across charts.
+
+Now implement this end-to-end.

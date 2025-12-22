@@ -11,6 +11,7 @@ export interface InventoryData {
     Active: number;
     'Active Under Contract': number;
     Closed: number;
+    Pending?: number;
   };
   countsBySubtype: Record<string, number>;
   rentalFilteredCount: number;
@@ -23,6 +24,23 @@ export interface InventoryData {
     subtypeSumMatchesTotal: boolean;
     statusSum: number;
     subtypeSum: number;
+  };
+  // Source breakdown for MLS vs Repliers chart
+  sourceBreakdown?: {
+    repliers: {
+      Active: number;
+      'Active Under Contract': number;
+      Pending: number;
+      Closed: number;
+      total: number;
+    };
+    database: {
+      Active: number;
+      'Active Under Contract': number;
+      Pending: number;
+      Closed: number;
+      total: number;
+    };
   };
 }
 
@@ -170,10 +188,12 @@ export async function getUnifiedInventory(forceRefresh = false): Promise<Invento
   }
   
   // === STEP 2: Count Closed from Database ===
+  let closedSource: 'repliers' | 'database' = 'database';
   try {
     const closedResult = await countClosedListingsUnified();
     
     inventoryData.countsByStatus.Closed = closedResult.totalClosed;
+    closedSource = closedResult.source;
     
     // Add closed subtype counts
     for (const [subtype, count] of Object.entries(closedResult.subtypeCounts)) {
@@ -212,6 +232,33 @@ export async function getUnifiedInventory(forceRefresh = false): Promise<Invento
     console.warn(`[Inventory] MISMATCH: statusSum=${statusSum} vs subtypeSum=${subtypeSum}, diff=${Math.abs(statusSum - subtypeSum)}`);
     errors.push(`Status/subtype count mismatch: ${statusSum} vs ${subtypeSum}`);
   }
+  
+  // === STEP 4: Add source breakdown for MLS vs Repliers chart ===
+  // Repliers API provides Active and Active Under Contract listings
+  // Closed listings come from Repliers API (primary) or Database (fallback)
+  const repliersActive = inventoryData.countsByStatus.Active;
+  const repliersAUC = inventoryData.countsByStatus['Active Under Contract'];
+  
+  // Track which source provided closed data
+  const closedFromRepliers = closedSource === 'repliers' ? inventoryData.countsByStatus.Closed : 0;
+  const closedFromDatabase = closedSource === 'database' ? inventoryData.countsByStatus.Closed : 0;
+  
+  inventoryData.sourceBreakdown = {
+    repliers: {
+      Active: repliersActive,
+      'Active Under Contract': repliersAUC,
+      Pending: 0, // Pending is grouped with AUC in Repliers
+      Closed: closedFromRepliers,
+      total: repliersActive + repliersAUC + closedFromRepliers,
+    },
+    database: {
+      Active: 0, // Database doesn't have active listings (Repliers is primary source)
+      'Active Under Contract': 0,
+      Pending: 0,
+      Closed: closedFromDatabase,
+      total: closedFromDatabase,
+    },
+  };
   
   // Set error state
   inventoryData.errors = errors;
@@ -300,6 +347,7 @@ async function countLiveListingsUnified(repliersClient: any): Promise<{
 async function countClosedListingsUnified(): Promise<{
   totalClosed: number;
   subtypeCounts: Record<string, number>;
+  source: 'repliers' | 'database';
 }> {
   const subtypeCounts: Record<string, number> = {};
   
@@ -341,7 +389,7 @@ async function countClosedListingsUnified(): Promise<{
       }
       
       console.log(`[Inventory] Counted ${totalClosed} closed listings from Repliers API`);
-      return { totalClosed, subtypeCounts };
+      return { totalClosed, subtypeCounts, source: 'repliers' };
       
     } catch (error: any) {
       console.error('[Inventory] Failed to get closed counts from Repliers, falling back to database:', error.message);
@@ -359,7 +407,8 @@ async function countClosedListingsUnified(): Promise<{
       totalClosed += count;
     }
     
-    return { totalClosed, subtypeCounts };
+    console.log(`[Inventory] Counted ${totalClosed} closed listings from Database`);
+    return { totalClosed, subtypeCounts, source: 'database' };
     
   } catch (error) {
     console.error('[Inventory] Failed to get closed counts from database:', error);
@@ -368,7 +417,7 @@ async function countClosedListingsUnified(): Promise<{
     const totalClosed = await storage.getClosedPropertyCount();
     subtypeCounts['Other'] = totalClosed;
     
-    return { totalClosed, subtypeCounts };
+    return { totalClosed, subtypeCounts, source: 'database' };
   }
 }
 
