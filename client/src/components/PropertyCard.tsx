@@ -5,6 +5,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { ShoppingCart, Bed, Bath, Maximize, MapPin, Calendar, TrendingUp, Home } from "lucide-react";
 import type { Property, Media } from "@shared/schema";
 import { formatPropertyType } from "@/lib/property-type-utils";
+import { StatusInspector } from "./StatusInspector";
 
 interface PropertyCardProps {
   property: Property;
@@ -13,6 +14,7 @@ interface PropertyCardProps {
   onSelect?: (selected: boolean) => void;
   onAddToCart?: () => void;
   onClick?: () => void;
+  statusInspectorEnabled?: boolean;
 }
 
 const statusConfig = {
@@ -28,7 +30,8 @@ export function PropertyCard({
   selected, 
   onSelect, 
   onAddToCart,
-  onClick 
+  onClick,
+  statusInspectorEnabled = false
 }: PropertyCardProps) {
   const primaryImage = media?.[0]?.mediaURL || media?.[0]?.localPath;
   const formattedPrice = property.listPrice 
@@ -169,6 +172,20 @@ export function PropertyCard({
           <div className="text-xs text-muted-foreground">
             Built in {property.yearBuilt}
           </div>
+        )}
+        
+        {/* Dev-only Status Inspector */}
+        {statusInspectorEnabled && (
+          <StatusInspector 
+            property={{
+              id: property.id,
+              listingId: property.listingId,
+              standardStatus: property.standardStatus || undefined,
+              status: (property as any).status || undefined,
+              lastStatus: (property as any).lastStatus || undefined,
+              raw: (property as any).raw || undefined,
+            }}
+          />
         )}
       </div>
     </Card>

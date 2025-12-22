@@ -35,6 +35,7 @@ interface PropertyResultsProps {
   onSelectAll: () => void;
   onPropertyClick: (property: Property) => void;
   onAddToCart: (property: Property) => void;
+  statusInspectorEnabled?: boolean;
 }
 
 export function PropertyResults({ 
@@ -44,7 +45,8 @@ export function PropertyResults({
   onToggleSelect, 
   onSelectAll,
   onPropertyClick,
-  onAddToCart 
+  onAddToCart,
+  statusInspectorEnabled = false
 }: PropertyResultsProps) {
   const [viewMode, setViewMode] = useState<'grid' | 'list' | 'table'>('grid');
   const [sortBy, setSortBy] = useState('status');
@@ -214,6 +216,7 @@ export function PropertyResults({
               onSelect={() => onToggleSelect(property.id)}
               onAddToCart={() => onAddToCart(property)}
               onClick={() => onPropertyClick(property)}
+              statusInspectorEnabled={statusInspectorEnabled}
             />
           ))}
         </div>

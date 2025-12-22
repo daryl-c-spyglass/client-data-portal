@@ -1,0 +1,181 @@
+Replit Agent Prompt — Fix Client Data Portal (Repliers + ACTRIS): Status Parity, Field Cleanup, Correct Counts, Working Results
+
+You are working in our Client Data Portal (Replit app) that integrates Repliers for ACTRIS. The portal is currently showing incorrect inventory status counts (e.g., 0 Active/Under Contract and everything Closed) and search mismatches vs MLS.
+
+Goal
+
+Make the Client Data Portal match MLS behavior as closely as possible by:
+
+fixing Repliers configuration issues,
+
+using RESO-style standardStatus consistently,
+
+removing confusing fields (Neighborhood),
+
+using Subdivision and other RESO-compliant fields,
+
+ensuring counts and results actually display correctly.
+
+1) Fix Repliers configuration (Root cause: API key / request failure)
+Requirements
+
+Confirm the app is reading the Repliers key from env var:
+
+REPLIERS_API_KEY
+
+Ensure backend routes (NOT frontend) use the key.
+
+Add clear server-side error messages:
+
+If missing key: return 500 with message “REPLIERS_API_KEY not configured”
+
+If 401/403: return message “Repliers auth failed (check key)”
+
+Update the UI to display actionable errors instead of silently showing 0 counts.
+
+Acceptance tests
+
+With key present, API calls succeed and counts are non-zero.
+
+With key missing, UI shows an explicit “API key not configured” message.
+
+2) Standardize Status filtering to RESO standardStatus only (Do NOT mix methods)
+Requirements
+
+Update all Client Data Portal listing queries and dashboard counts to use:
+
+standardStatus
+
+Do NOT use status=A/U or lastStatus in the same query when using standardStatus.
+
+Ensure status values shown in UI match MLS terms:
+
+Active
+
+Active Under Contract
+
+Pending
+
+Closed
+
+(others are okay if returned, but don’t rename them)
+
+Dashboard bucket definitions (for Portal summary)
+
+Active: standardStatus=Active
+
+Under Contract: standardStatus=Active Under Contract + standardStatus=Pending
+
+Sold: standardStatus=Closed
+
+(If the UI wants separate “Pending” vs “Active Under Contract”, expose both as sub-counts, but keep the main totals.)
+
+Acceptance tests
+
+AU / “Active Under Contract” listings appear and are not excluded.
+
+Pending shows correctly (not mislabeled).
+
+Counts are not all forced into Closed.
+
+3) Remove Neighborhood field (and stop filtering by it)
+Requirements
+
+Remove Neighborhood from Client Data Portal search UI.
+
+Remove any backend query parameter that filters on Neighborhood.
+
+If older saved links contain neighborhood=..., ignore it safely (do not break the page).
+
+Acceptance tests
+
+Neighborhood is not visible anywhere in Portal filters.
+
+Requests do not include Neighborhood.
+
+4) Use Subdivision (RESO-compliant) and align other filter fields
+Requirements
+
+Ensure Subdivision filter exists and works.
+
+Verify other filters use RESO-friendly fields consistently:
+
+City
+
+Subdivision
+
+Zip/Postal Code
+
+Beds/Baths
+
+Price
+
+SqFt
+
+Lot Size
+
+Year Built
+
+Stories
+
+Property Type
+
+Status (standardStatus)
+
+Acceptance tests
+
+Filtering by Subdivision returns expected results.
+
+Filters do not dramatically reduce results due to missing non-standard fields.
+
+5) Fix results rendering, pagination, and “Found X / Showing Y” mismatches
+Requirements
+
+Ensure results actually render (cards/table) after search.
+
+Fix “Found” count to match actual returned results.
+
+Ensure pagination works:
+
+If UI says “Showing 50 on page 1”, 50 should be visible (or show a correct number).
+
+If API returns 0 results, show proper empty state (“No results found”), not blank UI.
+
+Acceptance tests
+
+Searching returns visible listings.
+
+“Found” count and pagination match what’s displayed.
+
+6) Add a temporary “Status Inspector” (dev-only) to debug MLS parity
+Requirements
+
+Add a dev-only toggle (or show only in non-production) that, for each listing, can display:
+
+standardStatus
+
+plus raw fields if available: status, lastStatus, and any raw.*status fields
+
+Purpose: quickly identify why MLS shows 10 and portal shows 7.
+
+Acceptance tests
+
+When enabled, inspector shows status fields clearly without breaking layout.
+
+When disabled, UI stays clean.
+
+7) Deliverables
+
+List exact files changed + paths
+
+Confirm:
+
+Repliers key is wired correctly (server-side)
+
+standardStatus is used consistently (no mixing)
+
+Neighborhood removed, Subdivision used
+
+Dashboard counts and displayed results are accurate
+
+Basic parity test improved (MLS vs portal results closer)

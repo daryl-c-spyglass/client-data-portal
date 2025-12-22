@@ -968,6 +968,31 @@ export default function Dashboard() {
           </CardContent>
         </Card>
       )}
+      
+      {inventorySummary?.errors && inventorySummary.errors.length > 0 && (
+        <Card className="border-destructive/50 bg-destructive/5">
+          <CardContent className="pt-6">
+            <div className="flex items-start gap-4">
+              <AlertCircle className="w-5 h-5 text-destructive flex-shrink-0 mt-0.5" />
+              <div className="flex-1">
+                <h3 className="font-semibold text-destructive mb-1">
+                  {inventorySummary.errors.some(e => e.toLowerCase().includes('repliers') || e.toLowerCase().includes('api')) 
+                    ? "API Configuration Issue" 
+                    : "Data Warning"}
+                </h3>
+                {inventorySummary.errors.map((error, i) => (
+                  <p key={i} className="text-sm text-muted-foreground">{error}</p>
+                ))}
+                {inventorySummary.errors.some(e => e.toLowerCase().includes('repliers')) && (
+                  <p className="text-xs text-muted-foreground/70 mt-2">
+                    Check that REPLIERS_API_KEY is set in environment variables.
+                  </p>
+                )}
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Render widgets in user-specified order */}
       {config.widgetOrder.map((widgetKey) => {
@@ -1005,7 +1030,10 @@ export default function Dashboard() {
                             </p>
                             <p className="flex items-center gap-1">
                               <span className="w-2 h-2 rounded-full bg-amber-500"></span>
-                              {(inventorySummary?.countsByStatus?.['Active Under Contract'] ?? stats?.totalUnderContractProperties ?? 0).toLocaleString()} Active Under Contract
+                              {(inventorySummary 
+                                ? (inventorySummary.countsByStatus?.['Active Under Contract'] ?? 0) + (inventorySummary.countsByStatus?.['Pending'] ?? 0)
+                                : (stats?.totalUnderContractProperties ?? 0)
+                              ).toLocaleString()} Under Contract
                             </p>
                             <p className="flex items-center gap-1">
                               <span className="w-2 h-2 rounded-full bg-slate-500"></span>

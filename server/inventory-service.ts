@@ -10,8 +10,8 @@ export interface InventoryData {
   countsByStatus: {
     Active: number;
     'Active Under Contract': number;
+    Pending: number;
     Closed: number;
-    Pending?: number;
   };
   countsBySubtype: Record<string, number>;
   rentalFilteredCount: number;
@@ -129,11 +129,12 @@ export async function getUnifiedInventory(forceRefresh = false): Promise<Invento
     mlsScope: 'ACTRIS',
     classScope: 'residentialOnly',
     rentalExcluded: true,
-    statusIncluded: ['Active', 'Active Under Contract', 'Closed'],
+    statusIncluded: ['Active', 'Active Under Contract', 'Pending', 'Closed'],
     totalCount: 0,
     countsByStatus: {
       Active: 0,
       'Active Under Contract': 0,
+      Pending: 0,
       Closed: 0,
     },
     countsBySubtype: {
@@ -162,7 +163,8 @@ export async function getUnifiedInventory(forceRefresh = false): Promise<Invento
 
   const repliersClient = getRepliersClient();
 
-  // === STEP 1: Count Active + Under Contract from Repliers (unified scan) ===
+  // === STEP 1: Count Active + Under Contract + Pending from Repliers (unified scan) ===
+  // Uses RESO standardStatus only - never mix with legacy status codes
   // This counts BOTH status AND subtype in one pass for consistency
   if (repliersClient && isRepliersConfigured()) {
     try {
@@ -170,6 +172,7 @@ export async function getUnifiedInventory(forceRefresh = false): Promise<Invento
       
       inventoryData.countsByStatus.Active = liveResult.statusCounts.Active;
       inventoryData.countsByStatus['Active Under Contract'] = liveResult.statusCounts['Active Under Contract'];
+      inventoryData.countsByStatus.Pending = liveResult.statusCounts.Pending;
       
       // Merge live subtype counts
       for (const [subtype, count] of Object.entries(liveResult.subtypeCounts)) {
@@ -185,6 +188,9 @@ export async function getUnifiedInventory(forceRefresh = false): Promise<Invento
       console.error('[Inventory]', errorMsg);
       errors.push(errorMsg);
     }
+  } else {
+    // Add clear error message when Repliers is not configured
+    errors.push('Repliers API not configured - Active and Active Under Contract counts will be 0');
   }
   
   // === STEP 2: Count Closed from Database ===
@@ -212,6 +218,7 @@ export async function getUnifiedInventory(forceRefresh = false): Promise<Invento
   const statusSum = 
     inventoryData.countsByStatus.Active + 
     inventoryData.countsByStatus['Active Under Contract'] + 
+    inventoryData.countsByStatus.Pending +
     inventoryData.countsByStatus.Closed;
     
   const subtypeSum = Object.values(inventoryData.countsBySubtype).reduce((sum, count) => sum + count, 0);
@@ -234,10 +241,11 @@ export async function getUnifiedInventory(forceRefresh = false): Promise<Invento
   }
   
   // === STEP 4: Add source breakdown for MLS vs Repliers chart ===
-  // Repliers API provides Active and Active Under Contract listings
+  // Repliers API provides Active, Active Under Contract, and Pending listings
   // Closed listings come from Repliers API (primary) or Database (fallback)
   const repliersActive = inventoryData.countsByStatus.Active;
   const repliersAUC = inventoryData.countsByStatus['Active Under Contract'];
+  const repliersPending = inventoryData.countsByStatus.Pending;
   
   // Track which source provided closed data
   const closedFromRepliers = closedSource === 'repliers' ? inventoryData.countsByStatus.Closed : 0;
@@ -247,9 +255,9 @@ export async function getUnifiedInventory(forceRefresh = false): Promise<Invento
     repliers: {
       Active: repliersActive,
       'Active Under Contract': repliersAUC,
-      Pending: 0, // Pending is grouped with AUC in Repliers
+      Pending: repliersPending,
       Closed: closedFromRepliers,
-      total: repliersActive + repliersAUC + closedFromRepliers,
+      total: repliersActive + repliersAUC + repliersPending + closedFromRepliers,
     },
     database: {
       Active: 0, // Database doesn't have active listings (Repliers is primary source)
@@ -265,7 +273,7 @@ export async function getUnifiedInventory(forceRefresh = false): Promise<Invento
   inventoryData.isPartialData = errors.length > 0;
 
   const duration = Date.now() - startTime;
-  console.log(`[Inventory] Complete in ${duration}ms. Total: ${inventoryData.totalCount}, Active: ${inventoryData.countsByStatus.Active}, AUC: ${inventoryData.countsByStatus['Active Under Contract']}, Closed: ${inventoryData.countsByStatus.Closed}`);
+  console.log(`[Inventory] Complete in ${duration}ms. Total: ${inventoryData.totalCount}, Active: ${inventoryData.countsByStatus.Active}, AUC: ${inventoryData.countsByStatus['Active Under Contract']}, Pending: ${inventoryData.countsByStatus.Pending}, Closed: ${inventoryData.countsByStatus.Closed}`);
   console.log(`[Inventory] Subtypes:`, inventoryData.countsBySubtype);
   console.log(`[Inventory] Validation: statusSum=${statusSum}, subtypeSum=${subtypeSum}, match=${statusSum === subtypeSum}`);
 
@@ -278,12 +286,13 @@ export async function getUnifiedInventory(forceRefresh = false): Promise<Invento
 }
 
 // Count Active + Active Under Contract listings with unified status/subtype counting
+// Uses RESO-compliant standardStatus only - never mix with legacy status codes
 async function countLiveListingsUnified(repliersClient: any): Promise<{
-  statusCounts: { Active: number; 'Active Under Contract': number };
+  statusCounts: { Active: number; 'Active Under Contract': number; Pending: number };
   subtypeCounts: Record<string, number>;
   rentalFiltered: number;
 }> {
-  const statusCounts = { Active: 0, 'Active Under Contract': 0 };
+  const statusCounts = { Active: 0, 'Active Under Contract': 0, Pending: 0 };
   const subtypeCounts: Record<string, number> = {};
   let rentalFiltered = 0;
   
@@ -292,9 +301,10 @@ async function countLiveListingsUnified(repliersClient: any): Promise<{
     subtypeCounts[subtype] = 0;
   }
   
-  // Scan both Active and Active Under Contract
-  for (const status of ['A', 'U'] as const) {
-    const statusKey = status === 'A' ? 'Active' : 'Active Under Contract';
+  // Scan using RESO standardStatus values: Active, Active Under Contract, Pending
+  // Dashboard buckets: Active, Under Contract (AUC + Pending combined), Closed
+  for (const standardStatus of ['Active', 'Active Under Contract', 'Pending'] as const) {
+    const statusKey = standardStatus;
     let pageNum = 1;
     let hasMore = true;
     let statusCount = 0;
@@ -302,7 +312,7 @@ async function countLiveListingsUnified(repliersClient: any): Promise<{
     while (hasMore && pageNum <= 100) { // Safety limit
       try {
         const response = await repliersClient.searchListings({
-          status,
+          standardStatus,
           class: 'residential',
           resultsPerPage: 200,
           pageNum,

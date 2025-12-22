@@ -14,6 +14,7 @@ import { Map as MapIcon, Search, Database, RotateCcw, List, Home, Building2, Tre
 import { SearchCriteriaForm } from "@/components/SearchCriteria";
 import { PropertyResults } from "@/components/PropertyResults";
 import { PropertyMapView } from "@/components/PropertyMapView";
+import { StatusInspectorToggle } from "@/components/StatusInspector";
 import { unifiedSearchWithMeta, type SearchResultWithMeta } from "@/lib/api";
 import { useSelectedProperty } from "@/contexts/SelectedPropertyContext";
 import { useToast } from "@/hooks/use-toast";
@@ -157,9 +158,8 @@ function serializeCriteriaToUrl(criteria: SearchCriteria): string {
   if (criteria.zipCodes && criteria.zipCodes.length > 0) {
     params.set('zipCodes', criteria.zipCodes.join(','));
   }
-  if (criteria.neighborhood && criteria.neighborhood.length > 0) {
-    params.set('neighborhood', criteria.neighborhood.join(','));
-  }
+  // Note: neighborhood filter removed per RESO compliance - use subdivision instead
+  // Old neighborhood params are still parsed for backward compatibility but not serialized
   
   // Numeric filters
   if (criteria.listPriceMin !== undefined) {
@@ -231,6 +231,9 @@ export default function Properties() {
   const [showSaveModal, setShowSaveModal] = useState(false);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [searchName, setSearchName] = useState("");
+  
+  // Dev-only status inspector toggle
+  const [statusInspectorEnabled, setStatusInspectorEnabled] = useState(false);
   
   // Sync searchCriteria with URL when URL changes (browser history navigation)
   useEffect(() => {
@@ -823,14 +826,23 @@ export default function Properties() {
               <p className="text-sm">Please try again or modify your search criteria</p>
             </div>
           ) : (
-            <PropertyResults
-              properties={properties}
-              selectedIds={selectedIds}
-              onToggleSelect={toggleSelect}
-              onSelectAll={selectAll}
-              onPropertyClick={handlePropertyClick}
-              onAddToCart={handleAddToCart}
-            />
+            <div className="space-y-4">
+              {import.meta.env.DEV && (
+                <StatusInspectorToggle 
+                  enabled={statusInspectorEnabled} 
+                  onToggle={setStatusInspectorEnabled}
+                />
+              )}
+              <PropertyResults
+                properties={properties}
+                selectedIds={selectedIds}
+                onToggleSelect={toggleSelect}
+                onSelectAll={selectAll}
+                onPropertyClick={handlePropertyClick}
+                onAddToCart={handleAddToCart}
+                statusInspectorEnabled={statusInspectorEnabled}
+              />
+            </div>
           )}
         </TabsContent>
       </Tabs>

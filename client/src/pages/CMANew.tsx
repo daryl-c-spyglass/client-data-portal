@@ -92,10 +92,10 @@ export default function CMANew() {
     const savedSearchCriteria = cma.searchCriteria || {};
     
     // Use saved searchCriteria, falling back to extracting from properties
+    // Note: neighborhood is no longer used - use subdivision instead (RESO-compliant)
     const searchCriteria = {
       city: savedSearchCriteria.city || '',
       subdivision: savedSearchCriteria.subdivision || '',
-      neighborhood: savedSearchCriteria.neighborhood || '',
       minBeds: savedSearchCriteria.minBeds || '',
       maxPrice: savedSearchCriteria.maxPrice || '',
       statuses: savedSearchCriteria.statuses || ['active'],
@@ -170,7 +170,6 @@ export default function CMANew() {
       searchCriteria: {
         city: firstProp?.city || '',
         subdivision: (firstProp as any)?.subdivisionName || '',
-        neighborhood: (firstProp as any)?.neighborhood || '',
         statuses: Array.from(statuses).length > 0 ? Array.from(statuses) : ['active'],
         minBeds: '',
         maxPrice: '',

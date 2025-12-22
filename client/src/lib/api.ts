@@ -196,9 +196,8 @@ function buildSearchParams(criteria: SearchCriteria): URLSearchParams {
   if (criteria.cities && criteria.cities.length > 0) {
     params.append('city', criteria.cities.join(','));
   }
-  if (criteria.neighborhood && criteria.neighborhood.length > 0) {
-    params.append('neighborhood', criteria.neighborhood.join(','));
-  }
+  // Note: neighborhood filter removed per RESO compliance - use subdivision instead
+  // Old neighborhood URLs are parsed but not sent to API
   
   // Numeric filters - handle zero as valid value
   if (criteria.listPriceMin !== undefined && criteria.listPriceMin !== null) {
