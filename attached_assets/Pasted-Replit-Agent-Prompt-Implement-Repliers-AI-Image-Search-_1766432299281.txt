@@ -1,0 +1,307 @@
+Replit Agent Prompt — Implement Repliers AI Image Search (Buyer Search + CMA Similar Homes + Saved Lists)
+You are working in our IDX/CMA web app integrated with Repliers. Implement AI Image Search as a ranking feature (reorders results by relevance) in three places:
+
+
+Buyer Search (best fit)
+
+
+CMA “Find Similar Homes” (controlled + high value)
+
+
+Agent tools / Saved Lists (nice-to-have)
+
+
+Use this official reference:
+https://help.repliers.com/en/article/ai-image-search-implementation-guide-mx30ji/
+
+Core Concept (must follow)
+AI Image Search is NOT a narrowing filter by default — it primarily reorders results by relevance and includes a score per listing. Make sure the UI communicates this clearly.
+Implementation uses POST to Repliers listings endpoint (not GET) with imageSearchItems in the request body, while still allowing normal query params (city, minBeds, etc.) in the URL.
+
+A) Shared Backend Implementation (do once, reused everywhere)
+A1) Create server-side proxy route
+Create a backend route such as:
+
+
+POST /api/repliers/image-search
+
+
+Requirements
+
+
+Server-side only (do not expose Repliers API key to the browser)
+
+
+Accept payload:
+
+
+criteria (normal filters: city/subdivision/status/minBeds/maxPrice/map polygon, etc.)
+
+
+imageSearchItems (array of text/image inputs with boost)
+
+
+
+
+Build outbound request to Repliers:
+
+
+POST https://api.repliers.io/listings?<criteria as query params>
+
+
+JSON body: { imageSearchItems: [...] }
+
+
+
+
+Return normalized response:
+
+
+listings array with score
+
+
+images array reordered (if returned that way)
+
+
+total count
+
+
+
+
+A2) Validation & safety
+
+
+Validate imageSearchItems:
+
+
+max items limit (e.g., 10)
+
+
+allow types: text and image
+
+
+for image URLs: must be http/https
+
+
+boost must be numeric (default 1)
+
+
+
+
+Add caching for repeated identical searches (short TTL like 1–3 minutes)
+
+
+Add error handling with readable messages
+
+
+
+B) Buyer Search Integration (best fit)
+B1) UI placement
+In Buyer Search results page, add a panel near filters:
+
+
+Toggle: “Rank by Visual Match” (OFF by default)
+
+
+Inputs:
+
+
+Add “Text feature” chips (examples: “white kitchen”, “wine cellar”, “sauna”)
+
+
+Optional: image URL input (or upload if you already have uploader)
+
+
+Boost slider/field per item (optional in v1)
+
+
+
+
+B2) Behavior
+
+
+When toggle is OFF:
+
+
+use existing GET search and default sorting
+
+
+
+
+When toggle is ON and at least 1 imageSearchItem exists:
+
+
+call /api/repliers/image-search
+
+
+keep the same criteria filters (city/subdivision/status/etc.) so ranking happens within the filtered set
+
+
+
+
+Display:
+
+
+show results as usual
+
+
+show subtle “Visual Match” label and optionally a match indicator (e.g., High/Medium/Low) derived from score
+
+
+
+
+B3) UX requirement (avoid confusion)
+Add helper text:
+
+
+“Visual Match reorders results by relevance; it doesn’t hide inventory.”
+
+
+
+C) CMA “Find Similar Homes” (controlled, high value)
+C1) Where it goes
+Inside CMA workflow, after comps criteria (beds/baths/sqft/year/status=Closed/polygon):
+
+
+Add section: “Find Similar Homes (Visual Match)”
+
+
+Use it to rank comps, not replace comps criteria.
+
+
+C2) Behavior
+
+
+Start with the comps set from existing CMA filters (preferably Closed comps).
+
+
+When Visual Match is enabled:
+
+
+call /api/repliers/image-search with the SAME CMA criteria query params (polygon + filters)
+
+
+body includes imageSearchItems (text or reference image)
+
+
+
+
+Display comps ranked by score.
+
+
+Make photos clickable as currently required in CMA share links.
+
+
+C3) Suggested default inputs (optional)
+Allow user to auto-fill image search from:
+
+
+Subject property photos (if available)
+
+
+Or text prompts (“modern”, “updated kitchen”, “pool”)
+
+
+
+D) Agent Tools / Saved Lists (nice-to-have)
+D1) Feature
+On Saved List / Selected Listings page:
+
+
+Add action: “Find listings like this”
+
+
+User selects a listing → click “Find similar”
+
+
+App builds imageSearchItems from that listing’s top photo URLs (1–3 images) OR a couple of text prompts.
+
+
+D2) Behavior
+
+
+Reuse the same backend route.
+
+
+Use current context filters if available (area, price band, property type) to avoid irrelevant matches.
+
+
+Return a ranked list with Add-to-list button.
+
+
+
+E) Data model & UI display rules
+E1) Score handling
+
+
+Each listing includes score.
+
+
+Do not display raw decimals by default unless in debug mode.
+
+
+Convert to tiers:
+
+
+High match / Medium match / Low match
+
+
+(based on percentiles within the returned set)
+
+
+
+
+E2) Images
+
+
+If Repliers reorders images array by relevance, ensure UI respects that order so the most relevant images appear first.
+
+
+
+F) QA / Acceptance Tests
+Buyer Search
+
+
+With Visual Match OFF → existing behavior unchanged
+
+
+With Visual Match ON → same criteria results, reordered by relevance
+
+
+UI clearly states it’s reordering, not filtering
+
+
+CMA
+
+
+Comps criteria still works normally
+
+
+Visual Match ranks comps and improves relevance
+
+
+No change to share URL generation and photo click behavior
+
+
+Saved Lists
+
+
+“Find listings like this” returns ranked results and allows adding to list
+
+
+
+Deliverables
+
+
+File paths changed
+
+
+Backend route implemented and secured
+
+
+UI implemented in Buyer Search + CMA + Saved Lists
+
+
+Short README note referencing the Repliers AI Image Search KB:
+https://help.repliers.com/en/article/ai-image-search-implementation-guide-mx30ji/
+

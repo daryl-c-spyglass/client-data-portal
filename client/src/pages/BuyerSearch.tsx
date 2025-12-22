@@ -144,6 +144,7 @@ import {
 import { PropertyCard } from "@/components/PropertyCard";
 import { PropertyMapView } from "@/components/PropertyMapView";
 import { PolygonMapSearch } from "@/components/PolygonMapSearch";
+import VisualMatchPanel, { type ImageSearchItem } from "@/components/VisualMatchPanel";
 import { useSelectedProperty } from "@/contexts/SelectedPropertyContext";
 import type { Property, Media } from "@shared/schema";
 import { formatPropertyType } from "@/lib/property-type-utils";
@@ -404,6 +405,14 @@ export default function BuyerSearch() {
   const [mapCurrentPage, setMapCurrentPage] = useState(0);
   const [currentBoundary, setCurrentBoundary] = useState<number[][][] | null>(null);
   const mapPageSize = 50;
+  
+  // Visual Match AI search state
+  const [visualMatchEnabled, setVisualMatchEnabled] = useState(false);
+  const [visualMatchItems, setVisualMatchItems] = useState<ImageSearchItem[]>([]);
+  const [visualMatchResults, setVisualMatchResults] = useState<Property[]>([]);
+  const [isVisualSearching, setIsVisualSearching] = useState(false);
+  const [visualMatchPage, setVisualMatchPage] = useState(0);
+  const [visualMatchTotal, setVisualMatchTotal] = useState(0);
   
   // Floating card state
   const [floatingCardOpen, setFloatingCardOpen] = useState(false);
@@ -880,6 +889,64 @@ export default function BuyerSearch() {
     setSearchTrigger(prev => prev + 1);
   };
 
+  // Visual Match AI search handler
+  const handleVisualSearch = async () => {
+    if (visualMatchItems.length === 0) return;
+    
+    setIsVisualSearching(true);
+    setVisualMatchPage(0);
+    
+    try {
+      // Build criteria from current filters
+      const criteria: any = {
+        resultsPerPage: pageSize,
+        pageNum: 1,
+      };
+      
+      // Add status filters
+      if (filters.statusActive) criteria.standardStatus = 'Active';
+      else if (filters.statusUnderContract) criteria.standardStatus = 'Active Under Contract';
+      else if (filters.statusClosed) criteria.standardStatus = 'Closed';
+      
+      // Add other filters
+      if (filters.city) criteria.city = filters.city;
+      if (filters.postalCode) criteria.postalCode = filters.postalCode;
+      if (filters.subdivision) criteria.subdivision = filters.subdivision;
+      if (filters.minPrice) criteria.minPrice = filters.minPrice;
+      if (filters.maxPrice) criteria.maxPrice = filters.maxPrice;
+      if (filters.minBeds) criteria.minBeds = filters.minBeds;
+      if (filters.maxBeds) criteria.maxBeds = filters.maxBeds;
+      if (filters.minTotalBaths) criteria.minBaths = filters.minTotalBaths;
+      if (filters.maxTotalBaths) criteria.maxBaths = filters.maxTotalBaths;
+      if (filters.minLivingArea) criteria.minSqft = filters.minLivingArea;
+      if (filters.maxLivingArea) criteria.maxSqft = filters.maxLivingArea;
+      if (filters.propertySubType) criteria.propertyType = filters.propertySubType;
+      
+      const response = await fetch('/api/repliers/image-search', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          imageSearchItems: visualMatchItems,
+          criteria,
+        }),
+      });
+      
+      if (!response.ok) {
+        throw new Error('Visual search failed');
+      }
+      
+      const data = await response.json();
+      setVisualMatchResults(data.listings || []);
+      setVisualMatchTotal(data.count || 0);
+    } catch (error) {
+      console.error('Visual search error:', error);
+      setVisualMatchResults([]);
+      setVisualMatchTotal(0);
+    } finally {
+      setIsVisualSearching(false);
+    }
+  };
+
   // Polygon map search handler (uses separate map status state)
   const handlePolygonSearch = async (boundary: number[][][]) => {
     setCurrentBoundary(boundary);
@@ -1032,6 +1099,24 @@ export default function BuyerSearch() {
                     </div>
                   </div>
                 </div>
+
+                <Separator />
+
+                {/* Visual Match AI Search */}
+                <VisualMatchPanel
+                  enabled={visualMatchEnabled}
+                  onEnabledChange={(enabled) => {
+                    setVisualMatchEnabled(enabled);
+                    if (!enabled) {
+                      setVisualMatchResults([]);
+                      setVisualMatchTotal(0);
+                    }
+                  }}
+                  items={visualMatchItems}
+                  onItemsChange={setVisualMatchItems}
+                  isSearching={isVisualSearching}
+                  onSearch={handleVisualSearch}
+                />
 
                 <Separator />
 
@@ -3090,7 +3175,14 @@ export default function BuyerSearch() {
                   )}
                 </CardTitle>
                 <CardDescription>
-                  {viewMode === 'map' ? (
+                  {visualMatchEnabled && visualMatchResults.length > 0 ? (
+                    <>
+                      <span className="flex items-center gap-1">
+                        <Badge variant="secondary" className="text-xs mr-1">AI Visual Match</Badge>
+                        Found {visualMatchTotal.toLocaleString()} properties ranked by visual similarity
+                      </span>
+                    </>
+                  ) : viewMode === 'map' ? (
                     mapSearchResults.length > 0 
                       ? `Found ${mapSearchResults.length} properties in selected area (showing ${Math.min(mapPageSize, mapSearchResults.length - mapCurrentPage * mapPageSize)} on page ${mapCurrentPage + 1})`
                       : 'Draw a polygon on the map and click "Search Area" to find properties'
@@ -3185,6 +3277,54 @@ export default function BuyerSearch() {
                   <p className="text-sm mt-2">Use the polygon tool to outline your target area, then click "Search Area"</p>
                 </div>
               )
+            ) : isVisualSearching ? (
+              <div className="text-center py-12 text-muted-foreground">
+                <Loader2 className="w-8 h-8 mx-auto mb-4 animate-spin opacity-50" />
+                <p>Searching by visual similarity...</p>
+              </div>
+            ) : visualMatchEnabled && visualMatchResults.length > 0 ? (
+              <>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {visualMatchResults.map((property: any) => {
+                    const propertyId = property.listingId || property.id;
+                    const media = property.photos?.length ? convertPhotosToMedia(property.photos, propertyId) : [];
+                    return (
+                      <div key={property.id} className="relative">
+                        {property.matchTier && (
+                          <div className="absolute top-2 right-2 z-10">
+                            <Badge 
+                              variant="secondary"
+                              className={cn(
+                                "text-xs",
+                                property.matchTier === 'High' && "bg-emerald-500/90 text-white",
+                                property.matchTier === 'Medium' && "bg-amber-500/90 text-white",
+                                property.matchTier === 'Low' && "bg-gray-500/90 text-white"
+                              )}
+                            >
+                              {property.matchTier} Match
+                            </Badge>
+                          </div>
+                        )}
+                        <PropertyCard 
+                          property={property}
+                          media={media}
+                          onClick={() => handlePropertyClick(property, property.photos || [])}
+                          onAddToCart={() => {
+                            console.log('Add to selection:', property.id);
+                          }}
+                        />
+                      </div>
+                    );
+                  })}
+                </div>
+                {visualMatchTotal > pageSize && (
+                  <div className="flex items-center justify-center gap-4 mt-6 pt-6 border-t">
+                    <span className="text-sm text-muted-foreground">
+                      Showing {visualMatchResults.length} of {visualMatchTotal.toLocaleString()} results
+                    </span>
+                  </div>
+                )}
+              </>
             ) : isLoading ? (
               <div className="text-center py-12 text-muted-foreground">
                 Searching properties...

@@ -134,6 +134,26 @@ interface NLPResponse {
   summary?: string;
 }
 
+// AI Image Search types - used for visual similarity ranking
+export interface ImageSearchItem {
+  type: 'text' | 'image';
+  value?: string;  // For text type
+  url?: string;    // For image type
+  boost?: number;  // Default 1, higher = more weight
+}
+
+export interface ImageSearchParams extends ListingsSearchParams {
+  imageSearchItems: ImageSearchItem[];
+}
+
+export interface ImageSearchResult {
+  listings: (RepliersListing & { score?: number })[];
+  count: number;
+  numPages: number;
+  currentPage: number;
+  resultsPerPage: number;
+}
+
 // Cached subtype counts for Active/UC residential listings
 interface SubtypeCache {
   counts: Record<string, number>;
@@ -471,6 +491,53 @@ class RepliersClient {
     }));
     
     return counts;
+  }
+
+  // AI Image Search - ranks listings by visual similarity using POST request
+  // Reference: https://help.repliers.com/en/article/ai-image-search-implementation-guide-mx30ji/
+  async imageSearch(params: ImageSearchParams): Promise<ImageSearchResult> {
+    const { imageSearchItems, ...searchParams } = params;
+    
+    // Build query params from search criteria
+    const queryParams = new URLSearchParams();
+    
+    if (searchParams.standardStatus) queryParams.append('standardStatus', searchParams.standardStatus);
+    else if (searchParams.status) {
+      queryParams.append('status', searchParams.status);
+      if (searchParams.lastStatus) queryParams.append('lastStatus', searchParams.lastStatus);
+    }
+    if (searchParams.type) queryParams.append('type', searchParams.type);
+    if (searchParams.minPrice) queryParams.append('minPrice', searchParams.minPrice.toString());
+    if (searchParams.maxPrice) queryParams.append('maxPrice', searchParams.maxPrice.toString());
+    if (searchParams.minBeds) queryParams.append('minBeds', searchParams.minBeds.toString());
+    if (searchParams.maxBeds) queryParams.append('maxBeds', searchParams.maxBeds.toString());
+    if (searchParams.minBaths) queryParams.append('minBaths', searchParams.minBaths.toString());
+    if (searchParams.maxBaths) queryParams.append('maxBaths', searchParams.maxBaths.toString());
+    if (searchParams.minSqft) queryParams.append('minSqft', searchParams.minSqft.toString());
+    if (searchParams.maxSqft) queryParams.append('maxSqft', searchParams.maxSqft.toString());
+    if (searchParams.city) queryParams.append('city', searchParams.city);
+    if (searchParams.postalCode) queryParams.append('zip', searchParams.postalCode);
+    if (searchParams.subdivision) queryParams.append('subdivision', searchParams.subdivision);
+    if (searchParams.class) queryParams.append('class', normalizeRepliersClass(searchParams.class));
+    if (searchParams.propertyType) queryParams.append('class', normalizeRepliersClass(searchParams.propertyType));
+    if (searchParams.pageNum) queryParams.append('pageNum', searchParams.pageNum.toString());
+    if (searchParams.resultsPerPage) queryParams.append('resultsPerPage', searchParams.resultsPerPage.toString());
+
+    try {
+      const url = `/listings?${queryParams.toString()}`;
+      console.log(`🔍 [Repliers AI Image Search] POST ${url} with ${imageSearchItems.length} items`);
+      
+      const result = await this.withRetry(
+        () => this.client.post(url, { imageSearchItems }).then(r => r.data),
+        `imageSearch(${imageSearchItems.length} items)`
+      );
+      
+      console.log(`🔍 [Repliers AI Image Search] Response: count=${result.count || 0}, listings=${(result.listings || []).length}`);
+      return result;
+    } catch (error: any) {
+      console.error('Repliers imageSearch error:', error.response?.data || error.message);
+      throw new Error(`Failed to perform image search: ${error.message}`);
+    }
   }
 
   async nlpSearch(prompt: string, nlpId?: string): Promise<NLPResponse> {

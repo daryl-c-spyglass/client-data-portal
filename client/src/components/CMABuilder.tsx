@@ -11,10 +11,11 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { X, Plus, TrendingUp, Search, Loader2, AlertCircle, Home, MousePointerClick, RotateCcw, ChevronLeft, ChevronRight, Info, Map, ListFilter } from "lucide-react";
+import { X, Plus, TrendingUp, Search, Loader2, AlertCircle, Home, MousePointerClick, RotateCcw, ChevronLeft, ChevronRight, Info, Map, ListFilter, Sparkles } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { PolygonMapSearch } from "@/components/PolygonMapSearch";
+import VisualMatchPanel, { type ImageSearchItem } from "@/components/VisualMatchPanel";
 import { apiRequest } from "@/lib/queryClient";
 import type { Property } from "@shared/schema";
 
@@ -271,6 +272,12 @@ export function CMABuilder({ onCreateCMA, initialData }: CMABuilderProps) {
   const [isMapSearching, setIsMapSearching] = useState(false);
   const [currentBoundary, setCurrentBoundary] = useState<number[][][] | null>(null);
   
+  // Visual Match AI search state (for ranking comps by visual similarity)
+  const [visualMatchEnabled, setVisualMatchEnabled] = useState(false);
+  const [visualMatchItems, setVisualMatchItems] = useState<ImageSearchItem[]>([]);
+  const [visualMatchResults, setVisualMatchResults] = useState<Property[]>([]);
+  const [isVisualSearching, setIsVisualSearching] = useState(false);
+  
   // Property detail dialog state
   const [selectedProperty, setSelectedProperty] = useState<Property | null>(null);
   const [currentPhotoIndex, setCurrentPhotoIndex] = useState(0);
@@ -321,6 +328,9 @@ export function CMABuilder({ onCreateCMA, initialData }: CMABuilderProps) {
     setSearchMinBeds("");
     setSearchMinPrice("");
     setSearchMaxPrice("");
+    setVisualMatchEnabled(false);
+    setVisualMatchItems([]);
+    setVisualMatchResults([]);
     setSearchMinBaths("");
     setSearchMaxBaths("");
     setSearchStatuses(["active"]);
@@ -399,6 +409,60 @@ export function CMABuilder({ onCreateCMA, initialData }: CMABuilderProps) {
     refetch();
   };
 
+  // Visual Match AI search handler for ranking comps
+  const handleVisualSearch = async () => {
+    if (visualMatchItems.length === 0) return;
+    
+    setIsVisualSearching(true);
+    
+    try {
+      // Build criteria from current search filters
+      const criteria: any = {
+        resultsPerPage: 50,
+        pageNum: 1,
+      };
+      
+      // Add status filters - prefer closed for CMAs
+      if (searchStatuses.includes('closed')) {
+        criteria.standardStatus = 'Closed';
+      } else if (searchStatuses.includes('active')) {
+        criteria.standardStatus = 'Active';
+      }
+      
+      // Add filters
+      if (searchCity) criteria.city = searchCity;
+      if (searchZipCode) criteria.postalCode = searchZipCode;
+      if (searchSubdivision) criteria.subdivision = searchSubdivision;
+      if (searchMinPrice && searchMinPrice !== 'any') criteria.minPrice = parseInt(searchMinPrice);
+      if (searchMaxPrice && searchMaxPrice !== 'any') criteria.maxPrice = parseInt(searchMaxPrice);
+      if (searchMinBeds && searchMinBeds !== 'any') criteria.minBeds = parseInt(searchMinBeds);
+      if (searchMinBaths && searchMinBaths !== 'any') criteria.minBaths = parseInt(searchMinBaths);
+      if (searchMinSqft) criteria.minSqft = parseInt(searchMinSqft);
+      if (searchMaxSqft) criteria.maxSqft = parseInt(searchMaxSqft);
+      
+      const response = await fetch('/api/repliers/image-search', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          imageSearchItems: visualMatchItems,
+          criteria,
+        }),
+      });
+      
+      if (!response.ok) {
+        throw new Error('Visual search failed');
+      }
+      
+      const data = await response.json();
+      setVisualMatchResults(data.listings || []);
+    } catch (error) {
+      console.error('Visual search error:', error);
+      setVisualMatchResults([]);
+    } finally {
+      setIsVisualSearching(false);
+    }
+  };
+
   // Map polygon search handler
   const handlePolygonSearch = async (boundary: number[][][]) => {
     setCurrentBoundary(boundary);
@@ -446,9 +510,17 @@ export function CMABuilder({ onCreateCMA, initialData }: CMABuilderProps) {
     setCurrentBoundary(null);
   };
 
-  // Get the active results based on search mode
-  const activeSearchResults = searchMode === 'map' ? mapSearchResults : searchResults;
-  const activeResultCount = searchMode === 'map' ? mapSearchResults.length : totalResults;
+  // Get the active results based on search mode and visual match
+  const activeSearchResults = visualMatchEnabled && visualMatchResults.length > 0 
+    ? visualMatchResults 
+    : searchMode === 'map' 
+      ? mapSearchResults 
+      : searchResults;
+  const activeResultCount = visualMatchEnabled && visualMatchResults.length > 0
+    ? visualMatchResults.length
+    : searchMode === 'map' 
+      ? mapSearchResults.length 
+      : totalResults;
 
   const handleAddComparable = (property: Property) => {
     if (comparables.length >= 5) {
@@ -856,6 +928,27 @@ export function CMABuilder({ onCreateCMA, initialData }: CMABuilderProps) {
                   />
                 </div>
               </div>
+              
+              <Separator className="my-4" />
+              
+              {/* Visual Match AI Search - rank comps by visual similarity */}
+              <VisualMatchPanel
+                enabled={visualMatchEnabled}
+                onEnabledChange={(enabled) => {
+                  setVisualMatchEnabled(enabled);
+                  if (!enabled) {
+                    setVisualMatchResults([]);
+                  }
+                }}
+                items={visualMatchItems}
+                onItemsChange={setVisualMatchItems}
+                isSearching={isVisualSearching}
+                onSearch={handleVisualSearch}
+                compact={true}
+              />
+              
+              <Separator className="my-4" />
+              
               <Button onClick={handleSearch} disabled={isLoading} data-testid="button-search-properties">
                 {isLoading ? (
                   <Loader2 className="w-4 h-4 mr-2 animate-spin" />
@@ -1443,16 +1536,35 @@ export function CMABuilder({ onCreateCMA, initialData }: CMABuilderProps) {
                   return <Badge variant="secondary" className="flex-shrink-0">{property.standardStatus}</Badge>;
                 };
                 
+                // Get match tier from visual search results
+                const matchTier = (property as any).matchTier as string | undefined;
+                
                 return (
                   <Card 
                     key={property.id} 
-                    className="overflow-hidden cursor-pointer hover-elevate"
+                    className="overflow-hidden cursor-pointer hover-elevate relative"
                     onClick={() => {
                       setSelectedProperty(property);
                       setCurrentPhotoIndex(0);
                     }}
                     data-testid={`card-property-${property.id}`}
                   >
+                    {/* Visual Match Tier Badge */}
+                    {matchTier && visualMatchEnabled && (
+                      <div className="absolute top-2 left-2 z-10">
+                        <Badge 
+                          className={cn(
+                            "text-xs",
+                            matchTier === 'High' && "bg-emerald-500 text-white hover:bg-emerald-500",
+                            matchTier === 'Medium' && "bg-amber-500 text-white hover:bg-amber-500",
+                            matchTier === 'Low' && "bg-gray-500 text-white hover:bg-gray-500"
+                          )}
+                        >
+                          <Sparkles className="w-3 h-3 mr-1" />
+                          {matchTier} Match
+                        </Badge>
+                      </div>
+                    )}
                     <div className="flex">
                       {primaryPhoto ? (
                         <div className="w-32 h-32 flex-shrink-0">

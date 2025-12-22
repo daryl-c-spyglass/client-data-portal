@@ -75,6 +75,26 @@ The UI incorporates Spyglass Realty branding with an orange primary color scheme
     - `GET /api/chat/status` - Check if OpenAI is configured
     - `POST /api/cma/draft` - Create CMA draft from AI-collected criteria
 
+- **AI Image Search**: Visual similarity ranking for property listings powered by Repliers AI
+  - **Reference**: https://help.repliers.com/en/article/ai-image-search-implementation-guide-mx30ji/
+  - **Backend**: `POST /api/repliers/image-search` endpoint with validation, `RepliersClient.imageSearch()` method
+  - **Frontend**: `client/src/components/VisualMatchPanel.tsx` - reusable component for Visual Match UI
+  - **Integration Points**:
+    - **Buyer Search**: Toggle Visual Match to rank results by visual similarity (text descriptions or image URLs)
+    - **CMA Builder**: Use Visual Match to find comps with similar visual characteristics
+  - **API Format**: POST to `/listings` with `imageSearchItems` in request body
+    - Each item has `type` ('text' or 'image'), `value`/`url`, and optional `boost` (default 1)
+    - Score returned per listing is 0-1.0 per item (3 items = max score of 3.0)
+  - **Match Tiers**: High (≥70% of max score), Medium (≥40%), Low (<40%)
+  - **Preset Chips**: Quick-add options like "Modern Kitchen", "Open Floor Plan", "Pool & Backyard"
+  - **Validation**: Max 10 items, URLs must be http/https, boost must be numeric
+  - **Files**:
+    - `server/repliers-client.ts` - `imageSearch()` method and types
+    - `server/routes.ts` - `POST /api/repliers/image-search` endpoint
+    - `client/src/components/VisualMatchPanel.tsx` - UI component
+    - `client/src/pages/BuyerSearch.tsx` - Integration in Buyer Search filters
+    - `client/src/components/CMABuilder.tsx` - Integration in CMA comp search
+
 ### Feature Specifications
 
 - **IDX Platform**: Comprehensive property browsing, search, and filtering capabilities.

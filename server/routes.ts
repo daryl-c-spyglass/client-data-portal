@@ -17,6 +17,17 @@ import { fetchExternalUsers, fetchFromExternalApi } from "./external-api";
 import type { PropertyStatistics, TimelineDataPoint } from "@shared/schema";
 import { neighborhoodService } from "./neighborhood-service";
 
+// Calculate match tier for AI Image Search results
+// Score is relative to number of imageSearchItems (1.0 per item = perfect match)
+function calculateMatchTier(score: number | undefined, itemCount: number): 'High' | 'Medium' | 'Low' | null {
+  if (score === undefined || score === null) return null;
+  const maxScore = itemCount; // 1.0 per item
+  const ratio = score / maxScore;
+  if (ratio >= 0.7) return 'High';
+  if (ratio >= 0.4) return 'Medium';
+  return 'Low';
+}
+
 // Wrapper around shared filterOutRentalProperties that adds logging
 function filterOutRentals(properties: any[]): any[] {
   const rentals = properties.filter(p => isLikelyRentalProperty(p));
@@ -3285,6 +3296,106 @@ This email was sent by ${senderName} (${senderEmail}) via the MLS Grid IDX Platf
     } catch (error: any) {
       console.error("Repliers NLP error:", error.message);
       res.status(500).json({ error: "Failed to perform NLP search" });
+    }
+  });
+
+  // AI Image Search - ranks listings by visual similarity
+  // Reference: https://help.repliers.com/en/article/ai-image-search-implementation-guide-mx30ji/
+  app.post("/api/repliers/image-search", async (req, res) => {
+    try {
+      const client = getRepliersClient();
+      if (!client) {
+        res.status(503).json({ error: "Repliers API not configured" });
+        return;
+      }
+
+      const { imageSearchItems, criteria } = req.body;
+      
+      // Validate imageSearchItems
+      if (!imageSearchItems || !Array.isArray(imageSearchItems) || imageSearchItems.length === 0) {
+        res.status(400).json({ error: "imageSearchItems array is required with at least one item" });
+        return;
+      }
+      
+      if (imageSearchItems.length > 10) {
+        res.status(400).json({ error: "Maximum 10 imageSearchItems allowed" });
+        return;
+      }
+      
+      // Validate each item
+      for (const item of imageSearchItems) {
+        if (!item.type || !['text', 'image'].includes(item.type)) {
+          res.status(400).json({ error: "Each item must have type 'text' or 'image'" });
+          return;
+        }
+        if (item.type === 'text' && !item.value) {
+          res.status(400).json({ error: "Text items must have a value" });
+          return;
+        }
+        if (item.type === 'image') {
+          if (!item.url) {
+            res.status(400).json({ error: "Image items must have a url" });
+            return;
+          }
+          if (!item.url.startsWith('http://') && !item.url.startsWith('https://')) {
+            res.status(400).json({ error: "Image URLs must be http or https" });
+            return;
+          }
+        }
+        // Ensure boost is numeric
+        if (item.boost !== undefined && typeof item.boost !== 'number') {
+          res.status(400).json({ error: "Boost must be a number" });
+          return;
+        }
+      }
+      
+      // Build search params from criteria
+      const searchParams: any = {
+        imageSearchItems,
+        resultsPerPage: criteria?.resultsPerPage || 100,
+        pageNum: criteria?.pageNum || 1,
+      };
+      
+      // Add optional criteria filters
+      if (criteria) {
+        if (criteria.standardStatus) searchParams.standardStatus = criteria.standardStatus;
+        if (criteria.status) searchParams.status = criteria.status;
+        if (criteria.type) searchParams.type = criteria.type;
+        if (criteria.city) searchParams.city = criteria.city;
+        if (criteria.subdivision) searchParams.subdivision = criteria.subdivision;
+        if (criteria.postalCode) searchParams.postalCode = criteria.postalCode;
+        if (criteria.minPrice) searchParams.minPrice = criteria.minPrice;
+        if (criteria.maxPrice) searchParams.maxPrice = criteria.maxPrice;
+        if (criteria.minBeds) searchParams.minBeds = criteria.minBeds;
+        if (criteria.maxBeds) searchParams.maxBeds = criteria.maxBeds;
+        if (criteria.minBaths) searchParams.minBaths = criteria.minBaths;
+        if (criteria.maxBaths) searchParams.maxBaths = criteria.maxBaths;
+        if (criteria.minSqft) searchParams.minSqft = criteria.minSqft;
+        if (criteria.maxSqft) searchParams.maxSqft = criteria.maxSqft;
+        if (criteria.class) searchParams.class = criteria.class;
+        if (criteria.propertyType) searchParams.propertyType = criteria.propertyType;
+      }
+      
+      const result = await client.imageSearch(searchParams);
+      
+      // Map listings to standard format with score
+      const mappedListings = (result.listings || []).map((listing: any) => ({
+        ...client.mapToStandardProperty(listing),
+        score: listing.score,
+        // Calculate match tier based on score (per imageSearchItem, max score = 1.0 each)
+        matchTier: calculateMatchTier(listing.score, imageSearchItems.length),
+      }));
+      
+      res.json({
+        listings: mappedListings,
+        count: result.count,
+        numPages: result.numPages,
+        currentPage: result.currentPage,
+        resultsPerPage: result.resultsPerPage,
+      });
+    } catch (error: any) {
+      console.error("Repliers Image Search error:", error.message);
+      res.status(500).json({ error: "Failed to perform image search" });
     }
   });
 
