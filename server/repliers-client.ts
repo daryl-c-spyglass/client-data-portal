@@ -382,10 +382,14 @@ class RepliersClient {
     if (params.class) queryParams.append('class', normalizeRepliersClass(params.class));
 
     try {
-      return await this.withRetry(
-        () => this.client.get(`/listings?${queryParams.toString()}`).then(r => r.data),
-        `searchListings(status=${params.status || 'any'})`
+      const url = `/listings?${queryParams.toString()}`;
+      console.log(`🌐 [Repliers API Request] GET ${url}`);
+      const result = await this.withRetry(
+        () => this.client.get(url).then(r => r.data),
+        `searchListings(status=${params.status || params.standardStatus || 'any'})`
       );
+      console.log(`🌐 [Repliers API Response] count=${result.count || 0}, listings=${(result.listings || []).length}`);
+      return result;
     } catch (error: any) {
       console.error('Repliers searchListings error:', error.response?.data || error.message);
       throw new Error(`Failed to search listings: ${error.message}`);

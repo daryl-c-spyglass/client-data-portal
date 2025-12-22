@@ -455,15 +455,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const needsServerSideFiltering = minLotAcres || maxLotAcres || stories || minYearBuilt || maxYearBuilt;
         const effectiveLimit = (subdivision || needsServerSideFiltering) ? Math.min(parsedLimit * 10, 200) : parsedLimit;
         
-        // Diagnostic logging for subdivision searches
-        if (subdivision) {
-          console.log(`🔍 [Subdivision Search] Query: "${subdivision}"`);
-          console.log(`   - Status: ${repliersStatus}`);
-          console.log(`   - City: ${city || 'any'}`);
-          console.log(`   - Type filter: ${isSaleOnly ? 'Sale only' : 'All'}`);
-          console.log(`   - Field used: neighborhood (Repliers API field)`);
-        }
-        
         // Build search params - add type=Sale for Closed to exclude leased rentals
         const searchParams: any = {
           standardStatus: repliersStatus,  // RESO-compliant: Active, Pending, Closed
@@ -485,11 +476,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
           searchParams.type = 'sale';  // lowercase required by Repliers API
         }
         
+        // COMPREHENSIVE DIAGNOSTIC LOGGING
+        // Remove undefined values for cleaner logging
+        const cleanParams = Object.fromEntries(
+          Object.entries(searchParams).filter(([_, v]) => v !== undefined)
+        );
+        console.log(`\n📊 [CMA Search Diagnostic] ===================================`);
+        console.log(`   Status requested: ${repliersStatus}`);
+        console.log(`   Repliers API params: ${JSON.stringify(cleanParams, null, 2)}`);
+        console.log(`   NOTE: "neighborhood" param is how we send subdivision to Repliers`);
+        console.log(`   =============================================================\n`);
+        
         const response = await repliersClient.searchListings(searchParams);
         
-        // Log subdivision search results
-        if (subdivision) {
-          console.log(`   - Results before filter: ${(response.listings || []).length}`);
+        // Log detailed results
+        const listings = response.listings || [];
+        console.log(`📊 [CMA Search Results] Status: ${repliersStatus}`);
+        console.log(`   Total returned: ${listings.length}`);
+        if (listings.length > 0 && listings.length <= 20) {
+          console.log(`   Listings returned:`);
+          listings.forEach((l: any, i: number) => {
+            const addr = l.address || {};
+            const neighborhood = addr.neighborhood || 'N/A';
+            const subdivision = l.subdivision || l.raw?.subdivision || l.raw?.SubdivisionName || 'N/A';
+            console.log(`     ${i+1}. ${addr.streetNumber} ${addr.streetName} - neighborhood="${neighborhood}", subdivision="${subdivision}", sqft=${l.details?.sqft || l.livingArea || 'N/A'}`);
+          });
+        } else if (listings.length > 20) {
+          console.log(`   (Too many listings to show details)`);
         }
 
         return (response.listings || []).map((listing: any) => {
