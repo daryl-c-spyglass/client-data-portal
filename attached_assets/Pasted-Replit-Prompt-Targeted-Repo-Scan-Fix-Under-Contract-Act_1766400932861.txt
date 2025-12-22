@@ -1,0 +1,105 @@
+Replit Prompt: Targeted Repo Scan + Fix “Under Contract” → “Active Under Contract” (RESO)
+
+You are in an existing codebase. I need you to eliminate all appearances and logic buckets of “Under Contract” and normalize it to the RESO-aligned canonical label:
+
+Active Under Contract
+
+Phase 1 — Locate Status Touchpoints (Required)
+
+Search the repo for these strings and list every file/line reference:
+
+"Under Contract"
+
+"under contract"
+
+"U/C", "UC"
+
+"Active Under Contract"
+
+status, listingStatus, mlsStatus, contractStatus, StandardStatus, MlsStatus, reso
+
+Identify where status is:
+
+parsed from API responses
+
+mapped/normalized
+
+displayed (badges, cards, tables, detail pages)
+
+used in filtering / grouping / sorting
+
+exported (CSV / download / share)
+
+Phase 2 — Implement Canonical Normalization (Single Source of Truth)
+
+Create or update one shared helper and ensure all status comparisons and UI labels use it.
+
+Preferred: src/utils/normalizeStatus.ts (or closest existing utils folder)
+
+Helper signature (adjust to language/framework):
+
+normalizeStatus(raw: string | null | undefined): string
+
+Normalization rule:
+
+If raw status equals or implies any of:
+
+"Under Contract", "U/C", "UC"
+
+"Active Under Contract" (any casing/whitespace variants)
+
+Return exactly: "Active Under Contract"
+
+Otherwise return the cleaned original or existing normalized value (do NOT change other statuses)
+
+Also add a small helper if needed:
+
+isActiveUnderContract(raw: string): boolean
+
+Phase 3 — Apply Minimal, Targeted Changes
+
+Update only the necessary files found in Phase 1:
+
+Replace any hardcoded UI text “Under Contract” with “Active Under Contract”
+
+Replace any conditional checks like status === "Under Contract" with normalizeStatus(status) === "Active Under Contract"
+
+Ensure filter options do not show both buckets (no duplicate “Under Contract” and “Active Under Contract”)
+
+Ensure selecting “Active Under Contract” filter includes listings whose incoming raw status was “Under Contract” / “UC” / “U/C”
+
+Phase 4 — Update Tests / Fixtures (If Present)
+
+If tests exist, update or add unit tests for normalizeStatus():
+
+"Under Contract" → "Active Under Contract"
+
+" uc " → "Active Under Contract"
+
+"ACTIVE UNDER CONTRACT" → "Active Under Contract"
+
+Update fixtures so the UI never renders “Under Contract”
+
+Acceptance Criteria
+
+Repo-wide search for the literal display string "Under Contract" returns 0 results (except possibly historical changelogs—prefer updating fixtures/tests too).
+
+No UI section displays “Under Contract” — only “Active Under Contract”
+
+Filtering/grouping does not produce a separate “Under Contract” bucket
+
+Exports (if any) output “Active Under Contract”
+
+Output Required
+
+When done, provide:
+
+List of files modified
+
+For each file: what changed and why
+
+Confirmation of repo search results (no “Under Contract” remaining)
+
+Any tests added/updated and how to run them
+
+Now perform Phase 1 through Phase 4 and implement the minimal set of changes required.

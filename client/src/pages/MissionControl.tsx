@@ -336,7 +336,7 @@ export default function MissionControl() {
               variant="default"
             />
             <ProductionCard
-              title="Under Contract"
+              title="Active Under Contract"
               count={production.totals.underContract.count}
               volume={production.totals.underContract.volume}
               icon={DollarSign}
@@ -400,7 +400,7 @@ export default function MissionControl() {
                                 }
                               >
                                 {tx.status === "closed" ? "Closed" : 
-                                 tx.status === "under_contract" ? "Under Contract" : 
+                                 tx.status === "under_contract" ? "Active Under Contract" : 
                                  tx.status === "active" ? "Active" : tx.status}
                               </Badge>
                             </div>

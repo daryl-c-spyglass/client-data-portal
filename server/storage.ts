@@ -666,7 +666,7 @@ export class MemStorage implements IStorage {
       .map(p => ({
         date: new Date(p.listingContractDate!),
         price: Number(p.listPrice),
-        status: p.standardStatus as 'Active' | 'Under Contract' | 'Closed',
+        status: p.standardStatus as 'Active' | 'Active Under Contract' | 'Closed',
         propertyId: p.id,
         address: p.unparsedAddress!,
       }))
@@ -1438,7 +1438,7 @@ export class DbStorage implements IStorage {
       .map(p => ({
         date: new Date(p.listingContractDate!),
         price: Number(p.listPrice),
-        status: p.standardStatus as 'Active' | 'Under Contract' | 'Closed',
+        status: p.standardStatus as 'Active' | 'Active Under Contract' | 'Closed',
         propertyId: p.id,
         address: p.unparsedAddress!,
       }))

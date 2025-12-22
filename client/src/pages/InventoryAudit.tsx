@@ -228,9 +228,9 @@ export default function InventoryAudit() {
                 </span>
               </div>
               <div className="flex items-center justify-between p-4 rounded-lg bg-yellow-500/10 border border-yellow-500/20">
-                <span className="font-medium">Under Contract</span>
+                <span className="font-medium">Active Under Contract</span>
                 <span className="text-2xl font-bold text-yellow-600 dark:text-yellow-400" data-testid="text-uc-count">
-                  {formatNumber(audit?.totals?.byStatus?.['Under Contract'] || 0)}
+                  {formatNumber(audit?.totals?.byStatus?.['Active Under Contract'] || 0)}
                 </span>
               </div>
               <div className="flex items-center justify-between p-4 rounded-lg bg-blue-500/10 border border-blue-500/20">
@@ -294,7 +294,7 @@ export default function InventoryAudit() {
                       <tr className="border-b">
                         <th className="text-left p-2 font-medium">Subtype</th>
                         <th className="text-right p-2 font-medium text-green-600">Active</th>
-                        <th className="text-right p-2 font-medium text-yellow-600">Under Contract</th>
+                        <th className="text-right p-2 font-medium text-yellow-600">Active Under Contract</th>
                         <th className="text-right p-2 font-medium text-blue-600">Closed</th>
                       </tr>
                     </thead>
@@ -306,7 +306,7 @@ export default function InventoryAudit() {
                             {formatNumber(audit?.statusBySubtype?.['Active']?.[subtype.name] || 0)}
                           </td>
                           <td className="text-right p-2">
-                            {formatNumber(audit?.statusBySubtype?.['Under Contract']?.[subtype.name] || 0)}
+                            {formatNumber(audit?.statusBySubtype?.['Active Under Contract']?.[subtype.name] || 0)}
                           </td>
                           <td className="text-right p-2">
                             {formatNumber(audit?.statusBySubtype?.['Closed']?.[subtype.name] || 0)}

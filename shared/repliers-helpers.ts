@@ -148,10 +148,10 @@ export function normalizeStatus(status: string | null | undefined, lastStatus?: 
  * Legacy 3-status normalization for backward compatibility.
  * Use normalizeStatus() for new code.
  */
-export function normalizeStatusLegacy(status: string | null | undefined): 'Active' | 'Under Contract' | 'Closed' {
+export function normalizeStatusLegacy(status: string | null | undefined): 'Active' | 'Active Under Contract' | 'Closed' {
   const normalized = normalizeStatus(status);
   if (normalized === 'Active Under Contract' || normalized === 'Pending') {
-    return 'Under Contract';
+    return 'Active Under Contract';
   }
   return normalized;
 }

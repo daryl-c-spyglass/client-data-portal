@@ -151,7 +151,7 @@ export function calculateMarketSummary(properties: Property[]) {
   return {
     totalListings: properties.length,
     activeListings: properties.filter(p => p.standardStatus === 'Active').length,
-    pendingListings: properties.filter(p => p.standardStatus === 'Pending' || p.standardStatus === 'Under Contract').length,
+    pendingListings: properties.filter(p => p.standardStatus === 'Pending' || p.standardStatus === 'Active Under Contract').length,
     soldListings: properties.filter(p => p.standardStatus === 'Closed').length,
     avgListPrice: Math.round(avgListPrice),
     avgActivePrice: Math.round(avgActivePrice),

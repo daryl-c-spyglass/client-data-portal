@@ -52,7 +52,7 @@ function parseCriteriaFromUrl(searchString: string): SearchCriteria | null {
     // Parse status array - support both "status" and "statuses" keys
     const statusParam = params.get('statuses') || params.get('status');
     if (statusParam) {
-      criteria.status = statusParam.split(',') as ('Active' | 'Under Contract' | 'Closed' | 'Pending')[];
+      criteria.status = statusParam.split(',') as ('Active' | 'Active Under Contract' | 'Closed' | 'Pending')[];
     }
     
     // Parse cities array
@@ -535,7 +535,7 @@ export default function Properties() {
                   Active: {(inventory.countsByStatus['Active'] || 0).toLocaleString()}
                 </Badge>
                 <Badge variant="outline" className="bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200 text-xs" data-testid="badge-inventory-uc">
-                  UC: {(inventory.countsByStatus['Under Contract'] || 0).toLocaleString()}
+                  AUC: {(inventory.countsByStatus['Active Under Contract'] || 0).toLocaleString()}
                 </Badge>
                 <Badge variant="outline" className="bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 text-xs" data-testid="badge-inventory-closed">
                   Closed: {(inventory.countsByStatus['Closed'] || 0).toLocaleString()}
@@ -666,7 +666,7 @@ export default function Properties() {
                     Active: {searchResult.inventoryByStatus['Active']}
                   </Badge>
                   <Badge variant="outline" className="bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200" data-testid="badge-status-under-contract">
-                    Under Contract: {searchResult.inventoryByStatus['Under Contract']}
+                    Active Under Contract: {searchResult.inventoryByStatus['Active Under Contract']}
                   </Badge>
                   <Badge variant="outline" className="bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200" data-testid="badge-status-closed">
                     Closed: {searchResult.inventoryByStatus['Closed']}

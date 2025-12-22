@@ -214,7 +214,7 @@ const defaultConfig: DashboardConfig = {
 
 const statusConfig = {
   Active: { color: "bg-emerald-500", textColor: "text-white" },
-  "Under Contract": { color: "bg-amber-500", textColor: "text-white" },
+  "Active Under Contract": { color: "bg-amber-500", textColor: "text-white" },
   Closed: { color: "bg-slate-500", textColor: "text-white" },
   Pending: { color: "bg-blue-500", textColor: "text-white" },
 } as const;
@@ -988,7 +988,7 @@ export default function Dashboard() {
                             </p>
                             <p className="flex items-center gap-1">
                               <span className="w-2 h-2 rounded-full bg-amber-500"></span>
-                              {(inventorySummary?.countsByStatus?.['Under Contract'] ?? stats?.totalUnderContractProperties ?? 0).toLocaleString()} Under Contract
+                              {(inventorySummary?.countsByStatus?.['Active Under Contract'] ?? stats?.totalUnderContractProperties ?? 0).toLocaleString()} Active Under Contract
                             </p>
                             <p className="flex items-center gap-1">
                               <span className="w-2 h-2 rounded-full bg-slate-500"></span>

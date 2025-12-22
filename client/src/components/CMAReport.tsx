@@ -192,7 +192,7 @@ export function CMAReport({
   const closedProperties = properties.filter(p => p.standardStatus === 'Closed');
   const soldProperties = filterOutRentalProperties(closedProperties);
   const rentalProperties = closedProperties.filter(p => isLikelyRentalProperty(p));
-  const underContractProperties = properties.filter(p => p.standardStatus === 'Under Contract');
+  const underContractProperties = properties.filter(p => p.standardStatus === 'Active Under Contract');
   const activeProperties = properties.filter(p => p.standardStatus === 'Active');
   
   // Log filtered rentals for debugging
@@ -576,7 +576,7 @@ export function CMAReport({
                   
                   const statusConfig = {
                     'Active': { bg: 'bg-green-100 dark:bg-green-900/30', text: 'text-green-700 dark:text-green-400', border: 'border-green-200 dark:border-green-800' },
-                    'Under Contract': { bg: 'bg-yellow-100 dark:bg-yellow-900/30', text: 'text-yellow-700 dark:text-yellow-400', border: 'border-yellow-200 dark:border-yellow-800' },
+                    'Active Under Contract': { bg: 'bg-yellow-100 dark:bg-yellow-900/30', text: 'text-yellow-700 dark:text-yellow-400', border: 'border-yellow-200 dark:border-yellow-800' },
                     'Closed': { bg: 'bg-red-100 dark:bg-red-900/30', text: 'text-red-700 dark:text-red-400', border: 'border-red-200 dark:border-red-800' }
                   };
                   const status = statusConfig[property.standardStatus as keyof typeof statusConfig] || statusConfig['Active'];
@@ -701,7 +701,7 @@ export function CMAReport({
                   <CardTitle className="text-base">
                     {activeListingTab === 'all' ? 'All Properties' :
                      activeListingTab === 'sold' ? 'Sold Properties' :
-                     activeListingTab === 'under-contract' ? 'Under Contract' : 'Active Listings'} - Price Low to High
+                     activeListingTab === 'under-contract' ? 'Active Under Contract' : 'Active Listings'} - Price Low to High
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
@@ -744,7 +744,7 @@ export function CMAReport({
                           // Status badge styling
                           const statusConfig = {
                             'Active': { bg: 'bg-green-100 dark:bg-green-900/30', text: 'text-green-700 dark:text-green-400', border: 'border-green-200 dark:border-green-800' },
-                            'Under Contract': { bg: 'bg-yellow-100 dark:bg-yellow-900/30', text: 'text-yellow-700 dark:text-yellow-400', border: 'border-yellow-200 dark:border-yellow-800' },
+                            'Active Under Contract': { bg: 'bg-yellow-100 dark:bg-yellow-900/30', text: 'text-yellow-700 dark:text-yellow-400', border: 'border-yellow-200 dark:border-yellow-800' },
                             'Closed': { bg: 'bg-red-100 dark:bg-red-900/30', text: 'text-red-700 dark:text-red-400', border: 'border-red-200 dark:border-red-800' }
                           };
                           const status = statusConfig[property.standardStatus as keyof typeof statusConfig] || statusConfig['Active'];
@@ -1097,7 +1097,7 @@ export function CMAReport({
                   </div>
                   <div className="flex items-center gap-2">
                     <div className="w-3 h-3 rounded-full bg-yellow-500"></div>
-                    <span className="text-sm">Under Contract</span>
+                    <span className="text-sm">Active Under Contract</span>
                   </div>
                   <div className="flex items-center gap-2">
                     <div className="w-3 h-3 rounded-full bg-red-500"></div>
@@ -1115,7 +1115,7 @@ export function CMAReport({
                 // Filter timeline data based on status filters
                 const filteredTimelineData = timelineData.filter(d => {
                   if (d.status === 'Active' && !showActiveOnTimeline) return false;
-                  if (d.status === 'Under Contract' && !showUnderContractOnTimeline) return false;
+                  if (d.status === 'Active Under Contract' && !showUnderContractOnTimeline) return false;
                   if (d.status === 'Closed' && !showSoldOnTimeline) return false;
                   return true;
                 });
@@ -1133,7 +1133,7 @@ export function CMAReport({
                 
                 const getStatusColor = (status: string) => {
                   if (status === 'Active') return '#22c55e';
-                  if (status === 'Under Contract') return '#eab308';
+                  if (status === 'Active Under Contract') return '#eab308';
                   return '#ef4444';
                 };
                 
@@ -1167,7 +1167,7 @@ export function CMAReport({
                           if (active && payload && payload.length > 0) {
                             const data = payload[0].payload;
                             const statusColor = data.status === 'Active' ? 'text-green-600' : 
-                                               data.status === 'Under Contract' ? 'text-yellow-600' : 'text-red-600';
+                                               data.status === 'Active Under Contract' ? 'text-yellow-600' : 'text-red-600';
                             return (
                               <div className="bg-popover border rounded-lg shadow-lg p-3 text-sm">
                                 <p className="font-semibold text-foreground mb-1">{data.address || 'Property'}</p>
@@ -1741,13 +1741,13 @@ export function CMAReport({
               },
               {
                 key: 'under-contract',
-                label: 'Under Contract',
+                label: 'Active Under Contract',
                 properties: underContractProperties,
                 borderClass: 'border-yellow-200 dark:border-yellow-800',
                 bgClass: 'bg-yellow-50 dark:bg-yellow-950/30',
                 dotClass: 'bg-yellow-500',
                 titleClass: 'text-yellow-700 dark:text-yellow-400',
-                emptyText: 'No under contract listings in this CMA',
+                emptyText: 'No active under contract listings in this CMA',
                 isSold: false
               },
               {
@@ -1896,7 +1896,7 @@ export function CMAReport({
                     <Badge 
                       className={cn(
                         floatingCardProperty.standardStatus === 'Active' && "bg-emerald-500 text-white",
-                        floatingCardProperty.standardStatus === 'Under Contract' && "bg-amber-500 text-white",
+                        floatingCardProperty.standardStatus === 'Active Under Contract' && "bg-amber-500 text-white",
                         floatingCardProperty.standardStatus === 'Closed' && "bg-slate-500 text-white"
                       )}
                     >

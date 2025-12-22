@@ -23,6 +23,9 @@ export const STATUS_CODES = {
 export const STATUS_ABBREVIATIONS: Record<string, string> = {
   'A': 'Active',
   'AU': 'Active Under Contract',
+  'U': 'Active Under Contract',  // Under contract code → Active Under Contract (RESO)
+  'UC': 'Active Under Contract', // UC abbreviation → Active Under Contract (RESO)
+  'U/C': 'Active Under Contract', // U/C abbreviation → Active Under Contract (RESO)
   'P': 'Pending',
   'C': 'Closed',
   'S': 'Closed', // Sold = Closed
@@ -104,10 +107,14 @@ export function normalizeStatus(status: string | null | undefined): string {
   switch (lower) {
     case 'active':
       return STATUS_CODES.ACTIVE;
+    case 'under contract':
     case 'under_contract':
     case 'active_under_contract':
     case 'active under contract':
     case 'undercontract':
+    case 'uc':
+    case 'u/c':
+    case 'u':
       return STATUS_CODES.ACTIVE_UNDER_CONTRACT;
     case 'pending':
       return STATUS_CODES.PENDING;

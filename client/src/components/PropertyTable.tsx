@@ -70,7 +70,7 @@ export function PropertyTable({
         return 'bg-green-500/10 text-green-700 dark:text-green-400 border-green-500/20';
       case 'Pending':
         return 'bg-yellow-500/10 text-yellow-700 dark:text-yellow-400 border-yellow-500/20';
-      case 'Under Contract':
+      case 'Active Under Contract':
         return 'bg-blue-500/10 text-blue-700 dark:text-blue-400 border-blue-500/20';
       case 'Closed':
         return 'bg-gray-500/10 text-gray-700 dark:text-gray-400 border-gray-500/20';

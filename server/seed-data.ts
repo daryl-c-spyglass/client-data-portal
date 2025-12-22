@@ -68,7 +68,7 @@ export async function seedData() {
       listingId: "DEMO-003",
       listingKey: "demo-003",
       mlgCanView: true,
-      standardStatus: "Under Contract",
+      standardStatus: "Active Under Contract",
       listPrice: "725000",
       unparsedAddress: "910 Pine Drive, Austin, TX 78701",
       streetNumber: "910",

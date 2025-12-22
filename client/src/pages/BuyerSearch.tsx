@@ -516,7 +516,7 @@ export default function BuyerSearch() {
     const params = new URLSearchParams();
     
     if (filters.statusActive) params.append('standardStatus', 'Active');
-    if (filters.statusUnderContract) params.append('standardStatus', 'Under Contract');
+    if (filters.statusUnderContract) params.append('standardStatus', 'Active Under Contract');
     
     if (filters.minPrice) params.set('minListPrice', String(filters.minPrice));
     if (filters.maxPrice) params.set('maxListPrice', String(filters.maxPrice));
@@ -553,7 +553,7 @@ export default function BuyerSearch() {
     // Handle status toggles - HomeReview uses 'status' or 'statuses' parameter
     const statuses: string[] = [];
     if (filters.statusActive) statuses.push('Active');
-    if (filters.statusUnderContract) statuses.push('Under Contract');
+    if (filters.statusUnderContract) statuses.push('Active Under Contract');
     if (filters.statusClosed) statuses.push('Closed');
     if (statuses.length > 0) {
       statuses.forEach(s => params.append('statuses', s));
@@ -1013,7 +1013,7 @@ export default function BuyerSearch() {
                       />
                     </div>
                     <div className="flex items-center justify-between">
-                      <Label htmlFor="status-under-contract" className="text-base">Under Contract</Label>
+                      <Label htmlFor="status-under-contract" className="text-base">Active Under Contract</Label>
                       <Switch
                         id="status-under-contract"
                         checked={filters.statusUnderContract || false}
@@ -3310,7 +3310,7 @@ export default function BuyerSearch() {
                     <Badge 
                       className={cn(
                         floatingCardProperty.property.standardStatus === 'Active' && "bg-emerald-500 text-white",
-                        floatingCardProperty.property.standardStatus === 'Under Contract' && "bg-amber-500 text-white",
+                        floatingCardProperty.property.standardStatus === 'Active Under Contract' && "bg-amber-500 text-white",
                         floatingCardProperty.property.standardStatus === 'Closed' && "bg-slate-500 text-white"
                       )}
                     >

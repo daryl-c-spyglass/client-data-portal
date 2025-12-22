@@ -119,7 +119,7 @@ export default function CMANew() {
       const statuses = new Set<string>();
       propertiesData.forEach((p: any) => {
         if (p.standardStatus === 'Active') statuses.add('active');
-        else if (p.standardStatus === 'Under Contract' || p.standardStatus === 'Pending') statuses.add('under_contract');
+        else if (p.standardStatus === 'Active Under Contract' || p.standardStatus === 'Pending') statuses.add('under_contract');
         else if (p.standardStatus === 'Closed') statuses.add('closed');
       });
       if (statuses.size > 0) {
@@ -161,7 +161,7 @@ export default function CMANew() {
     const statuses = new Set<string>();
     preSelectedProperties.forEach((p: any) => {
       if (p.standardStatus === 'Active') statuses.add('active');
-      else if (p.standardStatus === 'Under Contract' || p.standardStatus === 'Pending') statuses.add('under_contract');
+      else if (p.standardStatus === 'Active Under Contract' || p.standardStatus === 'Pending') statuses.add('under_contract');
       else if (p.standardStatus === 'Closed') statuses.add('closed');
     });
     

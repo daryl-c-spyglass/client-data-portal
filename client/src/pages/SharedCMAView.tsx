@@ -121,7 +121,7 @@ export default function SharedCMAView() {
   const { cma, properties, statistics, timelineData } = data;
   const soldProperties = properties.filter(p => p.standardStatus === 'Closed');
   const activeProperties = properties.filter(p => p.standardStatus === 'Active');
-  const underContractProperties = properties.filter(p => p.standardStatus === 'Under Contract');
+  const underContractProperties = properties.filter(p => p.standardStatus === 'Active Under Contract');
 
   const formatPrice = (price: number | string | null | undefined) => {
     if (!price) return 'N/A';

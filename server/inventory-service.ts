@@ -9,7 +9,7 @@ export interface InventoryData {
   totalCount: number;
   countsByStatus: {
     Active: number;
-    'Under Contract': number;
+    'Active Under Contract': number;
     Closed: number;
   };
   countsBySubtype: Record<string, number>;
@@ -111,11 +111,11 @@ export async function getUnifiedInventory(forceRefresh = false): Promise<Invento
     mlsScope: 'ACTRIS',
     classScope: 'residentialOnly',
     rentalExcluded: true,
-    statusIncluded: ['Active', 'Under Contract', 'Closed'],
+    statusIncluded: ['Active', 'Active Under Contract', 'Closed'],
     totalCount: 0,
     countsByStatus: {
       Active: 0,
-      'Under Contract': 0,
+      'Active Under Contract': 0,
       Closed: 0,
     },
     countsBySubtype: {
@@ -151,7 +151,7 @@ export async function getUnifiedInventory(forceRefresh = false): Promise<Invento
       const liveResult = await countLiveListingsUnified(repliersClient);
       
       inventoryData.countsByStatus.Active = liveResult.statusCounts.Active;
-      inventoryData.countsByStatus['Under Contract'] = liveResult.statusCounts['Under Contract'];
+      inventoryData.countsByStatus['Active Under Contract'] = liveResult.statusCounts['Active Under Contract'];
       
       // Merge live subtype counts
       for (const [subtype, count] of Object.entries(liveResult.subtypeCounts)) {
@@ -191,7 +191,7 @@ export async function getUnifiedInventory(forceRefresh = false): Promise<Invento
   // === STEP 3: Calculate totals and validate ===
   const statusSum = 
     inventoryData.countsByStatus.Active + 
-    inventoryData.countsByStatus['Under Contract'] + 
+    inventoryData.countsByStatus['Active Under Contract'] + 
     inventoryData.countsByStatus.Closed;
     
   const subtypeSum = Object.values(inventoryData.countsBySubtype).reduce((sum, count) => sum + count, 0);
@@ -218,7 +218,7 @@ export async function getUnifiedInventory(forceRefresh = false): Promise<Invento
   inventoryData.isPartialData = errors.length > 0;
 
   const duration = Date.now() - startTime;
-  console.log(`[Inventory] Complete in ${duration}ms. Total: ${inventoryData.totalCount}, Active: ${inventoryData.countsByStatus.Active}, UC: ${inventoryData.countsByStatus['Under Contract']}, Closed: ${inventoryData.countsByStatus.Closed}`);
+  console.log(`[Inventory] Complete in ${duration}ms. Total: ${inventoryData.totalCount}, Active: ${inventoryData.countsByStatus.Active}, AUC: ${inventoryData.countsByStatus['Active Under Contract']}, Closed: ${inventoryData.countsByStatus.Closed}`);
   console.log(`[Inventory] Subtypes:`, inventoryData.countsBySubtype);
   console.log(`[Inventory] Validation: statusSum=${statusSum}, subtypeSum=${subtypeSum}, match=${statusSum === subtypeSum}`);
 
@@ -230,13 +230,13 @@ export async function getUnifiedInventory(forceRefresh = false): Promise<Invento
   return inventoryData;
 }
 
-// Count Active + Under Contract listings with unified status/subtype counting
+// Count Active + Active Under Contract listings with unified status/subtype counting
 async function countLiveListingsUnified(repliersClient: any): Promise<{
-  statusCounts: { Active: number; 'Under Contract': number };
+  statusCounts: { Active: number; 'Active Under Contract': number };
   subtypeCounts: Record<string, number>;
   rentalFiltered: number;
 }> {
-  const statusCounts = { Active: 0, 'Under Contract': 0 };
+  const statusCounts = { Active: 0, 'Active Under Contract': 0 };
   const subtypeCounts: Record<string, number> = {};
   let rentalFiltered = 0;
   
@@ -245,9 +245,9 @@ async function countLiveListingsUnified(repliersClient: any): Promise<{
     subtypeCounts[subtype] = 0;
   }
   
-  // Scan both Active and Under Contract
+  // Scan both Active and Active Under Contract
   for (const status of ['A', 'U'] as const) {
-    const statusKey = status === 'A' ? 'Active' : 'Under Contract';
+    const statusKey = status === 'A' ? 'Active' : 'Active Under Contract';
     let pageNum = 1;
     let hasMore = true;
     let statusCount = 0;
@@ -427,18 +427,18 @@ export async function getInventoryAudit(): Promise<InventoryAudit> {
   const repliersConfigured = !!(repliersClient && isRepliersConfigured());
   
   if (!repliersConfigured) {
-    warnings.push('Repliers API is NOT configured - Active and Under Contract counts will be 0');
+    warnings.push('Repliers API is NOT configured - Active and Active Under Contract counts will be 0');
   }
   
   // Build status by subtype cross-tab from database
   const statusBySubtype: Record<string, Record<string, number>> = {
     'Active': {},
-    'Under Contract': {},
+    'Active Under Contract': {},
     'Closed': {},
   };
   
   // Initialize all subtypes for each status
-  for (const status of ['Active', 'Under Contract', 'Closed']) {
+  for (const status of ['Active', 'Active Under Contract', 'Closed']) {
     for (const subtype of INVENTORY_PROPERTY_TYPES) {
       statusBySubtype[status][subtype] = 0;
     }
@@ -487,8 +487,8 @@ export async function getInventoryAudit(): Promise<InventoryAudit> {
     
     // For closed properties, use actual counts from inventory
     for (const [subtype, count] of Object.entries(inventory.countsBySubtype)) {
-      // Assume all current subtype counts are closed since active/UC are 0
-      if (inventory.countsByStatus.Active === 0 && inventory.countsByStatus['Under Contract'] === 0) {
+      // Assume all current subtype counts are closed since active/AUC are 0
+      if (inventory.countsByStatus.Active === 0 && inventory.countsByStatus['Active Under Contract'] === 0) {
         statusBySubtype['Closed'][subtype] = count;
       }
     }
@@ -507,8 +507,8 @@ export async function getInventoryAudit(): Promise<InventoryAudit> {
     warnings.push('Active count is 0 but Repliers is configured - possible API issue');
   }
   
-  if (inventory.countsByStatus['Under Contract'] === 0 && repliersConfigured) {
-    warnings.push('Under Contract count is 0 but Repliers is configured - possible API issue');
+  if (inventory.countsByStatus['Active Under Contract'] === 0 && repliersConfigured) {
+    warnings.push('Active Under Contract count is 0 but Repliers is configured - possible API issue');
   }
   
   const cacheAge = inventoryCache ? Date.now() - inventoryCache.timestamp : null;

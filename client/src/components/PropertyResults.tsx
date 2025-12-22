@@ -66,8 +66,8 @@ export function PropertyResults({
         return new Date(a.modificationTimestamp).getTime() - new Date(b.modificationTimestamp).getTime();
       case 'status':
       default:
-        // Sort by status: Active -> Pending -> Under Contract -> Closed
-        const statusOrder = { 'Active': 0, 'Pending': 1, 'Under Contract': 2, 'Closed': 3 };
+        // Sort by status: Active -> Pending -> Active Under Contract -> Closed
+        const statusOrder = { 'Active': 0, 'Pending': 1, 'Active Under Contract': 2, 'Closed': 3 };
         const aOrder = statusOrder[a.standardStatus as keyof typeof statusOrder] ?? 99;
         const bOrder = statusOrder[b.standardStatus as keyof typeof statusOrder] ?? 99;
         return aOrder - bOrder;
@@ -79,7 +79,7 @@ export function PropertyResults({
     all: sortedProperties,
     active: sortedProperties.filter(p => p.standardStatus === 'Active'),
     pending: sortedProperties.filter(p => p.standardStatus === 'Pending'),
-    underContract: sortedProperties.filter(p => p.standardStatus === 'Under Contract'),
+    underContract: sortedProperties.filter(p => p.standardStatus === 'Active Under Contract'),
     closed: sortedProperties.filter(p => p.standardStatus === 'Closed'),
   };
   
@@ -268,7 +268,7 @@ export function PropertyResults({
           <h3 className="text-lg font-semibold mb-2">No properties found</h3>
           <p className="text-muted-foreground">
             {statusFilter !== 'all' 
-              ? `No ${statusFilter === 'under-contract' ? 'Under Contract' : statusFilter === 'pending' ? 'Pending' : statusFilter.charAt(0).toUpperCase() + statusFilter.slice(1)} properties. Try a different filter.`
+              ? `No ${statusFilter === 'under-contract' ? 'Active Under Contract' : statusFilter === 'pending' ? 'Pending' : statusFilter.charAt(0).toUpperCase() + statusFilter.slice(1)} properties. Try a different filter.`
               : 'Try adjusting your search criteria to see more results'
             }
           </p>

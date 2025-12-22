@@ -202,17 +202,17 @@ export function SearchCriteriaForm({ onSearch, initialCriteria = {} }: SearchCri
             <div className="flex items-center space-x-2">
               <Switch 
                 id="status-under-contract"
-                checked={criteria.status?.includes('Under Contract')}
+                checked={criteria.status?.includes('Active Under Contract')}
                 onCheckedChange={(checked) => {
                   const current = criteria.status || [];
                   updateCriteria('status', checked 
-                    ? [...current, 'Under Contract']
-                    : current.filter(s => s !== 'Under Contract')
+                    ? [...current, 'Active Under Contract']
+                    : current.filter(s => s !== 'Active Under Contract')
                   );
                 }}
                 data-testid="switch-status-under-contract"
               />
-              <Label htmlFor="status-under-contract" className="cursor-pointer">Under Contract</Label>
+              <Label htmlFor="status-under-contract" className="cursor-pointer">Active Under Contract</Label>
             </div>
             <div className="flex items-center space-x-2">
               <Switch 

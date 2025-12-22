@@ -202,7 +202,7 @@ export class NeighborhoodService {
     
     const active = allListings.filter((p) => p.standardStatus === 'Active');
     const underContract = allListings.filter(
-      (p) => p.standardStatus === 'Under Contract' || p.standardStatus === 'Pending'
+      (p) => p.standardStatus === 'Active Under Contract' || p.standardStatus === 'Pending'
     );
     const sold = allListings.filter(
       (p) => p.standardStatus === 'Closed' && 

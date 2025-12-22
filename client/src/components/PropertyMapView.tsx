@@ -20,7 +20,7 @@ const defaultZoom = 10;
 const createPropertyIcon = (status: string) => {
   const color = status === "Active" 
     ? "#22c55e" 
-    : status === "Under Contract" || status === "Pending"
+    : status === "Active Under Contract" || status === "Pending"
     ? "#f59e0b"
     : "#6b7280";
   
@@ -120,7 +120,7 @@ function PropertyPopup({ property, onPropertyClick }: { property: Property; onPr
 
   const statusColor = property.standardStatus === "Active" 
     ? "bg-green-500" 
-    : property.standardStatus === "Under Contract" || property.standardStatus === "Pending"
+    : property.standardStatus === "Active Under Contract" || property.standardStatus === "Pending"
     ? "bg-amber-500"
     : "bg-gray-500";
 

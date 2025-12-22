@@ -198,7 +198,7 @@ export function NeighborhoodReview({ neighborhoodName, city, months = 6 }: Neigh
           />
           <StatCard
             icon={Building}
-            label="Under Contract"
+            label="Active Under Contract"
             value={stats.underContractCount}
           />
           <StatCard

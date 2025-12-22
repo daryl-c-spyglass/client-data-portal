@@ -36,12 +36,12 @@ interface UnifiedSearchResponse {
   dataSource?: string;
 }
 
-// Map status to MLS-standard values
+// Map status to MLS-standard RESO-aligned values
 function mapStatusToStandard(status: string): string {
   const statusMap: Record<string, string> = {
     'Active': 'Active',
-    'Under Contract': 'Under Contract',
-    'Active Under Contract': 'Under Contract',
+    'Under Contract': 'Active Under Contract',
+    'Active Under Contract': 'Active Under Contract',
     'Closed': 'Closed',
     'Sold': 'Closed',
     'Pending': 'Pending',
@@ -177,7 +177,7 @@ function buildSearchParams(criteria: SearchCriteria): URLSearchParams {
   if (criteria.status && criteria.status.length > 0) {
     const mappedStatuses = criteria.status.map(statusVal => {
       if (statusVal === 'Active') return 'active';
-      if (statusVal === 'Under Contract') return 'under_contract';
+      if (statusVal === 'Active Under Contract' || statusVal === 'Under Contract') return 'under_contract';
       if (statusVal === 'Closed') return 'closed';
       return statusVal.toLowerCase().replace(/ /g, '_');
     });
@@ -298,7 +298,7 @@ export async function unifiedSearchWithMeta(criteria: SearchCriteria): Promise<S
   // Compute inventory counts from results
   const inventoryByStatus: Record<string, number> = {
     'Active': 0,
-    'Under Contract': 0,
+    'Active Under Contract': 0,
     'Closed': 0,
   };
   
@@ -315,7 +315,7 @@ export async function unifiedSearchWithMeta(criteria: SearchCriteria): Promise<S
     // Count by status
     const status = p.standardStatus || 'Active';
     if (status === 'Active') inventoryByStatus['Active']++;
-    else if (status === 'Under Contract' || status === 'Pending') inventoryByStatus['Under Contract']++;
+    else if (status === 'Active Under Contract' || status === 'Under Contract' || status === 'Pending') inventoryByStatus['Active Under Contract']++;
     else if (status === 'Closed' || status === 'Sold') inventoryByStatus['Closed']++;
     
     // Count by subtype

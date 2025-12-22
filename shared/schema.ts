@@ -358,7 +358,7 @@ const stringOrArray = z.union([z.string(), z.array(z.string())]).transform((val)
 );
 
 export const searchCriteriaSchema = z.object({
-  status: stringOrArray.pipe(z.array(z.enum(['Active', 'Under Contract', 'Closed', 'Pending']))).optional(),
+  status: stringOrArray.pipe(z.array(z.enum(['Active', 'Active Under Contract', 'Closed', 'Pending']))).optional(),
   dateRange: z.object({
     from: z.string().optional(),
     to: z.string().optional(),
@@ -578,7 +578,7 @@ export interface PropertyStatistics {
 export interface TimelineDataPoint {
   date: Date;
   price: number;
-  status: 'Active' | 'Under Contract' | 'Closed';
+  status: 'Active' | 'Active Under Contract' | 'Closed';
   propertyId: string;
   address: string;
   daysOnMarket?: number | null;

@@ -17,7 +17,7 @@ interface PropertyCardProps {
 
 const statusConfig = {
   Active: { color: "bg-emerald-500", textColor: "text-white" },
-  "Under Contract": { color: "bg-amber-500", textColor: "text-white" },
+  "Active Under Contract": { color: "bg-amber-500", textColor: "text-white" },
   Closed: { color: "bg-slate-500", textColor: "text-white" },
   Pending: { color: "bg-blue-500", textColor: "text-white" },
 } as const;

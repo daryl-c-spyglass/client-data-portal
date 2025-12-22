@@ -223,7 +223,7 @@ export function CMABuilder({ onCreateCMA, initialData }: CMABuilderProps) {
     if (searchStatuses.length > 0) {
       const statusMap: Record<string, string> = {
         'active': 'Active',
-        'under_contract': 'Under Contract',
+        'under_contract': 'Active Under Contract',
         'closed': 'Sold/Closed'
       };
       const formattedStatuses = searchStatuses.map(s => statusMap[s] || s).join('/');
@@ -472,7 +472,7 @@ export function CMABuilder({ onCreateCMA, initialData }: CMABuilderProps) {
     // Get status description
     const statusLabels = searchStatuses.map(s => {
       if (s === 'active') return 'Active';
-      if (s === 'under_contract') return 'Under Contract';
+      if (s === 'under_contract') return 'Active Under Contract';
       if (s === 'closed') return 'Sold/Closed';
       return s;
     }).join(' & ');
@@ -1437,8 +1437,8 @@ export function CMABuilder({ onCreateCMA, initialData }: CMABuilderProps) {
                     return <Badge variant="secondary" className="flex-shrink-0">Sold</Badge>;
                   } else if (property.standardStatus === 'Active') {
                     return <Badge variant="default" className="flex-shrink-0 bg-green-600 hover:bg-green-600">Active</Badge>;
-                  } else if (property.standardStatus === 'Active Under Contract' || property.standardStatus === 'Under Contract') {
-                    return <Badge variant="default" className="flex-shrink-0 bg-amber-500 hover:bg-amber-500">Under Contract</Badge>;
+                  } else if (property.standardStatus === 'Active Under Contract') {
+                    return <Badge variant="default" className="flex-shrink-0 bg-amber-500 hover:bg-amber-500">Active Under Contract</Badge>;
                   }
                   return <Badge variant="secondary" className="flex-shrink-0">{property.standardStatus}</Badge>;
                 };

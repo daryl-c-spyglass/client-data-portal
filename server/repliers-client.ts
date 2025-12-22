@@ -534,14 +534,14 @@ class RepliersClient {
   }
 
   private mapStatus(status: string): string {
-    // Status mapping per Repliers API:
+    // Status mapping per Repliers API (RESO-aligned):
     // A = Active
-    // U = Under Contract
+    // U = Active Under Contract (RESO canonical)
     // P = Pending
     // S = Sold/Closed
     const statusMap: Record<string, string> = {
       'A': 'Active',
-      'U': 'Under Contract',
+      'U': 'Active Under Contract',
       'S': 'Closed',
       'X': 'Expired',
       'W': 'Withdrawn',
@@ -553,8 +553,8 @@ class RepliersClient {
       'Pending': 'Pending',
       'Expired': 'Expired',
       'Cancelled': 'Cancelled',
-      'Active Under Contract': 'Under Contract',
-      'Under Contract': 'Under Contract',
+      'Active Under Contract': 'Active Under Contract',
+      'Under Contract': 'Active Under Contract',
     };
     return statusMap[status] || status;
   }

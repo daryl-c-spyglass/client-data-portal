@@ -121,8 +121,8 @@ function calculateTimelineFromProperties(properties: any[]): TimelineDataPoint[]
     .filter(p => (p.listingContractDate || p.listDate) && (p.listPrice || p.closePrice) && (p.unparsedAddress || p.address))
     .map(p => {
       const rawStatusValue = p.standardStatus || p.status || 'Active';
-      // Normalize Pending to Under Contract for consistent handling
-      const status = (rawStatusValue === 'Pending' ? 'Under Contract' : rawStatusValue) as 'Active' | 'Under Contract' | 'Closed';
+      // Normalize Pending/Under Contract to Active Under Contract (RESO-aligned)
+      const status = (rawStatusValue === 'Pending' || rawStatusValue === 'Under Contract' ? 'Active Under Contract' : rawStatusValue) as 'Active' | 'Active Under Contract' | 'Closed';
       const listDate = new Date(p.listingContractDate || p.listDate);
       const closeDate = p.closeDate ? new Date(p.closeDate) : null;
       const underContractDate = p.underContractDate || p.pendingDate || p.statusChangeDate;
@@ -150,7 +150,7 @@ function calculateTimelineFromProperties(properties: any[]): TimelineDataPoint[]
         if (p.daysOnMarket != null) {
           daysOnMarket = Number(p.daysOnMarket);
         }
-      } else if (status === 'Under Contract') {
+      } else if (status === 'Active Under Contract') {
         // Days Under Contract = Current Date - Under Contract Date
         if (underContractDate) {
           const ucDate = new Date(underContractDate);
@@ -597,7 +597,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           }
           
           // Log status mapping for debugging
-          if (standardStatus.includes('Under Contract') || lastStatus === 'AU' || lastStatus === 'Act') {
+          if (standardStatus.includes('Under Contract') || standardStatus.includes('Active Under Contract') || lastStatus === 'AU' || lastStatus === 'Act') {
             console.log(`📋 AU Status mapping: standardStatus="${standardStatus}", status="${rawStatus}", lastStatus="${lastStatus}" → "${mappedStatus}" for ${listing.mlsNumber || 'unknown MLS#'}`);
           }
 
@@ -1210,7 +1210,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             
             const closePrice = listing.soldPrice || listing.closePrice;
             const standardStatus = status === 'active' ? 'Active'
-              : status === 'under_contract' ? 'Under Contract'
+              : status === 'under_contract' ? 'Active Under Contract'
               : 'Closed';
             
             const mlsNum = listing.mlsNumber || listingAny.listingId;
@@ -1421,16 +1421,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
               listingId: listing.mlsNumber,
               listingKey: listing.mlsNumber,
               standardStatus: (() => {
-                // Comprehensive status mapping for property detail lookup
+                // RESO-aligned status mapping for property detail lookup
                 const statusMap: Record<string, string> = {
                   'A': 'Active',
-                  'U': 'Under Contract',
+                  'U': 'Active Under Contract',
                   'S': 'Closed',
                   'P': 'Pending',
                   'Active': 'Active',
-                  'Active Under Contract': 'Under Contract',
-                  'Under Contract': 'Under Contract',
-                  'Pending': 'Under Contract',
+                  'Active Under Contract': 'Active Under Contract',
+                  'Under Contract': 'Active Under Contract',
+                  'Pending': 'Pending',
                   'Sold': 'Closed',
                   'Closed': 'Closed',
                 };
@@ -2212,11 +2212,11 @@ This email was sent by ${senderName} (${senderEmail}) via the MLS Grid IDX Platf
                     lotSizeSquareFeet: details.lotSize || listing.lotSizeSquareFeet,
                     lotSizeAcres: listing.lotSizeAcres,
                     standardStatus: (() => {
-                      // Comprehensive status mapping
+                      // RESO-aligned status mapping
                       const statusMap: Record<string, string> = {
-                        'A': 'Active', 'U': 'Under Contract', 'S': 'Closed', 'P': 'Pending',
-                        'Active': 'Active', 'Active Under Contract': 'Under Contract',
-                        'Under Contract': 'Under Contract', 'Pending': 'Under Contract',
+                        'A': 'Active', 'U': 'Active Under Contract', 'S': 'Closed', 'P': 'Pending',
+                        'Active': 'Active', 'Active Under Contract': 'Active Under Contract',
+                        'Under Contract': 'Active Under Contract', 'Pending': 'Pending',
                         'Sold': 'Closed', 'Closed': 'Closed',
                       };
                       return statusMap[listing.status] || listing.status;
@@ -3551,13 +3551,13 @@ This email was sent by ${senderName} (${senderEmail}) via the MLS Grid IDX Platf
       ]);
       
       // Log for debugging data consistency
-      console.log(`[Dashboard Stats] Using unified inventory: Total=${inventory.totalCount}, Active=${inventory.countsByStatus.Active}, UC=${inventory.countsByStatus['Under Contract']}, Closed=${inventory.countsByStatus.Closed}`);
+      console.log(`[Dashboard Stats] Using unified inventory: Total=${inventory.totalCount}, Active=${inventory.countsByStatus.Active}, AUC=${inventory.countsByStatus['Active Under Contract']}, Closed=${inventory.countsByStatus.Closed}`);
       console.log(`[Dashboard Stats] Subtypes:`, inventory.countsBySubtype);
       
       const responseData = {
         mlsScope: inventory.mlsScope,
         totalActiveProperties: inventory.countsByStatus.Active,
-        totalUnderContractProperties: inventory.countsByStatus['Under Contract'],
+        totalUnderContractProperties: inventory.countsByStatus['Active Under Contract'],
         totalClosedProperties: inventory.countsByStatus.Closed,
         totalProperties: inventory.totalCount,
         countsBySubtype: inventory.countsBySubtype,
