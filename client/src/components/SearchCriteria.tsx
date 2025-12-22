@@ -393,19 +393,7 @@ export function SearchCriteriaForm({ onSearch, initialCriteria = {} }: SearchCri
       </div>
 
       {/* Location with Autocomplete */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <div className="space-y-2">
-          <Label htmlFor="neighborhood">Neighborhood</Label>
-          <AutocompleteInput
-            id="neighborhood"
-            placeholder="Type to search..."
-            values={criteria.neighborhood || []}
-            onChange={(values) => updateCriteria('neighborhood', values.length > 0 ? values : undefined)}
-            apiEndpoint="/api/autocomplete/subdivisions"
-            testId="input-neighborhood"
-          />
-        </div>
-
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div className="space-y-2">
           <Label htmlFor="subdivisions">Subdivisions</Label>
           <AutocompleteInput

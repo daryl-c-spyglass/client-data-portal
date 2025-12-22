@@ -375,7 +375,6 @@ export const searchCriteriaSchema = z.object({
   listPriceMax: z.coerce.number().optional(),
   streetList: z.coerce.boolean().optional(),
   mlsNumbers: stringOrArray.optional(),
-  neighborhood: stringOrArray.optional(),
   subdivisions: stringOrArray.optional(),
   cities: stringOrArray.optional(),
   streetNumber: z.coerce.number().optional(),

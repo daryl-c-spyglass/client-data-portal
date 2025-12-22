@@ -2700,10 +2700,7 @@ This email was sent by ${senderName} (${senderEmail}) via the MLS Grid IDX Platf
         maxYearBuilt: req.query.maxYearBuilt ? parseInt(req.query.maxYearBuilt as string) : undefined,
         postalCodes: parseArray(req.query.postalCodes) || parseArray(req.query.zipCodes),
         cities: parseArray(req.query.cities),
-        // Combine subdivisions and neighborhoods params - both map to subdivision field
-        subdivisions: [...(parseArray(req.query.subdivisions) || []), ...(parseArray(req.query.neighborhoods) || [])].length > 0
-          ? [...(parseArray(req.query.subdivisions) || []), ...(parseArray(req.query.neighborhoods) || [])]
-          : undefined,
+        subdivisions: parseArray(req.query.subdivisions),
         propertySubType: parseArray(req.query.propertySubType),
         limit: req.query.limit ? parseInt(req.query.limit as string) : 50,
         skip: req.query.offset ? parseInt(req.query.offset as string) : 0,
