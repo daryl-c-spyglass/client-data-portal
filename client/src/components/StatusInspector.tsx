@@ -120,7 +120,7 @@ export function APIConfigError({ errors, isPartialData }: APIConfigErrorProps) {
         {hasRepliersError && (
           <p className="text-xs text-muted-foreground/70">
             Check that REPLIERS_API_KEY is set in environment variables. 
-            Active and Under Contract counts require a valid Repliers API key.
+            Active, Active Under Contract, and Pending counts require a valid Repliers API key.
           </p>
         )}
       </CardContent>

@@ -1011,7 +1011,7 @@ export default function Dashboard() {
                           <Info className="w-4 h-4 text-muted-foreground cursor-help" />
                         </TooltipTrigger>
                         <TooltipContent>
-                          <p>Active + Active Under Contract (from Repliers) + Closed (from database)</p>
+                          <p>Active + Active Under Contract + Pending + Closed (RESO standard)</p>
                         </TooltipContent>
                       </Tooltip>
                     </CardHeader>
@@ -1030,10 +1030,11 @@ export default function Dashboard() {
                             </p>
                             <p className="flex items-center gap-1">
                               <span className="w-2 h-2 rounded-full bg-amber-500"></span>
-                              {(inventorySummary 
-                                ? (inventorySummary.countsByStatus?.['Active Under Contract'] ?? 0) + (inventorySummary.countsByStatus?.['Pending'] ?? 0)
-                                : (stats?.totalUnderContractProperties ?? 0)
-                              ).toLocaleString()} Under Contract
+                              {(inventorySummary?.countsByStatus?.['Active Under Contract'] ?? 0).toLocaleString()} Active Under Contract
+                            </p>
+                            <p className="flex items-center gap-1">
+                              <span className="w-2 h-2 rounded-full bg-blue-500"></span>
+                              {(inventorySummary?.countsByStatus?.['Pending'] ?? 0).toLocaleString()} Pending
                             </p>
                             <p className="flex items-center gap-1">
                               <span className="w-2 h-2 rounded-full bg-slate-500"></span>

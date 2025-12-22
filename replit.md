@@ -37,7 +37,7 @@ The UI incorporates Spyglass Realty branding with an orange primary color scheme
   - Samples first page of each status for subtype distribution estimates
   - 5-minute cache TTL to balance freshness with API efficiency
   - Fallback to database for Closed listings when Repliers is unavailable
-  - Dashboard "Under Contract" metric = Active Under Contract + Pending combined
+  - Dashboard shows all 4 RESO statuses separately: Active, Active Under Contract, Pending, Closed
   - Error messages surface when REPLIERS_API_KEY is not configured
 - **Property Status Handling**: All user-facing status labels strictly follow the RESO Data Dictionary 4-status hierarchy:
   - **Active**: Properties currently on the market
