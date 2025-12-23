@@ -342,6 +342,9 @@ interface SearchFilters {
   // Date
   minListDate?: string;
   maxListDate?: string;
+  
+  // Transaction Type (Sale vs Lease)
+  listingType?: 'sale' | 'lease' | 'all';
 }
 
 interface HomeReviewResponse {
@@ -356,7 +359,7 @@ function parseUrlParams(): SearchFilters | null {
   const params = new URLSearchParams(window.location.search);
   if (params.toString() === '') return null;
   
-  const filters: SearchFilters = { statusActive: true };
+  const filters: SearchFilters = { statusActive: true, listingType: 'sale' };
   
   if (params.get('postalCode')) filters.postalCode = params.get('postalCode')!;
   if (params.get('city')) filters.city = params.get('city')!;
@@ -377,7 +380,7 @@ export default function BuyerSearch() {
   const [filters, setFilters] = useState<SearchFilters>(() => {
     const urlFilters = parseUrlParams();
     if (urlFilters) return urlFilters;
-    return searchState?.filters || { statusActive: true };
+    return searchState?.filters || { statusActive: true, listingType: 'sale' };
   });
   const [activeFiltersCount, setActiveFiltersCount] = useState(() => 
     searchState?.searchTriggered ? Object.keys(searchState.filters || {}).filter(k => !k.endsWith('Mode') && searchState.filters[k]).length : 1
@@ -724,6 +727,11 @@ export default function BuyerSearch() {
       if (filters.fuzzySearch !== false) {
         params.set('fuzzySearch', 'true'); // Enable by default for typo tolerance
       }
+    }
+    
+    // Transaction type (Sale vs Lease) - default to 'sale' to exclude rentals
+    if (filters.listingType && filters.listingType !== 'all') {
+      params.set('type', filters.listingType);
     }
     
     // Sort - Repliers requires specific format like listPriceAsc or listPriceDesc
@@ -1387,6 +1395,29 @@ export default function BuyerSearch() {
                       />
                     </div>
                   </div>
+                </div>
+
+                <Separator />
+
+                {/* Listing Type (Sale vs Lease) */}
+                <div className="space-y-3">
+                  <Label className="text-base font-semibold">Listing Type</Label>
+                  <Select
+                    value={filters.listingType || 'sale'}
+                    onValueChange={(value) => updateFilter('listingType', value as 'sale' | 'lease' | 'all')}
+                  >
+                    <SelectTrigger data-testid="select-listing-type">
+                      <SelectValue placeholder="Select listing type" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="sale" data-testid="option-listing-type-sale">For Sale</SelectItem>
+                      <SelectItem value="lease" data-testid="option-listing-type-lease">For Lease</SelectItem>
+                      <SelectItem value="all" data-testid="option-listing-type-all">All Listings</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-muted-foreground">
+                    Default: For Sale only. Select "For Lease" to view rental listings.
+                  </p>
                 </div>
 
                 <Separator />
