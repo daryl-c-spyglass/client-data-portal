@@ -1047,17 +1047,18 @@ export default function BuyerSearch() {
           
           // Fetch regular search results and add simulated demo scores
           try {
-            const demoResponse = await fetch(`/api/repliers/search?standardStatus=${criteria.standardStatus || 'Active'}&resultsPerPage=${pageSize}&pageNum=1${criteria.city ? `&city=${criteria.city}` : ''}`);
+            const demoResponse = await fetch(`/api/repliers/listings?standardStatus=${criteria.standardStatus || 'Active'}&resultsPerPage=${pageSize}&pageNum=1${criteria.city ? `&city=${criteria.city}` : ''}`);
             if (demoResponse.ok) {
               const demoData = await demoResponse.json();
               // Add simulated visual match scores to demo results
-              const demoListings = (demoData.listings || []).map((listing: any, index: number) => ({
+              // Note: /api/repliers/listings returns 'properties', not 'listings'
+              const demoListings = (demoData.properties || demoData.listings || []).map((listing: any, index: number) => ({
                 ...listing,
                 _visualScore: Math.max(0.3, 1 - (index * 0.05)), // Simulated decreasing scores
                 _demoMode: true
               }));
               setVisualMatchResults(demoListings);
-              setVisualMatchTotal(demoData.count || demoListings.length);
+              setVisualMatchTotal(demoData.count || demoData.total || demoListings.length);
             }
           } catch (e) {
             console.error('Demo mode fallback failed:', e);
@@ -1074,14 +1075,34 @@ export default function BuyerSearch() {
       setVisualMatchError('');
     } catch (error: any) {
       console.error('Visual search error:', error);
-      if (error.message?.includes('403') || error.message?.includes('not authorized')) {
+      if (error.message?.includes('403') || error.message?.includes('not authorized') || error.message?.includes('upgraded')) {
         setVisualMatchDemoMode(true);
-        setVisualMatchError('Visual Match requires an upgraded Repliers subscription. Showing demo mode.');
+        setVisualMatchError('Visual Match requires an upgraded Repliers subscription. Showing demo mode with simulated rankings.');
+        
+        // Fetch demo results in catch block - use filters directly since criteria is out of scope
+        const fallbackStatus = filters.statusActive ? 'Active' : filters.statusUnderContract ? 'Active+Under+Contract' : 'Active';
+        try {
+          const demoResponse = await fetch(`/api/repliers/listings?standardStatus=${fallbackStatus}&resultsPerPage=${pageSize}&pageNum=1${filters.city ? `&city=${filters.city}` : ''}`);
+          if (demoResponse.ok) {
+            const demoData = await demoResponse.json();
+            const demoListings = (demoData.properties || demoData.listings || []).map((listing: any, index: number) => ({
+              ...listing,
+              _visualScore: Math.max(0.3, 1 - (index * 0.05)),
+              _demoMode: true
+            }));
+            setVisualMatchResults(demoListings);
+            setVisualMatchTotal(demoData.count || demoData.total || demoListings.length);
+          }
+        } catch (e) {
+          console.error('Demo mode fallback failed:', e);
+          setVisualMatchResults([]);
+          setVisualMatchTotal(0);
+        }
       } else {
         setVisualMatchError(error.message || 'Visual search failed');
+        setVisualMatchResults([]);
+        setVisualMatchTotal(0);
       }
-      setVisualMatchResults([]);
-      setVisualMatchTotal(0);
     } finally {
       setIsVisualSearching(false);
     }

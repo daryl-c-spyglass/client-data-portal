@@ -1,0 +1,151 @@
+Replit Agent Prompt — Close Remaining Gaps (Using Attached Repliers “Property Search & Filtering” Doc)
+
+You have access to the attached Repliers documentation (Repliers – Property Search & Filtering.pdf) and should follow it for supported parameters and best practices.
+
+We already implemented/are implementing core search + RESO standardStatus + polygon + AI Assistant. Now we need to ensure we cover remaining “necessary” features:
+
+CMA Comparables / Similar Listings
+
+Buyer Search Address + Keyword Search (with fuzzy search)
+
+Map Clustering (optional but recommended if map performance is slow)
+
+1) CMA — Comparables / Similar Listings (Must-have)
+Goal
+
+In CMA, provide a reliable way to fetch sold comps and optionally similar active listings using Repliers best practices.
+
+Requirements
+
+Add a CMA workflow option:
+
+Find Sold Comparables
+
+(Optional) Find Similar Active Listings
+
+Use standard CMA criteria:
+
+Status: Closed (sold comps)
+
+Location: polygon or radius (whichever CMA uses)
+
+Beds/Baths ranges
+
+SqFt range
+
+Year built range
+
+Property type match
+
+Sold date range (if available)
+
+Ensure results are:
+
+displayed clearly
+
+selectable (Add button)
+
+usable for CMA output/share link
+
+Implementation guidance
+
+If Repliers provides a dedicated comparable/similar method in the doc, use it.
+
+If not, implement comp logic via /listings using:
+
+standardStatus=Closed
+
+geo boundary (polygon/radius)
+
+numeric ranges for beds/baths/sqft/year/price
+
+Preserve MLS parity rules (standardStatus only, no mixing legacy status params).
+
+Acceptance tests
+
+Selecting a subject property produces reasonable sold comps based on criteria.
+
+Comps list renders with photos and details.
+
+Agent can select comps and generate CMA share link.
+
+2) Buyer Search — Address / Keyword Search + Fuzzy Search (Must-have)
+Goal
+
+Improve usability and debugging by allowing keyword + address-based search like MLS.
+
+Requirements
+
+Add a search input that supports:
+
+Address fragments (e.g., “2500 Spring Creek”)
+
+MLS number
+
+Keywords (if supported)
+
+Enable fuzzy search where appropriate (typo tolerance).
+
+Use Repliers supported params from the attached doc:
+
+search=...
+
+searchFields=...
+
+fuzzySearch=true
+
+Make sure this keyword search works alongside existing filters and does not break pagination/counts.
+
+Acceptance tests
+
+Searching “2500 Spring Creek” returns that listing if present in inventory.
+
+Fuzzy search finds close matches for minor typos.
+
+Counts and pagination remain correct.
+
+3) Map Clustering (Optional / Phase 2)
+Goal
+
+If map mode becomes slow or overloaded with markers, implement clustering per the Repliers doc.
+
+Requirements
+
+Only implement if map performance is an issue.
+
+Use Repliers clustering support:
+
+cluster=true
+
+clusterPrecision
+
+clusterLimit
+
+(Optional) listings=false for cluster-only retrieval
+
+Ensure clustering does not affect:
+
+listing counts
+
+list results
+
+analytics
+Clusters are for map UI only.
+
+Acceptance tests
+
+Map loads faster with large result sets.
+
+Clicking a cluster zooms in / expands markers appropriately.
+
+List results remain correct and unchanged.
+
+Deliverables
+
+List file paths changed
+
+Confirm CMA now supports sold comps selection reliably
+
+Confirm Buyer Search supports address/keyword + fuzzy search
+
+If clustering added: confirm it improves map performance without changing counts/results

@@ -3784,6 +3784,14 @@ OUTPUT JSON:
       });
     } catch (error: any) {
       console.error("Repliers Image Search error:", error.message);
+      // Propagate 403 status when Repliers rejects due to subscription
+      if (error.message?.includes('403') || error.message?.includes('not authorized')) {
+        res.status(403).json({ 
+          error: "Visual Match requires an upgraded Repliers subscription",
+          upgradeRequired: true 
+        });
+        return;
+      }
       res.status(500).json({ error: "Failed to perform image search" });
     }
   });
