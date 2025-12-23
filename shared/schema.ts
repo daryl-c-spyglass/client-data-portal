@@ -330,6 +330,21 @@ export type InsertLeadGateSettings = z.infer<typeof insertLeadGateSettingsSchema
 export type UpdateLeadGateSettings = z.infer<typeof updateLeadGateSettingsSchema>;
 export type LeadGateSettings = typeof leadGateSettings.$inferSelect;
 
+// WordPress Favorites Schema - Favorited properties from WordPress integration
+export const wpFavorites = pgTable("wp_favorites", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  wpUserId: text("wp_user_id").notNull(), // WordPress user ID (external)
+  propertyId: text("property_id").notNull(), // MLS listing ID
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const insertWpFavoriteSchema = createInsertSchema(wpFavorites).omit({ 
+  id: true, 
+  createdAt: true 
+});
+export type InsertWpFavorite = z.infer<typeof insertWpFavoriteSchema>;
+export type WpFavorite = typeof wpFavorites.$inferSelect;
+
 // Neighborhood Boundaries Cache - Store fetched boundaries from Repliers API
 // This is SEPARATE from the subdivision field used for CMA comps
 export const neighborhoodBoundaries = pgTable("neighborhood_boundaries", {

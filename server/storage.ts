@@ -19,6 +19,8 @@ import {
   type TimelineDataPoint,
   type User,
   type InsertUser,
+  type WpFavorite,
+  type InsertWpFavorite,
   properties,
   media,
   savedSearches,
@@ -26,7 +28,8 @@ import {
   sellerUpdates,
   leadGateSettings,
   displayPreferences,
-  users
+  users,
+  wpFavorites
 } from "@shared/schema";
 import { randomUUID } from "crypto";
 import { drizzle } from "drizzle-orm/neon-serverless";
@@ -125,6 +128,12 @@ export interface IStorage {
   getAutocompleteMiddleSchools(search: string, limit?: number): Promise<{ value: string; count: number }[]>;
   getAutocompleteHighSchools(search: string, limit?: number): Promise<{ value: string; count: number }[]>;
   getAutocompleteSchoolDistricts(search: string, limit?: number): Promise<{ value: string; count: number }[]>;
+  
+  // WordPress Favorites operations
+  getWpFavoritesByUser(wpUserId: string): Promise<WpFavorite[]>;
+  createWpFavorite(favorite: InsertWpFavorite): Promise<WpFavorite>;
+  deleteWpFavorite(wpUserId: string, propertyId: string): Promise<boolean>;
+  getWpFavorite(wpUserId: string, propertyId: string): Promise<WpFavorite | undefined>;
 }
 
 export class MemStorage implements IStorage {
@@ -134,6 +143,7 @@ export class MemStorage implements IStorage {
   private savedSearches: Map<string, SavedSearch>;
   private cmas: Map<string, Cma>;
   private sellerUpdates: Map<string, SellerUpdate>;
+  private wpFavoritesMap: Map<string, WpFavorite>;
 
   constructor() {
     this.users = new Map();
@@ -142,6 +152,7 @@ export class MemStorage implements IStorage {
     this.savedSearches = new Map();
     this.cmas = new Map();
     this.sellerUpdates = new Map();
+    this.wpFavoritesMap = new Map();
   }
 
   // User operations
@@ -824,6 +835,38 @@ export class MemStorage implements IStorage {
       .sort((a, b) => b[1] - a[1])
       .slice(0, limit)
       .map(([value, count]) => ({ value, count }));
+  }
+
+  // WordPress Favorites operations
+  async getWpFavoritesByUser(wpUserId: string): Promise<WpFavorite[]> {
+    return Array.from(this.wpFavoritesMap.values()).filter(f => f.wpUserId === wpUserId);
+  }
+
+  async createWpFavorite(favorite: InsertWpFavorite): Promise<WpFavorite> {
+    const id = randomUUID();
+    const wpFavorite: WpFavorite = {
+      ...favorite,
+      id,
+      createdAt: new Date(),
+    };
+    this.wpFavoritesMap.set(id, wpFavorite);
+    return wpFavorite;
+  }
+
+  async deleteWpFavorite(wpUserId: string, propertyId: string): Promise<boolean> {
+    const entry = Array.from(this.wpFavoritesMap.entries()).find(
+      ([_, f]) => f.wpUserId === wpUserId && f.propertyId === propertyId
+    );
+    if (entry) {
+      return this.wpFavoritesMap.delete(entry[0]);
+    }
+    return false;
+  }
+
+  async getWpFavorite(wpUserId: string, propertyId: string): Promise<WpFavorite | undefined> {
+    return Array.from(this.wpFavoritesMap.values()).find(
+      f => f.wpUserId === wpUserId && f.propertyId === propertyId
+    );
   }
 }
 
@@ -1567,6 +1610,31 @@ export class DbStorage implements IStorage {
       LIMIT ${limit}
     `);
     return result.rows as { value: string; count: number }[];
+  }
+
+  // WordPress Favorites operations
+  async getWpFavoritesByUser(wpUserId: string): Promise<WpFavorite[]> {
+    const result = await this.db.select().from(wpFavorites).where(eq(wpFavorites.wpUserId, wpUserId));
+    return result;
+  }
+
+  async createWpFavorite(favorite: InsertWpFavorite): Promise<WpFavorite> {
+    const result = await this.db.insert(wpFavorites).values(favorite).returning();
+    return result[0];
+  }
+
+  async deleteWpFavorite(wpUserId: string, propertyId: string): Promise<boolean> {
+    const result = await this.db.delete(wpFavorites).where(
+      and(eq(wpFavorites.wpUserId, wpUserId), eq(wpFavorites.propertyId, propertyId))
+    );
+    return result.rowCount! > 0;
+  }
+
+  async getWpFavorite(wpUserId: string, propertyId: string): Promise<WpFavorite | undefined> {
+    const result = await this.db.select().from(wpFavorites).where(
+      and(eq(wpFavorites.wpUserId, wpUserId), eq(wpFavorites.propertyId, propertyId))
+    ).limit(1);
+    return result[0];
   }
 }
 

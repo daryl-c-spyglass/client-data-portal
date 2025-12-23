@@ -17,6 +17,7 @@ import { requireAuth, requireRole } from "./auth";
 import { fetchExternalUsers, fetchFromExternalApi } from "./external-api";
 import type { PropertyStatistics, TimelineDataPoint } from "@shared/schema";
 import { neighborhoodService } from "./neighborhood-service";
+import { registerWordPressRoutes } from "./wordpress-routes";
 
 // Calculate match tier for AI Image Search results
 // Score is relative to number of imageSearchItems (1.0 per item = perfect match)
@@ -197,6 +198,9 @@ function calculateTimelineFromProperties(properties: any[]): TimelineDataPoint[]
 export async function registerRoutes(app: Express): Promise<Server> {
   const mlsGridClient = createMLSGridClient();
   const repliersClient = initRepliersClient();
+  
+  // Register WordPress API routes with CORS
+  registerWordPressRoutes(app);
 
   // Track sync timestamps for system status (shared across all endpoints)
   const syncTimestamps = {
