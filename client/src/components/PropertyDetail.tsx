@@ -7,7 +7,6 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { 
   Heart, 
   Share2, 
@@ -21,24 +20,10 @@ import {
   ChevronLeft,
   ChevronRight,
   Check,
-  Copy,
-  Bug
+  Copy
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { useQuery } from "@tanstack/react-query";
-import { NeighborhoodReview } from "@/components/NeighborhoodReview";
 import type { Property, Media } from "@shared/schema";
-
-// Neighborhood boundary resolution response type
-interface NeighborhoodResolution {
-  found: boolean;
-  neighborhood: string | null;
-  city?: string;
-  area?: string;
-  boundary?: any;
-  centerLat?: number;
-  centerLng?: number;
-}
 
 const defaultIcon = L.icon({
   iconUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png",
@@ -91,7 +76,6 @@ export function PropertyDetail({
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [saved, setSaved] = useState(false);
   const [linkCopied, setLinkCopied] = useState(false);
-  const [debugOpen, setDebugOpen] = useState(false);
   const { toast } = useToast();
   const autoAdvanceRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const pauseTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -103,28 +87,6 @@ export function PropertyDetail({
     !isNaN(Number(property.latitude)) && 
     !isNaN(Number(property.longitude))
   );
-
-  // Fetch boundary-based neighborhood resolution using lat/lng
-  // This is the ONLY source of truth for "Neighborhood" - never use listing subdivision
-  const { data: neighborhoodResolution, isLoading: isLoadingNeighborhood } = useQuery<NeighborhoodResolution>({
-    queryKey: ['/api/neighborhoods/by-coordinates', property.latitude, property.longitude, property.city],
-    queryFn: async (): Promise<NeighborhoodResolution> => {
-      if (!hasCoordinates) return { found: false, neighborhood: null };
-      const params = new URLSearchParams({
-        lat: String(property.latitude),
-        lng: String(property.longitude),
-      });
-      if (property.city) params.append('city', property.city);
-      const res = await fetch(`/api/neighborhoods/by-coordinates?${params}`);
-      if (!res.ok) throw new Error('Failed to fetch neighborhood');
-      return res.json();
-    },
-    enabled: hasCoordinates,
-    staleTime: 1000 * 60 * 60, // Cache for 1 hour
-  });
-
-  // Resolved neighborhood from boundary (the ONLY valid source)
-  const resolvedNeighborhood = neighborhoodResolution?.found ? neighborhoodResolution.neighborhood : null;
 
   // Function to start auto-advance
   const startAutoAdvance = () => {
@@ -313,7 +275,6 @@ export function PropertyDetail({
             <TabsTrigger value="description" data-testid="tab-description">Description</TabsTrigger>
             <TabsTrigger value="features" data-testid="tab-features">Features & Amenities</TabsTrigger>
             <TabsTrigger value="history" data-testid="tab-history">Property History</TabsTrigger>
-            <TabsTrigger value="neighborhood" data-testid="tab-neighborhood">Neighborhood</TabsTrigger>
           </TabsList>
 
           <TabsContent value="description" className="space-y-4">
@@ -346,6 +307,27 @@ export function PropertyDetail({
                       <li>• Built in {property.yearBuilt}</li>
                     </ul>
                   </div>
+                  <div>
+                    <h4 className="font-semibold mb-2">Location</h4>
+                    <ul className="space-y-1 text-sm text-muted-foreground">
+                      {property.subdivision && <li>• Subdivision: {property.subdivision}</li>}
+                      <li>• City: {property.city || 'N/A'}</li>
+                      <li>• State: {property.stateOrProvince || 'TX'}</li>
+                      <li>• ZIP: {property.postalCode || 'N/A'}</li>
+                      {property.countyOrParish && <li>• County: {property.countyOrParish}</li>}
+                    </ul>
+                  </div>
+                  {(property.elementarySchool || property.middleOrJuniorSchool || property.highSchool || property.schoolDistrict) && (
+                    <div>
+                      <h4 className="font-semibold mb-2">Schools</h4>
+                      <ul className="space-y-1 text-sm text-muted-foreground">
+                        {property.elementarySchool && <li>• Elementary: {property.elementarySchool}</li>}
+                        {property.middleOrJuniorSchool && <li>• Middle: {property.middleOrJuniorSchool}</li>}
+                        {property.highSchool && <li>• High: {property.highSchool}</li>}
+                        {property.schoolDistrict && <li>• District: {property.schoolDistrict}</li>}
+                      </ul>
+                    </div>
+                  )}
                 </div>
               </CardContent>
             </Card>
@@ -388,136 +370,6 @@ export function PropertyDetail({
                 </div>
               </CardContent>
             </Card>
-          </TabsContent>
-
-          <TabsContent value="neighborhood" className="space-y-4">
-            <Card>
-              <CardContent className="pt-6">
-                <div className="space-y-4">
-                  {/* Location Info */}
-                  <div>
-                    <h4 className="font-semibold mb-2">Location</h4>
-                    <ul className="space-y-1 text-sm text-muted-foreground">
-                      {property.subdivision && (
-                        <li>Subdivision: {property.subdivision}</li>
-                      )}
-                      {resolvedNeighborhood && <li>Neighborhood: {resolvedNeighborhood}</li>}
-                      {isLoadingNeighborhood && hasCoordinates && (
-                        <li className="text-muted-foreground/60">Neighborhood: Loading...</li>
-                      )}
-                      {!resolvedNeighborhood && !isLoadingNeighborhood && hasCoordinates && (
-                        <li className="text-muted-foreground/60">Neighborhood: Not available</li>
-                      )}
-                      {!hasCoordinates && (
-                        <li className="text-muted-foreground/60">Neighborhood: Coordinates required</li>
-                      )}
-                      <li>City: {property.city || 'N/A'}</li>
-                      <li>State: {property.stateOrProvince || 'TX'}</li>
-                      <li>ZIP: {property.postalCode || 'N/A'}</li>
-                      {property.countyOrParish && <li>County: {property.countyOrParish}</li>}
-                      {property.mlsAreaMajor && <li>MLS Area: {property.mlsAreaMajor}</li>}
-                    </ul>
-                  </div>
-                  {/* Schools */}
-                  {(property.elementarySchool || property.middleOrJuniorSchool || property.highSchool || property.schoolDistrict) && (
-                    <div>
-                      <h4 className="font-semibold mb-2">Schools</h4>
-                      <ul className="space-y-1 text-sm text-muted-foreground">
-                        {property.elementarySchool && <li>Elementary: {property.elementarySchool}</li>}
-                        {property.middleOrJuniorSchool && <li>Middle: {property.middleOrJuniorSchool}</li>}
-                        {property.highSchool && <li>High: {property.highSchool}</li>}
-                        {property.schoolDistrict && <li>District: {property.schoolDistrict}</li>}
-                      </ul>
-                    </div>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
-            
-            {/* Neighborhood Market Overview - only show when resolved from boundary */}
-            {resolvedNeighborhood && (
-              <NeighborhoodReview 
-                neighborhoodName={resolvedNeighborhood} 
-                city={property.city || undefined}
-                months={6}
-              />
-            )}
-
-            {/* Dev-only Location Debug Panel */}
-            {import.meta.env.DEV && (
-              <Collapsible open={debugOpen} onOpenChange={setDebugOpen}>
-                <CollapsibleTrigger asChild>
-                  <Button variant="ghost" size="sm" className="flex items-center gap-2 text-xs text-muted-foreground">
-                    <Bug className="w-3 h-3" />
-                    Location Debug {debugOpen ? '▼' : '▶'}
-                  </Button>
-                </CollapsibleTrigger>
-                <CollapsibleContent>
-                  <Card className="mt-2 border-dashed border-yellow-500/50 bg-yellow-50/10">
-                    <CardContent className="pt-4">
-                      <div className="text-xs font-mono space-y-3">
-                        {/* Data Source */}
-                        {debugData && (
-                          <div className="p-2 bg-blue-50/30 rounded border border-blue-500/30">
-                            <p className="font-semibold text-blue-600">Data Source</p>
-                            <p>Source: <span className="text-foreground">{debugData.dataSource}</span></p>
-                            <p>Fetched: <span className="text-foreground">{new Date(debugData.fetchTimestamp).toLocaleString()}</span></p>
-                          </div>
-                        )}
-
-                        {/* Raw Repliers Fields */}
-                        {debugData?.rawFields && (
-                          <div className="p-2 bg-purple-50/30 rounded border border-purple-500/30">
-                            <p className="font-semibold text-purple-600">Raw Subdivision Fields (from API)</p>
-                            <div className="space-y-1 mt-1">
-                              {Object.entries(debugData.rawFields).map(([field, value]) => (
-                                <p key={field}>
-                                  {field}: <span className={value ? 'text-green-600 font-semibold' : 'text-muted-foreground'}>
-                                    {value || '(null)'}
-                                  </span>
-                                </p>
-                              ))}
-                            </div>
-                            <Separator className="my-2" />
-                            <p className="text-yellow-600 font-semibold">
-                              Subdivision Source: <span className="text-foreground">{debugData.subdivisionSource}</span>
-                            </p>
-                            <p className="text-yellow-600 font-semibold">
-                              Final Value: <span className="text-foreground">{debugData.subdivisionValue || '(none)'}</span>
-                            </p>
-                          </div>
-                        )}
-
-                        <h5 className="font-semibold text-yellow-600">Location Data Mapping</h5>
-                        <div className="grid grid-cols-2 gap-2">
-                          <div className="space-y-1">
-                            <p className="text-muted-foreground">From Listing (Normalized):</p>
-                            <p>subdivision: <span className="text-foreground">{property.subdivision || '(empty)'}</span></p>
-                            <p>neighborhood: <span className="text-foreground">{property.neighborhood || '(empty - expected)'}</span></p>
-                          </div>
-                          <div className="space-y-1">
-                            <p className="text-muted-foreground">From Boundary Resolution:</p>
-                            <p>resolvedNeighborhood: <span className="text-foreground">{resolvedNeighborhood || '(none)'}</span></p>
-                            <p>status: <span className="text-foreground">{isLoadingNeighborhood ? 'loading...' : neighborhoodResolution?.found ? 'found' : 'not found'}</span></p>
-                          </div>
-                        </div>
-                        <Separator className="my-2" />
-                        <div className="space-y-1">
-                          <p className="text-muted-foreground">Coordinates:</p>
-                          <p>lat: {property.latitude || '(none)'}, lng: {property.longitude || '(none)'}</p>
-                        </div>
-                        <div className="mt-2 p-2 bg-muted/50 rounded text-muted-foreground">
-                          <p className="font-semibold">Data Integrity Rules:</p>
-                          <p>• Subdivision = tract/community label from listing data</p>
-                          <p>• Neighborhood = geographic area from boundary polygon only</p>
-                          <p>• Repliers "neighborhood" field → maps to subdivision</p>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                </CollapsibleContent>
-              </Collapsible>
-            )}
           </TabsContent>
         </Tabs>
 
