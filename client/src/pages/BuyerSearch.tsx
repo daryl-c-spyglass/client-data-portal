@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 
 interface AutocompleteInputProps {
   placeholder?: string;
@@ -412,6 +413,7 @@ export default function BuyerSearch() {
   const [mapStatusClosed, setMapStatusClosed] = useState(false);
   const [mapCurrentPage, setMapCurrentPage] = useState(0);
   const [currentBoundary, setCurrentBoundary] = useState<number[][][] | null>(null);
+  const [mapDialogOpen, setMapDialogOpen] = useState(false);
   const mapPageSize = 50;
   
   // Visual Match AI search state
@@ -1582,8 +1584,26 @@ export default function BuyerSearch() {
                 {/* Polygon Map Search - Only shows when map mode is active */}
                 {viewMode === 'map' && (
                   <div className="space-y-4">
-                    {/* Map Status Filters */}
-                    <div className="space-y-3">
+                    {/* Open Map Dialog Button */}
+                    <Button
+                      size="lg"
+                      className="w-full h-14 text-base gap-3"
+                      onClick={() => setMapDialogOpen(true)}
+                      data-testid="button-open-map-dialog"
+                    >
+                      <MapIcon className="w-5 h-5" />
+                      Open Map to Draw Search Area
+                    </Button>
+                    
+                    {mapSearchResults.length > 0 && (
+                      <Badge variant="secondary" className="text-sm">
+                        {mapSearchResults.length} properties found in drawn area
+                      </Badge>
+                    )}
+                    
+                    {/* Map Status Quick Filters */}
+                    <div className="space-y-2 p-3 bg-muted/50 rounded-lg">
+                      <div className="text-xs font-medium text-muted-foreground mb-2">Status Filters</div>
                       <div className="flex items-center justify-between">
                         <Label htmlFor="map-filter-active" className="text-sm">Active</Label>
                         <Switch
@@ -1621,14 +1641,6 @@ export default function BuyerSearch() {
                         />
                       </div>
                     </div>
-
-                    {/* Polygon Map */}
-                    <PolygonMapSearch
-                      onSearch={handlePolygonSearch}
-                      onClear={handleClearPolygonSearch}
-                      isLoading={isMapSearching}
-                      resultCount={mapSearchResults.length}
-                    />
                   </div>
                 )}
 
@@ -3897,6 +3909,33 @@ export default function BuyerSearch() {
           )}
         </SheetContent>
       </Sheet>
+
+      {/* Large Map Search Dialog */}
+      <Dialog open={mapDialogOpen} onOpenChange={setMapDialogOpen}>
+        <DialogContent className="max-w-[95vw] w-[95vw] h-[90vh] max-h-[90vh] p-0 gap-0">
+          <DialogHeader className="p-4 pb-2 border-b">
+            <DialogTitle className="flex items-center gap-2">
+              <MapIcon className="w-5 h-5 text-primary" />
+              Draw Your Search Area
+            </DialogTitle>
+            <DialogDescription>
+              Use the polygon tool (pentagon icon) in the top-right corner to draw points around your search area. Double-click to complete the shape.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex-1 p-4 pt-2 overflow-hidden" style={{ height: 'calc(90vh - 120px)' }}>
+            <PolygonMapSearch
+              onSearch={(boundary) => {
+                handlePolygonSearch(boundary);
+                setMapDialogOpen(false);
+              }}
+              onClear={handleClearPolygonSearch}
+              isLoading={isMapSearching}
+              resultCount={mapSearchResults.length}
+              fullHeight
+            />
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

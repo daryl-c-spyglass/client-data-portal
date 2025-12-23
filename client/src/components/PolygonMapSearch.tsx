@@ -6,6 +6,7 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Loader2, Trash2, MapPin, AlertCircle, Search, PenTool } from "lucide-react";
+import { cn } from "@/lib/utils";
 import { MapLayersControl } from "./MapLayersControl";
 import "leaflet/dist/leaflet.css";
 import "leaflet-draw/dist/leaflet.draw.css";
@@ -15,6 +16,7 @@ interface PolygonMapSearchProps {
   onClear: () => void;
   isLoading?: boolean;
   resultCount?: number;
+  fullHeight?: boolean;
 }
 
 const AUSTIN_CENTER: [number, number] = [30.2672, -97.7431];
@@ -109,7 +111,7 @@ function MapController() {
   return null;
 }
 
-export function PolygonMapSearch({ onSearch, onClear, isLoading, resultCount }: PolygonMapSearchProps) {
+export function PolygonMapSearch({ onSearch, onClear, isLoading, resultCount, fullHeight }: PolygonMapSearchProps) {
   const [hasPolygon, setHasPolygon] = useState(false);
   const [currentBoundary, setCurrentBoundary] = useState<number[][][] | null>(null);
 
@@ -163,8 +165,8 @@ export function PolygonMapSearch({ onSearch, onClear, isLoading, resultCount }: 
         </Badge>
       )}
 
-      <Card className="overflow-hidden">
-        <div className="h-[400px] w-full relative">
+      <Card className={cn("overflow-hidden", fullHeight && "h-full")}>
+        <div className={cn("w-full relative", fullHeight ? "h-full" : "h-[400px]")}>
           <MapContainer
             center={AUSTIN_CENTER}
             zoom={DEFAULT_ZOOM}
