@@ -415,6 +415,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         soldDays,
         dateFrom,
         dateTo,
+        type,  // 'sale' or 'lease' to filter transaction type
         limit = '50',
       } = req.query as Record<string, string | undefined>;
 
@@ -492,6 +493,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // standardStatus=Closed returns BOTH sold sales AND leased rentals
         if (isSaleOnly) {
           searchParams.type = 'sale';  // lowercase required by Repliers API
+        }
+        
+        // Allow explicit type override from query parameter
+        if (type && type !== 'all') {
+          searchParams.type = type;
         }
         
         // COMPREHENSIVE DIAGNOSTIC LOGGING
@@ -1133,6 +1139,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         boundary, 
         statuses, 
         limit = 50,
+        type,  // 'sale' or 'lease' - default to 'sale' for CMA
         minBeds,
         maxBeds,
         minBaths,
@@ -1195,7 +1202,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
             searchParams.status = 'U';
           } else if (status === 'closed' || status === 'sold') {
             searchParams.standardStatus = 'Closed';
-            searchParams.type = 'sale';
+            // Use 'sale' type by default to exclude leased/rentals, but allow override
+            searchParams.type = type || 'sale';
+          }
+          
+          // Apply explicit type filter for all statuses if provided
+          if (type && !searchParams.type) {
+            searchParams.type = type;
           }
           
           const response = await repliersClient.searchListingsInBoundary(boundary, searchParams);

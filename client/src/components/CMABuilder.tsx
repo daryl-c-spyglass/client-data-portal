@@ -379,6 +379,8 @@ export function CMABuilder({ onCreateCMA, initialData }: CMABuilderProps) {
       params.set('sortBy', 'listingContractDate');
       params.set('sortOrder', 'desc');
     }
+    // CMA always uses sale listings only (no rentals/leases)
+    params.set('type', 'sale');
     params.set('limit', '20');
     return params.toString();
   };
@@ -434,6 +436,9 @@ export function CMABuilder({ onCreateCMA, initialData }: CMABuilderProps) {
         criteria.standardStatus = 'Active';
       }
       
+      // CMA always uses sale listings only (no rentals/leases)
+      criteria.type = 'sale';
+      
       // Add filters
       if (searchCity) criteria.city = searchCity;
       if (searchZipCode) criteria.postalCode = searchZipCode;
@@ -483,6 +488,7 @@ export function CMABuilder({ onCreateCMA, initialData }: CMABuilderProps) {
         boundary,
         statuses: searchStatuses,
         limit: 50,
+        type: 'sale',  // CMA always uses sale listings only (no rentals/leases)
         minBeds: searchMinBeds && searchMinBeds !== 'any' ? parseInt(searchMinBeds) : undefined,
         maxBeds: searchMaxBeds && searchMaxBeds !== 'any' ? parseInt(searchMaxBeds) : undefined,
         minBaths: searchMinBaths && searchMinBaths !== 'any' ? parseInt(searchMinBaths) : undefined,
