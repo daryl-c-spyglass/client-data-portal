@@ -1,0 +1,165 @@
+Replit Agent Prompt — “+ Add to CMA” Workflow + Prevent Rental/Lease Mixing (Inventory-Wide)
+
+You are working in our IDX/CMA app. On the Property Details page there is a button: “+ Add to CMA” (example link below). We need to clarify and implement where this adds the property, how the user uses it, and also ensure rental/lease listings are not mixed into sale inventory or CMA across the entire app.
+
+Sample page:
+https://f58e6159-1bf8-4479-a256-c997461de361-00-1jv089vliph98.riker.replit.dev/properties/ACT8248177
+
+1) Define the expected behavior of “+ Add to CMA”
+Requirements
+
+When the user clicks “+ Add to CMA”, implement one of the following flows (choose based on current app architecture, but must be explicit):
+
+Option A (Preferred): Add as Subject Property to a new CMA draft
+
+Create a new CMA draft record
+
+Set this property as the Subject Property
+
+Redirect user to CMA builder with subject property prefilled
+
+Option B: Add to an existing CMA draft
+
+Show modal: “Select CMA draft”
+
+Add property as Subject Property (or as a comp if that’s supported)
+
+Confirm success + “Open CMA” button
+
+Option C: Add to a “CMA Queue/Cart”
+
+Add property to a CMA queue
+
+CMA builder can import from queue later
+
+UI must be explicit
+
+After click:
+
+success toast: “Added to CMA: <Draft Name>”
+
+CTA button: “Open CMA”
+
+2) Confirm where it currently goes (trace + fix if needed)
+Requirements
+
+Trace current “Add to CMA” handler and backend route:
+
+what it stores
+
+where it stores it (DB / session / localStorage)
+
+what page user is expected to go to next
+
+If unclear or broken, fix to Option A or B.
+
+Add a short code comment or README note:
+
+“Add to CMA adds the property to: ____”
+
+“User can access it here: ____”
+
+3) Add a CMA entry point so users can always find it
+Requirements
+
+In CMA section, show a Draft CMAs list:
+
+subject property address
+
+created date/time
+
+status (draft)
+
+If Option A is used, redirect immediately to CMA builder after adding.
+
+4) Prevent Rental / Lease listings from mixing with Sale inventory (GLOBAL FIX)
+
+We are seeing possible leasing/rental listings included in places they shouldn’t be. We must enforce correct classification across:
+
+Client Data Portal
+
+Buyer Search
+
+CMA
+
+Property Details page
+
+Dashboard counts
+
+Share URLs / saved lists (if applicable)
+
+Requirements
+
+Define canonical “transaction type”
+
+Determine the best source field from the inventory provider (Repliers/MLS) that distinguishes:
+
+Sale / For Sale
+
+Lease / Rental
+
+Use one consistent logic across the app (central helper).
+
+Add explicit filters
+
+Buyer Search and Client Data Portal:
+
+add a visible filter: Listing Type: Sale | Lease
+
+default to Sale (unless client wants otherwise)
+
+CMA:
+
+CMA should only use Sale / Closed sales comps by default
+
+Lease comps should not appear unless user explicitly selects Lease mode
+
+Enforce in queries and counts
+
+Ensure all listing queries include the correct transaction-type constraint based on UI selection.
+
+Ensure dashboard/aggregate counts are computed using the same constraint so totals aren’t inflated by leases.
+
+Prevent cross-type CMA mistakes
+When user clicks “+ Add to CMA”:
+
+If the listing is Lease/Rental:
+
+show warning: “This is a lease listing. CMA is configured for sales comps.”
+
+block addition OR require explicit confirmation depending on business rules.
+
+If Sale:
+
+proceed normally
+
+Data cleanup / detection
+
+Identify which field(s) indicate Lease vs Sale (examples may include: transactionType, class, saleLease, propertySubType, or MLS-specific field).
+
+Add logging (dev-only) to confirm the field values seen in ACTRIS.
+
+5) Acceptance tests
+Add to CMA
+
+Clicking “+ Add to CMA” clearly creates/selects a CMA and lets user open it immediately.
+
+Rental/Sale separation
+
+Sale-only mode shows no Lease listings across sections.
+
+Lease listings only appear when Lease mode is selected.
+
+Dashboard counts differ appropriately between Sale and Lease views.
+
+CMA does not mix Lease into Sales comps.
+
+Deliverables
+
+File paths changed
+
+Confirm which Add-to-CMA flow was implemented (A/B/C)
+
+Confirm the canonical field(s) used to separate Sale vs Lease
+
+Confirm separation is enforced across all sections and in aggregates/counts

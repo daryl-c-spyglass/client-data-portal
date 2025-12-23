@@ -1,11 +1,13 @@
 import { useRoute, useLocation, useSearch } from "wouter";
 import { useEffect, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft, Loader2 } from "lucide-react";
 import { PropertyDetail } from "@/components/PropertyDetail";
 import { useLeadGateContext } from "@/contexts/LeadGateContext";
 import { useSelectedProperty } from "@/contexts/SelectedPropertyContext";
+import { useToast } from "@/hooks/use-toast";
+import { apiRequest } from "@/lib/queryClient";
 import type { Property, Media } from "@shared/schema";
 
 export default function PropertyDetailPage() {
@@ -14,6 +16,8 @@ export default function PropertyDetailPage() {
   const searchString = useSearch();
   const { trackPropertyView, gateEnabled } = useLeadGateContext();
   const { selectedProperty } = useSelectedProperty();
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
   const [viewTracked, setViewTracked] = useState(false);
   const listingId = params?.id;
   
@@ -148,8 +152,85 @@ export default function PropertyDetailPage() {
     }
   }, [viewTracked, gateEnabled, trackPropertyView, propertyData]);
 
+  // Add to CMA mutation - creates a draft CMA with this property as subject
+  const createCmaMutation = useMutation({
+    mutationFn: async (property: Property) => {
+      const address = property.unparsedAddress || 'Unknown Address';
+      const cmaData = {
+        name: `CMA for ${address}`,
+        subjectPropertyId: property.id || property.listingId,
+        comparablePropertyIds: [],
+        propertiesData: [property],
+        searchCriteria: {
+          city: property.city || '',
+          subdivision: property.subdivision || (property as any).subdivisionName || '',
+          minBeds: property.bedroomsTotal ? String(Math.max(1, property.bedroomsTotal - 1)) : '',
+          maxBeds: property.bedroomsTotal ? String(property.bedroomsTotal + 1) : '',
+          minSqft: property.livingArea ? String(Math.round(Number(property.livingArea) * 0.8)) : '',
+          maxSqft: property.livingArea ? String(Math.round(Number(property.livingArea) * 1.2)) : '',
+          statuses: ['closed'],
+          soldDays: '180',
+        },
+      };
+      const response = await apiRequest('/api/cmas', 'POST', cmaData);
+      return response.json();
+    },
+    onSuccess: (cma: { id: string }) => {
+      queryClient.invalidateQueries({ queryKey: ['/api/cmas'] });
+      toast({
+        title: "Added to CMA",
+        description: "A new CMA draft has been created. Click 'Open CMA' to continue.",
+        action: (
+          <Button size="sm" onClick={() => setLocation(`/cmas/${cma.id}`)}>
+            Open CMA
+          </Button>
+        ),
+      });
+      // Also redirect after a brief delay for immediate access
+      setTimeout(() => setLocation(`/cmas/${cma.id}`), 1500);
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to create CMA. Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Helper to check if listing is a lease/rental
+  const isLeaseProperty = (property: Property): boolean => {
+    const debug = (propertyData as any)?._debug;
+    // Check raw Repliers data for transaction type
+    if (debug?.rawRepliersFields) {
+      const raw = debug.rawRepliersFields;
+      // Repliers uses 'class' field: 'residential' vs 'condo' etc.
+      // and 'type' field to distinguish 'sale' vs 'lease'
+      if (raw.type?.toLowerCase() === 'lease') return true;
+      if (raw.transactionType?.toLowerCase() === 'lease') return true;
+    }
+    // Check property subtype for lease indicators
+    const subType = (property.propertySubType || '').toLowerCase();
+    if (subType.includes('lease') || subType.includes('rental')) return true;
+    return false;
+  };
+
   const handleAddToCMA = () => {
-    console.log("Add to CMA");
+    if (!propertyData) return;
+    const property = propertyData.property;
+    
+    // Check if this is a lease/rental listing
+    if (isLeaseProperty(property)) {
+      toast({
+        title: "Lease Listing Detected",
+        description: "This appears to be a lease/rental listing. CMA is configured for sales comparables only.",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    // Create CMA draft with this property as subject
+    createCmaMutation.mutate(property);
   };
 
   const handleSave = () => {
