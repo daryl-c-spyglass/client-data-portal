@@ -403,6 +403,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         minPrice,
         maxPrice,
         bedsMin,
+        bedsMax,
         bathsMin,
         minSqft,
         maxSqft,
@@ -480,6 +481,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           minPrice: minPrice ? parseInt(minPrice, 10) : undefined,
           maxPrice: maxPrice ? parseInt(maxPrice, 10) : undefined,
           minBeds: bedsMin ? parseInt(bedsMin, 10) : undefined,
+          maxBeds: bedsMax ? parseInt(bedsMax, 10) : undefined,
           minBaths: bathsMin ? parseInt(bathsMin, 10) : undefined,
           minSqft: minSqft ? parseInt(minSqft, 10) : undefined,
           maxSqft: maxSqft ? parseInt(maxSqft, 10) : undefined,
@@ -681,6 +683,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         if (minPrice) filters.minPrice = parseInt(minPrice, 10);
         if (maxPrice) filters.maxPrice = parseInt(maxPrice, 10);
         if (bedsMin) filters.minBeds = parseInt(bedsMin, 10);
+        if (bedsMax) filters.maxBeds = parseInt(bedsMax, 10);
         if (bathsMin) filters.minBaths = parseInt(bathsMin, 10);
         if (minSqft) filters.minSqft = parseInt(minSqft, 10);
         if (maxSqft) filters.maxSqft = parseInt(maxSqft, 10);
@@ -1131,6 +1134,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         statuses, 
         limit = 50,
         minBeds,
+        maxBeds,
         minBaths,
         minPrice,
         maxPrice,
@@ -1169,6 +1173,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           
           // Add filter parameters if provided
           if (minBeds) searchParams.minBeds = minBeds;
+          if (maxBeds) searchParams.maxBeds = maxBeds;
           if (minBaths) searchParams.minBaths = minBaths;
           if (minPrice) searchParams.minPrice = minPrice;
           if (maxPrice) searchParams.maxPrice = maxPrice;
@@ -3143,6 +3148,10 @@ This email was sent by ${senderName} (${senderEmail}) via the MLS Grid IDX Platf
       if (req.query.pageNum) params.pageNum = parseInt(req.query.pageNum as string);
       if (req.query.sortBy) params.sortBy = req.query.sortBy as string;
       if (req.query.class) params.class = req.query.class as string;
+      // Keyword/address search params
+      if (req.query.search) params.search = req.query.search as string;
+      if (req.query.searchFields) params.searchFields = req.query.searchFields as string;
+      if (req.query.fuzzySearch === 'true') params.fuzzySearch = true;
       
       // If filtering by street address, try to geocode and use bounding box
       if (streetNameFilter && isMapboxConfigured()) {

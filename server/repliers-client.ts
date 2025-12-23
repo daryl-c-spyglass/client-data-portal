@@ -36,6 +36,10 @@ interface ListingsSearchParams {
   sortBy?: string;
   fields?: string;
   class?: string;
+  // Keyword/address search params
+  search?: string;  // Free-text search (address, MLS#, keywords)
+  searchFields?: string;  // Comma-separated fields to search in (e.g., address.streetName,address.streetNumber)
+  fuzzySearch?: boolean;  // Enable typo tolerance
 }
 
 interface RepliersListing {
@@ -413,6 +417,10 @@ class RepliersClient {
     if (params.sortBy) queryParams.append('sortBy', params.sortBy);
     if (params.fields) queryParams.append('fields', params.fields);
     if (params.class) queryParams.append('class', normalizeRepliersClass(params.class));
+    // Keyword/address search params
+    if (params.search) queryParams.append('search', params.search);
+    if (params.searchFields) queryParams.append('searchFields', params.searchFields);
+    if (params.fuzzySearch) queryParams.append('fuzzySearch', 'true');
 
     try {
       const url = `/listings?${queryParams.toString()}`;

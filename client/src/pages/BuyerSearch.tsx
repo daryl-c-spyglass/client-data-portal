@@ -171,8 +171,10 @@ interface SearchFilters {
   minPrice?: number;
   maxPrice?: number;
   
-  // MLS
+  // MLS & Keyword Search
   mlsNumber?: string;
+  keywordSearch?: string;  // Free-text search (address, MLS#, description keywords)
+  fuzzySearch?: boolean;   // Enable typo tolerance for keyword search
   mlsAreas?: string;
   mlsAreasMode?: string;
   
@@ -712,6 +714,16 @@ export default function BuyerSearch() {
     }
     if (filters.streetNumber) {
       params.set('streetNumber', filters.streetNumber.trim());
+    }
+    
+    // Keyword/address search with fuzzy matching
+    if (filters.keywordSearch) {
+      params.set('search', filters.keywordSearch.trim());
+      // Search across address fields and MLS number
+      params.set('searchFields', 'address.streetNumber,address.streetName,mlsNumber');
+      if (filters.fuzzySearch !== false) {
+        params.set('fuzzySearch', 'true'); // Enable by default for typo tolerance
+      }
     }
     
     // Sort - Repliers requires specific format like listPriceAsc or listPriceDesc
@@ -1306,6 +1318,39 @@ export default function BuyerSearch() {
                       Visual preferences detected (optional) - use Visual Match for image-based search.
                     </div>
                   )}
+                </div>
+
+                <Separator />
+                
+                {/* Quick Search - Address/MLS/Keyword */}
+                <div className="space-y-3">
+                  <Label className="text-base font-semibold flex items-center gap-2">
+                    <Search className="w-4 h-4" />
+                    Quick Search
+                  </Label>
+                  <div className="relative">
+                    <Input
+                      placeholder="Address, MLS#, or keywords..."
+                      value={filters.keywordSearch || ''}
+                      onChange={(e) => updateFilter('keywordSearch', e.target.value || undefined)}
+                      data-testid="input-keyword-search"
+                      className="pr-10"
+                    />
+                    {filters.keywordSearch && (
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="absolute right-1 top-1/2 -translate-y-1/2 h-7 w-7"
+                        onClick={() => updateFilter('keywordSearch', undefined)}
+                        data-testid="button-clear-keyword-search"
+                      >
+                        <X className="w-4 h-4" />
+                      </Button>
+                    )}
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Search by address (e.g., "2500 Spring Creek"), MLS number, or keywords. Fuzzy matching is enabled.
+                  </p>
                 </div>
 
                 <Separator />

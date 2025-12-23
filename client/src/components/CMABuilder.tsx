@@ -158,6 +158,7 @@ interface InitialCMAData {
     subdivision?: string;
     zipCode?: string;
     minBeds?: string;
+    maxBeds?: string;
     minPrice?: string;
     maxPrice?: string;
     minBaths?: string;
@@ -202,6 +203,7 @@ export function CMABuilder({ onCreateCMA, initialData }: CMABuilderProps) {
   const [searchSubdivision, setSearchSubdivision] = useState(sc.subdivision || "");
   const [searchZipCode, setSearchZipCode] = useState(sc.zipCode || "");
   const [searchMinBeds, setSearchMinBeds] = useState(sc.minBeds || "");
+  const [searchMaxBeds, setSearchMaxBeds] = useState(sc.maxBeds || "");
   const [searchMinPrice, setSearchMinPrice] = useState(sc.minPrice || "");
   const [searchMaxPrice, setSearchMaxPrice] = useState(sc.maxPrice || "");
   const [searchMinBaths, setSearchMinBaths] = useState(sc.minBaths || "");
@@ -304,6 +306,7 @@ export function CMABuilder({ onCreateCMA, initialData }: CMABuilderProps) {
     setSearchSubdivision("");
     setSearchZipCode("");
     setSearchMinBeds("");
+    setSearchMaxBeds("");
     setSearchMinPrice("");
     setSearchMaxPrice("");
     setSearchMinBaths("");
@@ -326,6 +329,7 @@ export function CMABuilder({ onCreateCMA, initialData }: CMABuilderProps) {
     setSearchSubdivision("");
     setSearchZipCode("");
     setSearchMinBeds("");
+    setSearchMaxBeds("");
     setSearchMinPrice("");
     setSearchMaxPrice("");
     setVisualMatchEnabled(false);
@@ -356,6 +360,7 @@ export function CMABuilder({ onCreateCMA, initialData }: CMABuilderProps) {
     if (searchSubdivision) params.set('subdivision', searchSubdivision.trim());
     if (searchZipCode) params.set('postalCode', searchZipCode.trim());
     if (searchMinBeds && searchMinBeds !== 'any') params.set('bedsMin', searchMinBeds);
+    if (searchMaxBeds && searchMaxBeds !== 'any') params.set('bedsMax', searchMaxBeds);
     if (searchMinPrice && searchMinPrice !== 'any') params.set('minPrice', searchMinPrice);
     if (searchMaxPrice && searchMaxPrice !== 'any') params.set('maxPrice', searchMaxPrice);
     if (searchMinBaths && searchMinBaths !== 'any') params.set('bathsMin', searchMinBaths);
@@ -436,6 +441,7 @@ export function CMABuilder({ onCreateCMA, initialData }: CMABuilderProps) {
       if (searchMinPrice && searchMinPrice !== 'any') criteria.minPrice = parseInt(searchMinPrice);
       if (searchMaxPrice && searchMaxPrice !== 'any') criteria.maxPrice = parseInt(searchMaxPrice);
       if (searchMinBeds && searchMinBeds !== 'any') criteria.minBeds = parseInt(searchMinBeds);
+      if (searchMaxBeds && searchMaxBeds !== 'any') criteria.maxBeds = parseInt(searchMaxBeds);
       if (searchMinBaths && searchMinBaths !== 'any') criteria.minBaths = parseInt(searchMinBaths);
       if (searchMinSqft) criteria.minSqft = parseInt(searchMinSqft);
       if (searchMaxSqft) criteria.maxSqft = parseInt(searchMaxSqft);
@@ -478,6 +484,7 @@ export function CMABuilder({ onCreateCMA, initialData }: CMABuilderProps) {
         statuses: searchStatuses,
         limit: 50,
         minBeds: searchMinBeds && searchMinBeds !== 'any' ? parseInt(searchMinBeds) : undefined,
+        maxBeds: searchMaxBeds && searchMaxBeds !== 'any' ? parseInt(searchMaxBeds) : undefined,
         minBaths: searchMinBaths && searchMinBaths !== 'any' ? parseInt(searchMinBaths) : undefined,
         minPrice: searchMinPrice && searchMinPrice !== 'any' ? parseInt(searchMinPrice) : undefined,
         maxPrice: searchMaxPrice && searchMaxPrice !== 'any' ? parseInt(searchMaxPrice) : undefined,
@@ -587,6 +594,7 @@ export function CMABuilder({ onCreateCMA, initialData }: CMABuilderProps) {
         subdivision: searchSubdivision,
         zipCode: searchZipCode,
         minBeds: searchMinBeds,
+        maxBeds: searchMaxBeds,
         minPrice: searchMinPrice,
         maxPrice: searchMaxPrice,
         minBaths: searchMinBaths,
@@ -1273,9 +1281,62 @@ export function CMABuilder({ onCreateCMA, initialData }: CMABuilderProps) {
                     <span>{subjectProperty.livingArea && `${Number(subjectProperty.livingArea).toLocaleString()} sqft`}</span>
                   </div>
                 </div>
-                <p className="text-xs text-muted-foreground">
+                <p className="text-xs text-muted-foreground mb-3">
                   This property will be the focus of your CMA analysis
                 </p>
+                <Button
+                  variant="outline"
+                  className="w-full"
+                  onClick={() => {
+                    // Auto-fill search criteria based on subject property
+                    const sp = subjectProperty;
+                    if (sp) {
+                      // Set status to Closed for sold comps
+                      setSearchStatuses(['closed']);
+                      
+                      // Set location from subject
+                      if (sp.subdivision) setSearchSubdivision(sp.subdivision);
+                      else if (sp.city) setSearchCity(sp.city);
+                      if (sp.postalCode) setSearchZipCode(sp.postalCode);
+                      
+                      // Set sqft range (±20%)
+                      if (sp.livingArea) {
+                        const sqft = Number(sp.livingArea);
+                        const minSqft = Math.floor(sqft * 0.8);
+                        const maxSqft = Math.ceil(sqft * 1.2);
+                        setSearchMinSqft(String(minSqft));
+                        setSearchMaxSqft(String(maxSqft));
+                      }
+                      
+                      // Set beds (same or ±1)
+                      if (sp.bedroomsTotal) {
+                        const beds = Number(sp.bedroomsTotal);
+                        setSearchMinBeds(String(Math.max(1, beds - 1)));
+                        setSearchMaxBeds(String(beds + 1));
+                      }
+                      
+                      // Set baths (same or ±1)
+                      if (sp.bathroomsTotalInteger) {
+                        const baths = Number(sp.bathroomsTotalInteger);
+                        setSearchMinBaths(String(Math.max(1, baths - 1)));
+                        setSearchMaxBaths(String(baths + 1));
+                      }
+                      
+                      // Set sold days to last 6 months
+                      setSearchSoldDays('180');
+                      
+                      // Trigger search
+                      setSearchEnabled(true);
+                      setTimeout(() => {
+                        searchSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                      }, 100);
+                    }
+                  }}
+                  data-testid="button-find-sold-comps"
+                >
+                  <Search className="w-4 h-4 mr-2" />
+                  Find Sold Comparables
+                </Button>
               </div>
             ) : (
               <div className="space-y-4">
