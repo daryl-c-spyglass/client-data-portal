@@ -12,17 +12,47 @@ interface StatusInspectorProps {
     standardStatus?: string;
     status?: string;
     lastStatus?: string;
+    propertyType?: string;
+    propertySubType?: string;
+    style?: string;
+    details?: {
+      propertyType?: string;
+      style?: string;
+    };
     raw?: Record<string, any>;
   };
 }
 
 export function StatusInspector({ property }: StatusInspectorProps) {
+  const isLandOrLot = () => {
+    const combined = [
+      property.propertyType,
+      property.propertySubType,
+      property.style,
+      property.details?.propertyType,
+      property.details?.style,
+      property.raw?.propertyType,
+      property.raw?.propertySubType,
+      property.raw?.PropertyType,
+      property.raw?.PropertySubType,
+    ].filter(Boolean).join(' ').toLowerCase();
+    
+    const landIndicators = ['land', 'lot', 'lots', 'acreage', 'unimproved', 'vacant'];
+    return landIndicators.some(term => combined.includes(term));
+  };
+  
   return (
     <div className="mt-2 p-2 bg-muted/50 border border-dashed rounded text-xs space-y-1">
       <div className="flex items-center gap-2 text-muted-foreground">
         <Bug className="h-3 w-3" />
-        <span className="font-semibold">Status Inspector</span>
+        <span className="font-semibold">Status & Type Inspector</span>
+        {isLandOrLot() && (
+          <Badge variant="destructive" className="text-[10px] px-1 py-0">
+            LAND/LOT
+          </Badge>
+        )}
       </div>
+      
       <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-muted-foreground">
         <div>
           <span className="font-medium">standardStatus:</span>{" "}
@@ -41,12 +71,44 @@ export function StatusInspector({ property }: StatusInspectorProps) {
           <span className="text-foreground">{property.listingId || property.id || "(empty)"}</span>
         </div>
       </div>
-      {property.raw && Object.keys(property.raw).some(k => k.toLowerCase().includes('status')) && (
+      
+      <div className="border-t pt-1 mt-1">
+        <span className="font-medium text-muted-foreground">Property Type Fields:</span>
+        <div className="grid grid-cols-2 gap-x-4 gap-y-0.5 text-muted-foreground">
+          <div>
+            <span className="font-medium">propertyType:</span>{" "}
+            <span className="text-foreground">{property.propertyType || "(empty)"}</span>
+          </div>
+          <div>
+            <span className="font-medium">propertySubType:</span>{" "}
+            <span className="text-foreground">{property.propertySubType || "(empty)"}</span>
+          </div>
+          <div>
+            <span className="font-medium">style:</span>{" "}
+            <span className="text-foreground">{property.style || "(empty)"}</span>
+          </div>
+          <div>
+            <span className="font-medium">details.style:</span>{" "}
+            <span className="text-foreground">{property.details?.style || "(empty)"}</span>
+          </div>
+        </div>
+      </div>
+      
+      {property.raw && Object.keys(property.raw).some(k => 
+        k.toLowerCase().includes('status') || 
+        k.toLowerCase().includes('type') ||
+        k.toLowerCase().includes('style')
+      ) && (
         <div className="border-t pt-1 mt-1">
-          <span className="font-medium text-muted-foreground">Raw status fields:</span>
+          <span className="font-medium text-muted-foreground">Raw type/status fields:</span>
           <div className="grid grid-cols-2 gap-x-4 gap-y-0.5 text-muted-foreground">
             {Object.entries(property.raw)
-              .filter(([k]) => k.toLowerCase().includes('status'))
+              .filter(([k]) => 
+                k.toLowerCase().includes('status') || 
+                k.toLowerCase().includes('type') ||
+                k.toLowerCase().includes('style') ||
+                k.toLowerCase().includes('class')
+              )
               .map(([key, value]) => (
                 <div key={key}>
                   <span className="font-medium">{key}:</span>{" "}

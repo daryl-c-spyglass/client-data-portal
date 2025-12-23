@@ -3216,22 +3216,14 @@ This email was sent by ${senderName} (${senderEmail}) via the MLS Grid IDX Platf
         client.mapToStandardProperty(listing)
       );
       
-      // Apply server-side propertySubType filter
+      // Apply server-side propertySubType filter using centralized guard
+      // This excludes Land/Lots when Single Family is selected
       if (propertySubTypeFilter) {
-        const filterLower = propertySubTypeFilter.toLowerCase().trim();
-        standardizedProperties = standardizedProperties.filter(prop => {
-          const propSubType = (prop.propertySubType || prop.style || '').toLowerCase().trim();
-          // Exact match or contains the filter term
-          if (filterLower === 'single family') {
-            // Exclude land, lots, and unimproved properties when filtering for Single Family
-            const excludeTerms = ['land', 'lot', 'unimproved', 'vacant'];
-            const hasExcludeTerm = excludeTerms.some(term => propSubType.includes(term));
-            return propSubType.includes('single') || 
-                   propSubType.includes('detached') || 
-                   (propSubType.includes('family') && !hasExcludeTerm);
-          }
-          return propSubType.includes(filterLower) || propSubType === filterLower;
-        });
+        const beforeCount = standardizedProperties.length;
+        standardizedProperties = filterByPropertySubtype(standardizedProperties, propertySubTypeFilter);
+        if (beforeCount !== standardizedProperties.length) {
+          console.log(`[Properties Search] Property type filter: ${beforeCount} -> ${standardizedProperties.length} (excluded ${beforeCount - standardizedProperties.length} non-matching)`);
+        }
       }
       
       // Apply server-side street name filter
