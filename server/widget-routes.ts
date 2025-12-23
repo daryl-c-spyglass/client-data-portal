@@ -1,5 +1,7 @@
 import type { Express, Request, Response } from "express";
 import { getRepliersClient } from "./repliers-client";
+import path from "path";
+import fs from "fs";
 
 const ALLOWED_ORIGINS = [
   'https://spyglassrealty.com',
@@ -26,6 +28,26 @@ function widgetCors(req: Request, res: Response, next: () => void) {
 }
 
 export function registerWidgetRoutes(app: Express): void {
+  // Serve widget demo page (before Vite middleware intercepts)
+  app.get('/widget-demo.html', (_req: Request, res: Response) => {
+    const demoPath = path.resolve(process.cwd(), 'public', 'widget-demo.html');
+    if (fs.existsSync(demoPath)) {
+      res.sendFile(demoPath);
+    } else {
+      res.status(404).send('Widget demo not found');
+    }
+  });
+
+  // Serve widget JavaScript file
+  app.get('/spyglass-property-widget.js', (_req: Request, res: Response) => {
+    const widgetPath = path.resolve(process.cwd(), 'public', 'spyglass-property-widget.js');
+    if (fs.existsSync(widgetPath)) {
+      res.type('application/javascript').sendFile(widgetPath);
+    } else {
+      res.status(404).send('Widget not found');
+    }
+  });
+
   app.use('/api/widget', widgetCors);
 
   app.get('/api/widget/search', async (req: Request, res: Response) => {
