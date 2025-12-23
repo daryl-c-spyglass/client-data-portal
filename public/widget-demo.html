@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Spyglass Property Search Widget Demo</title>
+  <style>
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      margin: 0;
+      padding: 20px;
+      background: #f5f5f5;
+    }
+    h1 {
+      text-align: center;
+      color: #1a1a1a;
+      margin-bottom: 8px;
+    }
+    p.subtitle {
+      text-align: center;
+      color: #666;
+      margin-bottom: 30px;
+    }
+    #spyglass-search {
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+    .usage-info {
+      max-width: 800px;
+      margin: 40px auto;
+      padding: 20px;
+      background: white;
+      border-radius: 8px;
+      border: 1px solid #ddd;
+    }
+    .usage-info h2 {
+      margin-top: 0;
+    }
+    .usage-info pre {
+      background: #1a1a1a;
+      color: #f5f5f5;
+      padding: 16px;
+      border-radius: 6px;
+      overflow-x: auto;
+      font-size: 14px;
+    }
+    .usage-info code {
+      font-family: 'Monaco', 'Menlo', monospace;
+    }
+  </style>
+</head>
+<body>
+  <h1>Spyglass Property Search Widget</h1>
+  <p class="subtitle">Embeddable property search for WordPress</p>
+
+  <div id="spyglass-search"></div>
+
+  <div class="usage-info">
+    <h2>WordPress Integration</h2>
+    <p>To add this widget to your WordPress site, add the following code:</p>
+    <pre><code>&lt;!-- Add this where you want the search widget to appear --&gt;
+&lt;div id="spyglass-search"&gt;&lt;/div&gt;
+
+&lt;!-- Add this before the closing &lt;/body&gt; tag --&gt;
+&lt;script src="https://your-replit-url.replit.app/spyglass-property-widget.js"&gt;&lt;/script&gt;
+&lt;script&gt;
+  SpyglassPropertySearch.init('spyglass-search', {
+    apiUrl: 'https://your-replit-url.replit.app/api/widget',
+    googleMapsKey: 'YOUR_GOOGLE_MAPS_API_KEY' // Optional, for map view
+  });
+&lt;/script&gt;</code></pre>
+  </div>
+
+  <script src="/spyglass-property-widget.js"></script>
+  <script>
+    SpyglassPropertySearch.init('spyglass-search', {
+      apiUrl: window.location.origin + '/api/widget',
+      // googleMapsKey: '' // Add your Google Maps API key here for map view
+    });
+  </script>
+</body>
+</html>
