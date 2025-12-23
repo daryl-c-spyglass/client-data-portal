@@ -5780,6 +5780,124 @@ OUTPUT JSON:
     }
   });
 
+  // ========================================
+  // Map Layer Data (Flood Zones, School Districts)
+  // ========================================
+  
+  app.get("/api/map-layers/flood-zones", async (req, res) => {
+    try {
+      const { bounds } = req.query;
+      
+      // FEMA National Flood Hazard Layer - Layer 28 = Flood Hazard Zones
+      // Note: Use /arcgis/ path, not /gis/nfhl/
+      const floodUrl = new URL("https://hazards.fema.gov/arcgis/rest/services/public/NFHL/MapServer/28/query");
+      floodUrl.searchParams.set("where", "1=1");
+      floodUrl.searchParams.set("outFields", "FLD_ZONE,ZONE_SUBTY,SFHA_TF");
+      floodUrl.searchParams.set("f", "geojson");
+      floodUrl.searchParams.set("returnGeometry", "true");
+      
+      // Set geometry bounds for Austin area
+      let geometryBounds;
+      if (bounds) {
+        const [west, south, east, north] = (bounds as string).split(",").map(Number);
+        geometryBounds = { xmin: west, ymin: south, xmax: east, ymax: north };
+      } else {
+        // Default to central Austin area (smaller bounds for performance)
+        geometryBounds = { xmin: -97.8, ymin: 30.2, xmax: -97.65, ymax: 30.35 };
+      }
+      
+      floodUrl.searchParams.set("geometry", `${geometryBounds.xmin},${geometryBounds.ymin},${geometryBounds.xmax},${geometryBounds.ymax}`);
+      floodUrl.searchParams.set("geometryType", "esriGeometryEnvelope");
+      floodUrl.searchParams.set("spatialRel", "esriSpatialRelIntersects");
+      floodUrl.searchParams.set("inSR", "4326");
+      floodUrl.searchParams.set("outSR", "4326");
+      floodUrl.searchParams.set("resultRecordCount", "500");
+      
+      const response = await fetch(floodUrl.toString());
+      
+      if (!response.ok) {
+        throw new Error(`FEMA API error: ${response.status}`);
+      }
+      
+      const data = await response.json();
+      
+      res.json({
+        success: true,
+        type: "FeatureCollection",
+        features: data.features || [],
+        source: "FEMA NFHL",
+      });
+    } catch (error: any) {
+      console.error("[Map Layers] Flood zones error:", error.message);
+      res.status(500).json({
+        success: false,
+        error: "Failed to fetch flood zone data",
+        message: error.message,
+      });
+    }
+  });
+  
+  app.get("/api/map-layers/school-districts", async (req, res) => {
+    try {
+      // City of Austin ArcGIS - School District boundaries (Layer 2)
+      // Note: Service uses Texas State Plane projection, we request output in WGS84
+      const austinUrl = new URL("https://maps.austintexas.gov/arcgis/rest/services/Shared/BoundariesGrids_2/MapServer/2/query");
+      austinUrl.searchParams.set("where", "1=1");
+      austinUrl.searchParams.set("outFields", "NAME");
+      austinUrl.searchParams.set("f", "geojson");
+      austinUrl.searchParams.set("returnGeometry", "true");
+      austinUrl.searchParams.set("outSR", "4326");
+      austinUrl.searchParams.set("resultRecordCount", "100");
+      
+      const response = await fetch(austinUrl.toString());
+      
+      if (!response.ok) {
+        throw new Error(`Austin GIS API error: ${response.status}`);
+      }
+      
+      const data = await response.json();
+      
+      res.json({
+        success: true,
+        type: "FeatureCollection",
+        features: data.features || [],
+        source: "City of Austin GIS",
+      });
+    } catch (error: any) {
+      console.error("[Map Layers] School districts error:", error.message);
+      res.status(500).json({
+        success: false,
+        error: "Failed to fetch school district data",
+        message: error.message,
+      });
+    }
+  });
+  
+  app.get("/api/map-layers/available", async (req, res) => {
+    res.json({
+      layers: [
+        {
+          id: "flood-zones",
+          name: "Flood Zones",
+          description: "FEMA National Flood Hazard Layer",
+          endpoint: "/api/map-layers/flood-zones",
+          legend: [
+            { zone: "A", color: "#0000FF", label: "High Risk (100-yr)" },
+            { zone: "AE", color: "#0000AA", label: "High Risk w/ BFE" },
+            { zone: "AO", color: "#3333FF", label: "High Risk - Sheet Flow" },
+            { zone: "X", color: "#99CCFF", label: "Moderate to Low Risk" },
+          ],
+        },
+        {
+          id: "school-districts",
+          name: "School Districts",
+          description: "Austin area school district boundaries",
+          endpoint: "/api/map-layers/school-districts",
+        },
+      ],
+    });
+  });
+
   const httpServer = createServer(app);
 
   return httpServer;

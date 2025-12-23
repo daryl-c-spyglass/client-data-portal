@@ -42,6 +42,7 @@ The UI incorporates Spyglass Realty branding with an orange primary color scheme
 - **Market Insights**: Year-over-Year price comparisons and neighborhood-level market statistics.
 - **Property Detail Page**: Enhanced property details with neighborhood reviews and boundary maps.
 - **Search Enhancements**: Autocomplete for cities, zip codes, subdivisions, and elementary schools.
+- **Dynamic Map Layers**: Toggle-able flood zone (FEMA NFHL) and school district (City of Austin GIS) overlays on property maps with interactive legends.
 - **Dev Tools**: Status Inspector component for debugging MLS parity issues in development.
 
 ## External Dependencies
@@ -56,6 +57,8 @@ The UI incorporates Spyglass Realty branding with an orange primary color scheme
 - **Google Fonts CDN**: Typography (Inter font family).
 - **Recharts**: Charting and data visualization.
 - **SendGrid**: Email services.
+- **FEMA NFHL API**: National Flood Hazard Layer data for flood zone overlays.
+- **City of Austin ArcGIS**: School district boundary data for map layers.
 
 ### WordPress Integration API
 A dedicated API at `/api/wordpress/*` with CORS enabled for `spyglassrealty.org` provides endpoints for listing properties, retrieving single property details, advanced search, and managing user favorites.

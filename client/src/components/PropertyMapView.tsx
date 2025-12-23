@@ -5,6 +5,7 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { MapPin, Home, Bed, Bath, Ruler, ExternalLink, AlertTriangle, Calendar, ImageOff } from "lucide-react";
+import { MapLayersControl } from "./MapLayersControl";
 import type { Property } from "@shared/schema";
 import "leaflet/dist/leaflet.css";
 
@@ -313,6 +314,7 @@ export function PropertyMapView({ properties, onPropertyClick, isLoading }: Prop
           />
           
           {mapReady && <MapBoundsUpdater properties={propertiesWithCoords} />}
+          {mapReady && <MapLayersControl position="topright" />}
           
           {propertiesWithCoords.map((property) => {
             const uniqueKey = property.listingId || property.id;

@@ -6,6 +6,7 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Loader2, Trash2, MapPin, AlertCircle, Search, PenTool } from "lucide-react";
+import { MapLayersControl } from "./MapLayersControl";
 import "leaflet/dist/leaflet.css";
 import "leaflet-draw/dist/leaflet.draw.css";
 
@@ -179,6 +180,7 @@ export function PolygonMapSearch({ onSearch, onClear, isLoading, resultCount }: 
               onPolygonCreated={handlePolygonCreated}
               onPolygonDeleted={handlePolygonDeleted}
             />
+            <MapLayersControl position="topleft" />
           </MapContainer>
           
           {!hasPolygon && (
