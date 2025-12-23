@@ -7,6 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { 
   Heart, 
   Share2, 
@@ -20,7 +21,8 @@ import {
   ChevronLeft,
   ChevronRight,
   Check,
-  Copy
+  Copy,
+  Bug
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import type { Property, Media } from "@shared/schema";
@@ -76,6 +78,7 @@ export function PropertyDetail({
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [saved, setSaved] = useState(false);
   const [linkCopied, setLinkCopied] = useState(false);
+  const [debugOpen, setDebugOpen] = useState(false);
   const { toast } = useToast();
   const autoAdvanceRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const pauseTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -414,6 +417,69 @@ export function PropertyDetail({
             )}
           </CardContent>
         </Card>
+
+        {/* Dev-only Location Debug Panel */}
+        {import.meta.env.DEV && debugData && (
+          <Collapsible open={debugOpen} onOpenChange={setDebugOpen}>
+            <CollapsibleTrigger asChild>
+              <Button variant="ghost" size="sm" className="flex items-center gap-2 text-xs text-muted-foreground">
+                <Bug className="w-3 h-3" />
+                Location Debug {debugOpen ? '▼' : '▶'}
+              </Button>
+            </CollapsibleTrigger>
+            <CollapsibleContent>
+              <Card className="mt-2 border-dashed border-yellow-500/50 bg-yellow-50/10">
+                <CardContent className="pt-4">
+                  <div className="text-xs font-mono space-y-3">
+                    <div className="p-2 bg-blue-50/30 rounded border border-blue-500/30">
+                      <p className="font-semibold text-blue-600">Data Source</p>
+                      <p>Source: <span className="text-foreground">{debugData.dataSource}</span></p>
+                      <p>Fetched: <span className="text-foreground">{new Date(debugData.fetchTimestamp).toLocaleString()}</span></p>
+                    </div>
+
+                    {debugData.rawFields && (
+                      <div className="p-2 bg-purple-50/30 rounded border border-purple-500/30">
+                        <p className="font-semibold text-purple-600">Raw Subdivision Fields (from API)</p>
+                        <div className="space-y-1 mt-1">
+                          {Object.entries(debugData.rawFields).map(([field, value]) => (
+                            <p key={field}>
+                              {field}: <span className={value ? 'text-green-600 font-semibold' : 'text-muted-foreground'}>
+                                {value || '(null)'}
+                              </span>
+                            </p>
+                          ))}
+                        </div>
+                        <Separator className="my-2" />
+                        <p className="text-yellow-600 font-semibold">
+                          Subdivision Source: <span className="text-foreground">{debugData.subdivisionSource}</span>
+                        </p>
+                        <p className="text-yellow-600 font-semibold">
+                          Final Value: <span className="text-foreground">{debugData.subdivisionValue || '(none)'}</span>
+                        </p>
+                      </div>
+                    )}
+
+                    <h5 className="font-semibold text-yellow-600">Location Data Mapping</h5>
+                    <div className="grid grid-cols-2 gap-2">
+                      <div className="space-y-1">
+                        <p className="text-muted-foreground">From Listing (Normalized):</p>
+                        <p>subdivision: <span className="text-foreground">{property.subdivision || '(empty)'}</span></p>
+                      </div>
+                      <div className="space-y-1">
+                        <p className="text-muted-foreground">Coordinates:</p>
+                        <p>lat: {property.latitude || '(none)'}, lng: {property.longitude || '(none)'}</p>
+                      </div>
+                    </div>
+                    <div className="mt-2 p-2 bg-muted/50 rounded text-muted-foreground">
+                      <p className="font-semibold">Data Integrity Rules:</p>
+                      <p>• Subdivision = tract/community label from listing data</p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </CollapsibleContent>
+          </Collapsible>
+        )}
       </div>
 
       {/* Right Column - Sticky Stats Panel */}
