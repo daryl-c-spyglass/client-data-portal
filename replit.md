@@ -123,7 +123,19 @@ The UI incorporates Spyglass Realty branding with an orange primary color scheme
 - **Market Insights**: Year-over-Year price comparisons and neighborhood-level market statistics.
 - **Property Detail Page**: Enhanced property details with neighborhood reviews, boundary maps, and consistent data display.
 - **Search Enhancements**: Autocomplete for cities, zip codes, subdivisions, elementary schools, and separate filters for subdivisions in CMA and buyer searches.
-- **Dev Tools**: Status Inspector component (`StatusInspectorToggle`) available on Properties page in development mode for debugging MLS parity issues. Shows standardStatus, legacy status fields, and raw API values per listing.
+- **Dev Tools**: Status Inspector component (`StatusInspectorToggle`) available on Properties page in development mode for debugging MLS parity issues. Shows standardStatus, legacy status fields, raw API values, and property type fields per listing.
+- **Property Type Filtering**: Post-fetch filtering using `shared/propertyTypeGuard.ts` to handle Repliers API limitations
+  - **Problem**: Repliers API 'class' parameter only supports broad categories (residential, condo, commercial); 'residential' includes Land/Lots
+  - **Solution**: `filterByPropertySubtype()` applies regex-based filtering after API fetch
+  - **Single Family Logic**: Requires explicit markers ("single family", "sfr", "detached") AND excludes other types
+  - **Exclusion Patterns** (regex word boundaries to avoid false negatives):
+    - `/\bcondo(minium)?\b/` - Condo
+    - `/\btownhou?se?\b/` or `/\btownhome\b/` - Townhouse
+    - `/\bmulti[- ]?family\b/` - Multi-Family (NOT multi-level, multi-story)
+    - `/\b(duplex|triplex|fourplex|quadplex)\b/` - Plexes
+    - `/\b(manufactured|mobile|modular)\s*(home|house)?\b/` - Manufactured/Mobile
+  - **Land Detection**: `isLandOrLot()` checks for LAND_INDICATORS: land, lot, acreage, unimproved, vacant
+  - **Applied In**: `/api/search`, `/api/properties/search`, `/api/properties/search/polygon`
 
 ## External Dependencies
 
