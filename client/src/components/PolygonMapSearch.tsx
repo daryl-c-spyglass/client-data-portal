@@ -134,8 +134,8 @@ export function PolygonMapSearch({ onSearch, onClear, isLoading, resultCount, fu
   }, [currentBoundary, onSearch]);
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between flex-wrap gap-2">
+    <div className={cn("flex flex-col gap-3", fullHeight && "h-full")}>
+      <div className="flex items-center justify-between flex-wrap gap-2 flex-shrink-0">
         <div className="flex items-center gap-2">
           <MapPin className="w-5 h-5 text-primary" />
           <span className="font-medium">Draw a search area on the map</span>
@@ -160,12 +160,12 @@ export function PolygonMapSearch({ onSearch, onClear, isLoading, resultCount, fu
       </div>
 
       {resultCount !== undefined && resultCount > 0 && (
-        <Badge variant="secondary" className="text-sm">
+        <Badge variant="secondary" className="text-sm flex-shrink-0">
           {resultCount} properties found in area
         </Badge>
       )}
 
-      <Card className={cn("overflow-hidden", fullHeight && "h-full")}>
+      <Card className={cn("overflow-hidden", fullHeight ? "flex-1 min-h-0" : "")}>
         <div className={cn("w-full relative", fullHeight ? "h-full" : "h-[400px]")}>
           <MapContainer
             center={AUSTIN_CENTER}
