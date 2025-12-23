@@ -1,0 +1,100 @@
+Replit Agent Prompt — Improve “Map Layers” UX (Clickable, Larger, Floating Panel)
+
+In Buyer Search → Map Search, the Map Layers control exists but is too small and not user-friendly. We need to redesign it so users can easily toggle layers (Flood Zones, School Districts, etc.) using a clear, clickable floating UI.
+
+Use the current Buyer Search map UI as reference (see screenshot).
+
+1) Replace tiny Map Layers button with a user-friendly floating control
+Requirements
+
+The Map Layers entry should be a large, clearly clickable button (not tiny text).
+
+It should be placed on top of the map (top-left) as a floating control.
+
+Add an icon + label:
+
+Layers
+
+The hit area must be large enough for touch/mobile (min ~40px height).
+
+2) Clicking “Layers” opens a floating card/panel
+Floating card behavior
+
+On click, open a floating panel anchored to the button (like a popover).
+
+Panel must contain:
+
+Title: “Map Layers”
+
+Toggle switches (or checkboxes) for:
+
+Flood Zones
+
+School Districts
+
+(Any other existing layers should be listed too)
+
+Short descriptions under each (optional but preferred)
+
+Include a close “X” in the corner.
+
+Clicking outside closes the panel.
+
+Panel sizing
+
+Not full-screen
+
+Comfortable width (ex: 260–320px)
+
+Scrollable if many layers exist
+
+3) Make it obvious which layers are enabled
+Requirements
+
+When a layer is enabled:
+
+show a checkmark indicator
+
+keep the toggle state visible
+
+Add a small badge on the “Layers” button showing count enabled (e.g., “2”)
+
+4) Add a small Legend button (optional but recommended)
+
+When any layer is enabled:
+
+Show “Legend” button beside Layers
+
+Clicking opens a small panel explaining the colors for:
+
+Flood zones
+
+School districts
+
+5) Accessibility + usability
+
+Keyboard accessible (tab to button, enter to open, escape to close)
+
+The floating panel should not overlap critical map drawing tools (polygon buttons)
+
+Must work in desktop + mobile
+
+6) Acceptance tests
+
+User can easily click “Layers” and toggle Flood Zones / School Districts.
+
+Panel is readable and doesn’t feel cramped.
+
+Enabled count badge updates correctly.
+
+Panel closes when clicking outside or pressing Esc.
+
+No interference with polygon draw tools or map interactions.
+
+Deliverables
+
+File paths changed
+
+Confirm the floating panel works and is user friendly
+
+Include a screenshot showing the new Layers button + open floating panel
