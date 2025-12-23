@@ -184,7 +184,7 @@ export function PolygonMapSearch({ onSearch, onClear, isLoading, resultCount }: 
           </MapContainer>
           
           {!hasPolygon && (
-            <div className="absolute bottom-4 left-4 right-4 z-[1000]">
+            <div className="absolute bottom-4 left-4 right-4 z-[1001]">
               <div className="bg-card/95 backdrop-blur-sm border rounded-lg p-3 shadow-lg">
                 <div className="flex items-start gap-2">
                   <PenTool className="w-4 h-4 text-primary mt-0.5 flex-shrink-0" />

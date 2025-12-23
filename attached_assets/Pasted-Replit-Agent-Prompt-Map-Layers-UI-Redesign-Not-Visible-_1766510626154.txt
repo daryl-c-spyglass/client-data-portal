@@ -1,0 +1,122 @@
+Replit Agent Prompt — Map Layers UI “Redesign” Not Visible/Working + Add Demo + Make Testable
+
+The Map Layers UX redesign was marked complete (“larger button, floating panel, toggles, enabled badge, legend”), but it is not working and there’s no visible demo or clear way to test it. Fix this so it is actually visible, functional, and verifiable in Buyer Search → Map Search.
+
+1) Make the new Map Layers UI actually appear (visibility + placement)
+Requirements
+
+Confirm the new control renders in Buyer Search → Map Search view (not List view).
+
+Place it as a floating control inside the map container (top-left), above the map tiles and not outside the map frame.
+
+Ensure it is not hidden behind other components (z-index issue).
+
+Ensure it is not conditionally hidden due to missing state (e.g., only shows after a polygon is drawn—if so, remove that dependency).
+
+Acceptance
+
+When user switches to Map Search, they immediately see a clearly clickable “Layers” button.
+
+2) Fix click behavior (panel must open reliably)
+Requirements
+
+Clicking the Layers button opens a floating panel/popover anchored to the button.
+
+Clicking outside closes it.
+
+Esc closes it.
+
+Panel must not close immediately due to event bubbling.
+
+Ensure click works on desktop and mobile.
+
+Acceptance
+
+The panel opens every time and stays open until closed intentionally.
+
+3) Add a working “Demo Mode” so QA can verify layers even if APIs are empty
+
+Right now there’s no demo/feedback to prove it’s working.
+
+Requirements
+
+Add a Dev-only toggle (visible only in development) called:
+
+“Demo Layers”
+
+When ON:
+
+Render simple placeholder overlays:
+
+A sample polygon labeled “Flood Zone (Demo)”
+
+A sample district boundary labeled “School District (Demo)”
+
+These overlays should appear/disappear when toggles are switched in the Layers panel.
+
+This confirms the UI and rendering pipeline works even if real API responses are empty.
+
+Acceptance
+
+QA can turn on Demo Layers and visually see overlays appear/disappear.
+
+4) Add user-visible feedback when real layer data is not loading
+Requirements
+
+When toggling Flood Zones / School Districts:
+
+show a small loading indicator (“Loading flood zones…”)
+
+if request fails or returns 0:
+
+show “No flood zone data available for this area/zoom” (or “Failed to load… Retry”)
+
+Provide a Retry button.
+
+Acceptance
+
+No silent failures. User always knows what happened.
+
+5) Ensure the layer toggles are wired to real data loading
+Requirements
+
+When Flood Zones is ON:
+
+fetch data for current viewport bounds/zoom
+
+render polygons on map
+
+When OFF:
+
+remove polygons from map
+
+Same for School Districts.
+
+Re-fetch when map moves or zoom changes (debounced).
+
+Ensure layers do not conflict with polygon draw tools.
+
+Acceptance
+
+Real layers load when available; demo mode proves UI works regardless.
+
+6) Provide “How to test” instructions in the UI (short)
+Requirements
+
+Add a small help tooltip or text under Layers panel:
+
+“Turn on a layer to load overlays for the current map area. Pan/zoom to refresh.”
+
+If Demo mode exists (dev-only), mention:
+
+“Enable Demo Layers to preview overlays.”
+
+Deliverables
+
+File paths changed
+
+Confirm why it wasn’t visible (conditional render / z-index / wrong view / CSS)
+
+Confirm Layers + Legend panel opens and toggles work
+
+Confirm Demo Layers mode works and provides visible overlays
