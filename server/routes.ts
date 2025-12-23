@@ -3519,6 +3519,175 @@ OUTPUT JSON:
     }
   });
 
+  // OpenAI-only natural language parser (fallback when Repliers NLP unavailable)
+  // This endpoint parses user prompts directly via OpenAI without calling Repliers NLP
+  app.post("/api/ai/parse-natural-language", async (req, res) => {
+    try {
+      const { prompt } = req.body;
+      
+      if (!prompt || typeof prompt !== 'string') {
+        res.status(400).json({ error: "prompt is required" });
+        return;
+      }
+      
+      if (!process.env.OPENAI_API_KEY) {
+        res.status(503).json({ error: "OpenAI not configured" });
+        return;
+      }
+      
+      console.log(`🤖 [OpenAI NLP] Parsing: "${prompt.slice(0, 50)}..."`);
+      
+      // Fetch valid subdivisions for matching
+      let validSubdivisions: string[] = [];
+      try {
+        const results = await storage.getAutocompleteSubdivisions('', 500);
+        validSubdivisions = results.map(r => r.value);
+      } catch (e) {
+        console.warn('Failed to fetch subdivisions:', e);
+      }
+      
+      // Build prompt for OpenAI to parse natural language directly
+      const parsePrompt = `You are a real estate search assistant. Parse the user's natural language query into structured search filters.
+
+USER QUERY: "${prompt}"
+
+AVAILABLE SUBDIVISIONS (match exactly if mentioned): ${validSubdivisions.slice(0, 100).join(', ')}${validSubdivisions.length > 100 ? '...' : ''}
+
+Parse the query and extract these fields:
+- city: City name (Austin, Round Rock, Pflugerville, etc.)
+- subdivision: Only if it EXACTLY matches one from the list above (case-insensitive)
+- postalCode: ZIP code if mentioned
+- propertyType: Single Family, Condo, Townhouse, Land, Multi-Family, Duplex, Farm, Manufactured Home
+- minBeds: Minimum bedrooms (number)
+- minBaths: Minimum bathrooms (number)
+- minPrice: Minimum price (number, no commas)
+- maxPrice: Maximum price (number, no commas). Note: "under 800k" = maxPrice 800000
+- standardStatus: Active, Active Under Contract, Pending, or Closed
+  - "active" → Active
+  - "under contract" → Active Under Contract  
+  - "pending" → Pending
+  - "sold" or "closed" → Closed
+  - Default to Active if not specified
+- keywords: Any other descriptive terms (pool, updated kitchen, etc.)
+
+OUTPUT JSON:
+{
+  "filters": {
+    "city": "string or empty",
+    "subdivision": "string or empty (only if exact match)",
+    "postalCode": "string or empty",
+    "propertyType": "string or empty",
+    "minBeds": number or 0,
+    "minBaths": number or 0,
+    "minPrice": number or 0,
+    "maxPrice": number or 0,
+    "standardStatus": "Active|Active Under Contract|Pending|Closed",
+    "keywords": "string or empty"
+  },
+  "summary": "Friendly 1-2 sentence description of what was understood",
+  "warnings": ["array of any issues or clarifications needed"]
+}`;
+      
+      const openai = await import("openai");
+      const client = new openai.default({ apiKey: process.env.OPENAI_API_KEY });
+      
+      const completion = await client.chat.completions.create({
+        model: "gpt-4o-mini", // Use mini for cost efficiency
+        messages: [
+          { role: "system", content: "You are a real estate search parser. Always respond with valid JSON only." },
+          { role: "user", content: parsePrompt }
+        ],
+        response_format: { type: "json_object" },
+        temperature: 0.1,
+        max_tokens: 500,
+      });
+      
+      const responseText = completion.choices[0]?.message?.content || '{}';
+      let parsed;
+      
+      try {
+        parsed = JSON.parse(responseText);
+      } catch (e) {
+        console.error('Failed to parse OpenAI response:', responseText);
+        res.status(500).json({ error: "Failed to parse AI response" });
+        return;
+      }
+      
+      const filters = parsed.filters || {};
+      const warnings: string[] = [...(parsed.warnings || [])];
+      
+      // Apply same server-side validation as the sanitizer
+      // Rule 1: Strip neighborhood
+      if (filters.neighborhood) {
+        delete filters.neighborhood;
+        warnings.push("Neighborhood removed (we use Subdivision instead).");
+      }
+      
+      // Rule 2: Normalize status
+      let normalizedStatus = 'Active';
+      const statusRaw = (filters.standardStatus || '').toLowerCase().trim();
+      if (statusRaw === 'active') {
+        normalizedStatus = 'Active';
+      } else if (statusRaw === 'active under contract' || statusRaw === 'under contract') {
+        normalizedStatus = 'Active Under Contract';
+      } else if (statusRaw === 'pending') {
+        normalizedStatus = 'Pending';
+      } else if (statusRaw === 'closed' || statusRaw === 'sold') {
+        normalizedStatus = 'Closed';
+      }
+      
+      // Rule 3: Validate subdivision
+      let validatedSubdivision = '';
+      if (filters.subdivision) {
+        const subdivLower = filters.subdivision.toLowerCase();
+        const matched = validSubdivisions.find(s => s.toLowerCase() === subdivLower);
+        if (matched) {
+          validatedSubdivision = matched;
+        } else {
+          warnings.push(`Subdivision "${filters.subdivision}" not matched - please select manually.`);
+        }
+      }
+      
+      // Rule 4: Validate property type
+      const validPropertyTypes = [
+        'Single Family', 'Condo', 'Townhouse', 'Land', 'Multi-Family',
+        'Duplex', 'Triplex', 'Quadruplex', 'Farm', 'Ranch', 'Manufactured Home'
+      ];
+      let validatedPropertyType = '';
+      if (filters.propertyType) {
+        const ptLower = filters.propertyType.toLowerCase();
+        const matched = validPropertyTypes.find(pt => pt.toLowerCase() === ptLower);
+        if (matched) {
+          validatedPropertyType = matched;
+        }
+      }
+      
+      const result = {
+        filters: {
+          city: filters.city || '',
+          subdivision: validatedSubdivision,
+          postalCode: filters.postalCode || '',
+          propertyType: validatedPropertyType,
+          minBeds: Number(filters.minBeds) || 0,
+          minBaths: Number(filters.minBaths) || 0,
+          minPrice: Number(filters.minPrice) || 0,
+          maxPrice: Number(filters.maxPrice) || 0,
+          standardStatus: normalizedStatus,
+          keywords: filters.keywords || '',
+        },
+        sanitizedSummary: parsed.summary || 'Searching for properties...',
+        warnings,
+      };
+      
+      console.log('✅ [OpenAI NLP] Parsed result:', JSON.stringify(result.filters));
+      res.json(result);
+      
+    } catch (error: any) {
+      console.error("OpenAI NLP error:", error.message);
+      res.status(500).json({ error: "Failed to parse search query" });
+    }
+  });
+
   // AI Image Search - ranks listings by visual similarity
   // Reference: https://help.repliers.com/en/article/ai-image-search-implementation-guide-mx30ji/
   app.post("/api/repliers/image-search", async (req, res) => {

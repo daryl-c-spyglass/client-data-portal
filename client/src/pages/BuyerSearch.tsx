@@ -413,6 +413,8 @@ export default function BuyerSearch() {
   const [visualMatchEnabled, setVisualMatchEnabled] = useState(false);
   const [visualMatchItems, setVisualMatchItems] = useState<ImageSearchItem[]>([]);
   const [visualMatchResults, setVisualMatchResults] = useState<Property[]>([]);
+  const [visualMatchDemoMode, setVisualMatchDemoMode] = useState(false);
+  const [visualMatchError, setVisualMatchError] = useState('');
   const [isVisualSearching, setIsVisualSearching] = useState(false);
   const [visualMatchPage, setVisualMatchPage] = useState(0);
   const [visualMatchTotal, setVisualMatchTotal] = useState(0);
@@ -901,6 +903,7 @@ export default function BuyerSearch() {
   };
   
   // AI Assistant "Describe your ideal home" handler
+  // Uses OpenAI directly to parse natural language into search filters
   const handleAiDescribe = async () => {
     if (!aiPrompt.trim()) return;
     
@@ -911,44 +914,22 @@ export default function BuyerSearch() {
     setAiImageSearchItems(null);
     
     try {
-      // Step 1: Call Repliers NLP
-      const nlpResponse = await fetch('/api/repliers/nlp', {
+      // Call OpenAI-only endpoint to parse natural language
+      const response = await fetch('/api/ai/parse-natural-language', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ prompt: aiPrompt }),
       });
       
-      // Handle 406 - not a property search
-      if (nlpResponse.status === 406) {
-        const errorData = await nlpResponse.json();
-        setAiError(errorData.error || "That doesn't look like a property search. Try including location, price, beds, etc.");
-        setIsAiProcessing(false);
-        return;
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        if (response.status === 503) {
+          throw new Error('AI service not configured. Please check OpenAI API key.');
+        }
+        throw new Error(errorData.error || 'Failed to process your description');
       }
       
-      if (!nlpResponse.ok) {
-        throw new Error('Failed to process your description');
-      }
-      
-      const nlpData = await nlpResponse.json();
-      
-      // Step 2: Call OpenAI Sanitizer
-      const sanitizeResponse = await fetch('/api/ai/sanitize-repliers-nlp', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          userPrompt: aiPrompt,
-          repliersRequestUrl: nlpData.repliersRequestUrl,
-          repliersRequestBody: nlpData.repliersRequestBody,
-          repliersSummary: nlpData.repliersSummary,
-        }),
-      });
-      
-      if (!sanitizeResponse.ok) {
-        throw new Error('Failed to interpret your search');
-      }
-      
-      const sanitized = await sanitizeResponse.json();
+      const sanitized = await response.json();
       
       // Step 3: Merge sanitized filters with existing filters (preserve user selections)
       const newFilters: SearchFilters = { ...filters };
@@ -1020,6 +1001,7 @@ export default function BuyerSearch() {
     
     setIsVisualSearching(true);
     setVisualMatchPage(0);
+    setVisualMatchError('');
     
     try {
       // Build criteria from current filters
@@ -1057,14 +1039,47 @@ export default function BuyerSearch() {
       });
       
       if (!response.ok) {
-        throw new Error('Visual search failed');
+        const errorData = await response.json().catch(() => ({}));
+        // Handle 403 - feature not enabled, use demo mode with simulated scores
+        if (response.status === 403 || (errorData.error && errorData.error.includes('403'))) {
+          setVisualMatchDemoMode(true);
+          setVisualMatchError('Visual Match requires an upgraded Repliers subscription. Showing demo mode with simulated rankings.');
+          
+          // Fetch regular search results and add simulated demo scores
+          try {
+            const demoResponse = await fetch(`/api/repliers/search?standardStatus=${criteria.standardStatus || 'Active'}&resultsPerPage=${pageSize}&pageNum=1${criteria.city ? `&city=${criteria.city}` : ''}`);
+            if (demoResponse.ok) {
+              const demoData = await demoResponse.json();
+              // Add simulated visual match scores to demo results
+              const demoListings = (demoData.listings || []).map((listing: any, index: number) => ({
+                ...listing,
+                _visualScore: Math.max(0.3, 1 - (index * 0.05)), // Simulated decreasing scores
+                _demoMode: true
+              }));
+              setVisualMatchResults(demoListings);
+              setVisualMatchTotal(demoData.count || demoListings.length);
+            }
+          } catch (e) {
+            console.error('Demo mode fallback failed:', e);
+          }
+          return;
+        }
+        throw new Error(errorData.error || 'Visual search failed');
       }
       
       const data = await response.json();
       setVisualMatchResults(data.listings || []);
       setVisualMatchTotal(data.count || 0);
-    } catch (error) {
+      setVisualMatchDemoMode(false);
+      setVisualMatchError('');
+    } catch (error: any) {
       console.error('Visual search error:', error);
+      if (error.message?.includes('403') || error.message?.includes('not authorized')) {
+        setVisualMatchDemoMode(true);
+        setVisualMatchError('Visual Match requires an upgraded Repliers subscription. Showing demo mode.');
+      } else {
+        setVisualMatchError(error.message || 'Visual search failed');
+      }
       setVisualMatchResults([]);
       setVisualMatchTotal(0);
     } finally {
@@ -1318,12 +1333,16 @@ export default function BuyerSearch() {
                     if (!enabled) {
                       setVisualMatchResults([]);
                       setVisualMatchTotal(0);
+                      setVisualMatchDemoMode(false);
+                      setVisualMatchError('');
                     }
                   }}
                   items={visualMatchItems}
                   onItemsChange={setVisualMatchItems}
                   isSearching={isVisualSearching}
                   onSearch={handleVisualSearch}
+                  demoMode={visualMatchDemoMode}
+                  error={visualMatchError}
                 />
 
                 <Separator />

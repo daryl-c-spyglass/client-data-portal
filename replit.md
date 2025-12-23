@@ -76,19 +76,21 @@ The UI incorporates Spyglass Realty branding with an orange primary color scheme
     - `POST /api/cma/draft` - Create CMA draft from AI-collected criteria
 
 - **AI Search Assistant**: "Describe your ideal home" natural language search in Buyer Search
-  - **Pipeline**: User Prompt → Repliers NLP → OpenAI Sanitizer → Apply to Filters UI → Run Search
+  - **Pipeline**: User Prompt → OpenAI Parser → Apply to Filters UI → Run Search
   - **Backend Routes**:
-    - `POST /api/repliers/nlp` - Proxy to Repliers NLP API, returns structured response
+    - `POST /api/ai/parse-natural-language` - OpenAI-only parser (primary, works without Repliers NLP)
+    - `POST /api/repliers/nlp` - Legacy Repliers NLP proxy (requires upgraded subscription)
     - `POST /api/ai/sanitize-repliers-nlp` - OpenAI sanitizer with RESO-compliant validation
-  - **Sanitization Rules** (enforced server-side):
+  - **Validation Rules** (enforced server-side):
     - Strip `neighborhood` param (we use Subdivision instead) with warning
     - Validate subdivision against known list (case-insensitive exact match only)
     - Normalize status to RESO standardStatus (Active, Active Under Contract, Pending, Closed)
-    - Validate property types against allowed list
-  - **Frontend**: Text area panel in Buyer Search filters, Apply/Clear buttons
-  - **Error Handling**: 406 error for non-property searches with friendly message
+    - Validate property types against expanded RESO list
+  - **Frontend**: Text area panel in Buyer Search filters, Apply/Clear buttons, summary display
+  - **Error Handling**: Specific error messages for service unavailable, parse failures
+  - **Cost Efficiency**: Uses gpt-4o-mini with max_tokens=500 cap
   - **Files**:
-    - `server/routes.ts` - Both NLP and sanitizer routes
+    - `server/routes.ts` - OpenAI parser and sanitizer routes
     - `client/src/pages/BuyerSearch.tsx` - UI panel and `handleAiDescribe()` function
 
 - **AI Image Search**: Visual similarity ranking for property listings powered by Repliers AI

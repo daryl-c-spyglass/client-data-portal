@@ -1,0 +1,162 @@
+Replit Agent Prompt — Fix Buyer Search “Describe Your Ideal Home” Error + Add “Visual Match” Demo Mode
+
+You are working in our IDX web app (Buyer Search). Two requests:
+
+Fix the AI Assistant error:
+When user enters: “Find me a 3 bedroom home in Austin under 800k” the UI returns “Failed to process your description.”
+This must be debugged and fixed.
+
+Add a demo of Visual Match (AI Image Search) so we can test and showcase how results reorder by visual relevance.
+
+Reference docs:
+
+Repliers NLP (natural language): /nlp endpoint behavior
+
+Repliers AI Image Search KB: https://help.repliers.com/en/article/ai-image-search-implementation-guide-mx30ji/
+
+1) Fix “Describe Your Ideal Home” (Failed to process your description)
+A) Identify where it fails
+
+Trace the full pipeline:
+Frontend → /api/repliers/nlp → /api/ai/sanitize-repliers-nlp → apply filters → run search
+
+Add dev logging (no secrets) at each step:
+
+request received (prompt length)
+
+status code + response shape
+
+whether repliersRequestUrl exists
+
+whether OpenAI sanitizer returns valid filters
+
+B) Improve error handling in UI (must not be generic)
+
+Replace the generic error with actionable messages:
+
+If /api/repliers/nlp fails:
+
+show “Repliers NLP failed: <reason>”
+
+If sanitizer fails:
+
+show “AI sanitizer failed: <reason>”
+
+If search fails:
+
+show “Search failed: <reason>”
+
+C) Common root causes to check
+
+Missing/invalid REPLIERS_API_KEY
+
+NLP not enabled for that Repliers key
+
+406 response due to misrouted prompt payload
+
+OpenAI env keys missing (if sanitizer uses OpenAI)
+
+Sanitizer returning empty/invalid filter schema
+
+The app trying to call Repliers directly from browser (must be server-side)
+
+D) Acceptance test
+
+Input:
+
+Find me a 3 bedroom home in Austin under 800k
+
+Expected:
+
+UI shows interpreted summary
+
+Filters populate (city=Austin, minBeds=3, maxPrice=800000)
+
+Search runs and results display
+
+No “Failed to process your description”
+
+2) Add “Visual Match” Demo (AI Image Search)
+A) Add a demo UI toggle in Buyer Search
+
+Add a toggle/button near results sorting:
+
+Label: Visual Match (Demo)
+
+Helper text: “Reorders results by visual relevance (does not hide inventory).”
+
+B) Demo inputs (text-based)
+
+Provide 2–3 preset demo chips:
+
+“white kitchen”
+
+“swimming pool”
+
+“modern farmhouse”
+
+Allow user to select one or multiple.
+
+C) Implement backend proxy for AI image search
+
+Create route:
+
+POST /api/repliers/image-search
+
+Inputs:
+
+{
+  "criteria": { ...existing buyer filters... },
+  "imageSearchItems": [
+    { "type": "text", "value": "white kitchen", "boost": 1 }
+  ]
+}
+
+
+Behavior:
+
+Call Repliers listings endpoint via POST:
+
+POST https://api.repliers.io/listings?<criteria as query params>
+
+body { imageSearchItems }
+
+Return listings with score (and images reordered per Repliers)
+
+D) Frontend behavior
+
+If Visual Match Demo is OFF:
+
+existing search behavior unchanged
+
+If Visual Match Demo is ON and at least 1 demo chip selected:
+
+call /api/repliers/image-search
+
+display results in the same UI, but add:
+
+“Visual Match” badge
+
+optional match indicator (High/Med/Low) derived from score
+
+Include a “Back to normal sorting” option.
+
+E) Acceptance test
+
+Run normal search for Austin + filters
+
+Toggle Visual Match Demo + choose “white kitchen”
+
+Results reorder, and each listing shows it’s visually matched (badge/indicator)
+
+Turning demo off returns to normal ordering
+
+Deliverables
+
+File paths changed
+
+Root cause identified for the AI Assistant failure and the fix applied
+
+Visual Match Demo working end-to-end using Repliers AI Image Search
+
+Confirm all calls are server-side (no secrets in frontend)

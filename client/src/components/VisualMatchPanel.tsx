@@ -58,6 +58,8 @@ interface VisualMatchPanelProps {
   onSearch?: () => void;
   compact?: boolean;
   className?: string;
+  demoMode?: boolean;
+  error?: string;
 }
 
 const PRESET_CHIPS = [
@@ -79,7 +81,9 @@ export default function VisualMatchPanel({
   isSearching = false,
   onSearch,
   compact = false,
-  className
+  className,
+  demoMode = false,
+  error = ''
 }: VisualMatchPanelProps) {
   const [showImageUrl, setShowImageUrl] = useState(false);
   const [imageUrl, setImageUrl] = useState("");
@@ -153,6 +157,11 @@ export default function VisualMatchPanel({
         <div className="flex items-center gap-2">
           <Sparkles className="w-4 h-4 text-primary" />
           <Label className="text-base font-semibold">Visual Match</Label>
+          {demoMode && (
+            <Badge variant="outline" className="text-xs border-amber-500 text-amber-600">
+              Demo
+            </Badge>
+          )}
           {items.length > 0 && (
             <Badge variant="secondary" className="text-xs">
               {items.length}
@@ -178,6 +187,13 @@ export default function VisualMatchPanel({
           />
         </div>
       </div>
+
+      {/* Error/Demo Mode Message */}
+      {error && (
+        <div className="text-xs text-amber-600 bg-amber-50 dark:bg-amber-900/20 rounded-md p-2">
+          {error}
+        </div>
+      )}
 
       <div className="space-y-3">
         {items.length > 0 && (
