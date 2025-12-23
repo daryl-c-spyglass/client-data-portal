@@ -143,6 +143,7 @@ import {
   Loader2,
   Sparkles,
   Wand2,
+  Trash2,
 } from "lucide-react";
 import { Textarea } from "@/components/ui/textarea";
 import { PropertyCard } from "@/components/PropertyCard";
@@ -3924,15 +3925,38 @@ export default function BuyerSearch() {
           </DialogHeader>
           <div className="flex-1 p-4 pt-2 overflow-hidden" style={{ height: 'calc(90vh - 120px)' }}>
             <PolygonMapSearch
-              onSearch={(boundary) => {
-                handlePolygonSearch(boundary);
-                setMapDialogOpen(false);
-              }}
+              onSearch={handlePolygonSearch}
               onClear={handleClearPolygonSearch}
               isLoading={isMapSearching}
               resultCount={mapSearchResults.length}
               fullHeight
             />
+          </div>
+          <div className="flex items-center justify-between p-4 pt-2 border-t">
+            <div className="text-sm text-muted-foreground">
+              {mapSearchResults.length > 0 
+                ? `${mapSearchResults.length} properties found` 
+                : currentBoundary 
+                  ? "Click 'Search Area' to find properties"
+                  : "Draw a polygon to search"}
+            </div>
+            <div className="flex gap-2">
+              {currentBoundary && (
+                <Button 
+                  variant="outline" 
+                  onClick={() => {
+                    handleClearPolygonSearch();
+                  }}
+                  data-testid="button-clear-map-search"
+                >
+                  <Trash2 className="w-4 h-4 mr-2" />
+                  Clear Search
+                </Button>
+              )}
+              <Button onClick={() => setMapDialogOpen(false)} data-testid="button-close-map-dialog">
+                Done
+              </Button>
+            </div>
           </div>
         </DialogContent>
       </Dialog>

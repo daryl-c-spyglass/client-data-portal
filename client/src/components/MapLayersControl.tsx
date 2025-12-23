@@ -267,9 +267,11 @@ function LayerPanelContent({
   floodCount,
   schoolCount,
   districtNames,
+  districtsExpanded,
   onFloodToggle,
   onSchoolToggle,
   onDemoToggle,
+  onToggleDistrictsExpanded,
   onClose,
 }: {
   showFloodZones: boolean;
@@ -280,9 +282,11 @@ function LayerPanelContent({
   floodCount: number;
   schoolCount: number;
   districtNames: string[];
+  districtsExpanded: boolean;
   onFloodToggle: () => void;
   onSchoolToggle: () => void;
   onDemoToggle: () => void;
+  onToggleDistrictsExpanded: () => void;
   onClose: () => void;
 }) {
   const enabledCount = (showFloodZones ? 1 : 0) + (showSchoolDistricts ? 1 : 0);
@@ -426,7 +430,7 @@ function LayerPanelContent({
             <div>
               <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">School Districts</div>
               <div className="space-y-1">
-                {districtNames.slice(0, 4).map((name, idx) => (
+                {districtNames.slice(0, districtsExpanded ? districtNames.length : 4).map((name, idx) => (
                   <div key={name} className="flex items-center gap-2">
                     <div 
                       className="w-4 h-3 rounded-sm border border-black/20" 
@@ -436,7 +440,12 @@ function LayerPanelContent({
                   </div>
                 ))}
                 {districtNames.length > 4 && (
-                  <div className="text-xs text-gray-500">+{districtNames.length - 4} more</div>
+                  <button 
+                    onClick={onToggleDistrictsExpanded}
+                    className="text-xs text-primary hover:underline cursor-pointer"
+                  >
+                    {districtsExpanded ? "Show less" : `+${districtNames.length - 4} more`}
+                  </button>
                 )}
               </div>
             </div>
@@ -458,6 +467,7 @@ export function MapLayersControl({ position = "topright" }: MapLayersControlProp
   const [schoolStatus, setSchoolStatus] = useState<"idle" | "loading" | "success" | "error">("idle");
   const [floodCount, setFloodCount] = useState(0);
   const [schoolCount, setSchoolCount] = useState(0);
+  const [districtsExpanded, setDistrictsExpanded] = useState(false);
   const controlRef = useRef<L.Control | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
   const rootRef = useRef<ReturnType<typeof createRoot> | null>(null);
@@ -569,16 +579,18 @@ export function MapLayersControl({ position = "topright" }: MapLayersControlProp
               floodCount={floodCount}
               schoolCount={schoolCount}
               districtNames={districtNames}
+              districtsExpanded={districtsExpanded}
               onFloodToggle={() => setShowFloodZones(!showFloodZones)}
               onSchoolToggle={() => setShowSchoolDistricts(!showSchoolDistricts)}
               onDemoToggle={() => setDemoMode(!demoMode)}
+              onToggleDistrictsExpanded={() => setDistrictsExpanded(!districtsExpanded)}
               onClose={() => setIsOpen(false)}
             />
           </div>
         )}
       </div>
     );
-  }, [isOpen, showFloodZones, showSchoolDistricts, demoMode, enabledCount, floodStatus, schoolStatus, floodCount, schoolCount, districtNames]);
+  }, [isOpen, showFloodZones, showSchoolDistricts, demoMode, enabledCount, floodStatus, schoolStatus, floodCount, schoolCount, districtNames, districtsExpanded]);
 
   return (
     <MapLayerRenderer 
