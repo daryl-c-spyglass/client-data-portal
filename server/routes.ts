@@ -8,6 +8,7 @@ import { initRepliersClient, getRepliersClient, isRepliersConfigured } from "./r
 import { getUnifiedInventory, getInventoryDebugData, getInventoryAudit } from "./inventory-service";
 import { geocodeAddress, geocodeProperties, isMapboxConfigured } from "./mapbox-geocoding";
 import { searchCriteriaSchema, insertCmaSchema, insertUserSchema, insertSellerUpdateSchema, updateSellerUpdateSchema, updateLeadGateSettingsSchema, isLikelyRentalProperty, filterOutRentalProperties } from "@shared/schema";
+import { filterByPropertySubtype, isLandOrLot, getPropertyTypeInfo } from "@shared/propertyTypeGuard";
 import { findMatchingProperties, calculateMarketSummary } from "./seller-update-service";
 import { z } from "zod";
 import bcrypt from "bcryptjs";
@@ -1004,8 +1005,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
         console.log(`📦 Search: Filtered out ${beforeRentalFilter - nonRentalResults.length} rental properties from search results`);
       }
       
-      // Apply limit after rental filtering
-      const finalResults = nonRentalResults.slice(0, parsedLimit);
+      // Apply property subtype filtering to exclude Land/Lots when Single Family selected
+      // This is needed because Repliers 'class=residential' includes Land/Lots
+      const { propertyType: reqPropertyType } = req.query as Record<string, string | undefined>;
+      const propertyTypeFiltered = filterByPropertySubtype(nonRentalResults, reqPropertyType);
+      if (nonRentalResults.length !== propertyTypeFiltered.length) {
+        console.log(`📦 Search: Filtered out ${nonRentalResults.length - propertyTypeFiltered.length} listings due to property type mismatch`);
+      }
+      
+      // Apply limit after all filtering
+      const finalResults = propertyTypeFiltered.slice(0, parsedLimit);
 
       console.log(`📦 Multi-status search returned ${finalResults.length} listings from ${statusList.join(', ')}`);
 
@@ -1280,12 +1289,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       // Apply rental filtering
-      const filteredResults = filterOutRentals(allResults);
+      const rentalFilteredResults = filterOutRentals(allResults);
+      
+      // Apply property subtype filtering to exclude Land/Lots when Single Family selected
+      const propertyTypeFiltered = filterByPropertySubtype(rentalFilteredResults, propertyType);
+      if (rentalFilteredResults.length !== propertyTypeFiltered.length) {
+        console.log(`[Polygon Search] Filtered out ${rentalFilteredResults.length - propertyTypeFiltered.length} listings due to property type mismatch`);
+      }
       
       // Apply client-side point-in-polygon filtering as a fallback
       // in case the Repliers API didn't properly filter by boundary
       // Boundary coordinates are in [longitude, latitude] format (GeoJSON standard)
-      const polygonFilteredResults = filteredResults.filter((property: any) => {
+      const polygonFilteredResults = propertyTypeFiltered.filter((property: any) => {
         if (!property.latitude || !property.longitude) return false;
         const lat = parseFloat(String(property.latitude));
         const lng = parseFloat(String(property.longitude));
@@ -1313,7 +1328,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       const finalResults = polygonFilteredResults.slice(0, limit);
       
-      console.log(`[Polygon Search] Pre-filter: ${allResults.length}, Post-rental-filter: ${filteredResults.length}, Post-polygon-filter: ${polygonFilteredResults.length}, Returning: ${finalResults.length}`);
+      console.log(`[Polygon Search] Pre-filter: ${allResults.length}, Post-rental-filter: ${rentalFilteredResults.length}, Post-type-filter: ${propertyTypeFiltered.length}, Post-polygon-filter: ${polygonFilteredResults.length}, Returning: ${finalResults.length}`);
       
       res.json({
         properties: finalResults,

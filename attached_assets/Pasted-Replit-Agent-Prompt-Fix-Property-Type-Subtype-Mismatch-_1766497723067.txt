@@ -1,0 +1,147 @@
+Replit Agent Prompt — Fix Property Type/Subtype Mismatch (Land/Lots appearing in Single-Family) + Enforce Across App
+
+We have a bug where searching Active + Single Family (and sorting Price: Low → High) shows results that appear to be Land/Lot listings. This may also be happening in Closed searches. This issue must be fixed not only on the Properties section, but across all sections that use property filters.
+
+Example URL (include in your work/testing):
+https://f58e6159-1bf8-4479-a256-c997461de361-00-1jv089vliph98.riker.replit.dev/properties?statuses=Active&propertySubType=single-family
+
+1) Root Cause Investigation (must do first)
+Requirements
+
+Trace how the app builds the Repliers query for:
+
+statuses=Active
+
+propertySubType=single-family
+
+Confirm whether we are mapping UI “Single Family” to:
+
+Repliers propertyType
+
+Repliers propertySubType
+
+or a wrong/unsupported param
+
+Verify if:
+
+“single-family” is being sent in a field Repliers does not recognize, causing it to be ignored
+
+or the app is applying client-side filtering incorrectly after fetching mixed results
+
+Check whether Land/Lot listings have missing/incorrect subtype fields, causing them to slip through.
+
+Deliverable: short comment in code or dev notes describing the cause.
+
+2) Fix: Enforce Correct Property Classification (Type/Subtype) at Query Level
+Requirements (mandatory)
+
+Ensure that selecting Single Family excludes Land/Lots at the API query level (not just UI).
+
+Implement a canonical mapping layer:
+
+UI selection → provider-specific query params (Repliers)
+
+Use the provider’s correct field/value set for:
+
+propertyType
+
+propertySubType
+
+If Repliers values differ from our UI labels, map correctly.
+
+Must include exclusion logic
+
+If Repliers cannot reliably filter by subtype alone, add a defensive exclusion:
+
+Exclude propertyType=Land / Lots (or equivalent)
+
+Exclude subtypes that represent land/lots
+
+3) Add a Server-Side “Property Type Guard” (global)
+
+We must enforce this across:
+
+Properties section
+
+Buyer Search
+
+CMA
+
+Client Data Portal
+
+Saved Lists / Shares (if applicable)
+
+Dashboard counts (where property-type breakdown exists)
+
+Requirements
+
+Create a single shared function (server-side) used by all listing queries:
+
+buildPropertyTypeFilters(uiSelection) -> queryParams
+
+Ensure any request claiming “Single Family” cannot return Land/Lots.
+
+Also validate sorting edge case
+
+When sorting Price Low → High:
+
+Ensure results are not polluted by listings that:
+
+have price = 0 or null
+
+are lots with land-only pricing
+
+Decide how to handle:
+
+missing price listings (send to bottom)
+
+land pricing if land is excluded (should not appear at all)
+
+4) Data Consistency Checks (debug tooling)
+Requirements
+
+Add a dev-only “Type Inspector” (or reuse Status Inspector) that can show on each card:
+
+provider propertyType
+
+provider propertySubType
+
+any raw.* fields relevant to class/type
+So we can confirm why a lot is being returned in “single-family”.
+
+5) Regression Tests (must pass)
+Test cases
+
+Active + Single Family → should show only actual single-family listings (no Land/Lots)
+
+Closed + Single Family → should show only single-family closed listings (no Land/Lots)
+
+Active + Land/Lots filter → should show only land listings
+
+Price Low → High with Single Family:
+
+no land/lots appear
+
+listings with missing price are handled consistently (bottom or excluded per current product rule)
+
+Cross-section validation
+
+Confirm the fix applies in:
+
+Properties
+
+Buyer Search
+
+CMA results
+
+Client Data Portal counts/search
+
+Deliverables
+
+File paths changed
+
+Explanation of the root cause (param mismatch vs data mismatch vs client-side filtering bug)
+
+Confirmation that “Single Family” no longer includes Land/Lots in any section
+
+Screenshots or notes from regression tests using the sample URL above
