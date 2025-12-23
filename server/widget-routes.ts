@@ -48,6 +48,26 @@ export function registerWidgetRoutes(app: Express): void {
     }
   });
 
+  // Serve favorites widget demo page
+  app.get('/favorites-demo.html', (_req: Request, res: Response) => {
+    const demoPath = path.resolve(process.cwd(), 'public', 'favorites-demo.html');
+    if (fs.existsSync(demoPath)) {
+      res.sendFile(demoPath);
+    } else {
+      res.status(404).send('Favorites demo not found');
+    }
+  });
+
+  // Serve favorites widget JavaScript file
+  app.get('/spyglass-favorites-widget.js', (_req: Request, res: Response) => {
+    const widgetPath = path.resolve(process.cwd(), 'public', 'spyglass-favorites-widget.js');
+    if (fs.existsSync(widgetPath)) {
+      res.type('application/javascript').sendFile(widgetPath);
+    } else {
+      res.status(404).send('Favorites widget not found');
+    }
+  });
+
   app.use('/api/widget', widgetCors);
 
   app.get('/api/widget/search', async (req: Request, res: Response) => {
