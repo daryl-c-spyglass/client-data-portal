@@ -139,13 +139,30 @@ export function matchesPropertySubtype(
   
   // Handle different subtype patterns
   if (subtypeLower === 'single-family' || subtypeLower === 'single family' || subtypeLower === 'sfr') {
-    // Must be single family AND not land
-    const isSingleFamily = combined.includes('single family') || 
-                           combined.includes('single-family') ||
-                           combined.includes('sfr') ||
-                           combined.includes('detached') ||
-                           combined.includes('residential');
-    return isSingleFamily && !isLandOrLot(listing);
+    // Must have explicit Single Family markers AND not be land/condo/multi/townhouse/manufactured
+    // CRITICAL: Do NOT match generic "residential" - it includes all property types
+    const hasSingleFamilyMarker = combined.includes('single family') || 
+                                   combined.includes('single-family') ||
+                                   combined.includes('sfr') ||
+                                   combined.includes('single fam') ||
+                                   combined.includes('detached');
+    
+    // Exclude non-single-family types using PRECISE patterns (word boundaries)
+    // Avoid false negatives: "multi-level single family" should NOT be excluded
+    // Use regex word boundaries or specific phrase matching
+    const isExcludedType = 
+      // Condo/condominium
+      /\bcondo(minium)?\b/i.test(combined) ||
+      // Townhouse/townhome - but NOT "single family with attached garage"
+      (/\btownhou?se?\b/i.test(combined) || /\btownhome\b/i.test(combined)) ||
+      // Multi-family (not multi-level, multi-story)
+      /\bmulti[- ]?family\b/i.test(combined) ||
+      // Duplex/triplex/fourplex
+      /\b(duplex|triplex|fourplex|quadplex)\b/i.test(combined) ||
+      // Manufactured/mobile home
+      /\b(manufactured|mobile|modular)\s*(home|house)?\b/i.test(combined);
+    
+    return hasSingleFamilyMarker && !isLandOrLot(listing) && !isExcludedType;
   }
   
   if (subtypeLower === 'condo' || subtypeLower === 'condominium') {
