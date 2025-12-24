@@ -80,6 +80,17 @@ export function registerWidgetRoutes(app: Express): void {
 
   app.use('/api/widget', widgetCors);
 
+  // Serve logo for widgets under /api/widget path
+  app.get('/api/widget/spyglass-logo-white.png', (_req: Request, res: Response) => {
+    const logoPath = path.resolve(process.cwd(), 'public', 'spyglass-logo-white.png');
+    if (fs.existsSync(logoPath)) {
+      res.setHeader('Content-Type', 'image/png');
+      res.sendFile(logoPath);
+    } else {
+      res.status(404).send('Logo not found');
+    }
+  });
+
   app.get('/api/widget/search', async (req: Request, res: Response) => {
     try {
       const {
