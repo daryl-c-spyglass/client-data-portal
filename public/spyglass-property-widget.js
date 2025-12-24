@@ -16,10 +16,10 @@
   'use strict';
 
   const STYLES = `
-    @import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700&display=swap');
+    @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500;600;700&family=Poppins:wght@400;500;600;700&family=Lato:wght@400;700&display=swap');
 
     .spyglass-widget {
-      font-family: 'Montserrat', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      font-family: 'Poppins', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
       color: #333;
       line-height: 1.5;
       box-sizing: border-box;
@@ -30,22 +30,38 @@
     }
 
     .spyglass-header {
-      background: #1a1a1a;
+      background: #000000;
       color: white;
-      padding: 20px;
+      padding: 16px 20px;
       border-radius: 8px 8px 0 0;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+    }
+
+    .spyglass-header-logo {
+      height: 40px;
+      width: auto;
+    }
+
+    .spyglass-header-content {
+      flex: 1;
+      text-align: right;
     }
 
     .spyglass-header h2 {
-      margin: 0 0 4px 0;
-      font-size: 1.5rem;
-      font-weight: 700;
+      margin: 0 0 2px 0;
+      font-size: 1.25rem;
+      font-weight: 600;
+      font-family: 'Playfair Display', serif;
     }
 
     .spyglass-header p {
       margin: 0;
-      font-size: 0.875rem;
+      font-size: 0.8rem;
       opacity: 0.8;
+      font-family: 'Lato', sans-serif;
     }
 
     .spyglass-filters {
@@ -96,8 +112,8 @@
     .spyglass-filter-group select:focus,
     .spyglass-filter-group input:focus {
       outline: none;
-      border-color: #e85d04;
-      box-shadow: 0 0 0 3px rgba(232, 93, 4, 0.1);
+      border-color: #E03103;
+      box-shadow: 0 0 0 3px rgba(224, 49, 3, 0.1);
     }
 
     .spyglass-toggle-group {
@@ -125,7 +141,7 @@
     }
 
     .spyglass-toggle-btn.active {
-      background: #e85d04;
+      background: #E03103;
       color: white;
     }
 
@@ -134,7 +150,7 @@
     }
 
     .spyglass-btn-primary {
-      background: #e85d04;
+      background: #E03103;
       color: white;
       border: none;
       padding: 12px 24px;
@@ -147,7 +163,7 @@
     }
 
     .spyglass-btn-primary:hover {
-      background: #d14d00;
+      background: #c42a03;
     }
 
     .spyglass-btn-primary:active {
@@ -156,8 +172,8 @@
 
     .spyglass-btn-secondary {
       background: white;
-      color: #e85d04;
-      border: 2px solid #e85d04;
+      color: #E03103;
+      border: 2px solid #E03103;
       padding: 10px 22px;
       border-radius: 6px;
       font-family: inherit;
@@ -168,7 +184,7 @@
     }
 
     .spyglass-btn-secondary:hover {
-      background: #e85d04;
+      background: #E03103;
       color: white;
     }
 
@@ -197,9 +213,9 @@
     }
 
     .spyglass-view-btn.active {
-      background: #1a1a1a;
+      background: #222222;
       color: white;
-      border-color: #1a1a1a;
+      border-color: #222222;
     }
 
     .spyglass-view-btn svg {
@@ -292,7 +308,7 @@
     .spyglass-card-price {
       font-size: 1.25rem;
       font-weight: 700;
-      color: #1a1a1a;
+      color: #222222;
       margin-bottom: 8px;
     }
 
@@ -347,7 +363,7 @@
       width: 32px;
       height: 32px;
       border: 3px solid #e0e0e0;
-      border-top-color: #e85d04;
+      border-top-color: #E03103;
       border-radius: 50%;
       animation: spyglass-spin 0.8s linear infinite;
       margin-right: 12px;
@@ -388,8 +404,8 @@
     }
 
     .spyglass-page-btn:hover:not(:disabled) {
-      border-color: #e85d04;
-      color: #e85d04;
+      border-color: #E03103;
+      color: #E03103;
     }
 
     .spyglass-page-btn:disabled {
@@ -398,8 +414,8 @@
     }
 
     .spyglass-page-btn.active {
-      background: #e85d04;
-      border-color: #e85d04;
+      background: #E03103;
+      border-color: #E03103;
       color: white;
     }
 
@@ -447,7 +463,7 @@
       align-items: center;
       padding: 16px 20px;
       border-bottom: 1px solid #e0e0e0;
-      background: #1a1a1a;
+      background: #222222;
       color: white;
       border-radius: 12px 12px 0 0;
     }
@@ -464,7 +480,7 @@
 
     .spyglass-modal-gallery {
       position: relative;
-      background: #1a1a1a;
+      background: #222222;
     }
 
     .spyglass-modal-main-image {
@@ -478,7 +494,7 @@
       gap: 8px;
       padding: 12px;
       overflow-x: auto;
-      background: #1a1a1a;
+      background: #222222;
     }
 
     .spyglass-modal-thumb {
@@ -504,7 +520,7 @@
     .spyglass-modal-price {
       font-size: 2rem;
       font-weight: 700;
-      color: #1a1a1a;
+      color: #222222;
       margin-bottom: 8px;
     }
 
@@ -534,7 +550,7 @@
     .spyglass-modal-feature-value {
       font-size: 1.5rem;
       font-weight: 700;
-      color: #1a1a1a;
+      color: #222222;
     }
 
     .spyglass-modal-feature-label {
@@ -641,7 +657,7 @@
     }
 
     .spyglass-info-window-btn {
-      background: #e85d04;
+      background: #E03103;
       color: white;
       border: none;
       padding: 6px 12px;
@@ -754,11 +770,15 @@
 
     render() {
       const p = this.containerId;
+      const logoUrl = this.options.logoUrl || (this.options.apiUrl ? `${this.options.apiUrl}/spyglass-logo-white.png` : '/spyglass-logo-white.png');
       this.container.innerHTML = `
         <div class="spyglass-widget">
           <div class="spyglass-header">
-            <h2>Find Your Dream Home</h2>
-            <p>Search properties in Austin and surrounding areas</p>
+            <img src="${logoUrl}" alt="Spyglass Realty" class="spyglass-header-logo">
+            <div class="spyglass-header-content">
+              <h2>Find Your Dream Home</h2>
+              <p>Search properties in Austin and surrounding areas</p>
+            </div>
           </div>
 
           <div class="spyglass-filters">
@@ -1206,7 +1226,7 @@
           icon: {
             path: google.maps.SymbolPath.CIRCLE,
             scale: 8,
-            fillColor: '#e85d04',
+            fillColor: '#E03103',
             fillOpacity: 1,
             strokeColor: '#fff',
             strokeWeight: 2

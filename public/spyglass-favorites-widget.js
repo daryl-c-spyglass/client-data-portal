@@ -11,8 +11,10 @@
   };
 
   const STYLES = `
+    @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500;600;700&family=Poppins:wght@400;500;600;700&family=Lato:wght@400;700&display=swap');
+
     .spyglass-favorites-widget {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+      font-family: 'Poppins', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
       color: #333;
       line-height: 1.5;
     }
@@ -20,24 +22,35 @@
       box-sizing: border-box;
     }
     .spyglass-favorites-header {
-      background: #1a1a1a;
+      background: #000000;
       color: white;
       padding: 16px 20px;
       display: flex;
       align-items: center;
       justify-content: space-between;
       border-radius: 8px 8px 0 0;
+      gap: 16px;
+    }
+    .spyglass-favorites-header-logo {
+      height: 40px;
+      width: auto;
+    }
+    .spyglass-favorites-header-content {
+      display: flex;
+      align-items: center;
+      gap: 8px;
     }
     .spyglass-favorites-header h2 {
       margin: 0;
       font-size: 18px;
       font-weight: 600;
+      font-family: 'Playfair Display', serif;
       display: flex;
       align-items: center;
       gap: 8px;
     }
     .spyglass-favorites-header .heart-icon {
-      color: #e85d04;
+      color: #E03103;
     }
     .spyglass-favorites-tabs {
       display: flex;
@@ -51,14 +64,15 @@
       border-radius: 4px;
       cursor: pointer;
       font-size: 14px;
+      font-family: 'Lato', sans-serif;
       transition: all 0.2s;
     }
     .spyglass-favorites-tab:hover {
       background: rgba(255,255,255,0.1);
     }
     .spyglass-favorites-tab.active {
-      background: #e85d04;
-      border-color: #e85d04;
+      background: #E03103;
+      border-color: #E03103;
     }
     .spyglass-favorites-content {
       background: #fff;
@@ -78,7 +92,7 @@
       width: 32px;
       height: 32px;
       border: 3px solid #f3f3f3;
-      border-top: 3px solid #e85d04;
+      border-top: 3px solid #E03103;
       border-radius: 50%;
       animation: spin 1s linear infinite;
       margin-right: 12px;
@@ -99,11 +113,13 @@
     }
     .spyglass-favorites-empty h3 {
       margin: 0 0 8px 0;
-      color: #333;
+      color: #222222;
+      font-family: 'Playfair Display', serif;
     }
     .spyglass-favorites-empty p {
       margin: 0;
       font-size: 14px;
+      font-family: 'Lato', sans-serif;
     }
     .spyglass-favorites-grid {
       display: grid;
@@ -164,18 +180,18 @@
       height: 20px;
     }
     .spyglass-favorite-btn .heart-outline {
-      stroke: #e85d04;
+      stroke: #E03103;
       fill: none;
     }
     .spyglass-favorite-btn .heart-filled {
-      fill: #e85d04;
-      stroke: #e85d04;
+      fill: #E03103;
+      stroke: #E03103;
     }
     .spyglass-property-status {
       position: absolute;
       top: 10px;
       left: 10px;
-      background: #e85d04;
+      background: #E03103;
       color: white;
       padding: 4px 10px;
       border-radius: 4px;
@@ -184,7 +200,7 @@
     }
     .spyglass-property-status.pending {
       background: #fbbf24;
-      color: #1a1a1a;
+      color: #222222;
     }
     .spyglass-property-status.sold {
       background: #dc2626;
@@ -195,7 +211,7 @@
     .spyglass-property-price {
       font-size: 22px;
       font-weight: 700;
-      color: #1a1a1a;
+      color: #222222;
       margin: 0 0 8px 0;
     }
     .spyglass-property-address {
@@ -226,7 +242,7 @@
     .spyglass-login-prompt .icon {
       font-size: 48px;
       margin-bottom: 16px;
-      color: #e85d04;
+      color: #E03103;
     }
     .spyglass-login-prompt h3 {
       margin: 0 0 8px 0;
@@ -238,7 +254,7 @@
       font-size: 14px;
     }
     .spyglass-login-btn {
-      background: #e85d04;
+      background: #E03103;
       color: white;
       border: none;
       padding: 12px 32px;
@@ -249,7 +265,7 @@
       transition: background 0.2s;
     }
     .spyglass-login-btn:hover {
-      background: #d54e00;
+      background: #c42a03;
     }
     .spyglass-error {
       text-align: center;
@@ -258,7 +274,7 @@
     }
     .spyglass-error button {
       margin-top: 16px;
-      background: #e85d04;
+      background: #E03103;
       color: white;
       border: none;
       padding: 10px 24px;
@@ -288,9 +304,9 @@
       cursor: not-allowed;
     }
     .spyglass-pagination button.active {
-      background: #e85d04;
+      background: #E03103;
       color: white;
-      border-color: #e85d04;
+      border-color: #E03103;
     }
   `;
 
@@ -488,15 +504,19 @@
 
     render() {
       const hasUser = !!this.options.wpUserId;
+      const logoUrl = this.options.logoUrl || (this.options.apiUrl ? `${this.options.apiUrl}/spyglass-logo-white.png` : '/spyglass-logo-white.png');
       
       this.container.innerHTML = `
         <div class="spyglass-favorites-header">
-          <h2>
-            <svg class="heart-icon" width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
-              <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
-            </svg>
-            My Favorites
-          </h2>
+          <img src="${logoUrl}" alt="Spyglass Realty" class="spyglass-favorites-header-logo">
+          <div class="spyglass-favorites-header-content">
+            <h2>
+              <svg class="heart-icon" width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
+              </svg>
+              My Favorites
+            </h2>
+          </div>
           ${this.options.showPropertySearch ? `
             <div class="spyglass-favorites-tabs">
               <button class="spyglass-favorites-tab ${this.state.currentView === 'favorites' ? 'active' : ''}" 

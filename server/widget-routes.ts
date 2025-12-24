@@ -68,6 +68,16 @@ export function registerWidgetRoutes(app: Express): void {
     }
   });
 
+  // Serve logo for widgets
+  app.get('/spyglass-logo-white.png', (_req: Request, res: Response) => {
+    const logoPath = path.resolve(process.cwd(), 'public', 'spyglass-logo-white.png');
+    if (fs.existsSync(logoPath)) {
+      res.type('image/png').sendFile(logoPath);
+    } else {
+      res.status(404).send('Logo not found');
+    }
+  });
+
   app.use('/api/widget', widgetCors);
 
   app.get('/api/widget/search', async (req: Request, res: Response) => {
