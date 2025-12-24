@@ -1,0 +1,120 @@
+Replit Agent Prompt — Resolve Missing Agent Birthdays Using FUB People API (Stage = “Spyglass Agent”)
+
+We are missing birthdays for most agents in the Leads → Agent Insights panel. To resolve this, update the implementation to explicitly pull agent data from the Follow Up Boss People API using the stage=Spyglass Agent filter and map birthday fields correctly.
+
+1) Use the correct FUB endpoint for agents
+Endpoint (MUST USE)
+GET https://api.followupboss.com/v1/people?stage=Spyglass%20Agent
+
+
+This endpoint represents agents as people records, which is where birthday data is more reliably stored.
+
+2) Required fields to extract and normalize
+
+From each returned person record, extract and normalize ONLY the following fields:
+
+id
+
+name
+
+firstName
+
+lastName
+
+stage
+
+customBirthday ← primary birthday source
+
+Normalize into a server-side structure:
+
+type AgentProfile = {
+  id: string;
+  name: string;
+  firstName?: string;
+  lastName?: string;
+  birthday?: string | null;
+  stage: string;
+};
+
+
+Rules:
+
+birthday must be mapped from customBirthday
+
+If customBirthday is empty or missing:
+
+set birthday = null
+
+UI must show “Not on file”
+
+3) Integrate this with the existing Agent Insights panel
+Behavior
+
+When an agent is selected in Assigned Agent filter:
+
+Look up the agent in the cached Spyglass Agent people list
+
+Display:
+
+Birthday (from customBirthday)
+
+Home Anniversary (leave unchanged from current logic)
+
+Recent Activity (leave unchanged)
+
+Do NOT attempt to infer birthday from notes or activity.
+
+Caching (important)
+
+Cache the agent list server-side (TTL 5–15 minutes).
+
+Do not refetch this endpoint on every agent change.
+
+4) Fallback logic (must be explicit)
+
+If:
+
+stage=Spyglass Agent returns no results, OR
+
+the selected agent is not found in the response
+
+Then:
+
+Show Birthday = “Not on file”
+
+Add a dev-only console log explaining why (agent not found / missing field).
+
+Do NOT silently fail.
+
+5) UI requirements
+
+Birthday must be displayed in Agent Insights as:
+
+“Birthday: Jan 14” (formatted, no year unless required)
+
+or “Birthday: Not on file”
+
+If birthday exists, optionally highlight upcoming birthdays (nice-to-have, not required).
+
+6) Acceptance criteria (must pass)
+
+✅ Agents pulled from stage=Spyglass Agent
+✅ Birthday displayed when customBirthday exists
+✅ No raw HTML or debug output in UI
+✅ No duplicate API calls per agent selection
+✅ Works for multiple agents, not just one
+
+7) Deliverables
+
+File paths changed
+
+Confirmation that birthdays now come from:
+
+/v1/people?stage=Spyglass Agent
+
+
+Screenshot showing an agent with a populated birthday field
+
+Important
+
+This prompt does not replace existing Leads logic — it augments Agent Insights with a more reliable data source for birthdays.

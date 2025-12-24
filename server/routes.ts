@@ -5685,10 +5685,126 @@ OUTPUT JSON:
   });
 
   // ============================================================
+  // FUB Spyglass Agents Cache - People with stage=Spyglass Agent
+  // ============================================================
+  // Cache key for Spyglass Agent people list (10 min TTL)
+  const SPYGLASS_AGENTS_CACHE_KEY = 'fub_spyglass_agents';
+  const SPYGLASS_AGENTS_CACHE_TTL = 10 * 60 * 1000; // 10 minutes
+  
+  interface SpyglassAgentData {
+    id: number;
+    name: string;
+    firstName?: string;
+    lastName?: string;
+    email?: string;
+    customBirthday: string | null;
+    homeAnniversary: string | null;
+    stage: string;
+  }
+  
+  interface SpyglassAgentsCache {
+    byName: Record<string, SpyglassAgentData>;
+    byEmail: Record<string, SpyglassAgentData>;
+    all: SpyglassAgentData[];
+  }
+  
+  // Helper to fetch and cache Spyglass Agent people list
+  async function getSpyglassAgents(): Promise<SpyglassAgentsCache> {
+    const cached = fubCache.get(SPYGLASS_AGENTS_CACHE_KEY);
+    if (cached && Date.now() - cached.timestamp < SPYGLASS_AGENTS_CACHE_TTL) {
+      console.log('[FUB Spyglass Agents] Cache hit');
+      return cached.data as SpyglassAgentsCache;
+    }
+    
+    console.log('[FUB Spyglass Agents] Fetching from People API with stage=Spyglass Agent');
+    
+    const cache: SpyglassAgentsCache = { byName: {}, byEmail: {}, all: [] };
+    let offset = 0;
+    const limit = 100;
+    let hasMore = true;
+    
+    while (hasMore) {
+      const params = new URLSearchParams();
+      params.append('stage', 'Spyglass Agent');
+      params.append('limit', String(limit));
+      params.append('offset', String(offset));
+      
+      const { data } = await fubApiRequest(`/people?${params.toString()}`);
+      const people = data?.people || [];
+      
+      for (const person of people) {
+        const agentData: SpyglassAgentData = {
+          id: person.id,
+          name: person.name || `${person.firstName || ''} ${person.lastName || ''}`.trim(),
+          firstName: person.firstName,
+          lastName: person.lastName,
+          email: person.emails?.[0]?.value,
+          customBirthday: person.customBirthday || null,
+          homeAnniversary: person.customHomeAnniversary || person.customAnniversary || null,
+          stage: person.stage,
+        };
+        
+        cache.all.push(agentData);
+        
+        // Index by normalized name for matching
+        const fullName = agentData.name.toLowerCase().replace(/\s+/g, ' ').trim();
+        if (fullName) {
+          cache.byName[fullName] = agentData;
+        }
+        
+        // Also index by email for matching
+        if (agentData.email) {
+          cache.byEmail[agentData.email.toLowerCase()] = agentData;
+        }
+      }
+      
+      hasMore = people.length === limit;
+      offset += limit;
+    }
+    
+    console.log(`[FUB Spyglass Agents] Cached ${cache.all.length} agents (${Object.keys(cache.byName).length} by name, ${Object.keys(cache.byEmail).length} by email)`);
+    fubCache.set(SPYGLASS_AGENTS_CACHE_KEY, { data: cache, timestamp: Date.now() });
+    
+    return cache;
+  }
+  
+  // Helper to find agent in Spyglass cache by name or email
+  function findSpyglassAgent(cache: SpyglassAgentsCache, name: string, email?: string | null): SpyglassAgentData | null {
+    // Try email match first (most reliable)
+    if (email) {
+      const byEmail = cache.byEmail[email.toLowerCase()];
+      if (byEmail) return byEmail;
+    }
+    
+    // Try exact name match
+    const normalizedName = name.toLowerCase().replace(/\s+/g, ' ').trim();
+    const byName = cache.byName[normalizedName];
+    if (byName) return byName;
+    
+    // Try fuzzy name match (first + last name components)
+    const nameParts = normalizedName.split(' ').filter(Boolean);
+    if (nameParts.length >= 2) {
+      const firstName = nameParts[0];
+      const lastName = nameParts[nameParts.length - 1];
+      
+      for (const agent of cache.all) {
+        const agentFirst = (agent.firstName || '').toLowerCase();
+        const agentLast = (agent.lastName || '').toLowerCase();
+        if (agentFirst === firstName && agentLast === lastName) {
+          return agent;
+        }
+      }
+    }
+    
+    return null;
+  }
+
+  // ============================================================
   // FUB Agent Profile Endpoint - Birthday, Home Anniversary
   // ============================================================
   // GET /api/fub/agent/:agentId/profile
-  // Returns agent profile with birthday and home anniversary (from custom fields)
+  // Returns agent profile with birthday and home anniversary
+  // Birthday sourced from People API (stage=Spyglass Agent) customBirthday field
   app.get("/api/fub/agent/:agentId/profile", async (req, res) => {
     try {
       const { agentId } = req.params;
@@ -5708,50 +5824,75 @@ OUTPUT JSON:
         return;
       }
       
-      // Fetch user details from FUB
+      // Fetch user details from FUB Users API
       const { data: userResponse } = await fubApiRequest(`/users/${agentId}`);
       const user = userResponse;
       
-      // FUB may store birthday and home anniversary in custom fields
-      // Common field names to check: birthday, homeAnniversary, home_anniversary, anniversaryDate
-      const customFields = user.customFields || user.customProperties || [];
+      const agentName = `${user.firstName || ''} ${user.lastName || ''}`.trim() || user.name || 'Unknown';
       
-      // Helper to find custom field value
-      const findCustomField = (names: string[]): string | null => {
-        for (const name of names) {
-          const field = customFields.find((f: any) => 
-            f.name?.toLowerCase() === name.toLowerCase() || 
-            f.key?.toLowerCase() === name.toLowerCase()
-          );
-          if (field?.value) return field.value;
+      // Fetch birthday from Spyglass Agent people list
+      let birthday: string | null = null;
+      let homeAnniversary: string | null = null;
+      let birthdaySource = 'not_found';
+      
+      try {
+        const spyglassCache = await getSpyglassAgents();
+        
+        // Find agent by name or email
+        const agentData = findSpyglassAgent(spyglassCache, agentName, user.email);
+        
+        if (agentData) {
+          birthday = agentData.customBirthday || null;
+          homeAnniversary = agentData.homeAnniversary || null;
+          birthdaySource = birthday ? 'spyglass_agent_people' : 'not_in_record';
+          console.log(`[FUB Agent Profile] Agent ${agentName}: birthday=${birthday}, source=${birthdaySource}`);
+        } else {
+          console.log(`[FUB Agent Profile] Agent ${agentName} (ID: ${agentId}) not found in Spyglass Agent stage`);
+          birthdaySource = 'agent_not_in_spyglass_stage';
         }
-        // Also check direct properties
-        for (const name of names) {
-          const key = name.replace(/[_-]/g, '');
-          const val = user[name] || user[key] || user[name.toLowerCase()];
-          if (val) return val;
+      } catch (spyglassError: any) {
+        console.error(`[FUB Agent Profile] Failed to fetch Spyglass agents: ${spyglassError.message}`);
+        birthdaySource = 'spyglass_fetch_error';
+      }
+      
+      // Fallback: check user custom fields if birthday not found
+      if (!birthday) {
+        const customFields = user.customFields || user.customProperties || [];
+        const findCustomField = (names: string[]): string | null => {
+          for (const name of names) {
+            const field = customFields.find((f: any) => 
+              f.name?.toLowerCase() === name.toLowerCase() || 
+              f.key?.toLowerCase() === name.toLowerCase()
+            );
+            if (field?.value) return field.value;
+          }
+          return null;
+        };
+        birthday = findCustomField(['birthday', 'birthdate', 'customBirthday']);
+        if (birthday) birthdaySource = 'user_custom_fields';
+        
+        if (!homeAnniversary) {
+          homeAnniversary = findCustomField(['homeAnniversary', 'home_anniversary', 'anniversaryDate']);
         }
-        return null;
-      };
+      }
       
       const profile = {
         agentId: String(user.id),
-        agentName: `${user.firstName || ''} ${user.lastName || ''}`.trim() || user.name || 'Unknown',
+        agentName,
         email: user.email,
         phone: user.phones?.[0]?.value || user.phone || null,
-        birthday: findCustomField(['birthday', 'birthdate', 'birth_date', 'dateOfBirth']),
-        homeAnniversary: findCustomField(['homeAnniversary', 'home_anniversary', 'anniversaryDate', 'homeClosingDate']),
+        birthday,
+        homeAnniversary,
         role: user.role,
         createdAt: user.created,
-        customFields: customFields.map((f: any) => ({ name: f.name || f.key, value: f.value })),
         dataSource: 'Follow Up Boss',
+        birthdaySource,
         fetchedAt: new Date().toISOString(),
-        note: !findCustomField(['birthday']) ? 'Birthday not found in standard or custom fields' : null,
       };
       
       fubCache.set(cacheKey, { data: profile, timestamp: Date.now() });
       
-      console.log(`[FUB Agent Profile] Profile fetched for ${profile.agentName}`);
+      console.log(`[FUB Agent Profile] Profile fetched for ${profile.agentName}, birthday: ${birthday || 'Not on file'}`);
       res.json(profile);
       
     } catch (error: any) {

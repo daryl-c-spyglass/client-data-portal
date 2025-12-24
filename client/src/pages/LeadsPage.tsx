@@ -198,10 +198,32 @@ function AgentDetailsCard({
     return null;
   }
 
-  const formatDateSafe = (dateStr?: string | null) => {
+  const formatDateSafe = (dateStr?: string | null, includeYear = true) => {
     if (!dateStr) return null;
     try {
-      return format(parseISO(dateStr), "MMM d, yyyy");
+      let date: Date;
+      
+      // Handle various date formats: ISO, MM/DD, MM-DD, MM/DD/YYYY
+      if (dateStr.includes('T') || /^\d{4}-\d{2}-\d{2}/.test(dateStr)) {
+        // ISO format
+        date = parseISO(dateStr);
+      } else if (/^\d{1,2}[/-]\d{1,2}([/-]\d{2,4})?$/.test(dateStr)) {
+        // MM/DD or MM-DD or MM/DD/YYYY format
+        const parts = dateStr.split(/[/-]/);
+        const month = parseInt(parts[0], 10) - 1;
+        const day = parseInt(parts[1], 10);
+        const year = parts[2] ? (parts[2].length === 2 ? 2000 + parseInt(parts[2], 10) : parseInt(parts[2], 10)) : new Date().getFullYear();
+        date = new Date(year, month, day);
+      } else {
+        // Fallback: try native Date parsing
+        date = new Date(dateStr);
+      }
+      
+      if (isNaN(date.getTime())) {
+        return dateStr;
+      }
+      
+      return format(date, includeYear ? "MMM d, yyyy" : "MMM d");
     } catch {
       return dateStr;
     }
@@ -223,7 +245,7 @@ function AgentDetailsCard({
             <div>
               <p className="text-xs text-muted-foreground">Birthday</p>
               <p className="text-sm font-medium">
-                {formatDateSafe(profile.birthday) || "Not on file"}
+                {formatDateSafe(profile.birthday, false) || "Not on file"}
               </p>
             </div>
           </div>
