@@ -1,0 +1,81 @@
+Replit Agent Prompt — Strip/Render HTML in FUB Notes (Show Clean Text + Full Details)
+
+In the Leads → Agent Insights → Recent Activity feed, note content is displaying raw HTML like:
+
+<p><span data-user-id="61">Jeremy McHaney</span> - texted these folks...
+
+We need to fix this so users see clean, readable note text (no HTML tags), and make sure the full note details are visible.
+
+1) Fix note rendering (no HTML shown)
+Requirements
+
+Notes coming from FUB may include HTML markup (e.g., <p>, <span data-user-id=...>).
+
+In the UI, display plain text only:
+
+Convert HTML to text safely (strip tags)
+
+Preserve spacing/line breaks where possible
+
+Implementation (strict)
+
+Do not render HTML directly via dangerouslySetInnerHTML.
+
+Add a reusable utility function, e.g.:
+
+sanitizeFubNoteText(input: string): string
+
+Use one of these safe approaches:
+
+Convert HTML → text using DOM parsing (preferred in browser code)
+
+Strip tags using a safe sanitizer library (if already installed)
+
+Server-side: return a text field derived from HTML so the client never sees HTML
+
+2) Preserve meaningful formatting
+Requirements
+
+Keep line breaks:
+
+<br> and </p> should become \n
+
+Collapse excessive whitespace
+
+Convert HTML entities (e.g., &amp;) to normal characters
+
+3) Show full note content (no truncation)
+Requirements
+
+In Recent Activity list:
+
+Show up to 2 lines preview (optional)
+
+Add “View more” / expand to show full note text
+
+When expanded, show the entire note content (not cut off mid-sentence).
+
+4) Apply this consistently
+
+This fix must apply to:
+
+Agent Insights → Recent Activity notes
+
+Lead detail drawer/page notes (if implemented)
+
+Any other component that displays FUB notes/comments
+
+5) Acceptance tests (must pass)
+
+✅ Notes display clean text (no <p>, <span>, or HTML attributes)
+✅ Author name appears as normal text if present (e.g., “Jeremy McHaney - …”)
+✅ Full content can be viewed (expand or modal)
+✅ No XSS risk / no direct HTML rendering
+
+Deliverables
+
+File paths changed
+
+Confirm where conversion happens (server vs client)
+
+Screenshot showing a previously broken note now rendered cleanly

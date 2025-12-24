@@ -8,10 +8,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { UserCircle, Mail, Phone, Tag, Clock, AlertCircle, RefreshCw, Search, ArrowDownUp, Loader2, Cake, Home, Activity, MessageSquare, X } from "lucide-react";
+import { UserCircle, Mail, Phone, Tag, Clock, AlertCircle, RefreshCw, Search, ArrowDownUp, Loader2, Cake, Home, Activity, MessageSquare, X, ChevronDown, ChevronUp } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { format, parseISO, formatDistanceToNow } from "date-fns";
+import { sanitizeFubNoteText } from "@/lib/utils";
 
 interface Lead {
   id: string;
@@ -89,6 +90,51 @@ function getInitials(name: string): string {
     .join("")
     .toUpperCase()
     .slice(0, 2);
+}
+
+function ActivityItem({ item }: { item: AgentActivity }) {
+  const [isExpanded, setIsExpanded] = useState(false);
+  const cleanText = sanitizeFubNoteText(item.summary);
+  const isLong = cleanText.length > 120;
+  const previewText = isLong && !isExpanded ? cleanText.slice(0, 120) + "..." : cleanText;
+  
+  return (
+    <div 
+      className="flex items-start gap-2 p-2 rounded bg-muted/50 text-sm"
+      data-testid={`activity-item-${item.id}`}
+    >
+      <MessageSquare className="h-3 w-3 mt-1 text-muted-foreground shrink-0" />
+      <div className="min-w-0 flex-1">
+        <div className="flex items-center gap-2 flex-wrap">
+          <Badge variant="outline" className="text-xs">
+            {item.type}
+          </Badge>
+          <span className="text-xs text-muted-foreground">
+            {formatDistanceToNow(parseISO(item.occurredAt), { addSuffix: true })}
+          </span>
+        </div>
+        <p className="text-xs mt-1 whitespace-pre-wrap break-words">
+          {previewText}
+        </p>
+        {isLong && (
+          <button
+            onClick={() => setIsExpanded(!isExpanded)}
+            className="text-xs text-primary hover:underline mt-1 flex items-center gap-1"
+            data-testid={`button-expand-activity-${item.id}`}
+          >
+            {isExpanded ? (
+              <>Show less <ChevronUp className="h-3 w-3" /></>
+            ) : (
+              <>Show more <ChevronDown className="h-3 w-3" /></>
+            )}
+          </button>
+        )}
+        {item.leadName && (
+          <p className="text-xs text-muted-foreground mt-1">Lead: {item.leadName}</p>
+        )}
+      </div>
+    </div>
+  );
 }
 
 function AgentDetailsCard({ 
@@ -215,29 +261,9 @@ function AgentDetailsCard({
               )}
             </div>
           ) : activity && activity.recentActivity.length > 0 ? (
-            <div className="space-y-2 max-h-48 overflow-y-auto">
+            <div className="space-y-2 max-h-64 overflow-y-auto">
               {activity.recentActivity.slice(0, 10).map((item) => (
-                <div 
-                  key={item.id} 
-                  className="flex items-start gap-2 p-2 rounded bg-muted/50 text-sm"
-                  data-testid={`activity-item-${item.id}`}
-                >
-                  <MessageSquare className="h-3 w-3 mt-1 text-muted-foreground shrink-0" />
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <Badge variant="outline" className="text-xs">
-                        {item.type}
-                      </Badge>
-                      <span className="text-xs text-muted-foreground">
-                        {formatDistanceToNow(parseISO(item.occurredAt), { addSuffix: true })}
-                      </span>
-                    </div>
-                    <p className="text-xs mt-1 truncate">{item.summary}</p>
-                    {item.leadName && (
-                      <p className="text-xs text-muted-foreground">Lead: {item.leadName}</p>
-                    )}
-                  </div>
-                </div>
+                <ActivityItem key={item.id} item={item} />
               ))}
             </div>
           ) : (
