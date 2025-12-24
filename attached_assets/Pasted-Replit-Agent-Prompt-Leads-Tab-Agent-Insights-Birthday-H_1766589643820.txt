@@ -1,0 +1,149 @@
+Replit Agent Prompt — Leads Tab: Agent Insights (Birthday, Home Anniversary, Activity) + Make Tags Clickable
+
+The Leads section is still missing required features from the previous prompt. This task is to fully implement those missing items and fix tag visibility/usability.
+
+1) Leads Tab — Agent Insights (MUST IMPLEMENT)
+Goal
+
+In the Leads tab (left navigation), surface agent-specific insights pulled from Follow Up Boss (FUB).
+
+Required data (per agent)
+
+When an agent is selected (or when “All agents” is selected and grouped):
+
+Agent Birthday
+
+Agent Home Anniversary
+
+Recent Activity (from FUB timeline)
+
+UI Requirements
+
+Add an Agent Insights panel at the top of the Leads page (or in the right column if available).
+
+Display:
+
+🎂 Birthday (formatted date or “Not on file”)
+
+🏠 Home Anniversary (formatted date or “Not on file”)
+
+📌 Recent Activity (last 10 items max)
+
+Activity type (call, email, text, note, task, etc.)
+
+Timestamp
+
+Related lead name (if applicable)
+
+Behavior
+
+If All agents is selected:
+
+Show a grouped list OR
+
+Require selecting a specific agent to view insights (acceptable, but must be explicit in UI).
+
+Switching the agent filter must refresh the insights panel.
+
+If data does not exist, show a clear empty state (not blank).
+
+2) FUB API — Data Requirements (NO MOCKS)
+You must:
+
+Use real FUB API endpoints (same auth already used for Leads list).
+
+Pull:
+
+Agent profile data (birthday if available)
+
+Custom fields for home anniversary (if stored as custom field — document key used)
+
+Recent activity / timeline events
+
+Add server routes if missing:
+
+GET /api/fub/agent/:agentId/profile
+
+GET /api/fub/agent/:agentId/activity?limit=10
+
+Normalize responses before sending to UI.
+
+3) Make Lead Tags (+7, +11, etc.) Visible & Clickable (MUST FIX)
+Problem
+
+Leads currently show +7, +11, etc., but users cannot see or interact with those tags.
+
+Required behavior
+
+These numbers represent hidden tags.
+
+Clicking +N must:
+
+Open a popover / modal
+
+Display the full list of tags for that lead
+
+Tags must be:
+
+Clearly readable
+
+Scrollable if long
+
+Dismissible (click outside / close button)
+
+Optional enhancement (recommended)
+
+Make individual tags clickable to:
+
+Filter leads by that tag
+
+Or copy tag text
+
+4) UX & Accessibility Rules (STRICT)
+
+No silent failures
+
+No hidden data without explanation
+
+Loading states for:
+
+Agent insights
+
+Activity feed
+
+Error state if FUB fails:
+
+“Unable to load agent insights. Retry.”
+
+5) Acceptance Criteria (ALL MUST PASS)
+
+✅ Agent Birthday is visible (or “Not on file”)
+✅ Home Anniversary is visible (or “Not on file”)
+✅ Recent Activity shows real FUB events
+✅ Switching agents updates the panel
+✅ Clicking +N shows full tag list
+✅ No raw +7 / +11 without interaction
+✅ No mock/demo data
+
+6) Deliverables
+
+File paths changed
+
+FUB endpoints used (documented in code comments)
+
+Screenshot showing:
+
+Agent Insights panel
+
+Clicked tag popover with full tag list
+
+Important
+
+If any of the above cannot be implemented due to missing FUB fields, do not skip it.
+Instead:
+
+Surface a visible placeholder
+
+Add a code comment explaining what field is missing and why
+
+This task is not complete until all acceptance criteria are met.

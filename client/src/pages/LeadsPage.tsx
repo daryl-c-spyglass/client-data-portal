@@ -8,7 +8,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { UserCircle, Mail, Phone, Tag, Clock, AlertCircle, RefreshCw, Search, ArrowDownUp, Loader2, Cake, Home, Activity, MessageSquare } from "lucide-react";
+import { UserCircle, Mail, Phone, Tag, Clock, AlertCircle, RefreshCw, Search, ArrowDownUp, Loader2, Cake, Home, Activity, MessageSquare, X } from "lucide-react";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { format, parseISO, formatDistanceToNow } from "date-fns";
 
 interface Lead {
@@ -93,11 +95,17 @@ function AgentDetailsCard({
   activity,
   isLoadingProfile,
   isLoadingActivity,
+  profileError,
+  activityError,
+  onRetry,
 }: { 
   profile?: AgentProfile;
   activity?: AgentActivityData;
   isLoadingProfile: boolean;
   isLoadingActivity: boolean;
+  profileError?: Error | null;
+  activityError?: Error | null;
+  onRetry?: () => void;
 }) {
   if (isLoadingProfile) {
     return (
@@ -105,13 +113,35 @@ function AgentDetailsCard({
         <CardHeader>
           <CardTitle className="text-lg flex items-center gap-2">
             <UserCircle className="h-5 w-5" />
-            Agent Details
+            Agent Insights
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-3">
           <Skeleton className="h-4 w-48" />
           <Skeleton className="h-4 w-36" />
           <Skeleton className="h-4 w-40" />
+        </CardContent>
+      </Card>
+    );
+  }
+
+  if (profileError) {
+    return (
+      <Card className="border-destructive/50">
+        <CardHeader>
+          <CardTitle className="text-lg flex items-center gap-2">
+            <AlertCircle className="h-5 w-5 text-destructive" />
+            Agent Insights
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <p className="text-sm text-muted-foreground mb-3">Unable to load agent insights.</p>
+          {onRetry && (
+            <Button variant="outline" size="sm" onClick={onRetry} data-testid="button-retry-insights">
+              <RefreshCw className="h-4 w-4 mr-2" />
+              Retry
+            </Button>
+          )}
         </CardContent>
       </Card>
     );
@@ -131,11 +161,11 @@ function AgentDetailsCard({
   };
 
   return (
-    <Card data-testid="card-agent-details">
+    <Card data-testid="card-agent-insights">
       <CardHeader>
         <CardTitle className="text-lg flex items-center gap-2">
           <UserCircle className="h-5 w-5" />
-          Agent Details
+          Agent Insights
         </CardTitle>
         <CardDescription>{profile.agentName}</CardDescription>
       </CardHeader>
@@ -172,6 +202,16 @@ function AgentDetailsCard({
               <Skeleton className="h-10 w-full" />
               <Skeleton className="h-10 w-full" />
               <Skeleton className="h-10 w-full" />
+            </div>
+          ) : activityError ? (
+            <div className="text-center py-4">
+              <p className="text-sm text-muted-foreground mb-2">Unable to load activity feed.</p>
+              {onRetry && (
+                <Button variant="outline" size="sm" onClick={onRetry} data-testid="button-retry-activity">
+                  <RefreshCw className="h-4 w-4 mr-2" />
+                  Retry
+                </Button>
+              )}
             </div>
           ) : activity && activity.recentActivity.length > 0 ? (
             <div className="space-y-2 max-h-48 overflow-y-auto">
@@ -264,7 +304,37 @@ function LeadCard({ lead }: { lead: Lead }) {
               </Badge>
             ))}
             {lead.tags.length > 5 && (
-              <span className="text-xs text-muted-foreground">+{lead.tags.length - 5}</span>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button 
+                    variant="ghost" 
+                    size="sm" 
+                    className="h-5 px-2 text-xs text-muted-foreground hover:text-foreground"
+                    data-testid={`button-more-tags-${lead.id}`}
+                  >
+                    +{lead.tags.length - 5} more
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-64 p-0" align="start">
+                  <div className="flex items-center justify-between p-3 border-b">
+                    <h4 className="font-medium text-sm">All Tags ({lead.tags.length})</h4>
+                  </div>
+                  <ScrollArea className="max-h-48">
+                    <div className="p-3 flex flex-wrap gap-1">
+                      {lead.tags.map((tag) => (
+                        <Badge 
+                          key={tag} 
+                          variant="outline" 
+                          className="text-xs"
+                          data-testid={`tag-${tag}`}
+                        >
+                          {tag}
+                        </Badge>
+                      ))}
+                    </div>
+                  </ScrollArea>
+                </PopoverContent>
+              </Popover>
             )}
           </div>
         )}
@@ -347,7 +417,7 @@ export default function LeadsPage() {
   });
   
   // Fetch agent profile when a specific agent is selected
-  const { data: agentProfile, isLoading: isLoadingProfile } = useQuery<AgentProfile>({
+  const { data: agentProfile, isLoading: isLoadingProfile, error: profileError, refetch: refetchProfile } = useQuery<AgentProfile>({
     queryKey: ["/api/fub/agent", selectedUserId, "profile"],
     queryFn: async () => {
       const res = await fetch(`/api/fub/agent/${selectedUserId}/profile`, {
@@ -359,10 +429,11 @@ export default function LeadsPage() {
       return res.json();
     },
     enabled: statusData?.configured === true && selectedUserId !== "all",
+    retry: 1,
   });
   
   // Fetch agent activity when a specific agent is selected
-  const { data: agentActivity, isLoading: isLoadingActivity } = useQuery<AgentActivityData>({
+  const { data: agentActivity, isLoading: isLoadingActivity, error: activityError, refetch: refetchActivity } = useQuery<AgentActivityData>({
     queryKey: ["/api/fub/agent", selectedUserId, "activity"],
     queryFn: async () => {
       const res = await fetch(`/api/fub/agent/${selectedUserId}/activity?limit=20`, {
@@ -374,6 +445,7 @@ export default function LeadsPage() {
       return res.json();
     },
     enabled: statusData?.configured === true && selectedUserId !== "all",
+    retry: 1,
   });
   
   // Combine all pages of leads and sort client-side
@@ -532,13 +604,29 @@ export default function LeadsPage() {
         </CardContent>
       </Card>
       
-      {/* Agent Details Card - shown when a specific agent is selected */}
-      {selectedUserId !== "all" && (
+      {/* Agent Insights Card - shown when a specific agent is selected */}
+      {selectedUserId === "all" ? (
+        <Card className="border-dashed" data-testid="card-select-agent-prompt">
+          <CardContent className="py-6 text-center">
+            <UserCircle className="h-8 w-8 mx-auto text-muted-foreground mb-2" />
+            <p className="text-sm font-medium">Agent Insights</p>
+            <p className="text-sm text-muted-foreground mt-1">
+              Select an agent from the filter above to view their birthday, home anniversary, and recent activity.
+            </p>
+          </CardContent>
+        </Card>
+      ) : (
         <AgentDetailsCard
           profile={agentProfile}
           activity={agentActivity}
           isLoadingProfile={isLoadingProfile}
           isLoadingActivity={isLoadingActivity}
+          profileError={profileError as Error | null}
+          activityError={activityError as Error | null}
+          onRetry={() => {
+            refetchProfile();
+            refetchActivity();
+          }}
         />
       )}
       
