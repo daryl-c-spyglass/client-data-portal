@@ -36,13 +36,14 @@
       width: auto;
     }
     .spyglass-favorites-header-content {
+      flex: 1;
       display: flex;
       align-items: center;
       gap: 8px;
     }
     .spyglass-favorites-header h2 {
       margin: 0;
-      font-size: 18px;
+      font-size: 1.25rem;
       font-weight: 600;
       font-family: 'Playfair Display', serif;
       display: flex;
