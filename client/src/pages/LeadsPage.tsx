@@ -21,6 +21,7 @@ interface Lead {
   source?: string;
   stage?: string;
   assignedTo?: string;
+  assignedUserId?: string;
   createdAt?: string;
   lastActivity?: string;
   tags: string[];
@@ -524,8 +525,8 @@ export default function LeadsPage() {
   
   const handleLeadClick = useCallback((lead: Lead) => {
     setSelectedLeadId(lead.id);
-    if (lead.assignedTo) {
-      setSelectedUserId(lead.assignedTo);
+    if (lead.assignedUserId) {
+      setSelectedUserId(lead.assignedUserId);
       setShowNoAgentMessage(false);
     } else {
       setSelectedUserId("all");
