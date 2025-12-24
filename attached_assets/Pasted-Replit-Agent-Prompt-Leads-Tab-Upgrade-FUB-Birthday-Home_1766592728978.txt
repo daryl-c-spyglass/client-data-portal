@@ -1,0 +1,203 @@
+Replit Agent Prompt — Leads Tab Upgrade (FUB: Birthday + Home Anniversary + Recent Activity + Tags UX + Typeahead Search)
+
+You are working in the existing Mission Control web app.
+
+Goal
+
+Upgrade the Leads page so it supports:
+
+Agent-level milestones (Birthday, Home Anniversary, Recent Activity) pulled from Follow Up Boss (FUB)
+
+Better tag display UX (no more confusing “+7/+11” without visibility)
+
+A proper search UX (autocomplete suggestions while typing + dedicated Search button)
+
+Do not ship a partial implementation. If a data field is missing in FUB (e.g., birthdays not populated), the UI must clearly show that and we must provide a fallback plan (custom fields).
+
+1) Fix “Birthdays missing for most agents” (Root cause + Correct approach)
+A) Determine where “Birthday” & “Home Anniversary” live
+
+In FUB, these are commonly stored as custom fields (date type), not guaranteed to exist by default.
+
+Implement this discovery flow on server side:
+
+Call GET https://api.followupboss.com/v1/customFields
+
+Find custom fields that match these labels/names (case-insensitive):
+
+“Birthday”, “Birth Date”, “Date of Birth”
+
+“Home Anniversary”, “Closing Anniversary”, “Purchase Anniversary”, “Close Date”
+
+Store the resolved custom field “name” keys (the API returns both label and name). 
+Follow Up Boss
+
+If not found:
+
+Return birthdayFieldKey = null, homeAnniversaryFieldKey = null
+
+UI must show: “Not set in FUB (missing custom field)” and add a small helper note: “Admin needs to create/populate these custom date fields in FUB.”
+
+B) Fetch the data from People/Users
+
+For each lead/person record we display, also parse these fields if available:
+
+custom.<birthdayFieldKey>
+
+custom.<homeAnniversaryFieldKey>
+(Exact shape depends on your existing People mapping—keep it consistent with how other custom fields are represented.)
+
+FUB “people” endpoint supports custom fields and filtering logic; use it as the canonical data source for leads. 
+Follow Up Boss
++1
+
+2) Leads Tab (Left Nav) — Show Agent Birthday, Home Anniversary, Recent Activity
+A) UI placement (top of Leads page, below Filters)
+
+Add a new “Agent Insights” strip/card that updates when:
+
+Assigned Agent filter changes OR
+
+Search targets a specific lead OR
+
+“All agents” is selected
+
+When Assigned Agent = a specific agent:
+Show:
+
+Agent Birthday (if available)
+
+Agent Home Anniversary (if available)
+
+Recent Activity summary: last activity type + timestamp + subject (see activity logic below)
+
+When Assigned Agent = All agents:
+Show:
+
+A compact summary: “Showing All Agents”
+
+Still show “Recent Activity” as: most recent activity across currently loaded leads
+
+Tooltips/hover on items in Month/Week/Day calendar is separate; here it’s Leads page only.
+
+B) Recent Activity definition
+
+Implement “Recent Activity” using the best available FUB data you already pull (don’t invent fields):
+
+If leads payload includes a last activity field (common in CRMs), use it.
+
+If not included, add a lightweight server call to fetch recent events/notes only when needed (guarded by caching + only for selected agent).
+
+Must be resilient: if activity data cannot be fetched, show “No recent activity found” (not a hard error).
+
+3) Make the “+7 / +11” tags visible + clickable
+
+Right now tags show as a truncated count (“+7”). Replace with:
+
+A) Inline tags
+
+Show up to 3 tags as chips
+
+If more than 3 tags:
+
+show +N more chip
+
+clicking opens a small popover/modal listing all tags (searchable optional, but at least scrollable)
+
+B) Hover UX
+
+Hovering on +N more should show a tooltip preview of the next ~5 tags
+
+Clicking opens the full list
+
+C) No tags case
+
+Show “No tags” (subtle)
+
+4) Search UX: Autocomplete suggestions + Search button (Refresh becomes Search)
+A) Replace behavior
+
+Currently typing does nothing except filtering after refresh. Change to:
+
+As user types in Search input:
+
+after 250–400ms debounce, fetch suggestions and show dropdown
+
+suggestions are lead names (and optionally email/phone)
+
+User can:
+
+click a suggestion to apply it and run search immediately
+
+press Enter to run search
+
+click Search button to run search
+
+Important: When search input has any value, the orange button should label Search (not Refresh).
+When search input is empty, it becomes Refresh.
+
+B) Suggestions requirements
+
+Use server endpoint: /api/fub/leads/suggest?q=...&agentId=...
+
+Results:
+
+must include enough to disambiguate (name + email or phone)
+
+limit to 8–12 items
+
+keyboard navigation (up/down + enter) if feasible, but at least clickable
+
+C) Ensure “All leads show up when scrolling”
+
+Your existing list shows “Showing 50 … scroll for more”.
+Fix the agent dropdown limitation + ensure full pagination works:
+
+Implement infinite scroll using FUB pagination until no more results
+
+Must work for:
+
+All agents
+
+Single agent
+
+Search mode
+
+5) Assigned Agent dropdown must show ALL agents alphabetically
+Requirements
+
+When user opens “Assigned Agent” dropdown:
+
+load full agent/user list from FUB
+
+sort A→Z by display name
+
+“All agents” at top
+
+No “limited names” issue: if FUB paginates users, handle pagination until complete.
+
+6) Deliverables (must provide in final answer)
+
+File paths changed
+
+What endpoints were added/used
+
+Confirm:
+
+Birthday/Home Anniversary resolution via GET /v1/customFields
+
+Tags popover works
+
+Autocomplete suggestions work + Search button logic works
+
+Agent dropdown shows all agents A→Z
+
+Infinite scrolling loads beyond first page
+
+References (use these while implementing)
+
+Follow Up Boss custom fields endpoint (GET /v1/customFields) 
+Follow Up Boss
+
+Follow Up Boss people endpoint notes about custom fields 
+Follow Up Boss
