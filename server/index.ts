@@ -4,6 +4,7 @@ import cookieParser from "cookie-parser";
 import passport from "passport";
 import ConnectPgSimple from "connect-pg-simple";
 import { Pool } from "@neondatabase/serverless";
+import path from "path";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 import { seedData } from "./seed-data";
@@ -13,6 +14,9 @@ import { startMLSGridScheduledSync, triggerManualSync } from "./mlsgrid-sync";
 import { startEmailScheduler } from "./email-scheduler";
 
 const app = express();
+
+// Serve static files from public folder (logos, widget JS, etc.)
+app.use(express.static(path.join(process.cwd(), 'public')));
 
 // Cookie parser for lead gate tracking
 app.use(cookieParser());
