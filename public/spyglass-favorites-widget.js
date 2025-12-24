@@ -213,22 +213,26 @@
       font-weight: 700;
       color: #222222;
       margin: 0 0 8px 0;
+      font-family: 'Playfair Display', serif;
     }
     .spyglass-property-address {
       font-size: 14px;
       color: #333;
       margin: 0 0 4px 0;
+      font-family: 'Poppins', sans-serif;
     }
     .spyglass-property-location {
       font-size: 13px;
       color: #666;
       margin: 0 0 12px 0;
+      font-family: 'Poppins', sans-serif;
     }
     .spyglass-property-details {
       display: flex;
       gap: 16px;
       font-size: 13px;
       color: #666;
+      font-family: 'Poppins', sans-serif;
     }
     .spyglass-property-details span {
       display: flex;
@@ -247,11 +251,13 @@
     .spyglass-login-prompt h3 {
       margin: 0 0 8px 0;
       color: #333;
+      font-family: 'Playfair Display', serif;
     }
     .spyglass-login-prompt p {
       margin: 0 0 20px 0;
       color: #666;
       font-size: 14px;
+      font-family: 'Poppins', sans-serif;
     }
     .spyglass-login-btn {
       background: #E03103;
@@ -263,6 +269,7 @@
       font-weight: 600;
       cursor: pointer;
       transition: background 0.2s;
+      font-family: 'Lato', sans-serif;
     }
     .spyglass-login-btn:hover {
       background: #c42a03;
@@ -280,6 +287,7 @@
       padding: 10px 24px;
       border-radius: 6px;
       cursor: pointer;
+      font-family: 'Lato', sans-serif;
     }
     .spyglass-pagination {
       display: flex;
@@ -295,6 +303,7 @@
       border-radius: 4px;
       cursor: pointer;
       font-size: 14px;
+      font-family: 'Lato', sans-serif;
     }
     .spyglass-pagination button:hover:not(:disabled) {
       background: #f5f5f5;

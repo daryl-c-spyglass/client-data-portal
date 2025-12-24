@@ -65,10 +65,10 @@
     }
 
     .spyglass-filters {
-      background: #f8f9fa;
+      background: #f5f5f5;
       padding: 16px 20px;
-      border-left: 1px solid #e0e0e0;
-      border-right: 1px solid #e0e0e0;
+      border-left: 1px solid #ddd;
+      border-right: 1px solid #ddd;
     }
 
     .spyglass-filters-row {
@@ -96,6 +96,7 @@
       margin-bottom: 4px;
       text-transform: uppercase;
       letter-spacing: 0.5px;
+      font-family: 'Lato', sans-serif;
     }
 
     .spyglass-filter-group select,
@@ -104,7 +105,7 @@
       border: 1px solid #ddd;
       border-radius: 6px;
       font-size: 0.875rem;
-      font-family: inherit;
+      font-family: 'Lato', sans-serif;
       background: white;
       transition: border-color 0.2s, box-shadow 0.2s;
     }
@@ -129,7 +130,7 @@
       padding: 10px 16px;
       border: none;
       background: white;
-      font-family: inherit;
+      font-family: 'Lato', sans-serif;
       font-size: 0.875rem;
       font-weight: 500;
       cursor: pointer;
@@ -146,7 +147,7 @@
     }
 
     .spyglass-toggle-btn:hover:not(.active) {
-      background: #f0f0f0;
+      background: #eee;
     }
 
     .spyglass-btn-primary {
@@ -155,7 +156,7 @@
       border: none;
       padding: 12px 24px;
       border-radius: 6px;
-      font-family: inherit;
+      font-family: 'Lato', sans-serif;
       font-size: 0.875rem;
       font-weight: 600;
       cursor: pointer;
@@ -176,7 +177,7 @@
       border: 2px solid #E03103;
       padding: 10px 22px;
       border-radius: 6px;
-      font-family: inherit;
+      font-family: 'Lato', sans-serif;
       font-size: 0.875rem;
       font-weight: 600;
       cursor: pointer;
@@ -191,11 +192,11 @@
     .spyglass-view-toggle {
       display: flex;
       gap: 8px;
-      background: #f8f9fa;
+      background: #f5f5f5;
       padding: 12px 20px;
-      border-left: 1px solid #e0e0e0;
-      border-right: 1px solid #e0e0e0;
-      border-bottom: 1px solid #e0e0e0;
+      border-left: 1px solid #ddd;
+      border-right: 1px solid #ddd;
+      border-bottom: 1px solid #ddd;
     }
 
     .spyglass-view-btn {
@@ -203,7 +204,7 @@
       border: 1px solid #ddd;
       background: white;
       border-radius: 6px;
-      font-family: inherit;
+      font-family: 'Lato', sans-serif;
       font-size: 0.875rem;
       cursor: pointer;
       display: flex;
@@ -218,6 +219,10 @@
       border-color: #222222;
     }
 
+    .spyglass-view-btn:hover:not(.active) {
+      background: #eee;
+    }
+
     .spyglass-view-btn svg {
       width: 16px;
       height: 16px;
@@ -226,8 +231,8 @@
     .spyglass-results-info {
       padding: 12px 20px;
       background: white;
-      border-left: 1px solid #e0e0e0;
-      border-right: 1px solid #e0e0e0;
+      border-left: 1px solid #ddd;
+      border-right: 1px solid #ddd;
       font-size: 0.875rem;
       color: #666;
     }
@@ -238,14 +243,14 @@
       gap: 20px;
       padding: 20px;
       background: white;
-      border: 1px solid #e0e0e0;
+      border: 1px solid #ddd;
       border-top: none;
       border-radius: 0 0 8px 8px;
       min-height: 300px;
     }
 
     .spyglass-property-card {
-      border: 1px solid #e0e0e0;
+      border: 1px solid #ddd;
       border-radius: 8px;
       overflow: hidden;
       cursor: pointer;
@@ -261,7 +266,7 @@
     .spyglass-card-image {
       position: relative;
       padding-top: 66.67%;
-      background: #e0e0e0;
+      background: #ddd;
       overflow: hidden;
     }
 
@@ -310,6 +315,7 @@
       font-weight: 700;
       color: #222222;
       margin-bottom: 8px;
+      font-family: 'Playfair Display', serif;
     }
 
     .spyglass-card-address {
@@ -317,6 +323,7 @@
       color: #666;
       margin-bottom: 12px;
       line-height: 1.4;
+      font-family: 'Poppins', sans-serif;
     }
 
     .spyglass-card-features {
@@ -340,8 +347,8 @@
 
     .spyglass-map-container {
       height: 500px;
-      background: #e0e0e0;
-      border: 1px solid #e0e0e0;
+      background: #ddd;
+      border: 1px solid #ddd;
       border-top: none;
       border-radius: 0 0 8px 8px;
       display: none;
@@ -362,7 +369,7 @@
     .spyglass-loading-spinner {
       width: 32px;
       height: 32px;
-      border: 3px solid #e0e0e0;
+      border: 3px solid #ddd;
       border-top-color: #E03103;
       border-radius: 50%;
       animation: spyglass-spin 0.8s linear infinite;
@@ -387,7 +394,7 @@
       gap: 8px;
       padding: 20px;
       background: white;
-      border: 1px solid #e0e0e0;
+      border: 1px solid #ddd;
       border-top: none;
       border-radius: 0 0 8px 8px;
     }
@@ -397,7 +404,7 @@
       border: 1px solid #ddd;
       background: white;
       border-radius: 6px;
-      font-family: inherit;
+      font-family: 'Lato', sans-serif;
       font-size: 0.875rem;
       cursor: pointer;
       transition: all 0.2s;
@@ -462,7 +469,7 @@
       justify-content: space-between;
       align-items: center;
       padding: 16px 20px;
-      border-bottom: 1px solid #e0e0e0;
+      border-bottom: 1px solid #ddd;
       background: #222222;
       color: white;
       border-radius: 12px 12px 0 0;
@@ -522,12 +529,14 @@
       font-weight: 700;
       color: #222222;
       margin-bottom: 8px;
+      font-family: 'Playfair Display', serif;
     }
 
     .spyglass-modal-address {
       font-size: 1.125rem;
       color: #666;
       margin-bottom: 20px;
+      font-family: 'Poppins', sans-serif;
     }
 
     .spyglass-modal-features {
@@ -535,7 +544,7 @@
       flex-wrap: wrap;
       gap: 24px;
       padding: 20px;
-      background: #f8f9fa;
+      background: #f5f5f5;
       border-radius: 8px;
       margin-bottom: 24px;
     }
@@ -648,12 +657,14 @@
       font-weight: 700;
       font-size: 1rem;
       margin-bottom: 4px;
+      font-family: 'Playfair Display', serif;
     }
 
     .spyglass-info-window-address {
       font-size: 0.8rem;
       color: #666;
       margin-bottom: 8px;
+      font-family: 'Poppins', sans-serif;
     }
 
     .spyglass-info-window-btn {
