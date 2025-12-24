@@ -8,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { UserCircle, Mail, Phone, Tag, Clock, AlertCircle, RefreshCw, Search, ArrowDownUp, Loader2 } from "lucide-react";
+import { UserCircle, Mail, Phone, Tag, Clock, AlertCircle, RefreshCw, Search, ArrowDownUp, Loader2, Cake, Home, Activity, MessageSquare } from "lucide-react";
 import { format, parseISO, formatDistanceToNow } from "date-fns";
 
 interface Lead {
@@ -49,6 +49,34 @@ interface UsersData {
   count: number;
 }
 
+interface AgentProfile {
+  agentId: string;
+  agentName: string;
+  email: string;
+  phone?: string;
+  birthday?: string | null;
+  homeAnniversary?: string | null;
+  role?: string;
+  createdAt?: string;
+  note?: string | null;
+}
+
+interface AgentActivity {
+  id: string;
+  type: string;
+  occurredAt: string;
+  summary: string;
+  leadId?: string;
+  leadName?: string;
+}
+
+interface AgentActivityData {
+  agentId: string;
+  recentActivity: AgentActivity[];
+  count: number;
+  sinceDate: string;
+}
+
 type SortOption = "az" | "za";
 
 function getInitials(name: string): string {
@@ -58,6 +86,128 @@ function getInitials(name: string): string {
     .join("")
     .toUpperCase()
     .slice(0, 2);
+}
+
+function AgentDetailsCard({ 
+  profile, 
+  activity,
+  isLoadingProfile,
+  isLoadingActivity,
+}: { 
+  profile?: AgentProfile;
+  activity?: AgentActivityData;
+  isLoadingProfile: boolean;
+  isLoadingActivity: boolean;
+}) {
+  if (isLoadingProfile) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-lg flex items-center gap-2">
+            <UserCircle className="h-5 w-5" />
+            Agent Details
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <Skeleton className="h-4 w-48" />
+          <Skeleton className="h-4 w-36" />
+          <Skeleton className="h-4 w-40" />
+        </CardContent>
+      </Card>
+    );
+  }
+
+  if (!profile) {
+    return null;
+  }
+
+  const formatDateSafe = (dateStr?: string | null) => {
+    if (!dateStr) return null;
+    try {
+      return format(parseISO(dateStr), "MMM d, yyyy");
+    } catch {
+      return dateStr;
+    }
+  };
+
+  return (
+    <Card data-testid="card-agent-details">
+      <CardHeader>
+        <CardTitle className="text-lg flex items-center gap-2">
+          <UserCircle className="h-5 w-5" />
+          Agent Details
+        </CardTitle>
+        <CardDescription>{profile.agentName}</CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <div className="grid grid-cols-2 gap-4">
+          <div className="flex items-center gap-2">
+            <Cake className="h-4 w-4 text-muted-foreground" />
+            <div>
+              <p className="text-xs text-muted-foreground">Birthday</p>
+              <p className="text-sm font-medium">
+                {formatDateSafe(profile.birthday) || "Not on file"}
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <Home className="h-4 w-4 text-muted-foreground" />
+            <div>
+              <p className="text-xs text-muted-foreground">Home Anniversary</p>
+              <p className="text-sm font-medium">
+                {formatDateSafe(profile.homeAnniversary) || "Not on file"}
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <div className="pt-2 border-t">
+          <div className="flex items-center gap-2 mb-3">
+            <Activity className="h-4 w-4 text-muted-foreground" />
+            <p className="text-sm font-medium">Recent Activity</p>
+          </div>
+          
+          {isLoadingActivity ? (
+            <div className="space-y-2">
+              <Skeleton className="h-10 w-full" />
+              <Skeleton className="h-10 w-full" />
+              <Skeleton className="h-10 w-full" />
+            </div>
+          ) : activity && activity.recentActivity.length > 0 ? (
+            <div className="space-y-2 max-h-48 overflow-y-auto">
+              {activity.recentActivity.slice(0, 10).map((item) => (
+                <div 
+                  key={item.id} 
+                  className="flex items-start gap-2 p-2 rounded bg-muted/50 text-sm"
+                  data-testid={`activity-item-${item.id}`}
+                >
+                  <MessageSquare className="h-3 w-3 mt-1 text-muted-foreground shrink-0" />
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <Badge variant="outline" className="text-xs">
+                        {item.type}
+                      </Badge>
+                      <span className="text-xs text-muted-foreground">
+                        {formatDistanceToNow(parseISO(item.occurredAt), { addSuffix: true })}
+                      </span>
+                    </div>
+                    <p className="text-xs mt-1 truncate">{item.summary}</p>
+                    {item.leadName && (
+                      <p className="text-xs text-muted-foreground">Lead: {item.leadName}</p>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="text-sm text-muted-foreground py-4 text-center">
+              No recent activity in the last 30 days
+            </p>
+          )}
+        </div>
+      </CardContent>
+    </Card>
+  );
 }
 
 function LeadCard({ lead }: { lead: Lead }) {
@@ -194,6 +344,36 @@ export default function LeadsPage() {
     },
     initialPageParam: 0,
     enabled: statusData?.configured === true,
+  });
+  
+  // Fetch agent profile when a specific agent is selected
+  const { data: agentProfile, isLoading: isLoadingProfile } = useQuery<AgentProfile>({
+    queryKey: ["/api/fub/agent", selectedUserId, "profile"],
+    queryFn: async () => {
+      const res = await fetch(`/api/fub/agent/${selectedUserId}/profile`, {
+        credentials: "include",
+      });
+      if (!res.ok) {
+        throw new Error("Failed to fetch agent profile");
+      }
+      return res.json();
+    },
+    enabled: statusData?.configured === true && selectedUserId !== "all",
+  });
+  
+  // Fetch agent activity when a specific agent is selected
+  const { data: agentActivity, isLoading: isLoadingActivity } = useQuery<AgentActivityData>({
+    queryKey: ["/api/fub/agent", selectedUserId, "activity"],
+    queryFn: async () => {
+      const res = await fetch(`/api/fub/agent/${selectedUserId}/activity?limit=20`, {
+        credentials: "include",
+      });
+      if (!res.ok) {
+        throw new Error("Failed to fetch agent activity");
+      }
+      return res.json();
+    },
+    enabled: statusData?.configured === true && selectedUserId !== "all",
   });
   
   // Combine all pages of leads and sort client-side
@@ -351,6 +531,16 @@ export default function LeadsPage() {
           </div>
         </CardContent>
       </Card>
+      
+      {/* Agent Details Card - shown when a specific agent is selected */}
+      {selectedUserId !== "all" && (
+        <AgentDetailsCard
+          profile={agentProfile}
+          activity={agentActivity}
+          isLoadingProfile={isLoadingProfile}
+          isLoadingActivity={isLoadingActivity}
+        />
+      )}
       
       {process.env.NODE_ENV === "development" && leadsData?.pages[0] && (
         <Card className="bg-muted/50">

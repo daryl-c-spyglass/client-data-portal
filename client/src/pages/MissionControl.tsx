@@ -136,11 +136,15 @@ function SideBreakdown({ title, data }: {
 
 export default function MissionControl() {
   const [agentId, setAgentId] = useState("");
-  const [dateRange, setDateRange] = useState("30");
+  const [dateRange, setDateRange] = useState("ytd");
   const [emphasis, setEmphasis] = useState<"volume" | "count">("volume");
   const [useMockData, setUseMockData] = useState(false);
   
-  const startDate = format(subDays(new Date(), parseInt(dateRange)), "yyyy-MM-dd");
+  // Calculate date range - YTD starts from Jan 1 of current year
+  const currentYear = new Date().getFullYear();
+  const startDate = dateRange === "ytd" 
+    ? `${currentYear}-01-01`
+    : format(subDays(new Date(), parseInt(dateRange)), "yyyy-MM-dd");
   const endDate = format(new Date(), "yyyy-MM-dd");
   
   const { data: statusData, isLoading: statusLoading } = useQuery<{ configured: boolean; status: string; message: string }>({
@@ -236,6 +240,7 @@ export default function MissionControl() {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
+                  <SelectItem value="ytd">Year to Date (YTD)</SelectItem>
                   <SelectItem value="7">Last 7 days</SelectItem>
                   <SelectItem value="30">Last 30 days</SelectItem>
                   <SelectItem value="90">Last 90 days</SelectItem>

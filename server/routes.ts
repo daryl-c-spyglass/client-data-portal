@@ -4998,6 +4998,114 @@ OUTPUT JSON:
   });
   
   // ============================================================
+  // ReZen Reports YTD Endpoint - Agent Production by Status
+  // ============================================================
+  // GET /api/rezen/reports/agent-production?start=YYYY-MM-DD&end=YYYY-MM-DD&agentId=<optional>
+  // Returns YTD production counts and volume by status (Active/Pending/Closed) per agent
+  app.get("/api/rezen/reports/agent-production", async (req, res) => {
+    try {
+      const { start, end, agentId } = req.query as Record<string, string>;
+      
+      // Default to YTD if no dates provided
+      const currentYear = new Date().getFullYear();
+      const ytdStart = start || `${currentYear}-01-01`;
+      const ytdEnd = end || new Date().toISOString().split('T')[0];
+      
+      console.log(`[ReZen Reports] Fetching YTD agent production - agent: ${agentId || 'all'}, range: ${ytdStart} to ${ytdEnd}`);
+      
+      const cacheKey = `rezen_reports_${agentId || 'all'}_${ytdStart}_${ytdEnd}`;
+      const cached = rezenCache.get(cacheKey);
+      if (cached && Date.now() - cached.timestamp < REZEN_CACHE_TTL) {
+        console.log(`[ReZen Reports] Cache hit for ${cacheKey}`);
+        res.json(cached.data);
+        return;
+      }
+      
+      // If no agentId provided, we need to fetch all agents first
+      // For now, if agentId is provided, fetch their production directly
+      if (agentId) {
+        // Single agent report
+        const transactions = await rezenApiRequest(`/transactions/participant/${agentId}/current`);
+        const txList = Array.isArray(transactions) ? transactions : transactions?.transactions || [];
+        
+        const agentProduction = {
+          agentId,
+          agentName: txList[0]?.agentName || txList[0]?.participant?.name || agentId,
+          ytdStart,
+          ytdEnd,
+          activeCount: 0,
+          activeVolume: 0,
+          pendingCount: 0,
+          pendingVolume: 0,
+          closedCount: 0,
+          closedVolume: 0,
+          unmappedStatuses: [] as string[],
+        };
+        
+        for (const tx of txList) {
+          const txDate = new Date(tx.closingDate || tx.createdAt || tx.contractDate);
+          if (txDate < new Date(ytdStart) || txDate > new Date(ytdEnd)) continue;
+          
+          const status = mapRezenStatus(tx.lifecycleState || tx.status || tx.transactionStatus || '');
+          const volume = getRezenVolume(tx, tx.lifecycleState || tx.status || '');
+          
+          if (status === 'active') {
+            agentProduction.activeCount++;
+            agentProduction.activeVolume += volume;
+          } else if (status === 'under_contract') {
+            agentProduction.pendingCount++;
+            agentProduction.pendingVolume += volume;
+          } else if (status === 'closed') {
+            agentProduction.closedCount++;
+            agentProduction.closedVolume += volume;
+          } else {
+            const rawStatus = tx.lifecycleState || tx.status || tx.transactionStatus || 'unknown';
+            if (!agentProduction.unmappedStatuses.includes(rawStatus)) {
+              agentProduction.unmappedStatuses.push(rawStatus);
+              console.log(`[ReZen Reports] Unmapped status: ${rawStatus}`);
+            }
+          }
+        }
+        
+        const result = {
+          agents: [agentProduction],
+          ytdStart,
+          ytdEnd,
+          dataSource: 'ReZen API',
+          fetchedAt: new Date().toISOString(),
+          warning: agentProduction.unmappedStatuses.length > 0 
+            ? `Some statuses could not be categorized: ${agentProduction.unmappedStatuses.join(', ')}` 
+            : null,
+        };
+        
+        rezenCache.set(cacheKey, { data: result, timestamp: Date.now() });
+        res.json(result);
+        return;
+      }
+      
+      // All agents report - fetch transactions and group by agent
+      // Note: ReZen might not have a "list all agents" endpoint, so we return empty for now
+      // This would need agent IDs from another source (e.g., FUB users or manual config)
+      res.json({
+        agents: [],
+        ytdStart,
+        ytdEnd,
+        dataSource: 'ReZen API',
+        fetchedAt: new Date().toISOString(),
+        note: 'Provide agentId parameter to fetch specific agent production. All-agents view requires agent IDs from external source.',
+      });
+      
+    } catch (error: any) {
+      console.error('[ReZen Reports] Fetch error:', error.message);
+      res.status(500).json({ 
+        error: 'Failed to fetch agent production report', 
+        details: error.message,
+        note: process.env.REZEN_API_KEY ? 'API key configured' : 'API key not configured'
+      });
+    }
+  });
+  
+  // ============================================================
   // ReZen Mock Data Endpoint - For Testing Mission Control UI
   // ============================================================
   // GET /api/rezen/mock/production?agentId=agent_ryan_001&startDate=2025-11-18&endDate=2025-12-18
@@ -5571,6 +5679,207 @@ OUTPUT JSON:
       res.status(500).json({ 
         error: error.message,
         help: 'Check FUB_API_KEY permissions. The API key must have access to read users.'
+      });
+    }
+  });
+
+  // ============================================================
+  // FUB Agent Profile Endpoint - Birthday, Home Anniversary
+  // ============================================================
+  // GET /api/fub/agent/:agentId/profile
+  // Returns agent profile with birthday and home anniversary (from custom fields)
+  app.get("/api/fub/agent/:agentId/profile", async (req, res) => {
+    try {
+      const { agentId } = req.params;
+      
+      if (!agentId) {
+        res.status(400).json({ error: "agentId is required" });
+        return;
+      }
+      
+      console.log(`[FUB Agent Profile] Fetching profile for agent ${agentId}`);
+      
+      const cacheKey = `fub_agent_profile_${agentId}`;
+      const cached = fubCache.get(cacheKey);
+      if (cached && Date.now() - cached.timestamp < FUB_CACHE_TTL) {
+        console.log(`[FUB Agent Profile] Cache hit for ${cacheKey}`);
+        res.json(cached.data);
+        return;
+      }
+      
+      // Fetch user details from FUB
+      const { data: userResponse } = await fubApiRequest(`/users/${agentId}`);
+      const user = userResponse;
+      
+      // FUB may store birthday and home anniversary in custom fields
+      // Common field names to check: birthday, homeAnniversary, home_anniversary, anniversaryDate
+      const customFields = user.customFields || user.customProperties || [];
+      
+      // Helper to find custom field value
+      const findCustomField = (names: string[]): string | null => {
+        for (const name of names) {
+          const field = customFields.find((f: any) => 
+            f.name?.toLowerCase() === name.toLowerCase() || 
+            f.key?.toLowerCase() === name.toLowerCase()
+          );
+          if (field?.value) return field.value;
+        }
+        // Also check direct properties
+        for (const name of names) {
+          const key = name.replace(/[_-]/g, '');
+          const val = user[name] || user[key] || user[name.toLowerCase()];
+          if (val) return val;
+        }
+        return null;
+      };
+      
+      const profile = {
+        agentId: String(user.id),
+        agentName: `${user.firstName || ''} ${user.lastName || ''}`.trim() || user.name || 'Unknown',
+        email: user.email,
+        phone: user.phones?.[0]?.value || user.phone || null,
+        birthday: findCustomField(['birthday', 'birthdate', 'birth_date', 'dateOfBirth']),
+        homeAnniversary: findCustomField(['homeAnniversary', 'home_anniversary', 'anniversaryDate', 'homeClosingDate']),
+        role: user.role,
+        createdAt: user.created,
+        customFields: customFields.map((f: any) => ({ name: f.name || f.key, value: f.value })),
+        dataSource: 'Follow Up Boss',
+        fetchedAt: new Date().toISOString(),
+        note: !findCustomField(['birthday']) ? 'Birthday not found in standard or custom fields' : null,
+      };
+      
+      fubCache.set(cacheKey, { data: profile, timestamp: Date.now() });
+      
+      console.log(`[FUB Agent Profile] Profile fetched for ${profile.agentName}`);
+      res.json(profile);
+      
+    } catch (error: any) {
+      console.error('[FUB Agent Profile] Fetch error:', error.message);
+      res.status(500).json({ 
+        error: 'Failed to fetch agent profile', 
+        details: error.message,
+        note: process.env.FUB_API_KEY ? 'API key configured' : 'API key not configured'
+      });
+    }
+  });
+
+  // ============================================================
+  // FUB Agent Activity Endpoint - Recent Activity/Timeline
+  // ============================================================
+  // GET /api/fub/agent/:agentId/activity?since=YYYY-MM-DD&limit=20
+  // Returns recent activity (calls, emails, texts, notes) for an agent
+  app.get("/api/fub/agent/:agentId/activity", async (req, res) => {
+    try {
+      const { agentId } = req.params;
+      const { since, limit = '20' } = req.query as Record<string, string>;
+      
+      if (!agentId) {
+        res.status(400).json({ error: "agentId is required" });
+        return;
+      }
+      
+      const limitNum = Math.min(parseInt(limit) || 20, 50);
+      const sinceDate = since || new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+      
+      console.log(`[FUB Agent Activity] Fetching activity for agent ${agentId}, since: ${sinceDate}, limit: ${limitNum}`);
+      
+      const cacheKey = `fub_agent_activity_${agentId}_${sinceDate}_${limitNum}`;
+      const cached = fubCache.get(cacheKey);
+      if (cached && Date.now() - cached.timestamp < FUB_CACHE_TTL) {
+        console.log(`[FUB Agent Activity] Cache hit for ${cacheKey}`);
+        res.json(cached.data);
+        return;
+      }
+      
+      // FUB has different endpoints for different activity types
+      // We'll try /events or /notes as those are common activity endpoints
+      const activities: any[] = [];
+      let eventsFetched = false;
+      let notesFetched = false;
+      
+      // Try to fetch events (calls, emails, texts)
+      try {
+        const eventsParams = new URLSearchParams();
+        eventsParams.append('userId', agentId);
+        eventsParams.append('since', sinceDate);
+        eventsParams.append('limit', String(limitNum));
+        
+        const { data: eventsResponse } = await fubApiRequest(`/events?${eventsParams.toString()}`);
+        const events = eventsResponse?.events || [];
+        
+        events.forEach((e: any) => {
+          activities.push({
+            id: String(e.id),
+            type: e.type || e.category || 'event',
+            occurredAt: e.created || e.occurredAt || e.timestamp,
+            summary: e.description || e.subject || e.name || 'Activity',
+            leadId: e.personId || e.leadId,
+            leadName: e.person?.name || e.personName || null,
+          });
+        });
+        eventsFetched = true;
+        console.log(`[FUB Agent Activity] Fetched ${events.length} events`);
+      } catch (e: any) {
+        console.log(`[FUB Agent Activity] Events endpoint not available: ${e.message}`);
+      }
+      
+      // Try to fetch notes
+      try {
+        const notesParams = new URLSearchParams();
+        notesParams.append('userId', agentId);
+        notesParams.append('limit', String(limitNum));
+        
+        const { data: notesResponse } = await fubApiRequest(`/notes?${notesParams.toString()}`);
+        const notes = notesResponse?.notes || [];
+        
+        notes.forEach((n: any) => {
+          const noteDate = new Date(n.created || n.createdAt);
+          if (noteDate >= new Date(sinceDate)) {
+            activities.push({
+              id: String(n.id),
+              type: 'note',
+              occurredAt: n.created || n.createdAt,
+              summary: n.body?.substring(0, 200) || n.text?.substring(0, 200) || 'Note added',
+              leadId: n.personId || n.leadId,
+              leadName: n.person?.name || n.personName || null,
+            });
+          }
+        });
+        notesFetched = true;
+        console.log(`[FUB Agent Activity] Fetched ${notes.length} notes`);
+      } catch (e: any) {
+        console.log(`[FUB Agent Activity] Notes endpoint not available: ${e.message}`);
+      }
+      
+      // Sort by date descending and limit
+      activities.sort((a, b) => new Date(b.occurredAt).getTime() - new Date(a.occurredAt).getTime());
+      const limitedActivities = activities.slice(0, limitNum);
+      
+      const result = {
+        agentId,
+        recentActivity: limitedActivities,
+        count: limitedActivities.length,
+        sinceDate,
+        dataSource: 'Follow Up Boss',
+        fetchedAt: new Date().toISOString(),
+        debug: {
+          eventsFetched,
+          notesFetched,
+          totalActivitiesFound: activities.length,
+        },
+      };
+      
+      fubCache.set(cacheKey, { data: result, timestamp: Date.now() });
+      
+      console.log(`[FUB Agent Activity] Returning ${limitedActivities.length} activities for agent ${agentId}`);
+      res.json(result);
+      
+    } catch (error: any) {
+      console.error('[FUB Agent Activity] Fetch error:', error.message);
+      res.status(500).json({ 
+        error: 'Failed to fetch agent activity', 
+        details: error.message,
+        note: process.env.FUB_API_KEY ? 'API key configured' : 'API key not configured'
       });
     }
   });

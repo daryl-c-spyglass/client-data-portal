@@ -1,0 +1,181 @@
+Replit Agent Prompt — Mission Control: ReZen Reports (Agent YTD Active/Pending/Closed) + Leads Tab Enhancements (FUB birthdays/anniversaries/activity)
+
+You are working in the Mission Control (Agent Dashboard) app. Implement the following two updates:
+
+1) Reports Section (Left Nav) — ReZen API: Agent Deal Status (YTD)
+Goal
+
+In Reports (left-side nav), show each agent’s Year-To-Date production counts and volume by deal status:
+
+Active (YTD)
+
+Pending (YTD)
+
+Closed (YTD)
+
+If volume is available, also include:
+
+Total $ volume by status (optional if API supports)
+
+Requirements
+
+Use the existing ReZen Mission Control API (client provided key/id already configured in app).
+
+Add a date-range control:
+
+Default: YTD (Jan 1 → today)
+
+Optional: allow custom date range (nice-to-have)
+
+Fetch production per agent and group into the 3 buckets above.
+
+Display as:
+
+Agent name
+
+Active (count and $)
+
+Pending (count and $)
+
+Closed (count and $)
+
+Ensure results match the selected agent filter (All agents vs specific agent).
+
+Implementation details
+
+Create a backend route (server-side) such as:
+
+GET /api/rezen/reports/agent-production?start=YYYY-MM-DD&end=YYYY-MM-DD&agentId=<optional>
+
+If ReZen requires multiple endpoints (agent list + deals):
+
+cache agent list (short TTL)
+
+fetch deals/transactions and aggregate server-side
+
+Normalize data into a stable shape for UI:
+
+type AgentProduction = {
+  agentId: string;
+  agentName: string;
+  ytdStart: string;
+  ytdEnd: string;
+  activeCount: number;
+  activeVolume?: number;
+  pendingCount: number;
+  pendingVolume?: number;
+  closedCount: number;
+  closedVolume?: number;
+};
+
+Error handling
+
+If ReZen returns missing fields or unknown statuses:
+
+log raw status values (dev-only)
+
+map them safely into Active/Pending/Closed
+
+show a warning if some statuses can’t be categorized
+
+Acceptance tests
+
+Reports page loads and shows YTD totals for All agents
+
+Selecting a specific agent updates the report correctly
+
+Date range defaults to YTD and is correct for current year
+
+2) Leads Tab (Left Nav) — FUB: Agent Birthday, Home Anniversary, Recent Activity
+Goal
+
+In Leads (left nav), when viewing a specific agent (or All agents), show:
+
+Agent Birthday
+
+Agent Home Anniversary
+
+Recent Activity summary from FUB (calls/emails/texts/notes, etc.)
+
+Requirements
+
+Ensure the data is agent-specific:
+
+If “All agents” is selected, show list view grouped by agent.
+
+If a single agent is selected, show that agent’s details + activity feed.
+
+Use FUB API to retrieve:
+
+Agent/user profile fields (birthday if available)
+
+Home anniversary field (if stored as a custom field)
+
+Recent activity/events (timeline)
+
+Implementation details
+
+Confirm which FUB endpoints are used in the app already (Leads section works today).
+
+Add/extend backend routes:
+
+GET /api/fub/agents (list all agents/users)
+
+GET /api/fub/agent/:agentId/profile (birthday + fields)
+
+GET /api/fub/agent/:agentId/activity?since=... (recent activity)
+
+If birthday/home anniversary are not in standard fields:
+
+fetch custom fields
+
+map by known field keys (document the mapping)
+
+Normalize response for UI:
+
+type AgentLeadInsights = {
+  agentId: string;
+  agentName: string;
+  birthday?: string | null;
+  homeAnniversary?: string | null;
+  recentActivity: Array<{
+    id: string;
+    type: string;
+    occurredAt: string;
+    summary: string;
+    leadId?: string;
+    leadName?: string;
+  }>;
+};
+
+UI expectations
+
+Add a compact “Agent Details” card in Leads view:
+
+Birthday
+
+Home Anniversary
+
+“Recent Activity” list (last 10–20 items)
+
+Add loading + empty states:
+
+“No birthday/home anniversary on file”
+
+“No recent activity in the last X days”
+
+Acceptance tests
+
+Switching agent filter updates birthday/home anniversary/activity correctly
+
+If agent has no data, UI shows clean empty states (no errors)
+
+Deliverables
+
+File paths changed
+
+Confirm ReZen Reports shows Active/Pending/Closed YTD
+
+Confirm Leads tab shows agent birthday, home anniversary, and recent activity from FUB
+
+Notes on any missing fields from APIs (e.g., if birthday isn’t provided by FUB, identify where it must be stored/custom field)
