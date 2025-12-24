@@ -250,11 +250,31 @@ function AgentDetailsCard({
   );
 }
 
-function LeadCard({ lead }: { lead: Lead }) {
+function LeadCard({ 
+  lead, 
+  isSelected, 
+  onClick 
+}: { 
+  lead: Lead; 
+  isSelected?: boolean;
+  onClick?: () => void;
+}) {
   return (
     <div 
-      className="flex items-start gap-4 p-4 rounded-lg border bg-card hover-elevate"
+      className={`flex items-start gap-4 p-4 rounded-lg border bg-card hover-elevate cursor-pointer transition-all ${
+        isSelected ? "ring-2 ring-primary border-primary" : ""
+      }`}
       data-testid={`card-lead-${lead.id}`}
+      onClick={onClick}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          onClick?.();
+        }
+      }}
+      tabIndex={0}
+      role="button"
+      aria-pressed={isSelected}
     >
       <Avatar className="h-10 w-10">
         <AvatarFallback className="bg-primary/10 text-primary">
@@ -362,6 +382,8 @@ export default function LeadsPage() {
   const [selectedUserId, setSelectedUserId] = useState<string>("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [sortOption, setSortOption] = useState<SortOption>("az");
+  const [selectedLeadId, setSelectedLeadId] = useState<string | null>(null);
+  const [showNoAgentMessage, setShowNoAgentMessage] = useState(false);
   
   const loadMoreRef = useRef<HTMLDivElement>(null);
   
@@ -500,6 +522,19 @@ export default function LeadsPage() {
     };
   }, [handleObserver]);
   
+  const handleLeadClick = useCallback((lead: Lead) => {
+    setSelectedLeadId(lead.id);
+    if (lead.assignedTo) {
+      setSelectedUserId(lead.assignedTo);
+      setShowNoAgentMessage(false);
+    } else {
+      setSelectedUserId("all");
+      setShowNoAgentMessage(true);
+    }
+  }, []);
+  
+  const selectedLead = selectedLeadId ? filteredLeads.find(l => l.id === selectedLeadId) : null;
+  
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -550,7 +585,11 @@ export default function LeadsPage() {
           <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
             <div className="space-y-2">
               <Label>Assigned Agent</Label>
-              <Select value={selectedUserId} onValueChange={setSelectedUserId}>
+              <Select value={selectedUserId} onValueChange={(value) => {
+                setSelectedUserId(value);
+                setShowNoAgentMessage(false);
+                setSelectedLeadId(null);
+              }}>
                 <SelectTrigger data-testid="select-agent">
                   <SelectValue placeholder="All agents" />
                 </SelectTrigger>
@@ -606,13 +645,23 @@ export default function LeadsPage() {
       </Card>
       
       {/* Agent Insights Card - shown when a specific agent is selected */}
-      {selectedUserId === "all" ? (
+      {showNoAgentMessage ? (
+        <Card className="border-amber-200 bg-amber-50 dark:bg-amber-900/20" data-testid="card-no-assigned-agent">
+          <CardContent className="py-6 text-center">
+            <AlertCircle className="h-8 w-8 mx-auto text-amber-600 mb-2" />
+            <p className="text-sm font-medium text-amber-800 dark:text-amber-200">No Assigned Agent</p>
+            <p className="text-sm text-amber-700 dark:text-amber-300 mt-1">
+              {selectedLead ? `"${selectedLead.name}" does not have an assigned agent in Follow Up Boss.` : "This lead does not have an assigned agent."}
+            </p>
+          </CardContent>
+        </Card>
+      ) : selectedUserId === "all" ? (
         <Card className="border-dashed" data-testid="card-select-agent-prompt">
           <CardContent className="py-6 text-center">
             <UserCircle className="h-8 w-8 mx-auto text-muted-foreground mb-2" />
             <p className="text-sm font-medium">Agent Insights</p>
             <p className="text-sm text-muted-foreground mt-1">
-              Select an agent from the filter above to view their birthday, home anniversary, and recent activity.
+              Select an agent from the filter above or click a lead to view agent insights.
             </p>
           </CardContent>
         </Card>
@@ -700,7 +749,12 @@ export default function LeadsPage() {
           ) : (
             <div className="space-y-2">
               {filteredLeads.map((lead) => (
-                <LeadCard key={lead.id} lead={lead} />
+                <LeadCard 
+                  key={lead.id} 
+                  lead={lead} 
+                  isSelected={selectedLeadId === lead.id}
+                  onClick={() => handleLeadClick(lead)}
+                />
               ))}
               
               {/* Infinite scroll trigger */}

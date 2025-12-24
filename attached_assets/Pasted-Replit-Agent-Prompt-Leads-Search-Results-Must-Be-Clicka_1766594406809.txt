@@ -1,0 +1,101 @@
+Replit Agent Prompt — Leads Search Results Must Be Clickable (Open Lead Details + Populate Agent Insights)
+
+In the Leads section, search is returning results (example: “Adrian Lennar South”), but clicking the lead name does nothing. This is a UX bug — users expect the lead row/card to open details or at minimum trigger a selection state that loads the insights panel.
+
+We need to make each lead row clickable and functional.
+
+1) Make Lead Cards Clickable (Primary Fix)
+Requirements
+
+The entire lead row/card (or at least the lead name) must be clickable.
+
+On click, it must do ONE of the following (choose best based on app architecture):
+
+Option A (Preferred): Navigate to Lead Details page
+
+Route: /leads/:leadId
+
+Show:
+
+name, email, phone
+
+tags
+
+assigned agent
+
+created date
+
+recent activity (timeline)
+
+Provide a Back button to Leads list.
+
+Option B: Open a side panel (drawer)
+
+Clicking a lead opens a right-side drawer with the same details.
+
+Drawer can be closed without losing the list state.
+
+Option C: Expand inline
+
+Clicking expands the card to show details + activity.
+
+Must be consistent across list and search results.
+
+2) Ensure Lead Click Also Updates “Agent Insights” Correctly
+Requirement
+
+When a lead is clicked:
+
+If that lead has an assigned agent:
+
+the Agent Insights panel should populate for that agent
+
+show birthday / home anniversary / recent activity
+
+If assigned agent is unknown:
+
+show “No assigned agent found for this lead”
+
+3) Add Visual UX Feedback (Selection State)
+Requirements
+
+When a lead is clicked:
+
+highlight the selected lead row
+
+show cursor pointer on hover
+
+Add aria accessibility:
+
+lead row should be keyboard accessible (Enter to open)
+
+4) Fix likely cause: click handler missing / blocked
+Requirements
+
+Inspect current lead card component and confirm:
+
+it has onClick wired
+
+it is not blocked by an overlay / disabled div
+
+it is not inside an element preventing pointer events
+
+If currently using buttons/links inside the row:
+
+ensure event bubbling does not prevent the card click
+
+5) Acceptance Tests (Must Pass)
+
+✅ Search “Adrian Lennar South” → results show
+✅ Clicking the lead name OR card opens lead details (route/drawer/expand)
+✅ Agent Insights updates based on the clicked lead’s assigned agent
+✅ Selected lead is visually highlighted
+✅ Works for All agents and single-agent filter modes
+
+Deliverables
+
+File paths changed
+
+Confirm which option was implemented (A/B/C)
+
+Screenshot or short note showing clicking a lead opens details successfully
