@@ -5733,14 +5733,26 @@ OUTPUT JSON:
       const people = data?.people || [];
       
       for (const person of people) {
+        // Log first few people to check for birthday data
+        if (cache.all.length < 3) {
+          console.log(`[FUB Spyglass Agents] Person: ${person.firstName} ${person.lastName} (ID: ${person.id})`);
+        }
+        
+        // Check multiple possible birthday field locations
+        const birthdayValue = person.customBirthday || person.birthday || 
+          (person.customFields?.find?.((f: any) => /birthday/i.test(f.name || f.key))?.value) || null;
+        
+        const anniversaryValue = person.customHomeAnniversary || person.customAnniversary || person.homeAnniversary ||
+          (person.customFields?.find?.((f: any) => /anniversary/i.test(f.name || f.key))?.value) || null;
+        
         const agentData: SpyglassAgentData = {
           id: person.id,
           name: person.name || `${person.firstName || ''} ${person.lastName || ''}`.trim(),
           firstName: person.firstName,
           lastName: person.lastName,
           email: person.emails?.[0]?.value,
-          customBirthday: person.customBirthday || null,
-          homeAnniversary: person.customHomeAnniversary || person.customAnniversary || null,
+          customBirthday: birthdayValue,
+          homeAnniversary: anniversaryValue,
           stage: person.stage,
         };
         
