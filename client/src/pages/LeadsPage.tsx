@@ -470,11 +470,12 @@ export default function LeadsPage() {
   const filteredLeads = sortedLeads.filter((lead) => {
     if (!searchQuery) return true;
     const query = searchQuery.toLowerCase();
+    const sourceStr = typeof lead.source === 'string' ? lead.source : '';
     return (
       lead.name?.toLowerCase().includes(query) ||
       lead.email?.toLowerCase().includes(query) ||
       lead.phone?.includes(query) ||
-      lead.source?.toLowerCase().includes(query)
+      sourceStr.toLowerCase().includes(query)
     );
   });
   
