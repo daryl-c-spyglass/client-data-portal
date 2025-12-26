@@ -1,8 +1,7 @@
 import { Property } from "@shared/schema";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Button } from "@/components/ui/button";
-import { Bed, Bath, Maximize, MapPin, Home, Calendar, DollarSign, ShoppingCart } from "lucide-react";
+import { Bed, Bath, Maximize, MapPin, Home, Calendar, DollarSign } from "lucide-react";
 import { formatPropertyType } from "@/lib/property-type-utils";
 
 interface PropertyListCardProps {
@@ -11,7 +10,6 @@ interface PropertyListCardProps {
   selected?: boolean;
   onSelect?: (selected: boolean) => void;
   onClick?: () => void;
-  onAddToCart?: () => void;
 }
 
 export function PropertyListCard({ 
@@ -19,8 +17,7 @@ export function PropertyListCard({
   media, 
   selected, 
   onSelect, 
-  onClick,
-  onAddToCart 
+  onClick 
 }: PropertyListCardProps) {
   const primaryImage = media?.[0]?.mediaURL || media?.[0]?.localPath;
   
@@ -158,17 +155,6 @@ export function PropertyListCard({
         </div>
       </div>
 
-      {/* Actions */}
-      <div className="flex items-center" onClick={(e) => e.stopPropagation()}>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={onAddToCart}
-          data-testid={`button-add-to-cart-${property.id}`}
-        >
-          <ShoppingCart className="w-4 h-4" />
-        </Button>
-      </div>
     </div>
   );
 }

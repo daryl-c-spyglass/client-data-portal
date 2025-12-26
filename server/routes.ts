@@ -1688,9 +1688,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/searches", async (req, res) => {
     try {
-      const search = await storage.createSavedSearch(req.body);
+      const { name, criteria } = req.body;
+      
+      if (!name || !criteria) {
+        res.status(400).json({ error: "Name and criteria are required" });
+        return;
+      }
+      
+      // Use authenticated user's ID if available, otherwise null for anonymous saves
+      const user = req.user as any;
+      const userId = user?.id || null;
+      
+      const search = await storage.createSavedSearch({
+        name,
+        criteria,
+        userId,
+      });
       res.status(201).json(search);
     } catch (error) {
+      console.error('Failed to create saved search:', error);
       res.status(500).json({ error: "Failed to create saved search" });
     }
   });

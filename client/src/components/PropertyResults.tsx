@@ -34,7 +34,6 @@ interface PropertyResultsProps {
   onToggleSelect: (id: string) => void;
   onSelectAll: () => void;
   onPropertyClick: (property: Property) => void;
-  onAddToCart: (property: Property) => void;
   statusInspectorEnabled?: boolean;
 }
 
@@ -45,7 +44,6 @@ export function PropertyResults({
   onToggleSelect, 
   onSelectAll,
   onPropertyClick,
-  onAddToCart,
   statusInspectorEnabled = false
 }: PropertyResultsProps) {
   const [viewMode, setViewMode] = useState<'grid' | 'list' | 'table'>('grid');
@@ -214,7 +212,6 @@ export function PropertyResults({
               media={mediaMap?.get(property.listingId) || convertPhotosToMedia(property)}
               selected={selectedIds.has(property.id)}
               onSelect={() => onToggleSelect(property.id)}
-              onAddToCart={() => onAddToCart(property)}
               onClick={() => onPropertyClick(property)}
               statusInspectorEnabled={statusInspectorEnabled}
             />
@@ -232,7 +229,6 @@ export function PropertyResults({
               media={mediaMap?.get(property.listingId) || convertPhotosToMedia(property)}
               selected={selectedIds.has(property.id)}
               onSelect={() => onToggleSelect(property.id)}
-              onAddToCart={() => onAddToCart(property)}
               onClick={() => onPropertyClick(property)}
             />
           ))}
@@ -248,7 +244,6 @@ export function PropertyResults({
           onToggleSelect={onToggleSelect}
           onSelectAll={onSelectAll}
           onPropertyClick={onPropertyClick}
-          onAddToCart={onAddToCart}
         />
       )}
       

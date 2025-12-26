@@ -480,10 +480,6 @@ export default function Properties() {
     navigate(`/properties/${property.id}`);
   };
 
-  const handleAddToCart = (property: Property) => {
-    console.log("Add to cart:", property);
-  };
-
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between flex-wrap gap-2">
@@ -839,7 +835,6 @@ export default function Properties() {
                 onToggleSelect={toggleSelect}
                 onSelectAll={selectAll}
                 onPropertyClick={handlePropertyClick}
-                onAddToCart={handleAddToCart}
                 statusInspectorEnabled={statusInspectorEnabled}
               />
             </div>

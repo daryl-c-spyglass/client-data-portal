@@ -182,7 +182,7 @@ export type User = typeof users.$inferSelect;
 // Saved Searches Schema
 export const savedSearches = pgTable("saved_searches", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  userId: varchar("user_id").notNull().references(() => users.id),
+  userId: varchar("user_id"), // Optional - null for anonymous/unauthenticated saves
   name: text("name").notNull(),
   criteria: json("criteria").notNull(),
   createdAt: timestamp("created_at").notNull().defaultNow(),

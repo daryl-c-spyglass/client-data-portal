@@ -10,7 +10,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { ArrowUpDown, ArrowUp, ArrowDown, ShoppingCart, ExternalLink } from "lucide-react";
+import { ArrowUpDown, ArrowUp, ArrowDown, ExternalLink } from "lucide-react";
 
 interface PropertyTableProps {
   properties: Property[];
@@ -19,7 +19,6 @@ interface PropertyTableProps {
   onToggleSelect: (id: string) => void;
   onSelectAll: () => void;
   onPropertyClick: (property: Property) => void;
-  onAddToCart: (property: Property) => void;
 }
 
 export function PropertyTable({
@@ -29,7 +28,6 @@ export function PropertyTable({
   onToggleSelect,
   onSelectAll,
   onPropertyClick,
-  onAddToCart,
 }: PropertyTableProps) {
   // Map parent's sortBy to column sorting
   const getSortInfo = () => {
@@ -182,15 +180,7 @@ export function PropertyTable({
                   {property.daysOnMarket !== null ? property.daysOnMarket : '-'}
                 </TableCell>
                 <TableCell onClick={(e) => e.stopPropagation()}>
-                  <div className="flex items-center justify-center gap-1">
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => onAddToCart(property)}
-                      data-testid={`button-add-to-cart-${property.id}`}
-                    >
-                      <ShoppingCart className="w-4 h-4" />
-                    </Button>
+                  <div className="flex items-center justify-center">
                     <Button
                       variant="ghost"
                       size="icon"

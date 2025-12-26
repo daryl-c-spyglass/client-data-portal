@@ -1,0 +1,148 @@
+Replit Agent Prompt — Properties (Closed): Remove/Clarify Cart Icon + Fix “Save Search” Failure
+
+We have two issues in the Properties section when viewing Closed results:
+
+Property cards show a checkbox icon and a cart icon. It’s unclear if the cart icon is necessary/used. If it has no functional purpose, remove it to avoid user confusion.
+
+Save Search flow is broken. When trying to save a search, the modal appears, but saving fails with: “Failed to save search. Please try again.”
+
+Use this exact URL to reproduce:
+https://f58e6159-1bf8-4479-a256-c997461de361-00-1jv089vliph98.riker.replit.dev/properties?statuses=Closed&cities=Austin&propertySubType=single-family
+
+Screenshot is provided for reference.
+
+1) Cart Icon on Property Cards (Closed listings)
+A) Determine if cart icon is used
+
+Identify what the cart icon is intended to do:
+
+Does it add to CMA?
+
+Add to a client list?
+
+Add to a “cart” or saved list?
+
+Or is it unused/placeholder?
+
+B) Implement the correct outcome (strict)
+
+If cart icon has NO working function or no user-visible destination:
+
+Remove the cart icon from property cards (Closed view and ideally across all statuses for consistency)
+
+Keep only the checkbox/select behavior if that’s the intended selection mechanism
+
+If cart icon DOES have a real function:
+
+Make it explicit with:
+
+Tooltip on hover: “Add to ___”
+
+Click action that navigates or confirms where it goes
+
+Ensure it is not redundant with the checkbox selection
+
+Acceptance
+
+There is no confusing cart icon with no purpose.
+
+Either removed or clearly functional + explained.
+
+2) Fix “Save Search” Failure (Critical Bug)
+A) Reproduce and trace
+
+Click Select / checkbox on properties, then trigger Save Search modal.
+
+Attempt to save and capture:
+
+network request URL
+
+payload
+
+response status and body
+
+Identify if failure is caused by:
+
+missing auth/session
+
+missing required fields (name/userId/filters)
+
+backend route not implemented
+
+DB insert error
+
+API key/env var missing
+
+validation rejecting filters
+
+B) Implement a working Save Search backend (if missing/broken)
+
+Ensure there is a server endpoint like:
+
+POST /api/saved-searches
+
+Required payload to store:
+
+{
+  "name": "Austin - Test - Daryl",
+  "filters": {
+    "statuses": ["Closed"],
+    "cities": ["Austin"],
+    "propertySubType": "single-family",
+    "...any other filters in the URL/UI..."
+  },
+  "source": "properties"
+}
+
+
+Persist to database with:
+
+id
+
+name
+
+filters (JSON)
+
+createdAt
+
+createdBy (if auth exists; if not, store as null and still allow saving)
+
+C) Fix client-side handling
+
+On success:
+
+close modal
+
+toast: “Search saved”
+
+On failure:
+
+show the real reason (dev mode: include error detail; prod: user-friendly message)
+
+Prevent double-submit (disable Save button while saving)
+
+3) Ensure Saved Searches are discoverable
+
+If the app already has “Saved Searches” somewhere:
+
+confirm the saved search appears in that list
+If not:
+
+add a basic Saved Searches page OR add a dropdown under Save Search button showing saved items
+
+4) Acceptance Tests (Must Pass)
+
+✅ Using the sample URL, saving a search succeeds and shows confirmation
+✅ Saved search is visible somewhere after saving
+✅ Cart icon is either removed (if unused) OR clearly functional with tooltip + destination
+✅ No console errors; network calls return 200 on save
+
+Deliverables
+
+File paths changed
+
+Explanation of cart icon purpose (or confirmation removed)
+
+Root cause of Save Search failure + fix
+
+Screenshot showing successful saved search flow

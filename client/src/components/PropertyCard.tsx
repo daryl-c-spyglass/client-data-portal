@@ -1,8 +1,7 @@
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
-import { ShoppingCart, Bed, Bath, Maximize, MapPin, Calendar, TrendingUp, Home } from "lucide-react";
+import { Bed, Bath, Maximize, MapPin, Calendar, TrendingUp, Home } from "lucide-react";
 import type { Property, Media } from "@shared/schema";
 import { formatPropertyType } from "@/lib/property-type-utils";
 import { StatusInspector } from "./StatusInspector";
@@ -12,7 +11,6 @@ interface PropertyCardProps {
   media?: Media[];
   selected?: boolean;
   onSelect?: (selected: boolean) => void;
-  onAddToCart?: () => void;
   onClick?: () => void;
   statusInspectorEnabled?: boolean;
 }
@@ -29,7 +27,6 @@ export function PropertyCard({
   media, 
   selected, 
   onSelect, 
-  onAddToCart,
   onClick,
   statusInspectorEnabled = false
 }: PropertyCardProps) {
@@ -77,31 +74,16 @@ export function PropertyCard({
           </div>
         )}
         
-        {/* Selection Checkbox & Cart */}
-        <div className="absolute bottom-4 left-4 flex items-center gap-2">
-          {onSelect && (
-            <div className="bg-white rounded-md p-1" onClick={(e) => e.stopPropagation()}>
-              <Checkbox 
-                checked={selected} 
-                onCheckedChange={onSelect}
-                data-testid={`checkbox-select-${property.id}`}
-              />
-            </div>
-          )}
-          {onAddToCart && (
-            <Button 
-              size="icon" 
-              variant="secondary" 
-              onClick={(e) => {
-                e.stopPropagation();
-                onAddToCart();
-              }}
-              data-testid={`button-cart-${property.id}`}
-            >
-              <ShoppingCart className="w-4 h-4" />
-            </Button>
-          )}
-        </div>
+        {/* Selection Checkbox */}
+        {onSelect && (
+          <div className="absolute bottom-4 left-4 bg-white rounded-md p-1" onClick={(e) => e.stopPropagation()}>
+            <Checkbox 
+              checked={selected} 
+              onCheckedChange={onSelect}
+              data-testid={`checkbox-select-${property.id}`}
+            />
+          </div>
+        )}
       </div>
       
       {/* Property Details */}
