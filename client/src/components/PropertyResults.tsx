@@ -36,6 +36,7 @@ interface PropertyResultsProps {
   onClearSelection: () => void;
   onPropertyClick: (property: Property) => void;
   statusInspectorEnabled?: boolean;
+  criteriaKey?: string;
 }
 
 export function PropertyResults({ 
@@ -46,7 +47,8 @@ export function PropertyResults({
   onSelectAll,
   onClearSelection,
   onPropertyClick,
-  statusInspectorEnabled = false
+  statusInspectorEnabled = false,
+  criteriaKey = ''
 }: PropertyResultsProps) {
   const [viewMode, setViewMode] = useState<'grid' | 'list' | 'table'>('grid');
   const [sortBy, setSortBy] = useState('status');
@@ -54,6 +56,11 @@ export function PropertyResults({
   const [displayCount, setDisplayCount] = useState(20);
   
   const ITEMS_PER_PAGE = 20;
+  
+  // Reset pagination to page 1 when search criteria changes (e.g., Run Search)
+  useEffect(() => {
+    setDisplayCount(ITEMS_PER_PAGE);
+  }, [criteriaKey]);
 
   // Sort properties based on selected sort option
   const sortedProperties = [...properties].sort((a, b) => {

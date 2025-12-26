@@ -380,13 +380,26 @@ export default function Properties() {
     saveSearchMutation.mutate({ name: searchName.trim(), criteria: searchCriteria });
   };
   
-  // Run a saved search
+  // Run a saved search - executes immediately with fresh data
   const runSavedSearch = (savedSearch: SavedSearch) => {
     const criteria = savedSearch.criteria as SearchCriteria;
-    setSearchCriteria(criteria);
     const queryString = serializeCriteriaToUrl(criteria);
+    
+    // 1. Clear any previous selections
+    setSelectedIds(new Set());
+    
+    // 2. Invalidate the query cache to force fresh data fetch
+    queryClient.invalidateQueries({ queryKey: ['/api/search', queryString] });
+    
+    // 3. Apply the saved filters
+    setSearchCriteria(criteria);
+    
+    // 4. Navigate to URL with filters and switch to results tab
     navigate(`/properties?${queryString}`, { replace: true });
     setActiveTab("results");
+    
+    // 5. Scroll to top of page
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
   
   // Format criteria summary for display
@@ -867,6 +880,7 @@ export default function Properties() {
                 onClearSelection={clearSelection}
                 onPropertyClick={handlePropertyClick}
                 statusInspectorEnabled={statusInspectorEnabled}
+                criteriaKey={criteriaKey}
               />
             </div>
           )}
