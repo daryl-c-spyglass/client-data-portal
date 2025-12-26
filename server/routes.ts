@@ -1688,13 +1688,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/searches", async (req, res) => {
     try {
-      // Require authentication for saving searches
-      const user = req.user as any;
-      if (!user?.id) {
-        res.status(401).json({ error: "You must be logged in to save searches" });
-        return;
-      }
-      
       const { name, criteria } = req.body;
       
       if (!name || !criteria) {
@@ -1702,10 +1695,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return;
       }
       
+      // Use authenticated user's ID if available, otherwise null for anonymous saves
+      const user = req.user as any;
+      const userId = user?.id || null;
+      
       const search = await storage.createSavedSearch({
         name,
         criteria,
-        userId: user.id,
+        userId,
       });
       res.status(201).json(search);
     } catch (error) {
