@@ -1,0 +1,214 @@
+Replit Agent Prompt — Mission Control “Reports” (ReZen / Arrakis) Using Provided Docs + DevTools Validation
+
+You are implementing Mission Control → Reports (left nav) to show agent-level deal reporting from ReZen (Arrakis). Use BOTH provided docs as references:
+
+API - Bolt.pdf
+
+ReZen_API_Reference_Mission_Control.docx
+
+This must be production-ready, with minimal guessing. Where fields/status/date logic is unclear, validate via ReZen UI → DevTools Network calls (per CTO guidance).
+
+0) Business Requirement (Ryan)
+
+For the selected agent, show YTD counts (and volume if available) for:
+
+Active
+
+Pending
+
+Closed
+
+If “Active Under Contract” exists, treat it as Pending unless explicitly separated.
+
+1) Base URL + Auth (Strict)
+Base host
+
+Use:
+
+https://arrakis.therealbrokerage.com/api
+
+Auth
+
+Use Bearer token. Do NOT hardcode it in frontend.
+
+Implement a backend proxy layer (server routes) that injects Authorization.
+
+Token acquisition approach (per docs / CTO guidance): capture from ReZen UI DevTools Network calls (Authorization header).
+
+Store token in .env (server-side only) and reference via process.env.
+
+2) ReZen / Arrakis Endpoints to Use (from docs)
+
+Use agent-scoped endpoints keyed by {yentaId}:
+
+Primary endpoints
+
+GET /v1/reports/{yentaId}/transactions/open
+
+GET /v1/reports/{yentaId}/transactions/closed
+
+(Optional for future) GET /v1/reports/{yentaId}/transactions/terminated
+
+Secondary (status breakdown / counts)
+
+GET /v1/transactions/participant/{yentaId}/transactions/lifecycle-group-counts
+
+(Optional) GET /v1/transactions/participant/{yentaId}/transactions/{lifecycleGroup}
+
+3) DevTools Validation (Mandatory, No Guessing)
+
+Because ReZen doesn’t provide support for API questions, you MUST validate real requests:
+
+Steps
+
+Open the ReZen UI page where agent transactions/production are visible.
+
+DevTools → Network → XHR/Fetch
+
+Identify the requests that load:
+
+open transactions
+
+closed transactions
+
+any date range selection / YTD behavior
+
+Confirm:
+
+exact endpoint paths
+
+query params (if any)
+
+which response fields represent:
+
+deal status (active/pending)
+
+deal close date for YTD
+
+Deliverable
+
+In code comments (dev-only), document:
+
+which ReZen UI page was used
+
+the validated endpoints + relevant query params
+
+sample response keys used for mapping
+
+4) YTD Logic (Strict)
+
+Default date range = Year To Date:
+
+start = Jan 1 of current year (local timezone)
+
+end = today
+
+Filtering rules
+
+If endpoints accept date query params (validate):
+
+pass them server-side
+
+If not:
+
+filter the returned transactions server-side using the validated date field
+
+Do NOT guess date fields. Use the field actually present (e.g., closedDate, closeDate, etc.) as confirmed from the response payload.
+
+5) Status Mapping (Active vs Pending vs Closed)
+Closed
+
+Closed deals should come from:
+
+transactions/closed endpoint (preferred)
+
+Active vs Pending
+
+The “open” endpoint likely contains multiple internal states.
+Implement a mapping function based on validated response fields:
+
+type StatusBucket = "active" | "pending" | "closed";
+
+function mapOpenToBucket(tx: any): "active" | "pending" | null {
+  // Based on validated keys (e.g., lifecycleGroup/status fields)
+}
+
+
+Rules:
+
+If response includes “Active Under Contract”, map to pending
+
+If a record cannot be mapped confidently, exclude it and log (dev-only) for review.
+
+6) Backend API for Mission Control Reports
+
+Create a backend endpoint the UI will call:
+
+Endpoint
+
+GET /api/rezen/reports/ytd?agentId=<yentaId>&start=<YYYY-MM-DD>&end=<YYYY-MM-DD>
+
+Response shape
+type AgentYtdReport = {
+  agentId: string;
+  start: string;
+  end: string;
+  activeCount: number;
+  pendingCount: number;
+  closedCount: number;
+  activeVolume?: number;
+  pendingVolume?: number;
+  closedVolume?: number;
+  meta?: {
+    source: "rezen-arrakis";
+    usedEndpoints: string[];
+  };
+};
+
+Caching
+
+Cache per agent + date range for 5–15 minutes to reduce load.
+
+7) UI Requirements (Mission Control → Reports)
+
+Add a “Reports” panel in left nav (or inside Mission Control page per current layout).
+
+Must include:
+
+Agent selector (existing)
+
+Date range (default YTD; optional custom range)
+
+Three tiles/cards:
+
+Active (count + volume if available)
+
+Pending (count + volume if available)
+
+Closed (count + volume if available)
+
+Clear loading and error states.
+
+If token/auth fails:
+
+show “Unable to load ReZen reports (auth). Please reconnect.”
+
+8) Acceptance Criteria (Must Pass)
+
+✅ With a valid {yentaId}, Reports populates with real data
+✅ YTD range applies correctly using validated date field
+✅ Active vs Pending mapping is implemented and documented
+✅ No frontend exposure of Bearer token
+✅ Errors are user-friendly and logged (dev-only detail ok)
+
+9) Deliverables
+
+File paths changed
+
+Confirmed endpoints used
+
+Status mapping logic summary (which field(s) were used)
+
+Confirm YTD date field used
+
+Screenshot of Reports showing results for one agent

@@ -4878,6 +4878,9 @@ OUTPUT JSON:
   }
   
   // Get agent production/transactions from ReZen
+  // Using documented endpoints from ReZen API Reference:
+  // - GET /api/v1/reports/{yentaId}/transactions/open (Active/Pending deals)
+  // - GET /api/v1/reports/{yentaId}/transactions/closed (Closed deals)
   app.get("/api/rezen/production", async (req, res) => {
     try {
       const { agentId, startDate, endDate } = req.query as Record<string, string>;
@@ -4895,11 +4898,45 @@ OUTPUT JSON:
         return;
       }
       
-      console.log(`[ReZen] Fetching production for agent ${agentId}`);
+      console.log(`[ReZen] Fetching production for agent ${agentId} using reports endpoints`);
       
-      // Fetch transactions for the agent
-      // Using the participant endpoint to get transactions by user/agent
-      const transactions = await rezenApiRequest(`/transactions/participant/${agentId}/current`);
+      // Fetch transactions using documented report endpoints
+      // Open endpoint returns active/pending deals, Closed endpoint returns closed deals
+      let openError: Error | null = null;
+      let closedError: Error | null = null;
+      
+      const [openResult, closedResult] = await Promise.all([
+        rezenApiRequest(`/reports/${agentId}/transactions/open`).catch(err => {
+          console.warn(`[ReZen] Open transactions fetch failed: ${err.message}`);
+          openError = err;
+          return null;
+        }),
+        rezenApiRequest(`/reports/${agentId}/transactions/closed`).catch(err => {
+          console.warn(`[ReZen] Closed transactions fetch failed: ${err.message}`);
+          closedError = err;
+          return null;
+        }),
+      ]);
+      
+      // If both endpoints failed, return error (don't return zeroed data)
+      if (openError && closedError) {
+        console.error('[ReZen] Both endpoints failed - cannot return production data');
+        res.status(500).json({
+          error: 'Failed to fetch production data from ReZen',
+          details: 'Both open and closed transaction endpoints failed',
+          openError: (openError as Error).message,
+          closedError: (closedError as Error).message,
+        });
+        return;
+      }
+      
+      // Combine both transaction lists (allow partial data if one endpoint failed)
+      const openTxList = openResult ? (Array.isArray(openResult) ? openResult : openResult?.transactions || []) : [];
+      const closedTxList = closedResult ? (Array.isArray(closedResult) ? closedResult : closedResult?.transactions || []) : [];
+      const allTransactions = [...openTxList, ...closedTxList];
+      
+      // Track data quality
+      const dataQuality = openError || closedError ? 'partial' : 'complete';
       
       // Process and aggregate transactions
       const production = {
@@ -4921,12 +4958,21 @@ OUTPUT JSON:
         transactions: [] as any[],
         dataSource: 'ReZen API',
         fetchedAt: new Date().toISOString(),
+        meta: {
+          source: 'rezen-arrakis',
+          dataQuality,
+          usedEndpoints: [
+            `/reports/${agentId}/transactions/open`,
+            `/reports/${agentId}/transactions/closed`,
+          ],
+          openTxCount: openTxList.length,
+          closedTxCount: closedTxList.length,
+          openEndpointFailed: !!openError,
+          closedEndpointFailed: !!closedError,
+        },
       };
       
-      // Handle array or object response
-      const txList = Array.isArray(transactions) ? transactions : transactions?.transactions || [];
-      
-      for (const tx of txList) {
+      for (const tx of allTransactions) {
         const status = mapRezenStatus(tx.lifecycleState || tx.status || tx.transactionStatus || '');
         const side = mapRezenSide(tx);
         const volume = getRezenVolume(tx, tx.lifecycleState || tx.status || '');
