@@ -1,0 +1,107 @@
+Replit Agent Prompt — Properties: “Back to Search” Should Return to Results (Not Search Criteria) + Preserve Context
+Problem
+
+In the Properties flow, after running a search and viewing results, if the user clicks a property card (goes to details) and then clicks “Back to Search”, it returns them to Search Criteria instead of returning them to the Results view they were just in. This adds extra clicks and slows down selection workflows.
+
+Primary URL to test:
+https://f58e6159-1bf8-4479-a256-c997461de361-00-1jv089vliph98.riker.replit.dev/properties
+
+1) Expected Behavior (MUST IMPLEMENT)
+When user is in Results → opens Property Detail → clicks “Back to Search”
+
+✅ Return them to:
+
+View Results tab (not Search Criteria)
+
+The same filters/query they had
+
+The same pagination position (if possible)
+
+The same scroll position (if possible)
+
+This should feel like “go back to the list I was looking at,” not “restart search.”
+
+2) Implementation Requirements (Strict)
+A) Store navigation context when entering property detail
+
+When user clicks a property card from /properties?...:
+
+capture:
+
+the current full URL (including query params)
+
+the active tab (Results vs Criteria vs Map)
+
+current page index (if paginated)
+
+scroll position in results list
+
+Persist this context in ONE of:
+
+location.state (preferred)
+
+sessionStorage (fallback)
+
+a lightweight global store
+
+Example shape:
+
+type PropertiesNavContext = {
+  fromUrl: string;          // full /properties?... URL
+  activeTab: "results" | "criteria" | "map";
+  page?: number;
+  scrollY?: number;
+};
+
+B) Make “Back to Search” use this context
+
+On property detail page:
+
+“Back to Search” button should:
+
+navigate to fromUrl
+
+restore tab to results
+
+restore scroll position (after render)
+
+C) Fallback behavior (if user lands directly on detail page)
+
+If no context exists (user opened property detail directly via a shared link):
+
+“Back to Search” should go to /properties
+
+default tab can remain Search Criteria
+
+3) Do NOT trigger a new search unnecessarily
+
+Returning to results should NOT clear or reset filters
+
+It should NOT force a full refetch if cached results exist
+
+If refetch is required, keep UX smooth and return user to Results view regardless
+
+4) Acceptance Tests
+
+✅ Run a search → go to View Results → click a property → Back to Search
+→ lands on View Results with same search context
+
+✅ Scroll down results, click property, go back
+→ returns near previous scroll position (or at least same page)
+
+✅ If user opens a property detail URL directly
+→ Back to Search returns to /properties safely
+
+Deliverables
+
+File paths changed
+
+Confirm which method used (location.state vs sessionStorage/store)
+
+Short note confirming restoration of:
+
+results tab
+
+filters/query params
+
+scroll position/page (if implemented)

@@ -236,13 +236,30 @@ export default function Properties() {
   const [statusInspectorEnabled, setStatusInspectorEnabled] = useState(false);
   
   // Sync searchCriteria with URL when URL changes (browser history navigation)
+  // Also check for tab=results parameter to return to results view after property detail
   useEffect(() => {
+    const params = new URLSearchParams(searchString);
+    const tabParam = params.get('tab');
+    
     if (urlCriteria) {
       setSearchCriteria(urlCriteria);
+      // If tab=results is explicitly set (coming back from property detail), go to results
+      // Otherwise default to results since we have criteria
+      setActiveTab("results");
+    } else if (tabParam === 'results') {
+      // Coming back from property detail but no criteria - still go to results (will show empty state)
       setActiveTab("results");
     } else {
       setSearchCriteria(null);
       setActiveTab("search");
+    }
+    
+    // Clean up the tab parameter from URL to prevent it persisting
+    if (tabParam) {
+      params.delete('tab');
+      const newSearch = params.toString();
+      const newUrl = newSearch ? `/properties?${newSearch}` : '/properties';
+      navigate(newUrl, { replace: true });
     }
   }, [searchString]); // Re-run when URL changes
   
@@ -484,7 +501,13 @@ export default function Properties() {
       property,
       media: convertPhotosToMedia(property),
     });
-    navigate(`/properties/${property.id}`);
+    // Store the current URL with query params so "Back to Search" returns to results view
+    // Add tab=results to ensure we return to the results tab, not search criteria
+    const currentUrl = window.location.pathname + window.location.search;
+    const returnUrl = currentUrl.includes('?') 
+      ? `${currentUrl}&tab=results` 
+      : `${currentUrl}?tab=results`;
+    navigate(`/properties/${property.id}?from=${encodeURIComponent(returnUrl)}`);
   };
 
   return (
