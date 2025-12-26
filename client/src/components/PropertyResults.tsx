@@ -33,6 +33,7 @@ interface PropertyResultsProps {
   selectedIds: Set<string>;
   onToggleSelect: (id: string) => void;
   onSelectAll: () => void;
+  onClearSelection: () => void;
   onPropertyClick: (property: Property) => void;
   statusInspectorEnabled?: boolean;
 }
@@ -43,6 +44,7 @@ export function PropertyResults({
   selectedIds, 
   onToggleSelect, 
   onSelectAll,
+  onClearSelection,
   onPropertyClick,
   statusInspectorEnabled = false
 }: PropertyResultsProps) {
@@ -158,6 +160,17 @@ export function PropertyResults({
             <span className="text-sm text-muted-foreground">
               {selectedIds.size} Selected
             </span>
+            {selectedIds.size > 0 && (
+              <Button 
+                variant="ghost" 
+                size="sm"
+                onClick={onClearSelection}
+                className="text-muted-foreground hover:text-foreground"
+                data-testid="button-clear-selection"
+              >
+                Clear
+              </Button>
+            )}
           </div>
 
           <Select value={sortBy} onValueChange={setSortBy}>

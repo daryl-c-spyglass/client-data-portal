@@ -429,6 +429,7 @@ export default function Properties() {
   
   const handleReset = () => {
     setSearchCriteria(null);
+    clearSelection(); // Clear selection when resetting search
     navigate('/properties', { replace: true });
     setActiveTab("search");
   };
@@ -471,7 +472,13 @@ export default function Properties() {
     } as unknown as Media));
   };
 
+  const clearSelection = () => {
+    setSelectedIds(new Set());
+  };
+
   const handlePropertyClick = (property: Property) => {
+    // Clear selection when navigating to property detail to prevent sticky selections
+    clearSelection();
     // Set the selected property in context before navigation
     setSelectedProperty({
       property,
@@ -627,7 +634,7 @@ export default function Properties() {
                 <RotateCcw className="w-4 h-4 mr-2" />
                 Reset
               </Button>
-              <Button variant="outline" onClick={() => setActiveTab("search")} data-testid="button-modify-search">
+              <Button variant="outline" onClick={() => { clearSelection(); setActiveTab("search"); }} data-testid="button-modify-search">
                 <Search className="w-4 h-4 mr-2" />
                 Modify Search
               </Button>
@@ -834,6 +841,7 @@ export default function Properties() {
                 selectedIds={selectedIds}
                 onToggleSelect={toggleSelect}
                 onSelectAll={selectAll}
+                onClearSelection={clearSelection}
                 onPropertyClick={handlePropertyClick}
                 statusInspectorEnabled={statusInspectorEnabled}
               />

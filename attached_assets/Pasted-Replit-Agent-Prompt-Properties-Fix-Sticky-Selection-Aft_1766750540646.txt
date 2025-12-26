@@ -1,0 +1,117 @@
+Replit Agent Prompt — Properties: Fix “Sticky Selection” After Opening a Listing + Back to Search
+Problem
+In the Properties section, when a user selects listings (checkbox/selection), then accidentally clicks into a property details page and uses Back to Search, the previously selected checkboxes remain selected. Even if the user goes back to the Search Criteria panel, the selection state persists unless they manually clear it.
+This is confusing. Selection should not “stick” unintentionally across navigation.
+
+1) Define correct expected behavior (implement this)
+Required behavior (strict)
+
+
+Selections should be scoped to the current search session and should behave predictably:
+
+
+A) When user navigates from results → property detail → back to results
+
+
+Keep the user’s search filters and current page state
+
+
+BUT selection behavior must be one of these (choose and implement consistently):
+
+
+✅ Option 1 (Recommended): Clear selection automatically
+
+
+When returning to results from a property details page, reset selected items to none.
+
+
+Show a subtle toast: “Selection cleared” (optional).
+
+
+✅ Option 2: Ask user
+
+
+If there are selected items and user clicks a property card:
+
+
+prompt: “You have X selected. Continue and keep selection, or clear?”
+
+
+default: Clear
+
+
+
+
+(Do NOT keep sticky selections silently without explicit UX.)
+
+2) Fix the root cause (state persistence)
+Requirements
+
+
+Identify where selection is stored:
+
+
+React state, global store, URL params, localStorage, etc.
+
+
+
+
+Ensure selection state is not persisted across navigation unless explicitly required.
+
+
+On route change to /properties/:id:
+
+
+clear selectedListingIds (if using Option 1)
+
+
+
+
+On returning to /properties:
+
+
+ensure selected state initializes empty.
+
+
+
+
+
+3) Ensure Search Criteria view resets selection too
+Requirements
+
+
+If user clicks “Modify Search” or goes back to Search Criteria panel:
+
+
+selection should be cleared automatically (or at minimum, provide a visible “Clear selection” action)
+
+
+
+
+Add a small UI element near “Selected X”:
+
+
+“Clear selection” (one-click)
+
+
+
+
+
+4) Acceptance Tests (must pass)
+✅ Select 3 items → click a property → Back to Search → selection is cleared (Option 1)
+✅ Search criteria panel does not keep stale selections
+✅ No need for user to manually hit a full “Clear” to remove selections
+✅ No regression: filters and results still persist correctly on back navigation
+
+Deliverables
+
+
+File paths changed
+
+
+Confirm which option was implemented (auto-clear vs prompt)
+
+
+Screenshot/notes showing selection clears after viewing a property and returning to results
+
+
