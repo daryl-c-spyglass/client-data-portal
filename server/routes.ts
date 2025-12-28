@@ -889,6 +889,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
           // Log the search query for debugging
           console.log(`🔍 [Subdivision Filter] Searching for: "${subdivision}"`);
           
+          // Log sample of subdivision values for debugging
+          const sampleProps = filtered.slice(0, 10);
+          console.log(`   Sample subdivision values in results:`);
+          sampleProps.forEach((p: any) => {
+            console.log(`     - "${p.address}": subdiv="${p.subdivision || 'NULL'}", subdivName="${p.subdivisionName || 'NULL'}", neighborhood="${p.neighborhood || 'NULL'}"`);
+          });
+          
           filtered = filtered.filter((p: any) => {
             const propSubdiv = (p.subdivision || '').toLowerCase().trim();
             const propSubdivName = (p.subdivisionName || '').toLowerCase().trim();
