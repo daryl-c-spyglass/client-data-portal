@@ -887,23 +887,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
           filtered = filtered.filter((p: any) => {
             const propSubdiv = (p.subdivision || '').toLowerCase().trim();
             const propSubdivName = (p.subdivisionName || '').toLowerCase().trim();
+            // CRITICAL: Also check neighborhood field - Repliers stores subdivision info there for Active listings
+            const propNeighborhood = (p.neighborhood || '').toLowerCase().trim();
             
             // Stricter matching logic:
             // 1. Exact match (case-insensitive)
             // 2. Property subdivision STARTS WITH search term (e.g., "Barton Hills" matches "Barton Hills West")
             // 3. All search term words appear in the subdivision (e.g., "Barton Hills" matches "Barton Hills Section 2")
             
-            const exactMatch = propSubdiv === subdivisionLower || propSubdivName === subdivisionLower;
-            const startsWithMatch = propSubdiv.startsWith(subdivisionLower) || propSubdivName.startsWith(subdivisionLower);
+            const exactMatch = propSubdiv === subdivisionLower || propSubdivName === subdivisionLower || propNeighborhood === subdivisionLower;
+            const startsWithMatch = propSubdiv.startsWith(subdivisionLower) || propSubdivName.startsWith(subdivisionLower) || propNeighborhood.startsWith(subdivisionLower);
             const allWordsMatch = searchTerms.every(term => 
-              propSubdiv.includes(term) || propSubdivName.includes(term)
+              propSubdiv.includes(term) || propSubdivName.includes(term) || propNeighborhood.includes(term)
             );
             
             // Reject partial matches that don't contain ALL search terms
             // This prevents "Barton Creek" from matching "Barton Hills"
             const hasAllTerms = searchTerms.length > 1 
-              ? searchTerms.every(term => propSubdiv.includes(term) || propSubdivName.includes(term))
-              : propSubdiv.includes(subdivisionLower) || propSubdivName.includes(subdivisionLower);
+              ? searchTerms.every(term => propSubdiv.includes(term) || propSubdivName.includes(term) || propNeighborhood.includes(term))
+              : propSubdiv.includes(subdivisionLower) || propSubdivName.includes(subdivisionLower) || propNeighborhood.includes(subdivisionLower);
             
             return exactMatch || startsWithMatch || (allWordsMatch && hasAllTerms);
           });
@@ -915,7 +917,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           if (beforeCount > 0) {
             console.log(`   - Sample kept properties:`);
             filtered.slice(0, 3).forEach((p: any) => {
-              console.log(`     ✓ ${p.address} - Subdivision: "${p.subdivision || 'N/A'}"`);
+              console.log(`     ✓ ${p.address} - Subdivision: "${p.subdivision || 'N/A'}", Neighborhood: "${p.neighborhood || 'N/A'}"`);
             });
           }
         }
