@@ -669,8 +669,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
             longitude: toNumber(map.longitude ?? listing.longitude),
             photos: photos,
             // CRITICAL: Repliers "neighborhood" field = subdivision (tract label), NOT geographic neighborhood
-            subdivision: addr.neighborhood || listing.subdivisionName || null,
-            subdivisionName: addr.neighborhood || listing.subdivisionName || null,
+            // Extended fallback chain for Closed listings which may store subdivision in different fields
+            subdivision: addr.neighborhood || listing.subdivisionName || listing.subdivision || 
+                        (listing.raw?.SubdivisionName) || (listing.raw?.Subdivision) || 
+                        details.subdivision || (details as any).SubdivisionName || null,
+            subdivisionName: addr.neighborhood || listing.subdivisionName || listing.subdivision || 
+                            (listing.raw?.SubdivisionName) || (listing.raw?.Subdivision) || 
+                            details.subdivision || (details as any).SubdivisionName || null,
             neighborhood: null,  // MUST be resolved from boundary polygons, never from listing data
             daysOnMarket: toNumber(listing.daysOnMarket),
             cumulativeDaysOnMarket: toNumber(listing.cumulativeDaysOnMarket) || toNumber(listing.daysOnMarket),
