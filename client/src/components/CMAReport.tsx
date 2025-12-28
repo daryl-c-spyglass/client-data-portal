@@ -5,7 +5,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, Legend, ResponsiveContainer, LineChart, Line, ReferenceLine, ScatterChart, Scatter, ZAxis, Cell } from "recharts";
-import { Save, Edit, FileText, Printer, Info, Home, Mail, ChevronLeft, ChevronRight, Bed, Bath, Maximize, MapPin, Calendar, Map as MapIcon, ExternalLink } from "lucide-react";
+import { Save, Edit, FileText, Printer, Info, Home, Mail, ChevronLeft, ChevronRight, Bed, Bath, Maximize, MapPin, Calendar, Map as MapIcon, ExternalLink, DollarSign, TrendingUp, Target, Zap, Clock, BarChart3 } from "lucide-react";
 import { MapContainer, TileLayer, Marker, Popup, useMap } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
 import L from "leaflet";
@@ -325,6 +325,119 @@ export function CMAReport({
       yearBuilt: computeStats(includedProperties.map(p => p.yearBuilt || 0)),
     };
   }, [properties, excludedPropertyIds]);
+
+  // Dynamic pricing suggestion calculation based on market trends
+  const pricingSuggestion = useMemo(() => {
+    // Get included sold properties for analysis
+    const soldForAnalysis = soldProperties.filter(p => !excludedPropertyIds.has(p.id));
+    
+    if (soldForAnalysis.length < 2) {
+      return null; // Need at least 2 sold properties for analysis
+    }
+
+    // Calculate base metrics from sold properties
+    const soldPrices = soldForAnalysis
+      .map(p => p.closePrice ? Number(p.closePrice) : 0)
+      .filter(price => price > 0);
+    
+    const soldPricesPerSqFt = soldForAnalysis
+      .filter(p => p.livingArea && Number(p.livingArea) > 0 && p.closePrice)
+      .map(p => Number(p.closePrice) / Number(p.livingArea));
+
+    if (soldPrices.length === 0) return null;
+
+    // Calculate average price per sqft
+    const avgPricePerSqFt = soldPricesPerSqFt.length > 0 
+      ? soldPricesPerSqFt.reduce((a, b) => a + b, 0) / soldPricesPerSqFt.length 
+      : 0;
+
+    // Calculate market trend adjustment based on recent sales
+    let marketTrendAdjustment = 0;
+    const soldWithDates = soldForAnalysis.filter(p => p.closeDate && p.closePrice);
+    
+    if (soldWithDates.length >= 3) {
+      // Sort by close date
+      const sortedByDate = [...soldWithDates].sort((a, b) => 
+        new Date(a.closeDate!).getTime() - new Date(b.closeDate!).getTime()
+      );
+      
+      // Compare first half vs second half average prices
+      const midpoint = Math.floor(sortedByDate.length / 2);
+      const earlyHalf = sortedByDate.slice(0, midpoint);
+      const lateHalf = sortedByDate.slice(midpoint);
+      
+      const earlyAvg = earlyHalf.reduce((sum, p) => sum + Number(p.closePrice), 0) / earlyHalf.length;
+      const lateAvg = lateHalf.reduce((sum, p) => sum + Number(p.closePrice), 0) / lateHalf.length;
+      
+      if (earlyAvg > 0) {
+        marketTrendAdjustment = ((lateAvg - earlyAvg) / earlyAvg) * 100;
+      }
+    }
+
+    // Calculate list-to-sale ratio from sold properties
+    const ratios = soldForAnalysis
+      .filter(p => p.listPrice && p.closePrice && Number(p.listPrice) > 0)
+      .map(p => (Number(p.closePrice) / Number(p.listPrice)) * 100);
+    
+    const avgListToSaleRatio = ratios.length > 0 
+      ? ratios.reduce((a, b) => a + b, 0) / ratios.length 
+      : 100;
+
+    // Calculate DOM (Days on Market) analysis
+    const doms = soldForAnalysis
+      .map(p => p.daysOnMarket || 0)
+      .filter(dom => dom > 0);
+    const avgDom = doms.length > 0 ? doms.reduce((a, b) => a + b, 0) / doms.length : 0;
+
+    // Determine market condition based on DOM
+    let marketCondition: 'hot' | 'balanced' | 'slow' = 'balanced';
+    if (avgDom < 21) marketCondition = 'hot';
+    else if (avgDom > 60) marketCondition = 'slow';
+
+    // Calculate suggested price range
+    const sortedPrices = [...soldPrices].sort((a, b) => a - b);
+    const q1Index = Math.floor(sortedPrices.length * 0.25);
+    const q3Index = Math.floor(sortedPrices.length * 0.75);
+    const q1 = sortedPrices[q1Index] || sortedPrices[0];
+    const q3 = sortedPrices[q3Index] || sortedPrices[sortedPrices.length - 1];
+    const iqr = q3 - q1;
+    
+    // Apply market trend adjustment to suggestion (capped at ±10%)
+    const trendMultiplier = 1 + Math.max(-0.1, Math.min(0.1, marketTrendAdjustment / 100));
+    
+    // Suggested range based on quartiles with trend adjustment
+    const suggestedLow = Math.round(q1 * trendMultiplier);
+    const suggestedHigh = Math.round(q3 * trendMultiplier);
+    const suggestedMid = Math.round(((q1 + q3) / 2) * trendMultiplier);
+
+    // Quick sale vs maximum value suggestions
+    const quickSalePrice = Math.round(suggestedLow * 0.98); // Slightly below low for quick sale
+    const maxValuePrice = Math.round(suggestedHigh * 1.02); // Slightly above high for max value
+
+    // Confidence score based on data quality (0-100)
+    let confidenceScore = 50; // Base score
+    confidenceScore += Math.min(20, soldForAnalysis.length * 2); // More comps = higher confidence
+    confidenceScore += soldPricesPerSqFt.length > 3 ? 10 : 0; // Good sqft data
+    confidenceScore += ratios.length > 2 ? 10 : 0; // Good ratio data
+    confidenceScore -= Math.abs(marketTrendAdjustment) > 10 ? 10 : 0; // Volatile market reduces confidence
+    confidenceScore = Math.max(0, Math.min(100, confidenceScore));
+
+    return {
+      suggestedLow,
+      suggestedMid,
+      suggestedHigh,
+      quickSalePrice,
+      maxValuePrice,
+      avgPricePerSqFt,
+      marketTrendAdjustment,
+      avgListToSaleRatio,
+      avgDom,
+      marketCondition,
+      confidenceScore,
+      compsAnalyzed: soldForAnalysis.length,
+      priceRange: { min: sortedPrices[0], max: sortedPrices[sortedPrices.length - 1] },
+    };
+  }, [soldProperties, excludedPropertyIds]);
 
   // Prepare chart data - use filtered statistics
   const priceRangeData = [
@@ -677,6 +790,198 @@ export function CMAReport({
               </Table>
             </CardContent>
           </Card>
+
+          {/* Dynamic Pricing Suggestion Card */}
+          {pricingSuggestion && (
+            <Card className="border-primary/20 bg-gradient-to-br from-background to-primary/5">
+              <CardHeader className="pb-2">
+                <CardTitle className="flex items-center gap-2">
+                  <Target className="w-5 h-5 text-primary" />
+                  Suggested Price Range
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Info className="w-4 h-4 text-muted-foreground cursor-help" />
+                    </TooltipTrigger>
+                    <TooltipContent side="right" className="max-w-sm">
+                      <p className="text-sm">
+                        Price suggestions based on {pricingSuggestion.compsAnalyzed} sold comparable properties, 
+                        adjusted for current market trends. Not a formal appraisal.
+                      </p>
+                    </TooltipContent>
+                  </Tooltip>
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                {/* Main Price Range Display */}
+                <div className="text-center space-y-2">
+                  <div className="flex items-center justify-center gap-3 text-3xl font-bold">
+                    <span className="text-muted-foreground">${pricingSuggestion.suggestedLow.toLocaleString()}</span>
+                    <span className="text-muted-foreground">-</span>
+                    <span className="text-primary">${pricingSuggestion.suggestedHigh.toLocaleString()}</span>
+                  </div>
+                  <p className="text-sm text-muted-foreground">
+                    Suggested listing range based on {pricingSuggestion.compsAnalyzed} comparable sales
+                  </p>
+                </div>
+
+                {/* Visual Price Range Bar */}
+                {(() => {
+                  const rangeSpan = pricingSuggestion.priceRange.max - pricingSuggestion.priceRange.min;
+                  const hasValidRange = rangeSpan > 0;
+                  
+                  const clamp = (val: number) => Math.max(0, Math.min(100, val));
+                  
+                  const leftPct = hasValidRange 
+                    ? clamp(((pricingSuggestion.suggestedLow - pricingSuggestion.priceRange.min) / rangeSpan) * 100)
+                    : 10;
+                  const rightPct = hasValidRange 
+                    ? clamp(100 - ((pricingSuggestion.suggestedHigh - pricingSuggestion.priceRange.min) / rangeSpan) * 100)
+                    : 10;
+                  const midPct = hasValidRange
+                    ? clamp(((pricingSuggestion.suggestedMid - pricingSuggestion.priceRange.min) / rangeSpan) * 100)
+                    : 50;
+                  
+                  return (
+                    <div className="space-y-2">
+                      <div className="relative h-8 bg-muted rounded-md overflow-hidden">
+                        {hasValidRange ? (
+                          <>
+                            <div 
+                              className="absolute h-full bg-gradient-to-r from-green-500/40 via-primary/60 to-orange-500/40 rounded-md"
+                              style={{ left: `${leftPct}%`, right: `${rightPct}%` }}
+                            />
+                            <div 
+                              className="absolute w-1 h-full bg-primary"
+                              style={{ left: `${midPct}%` }}
+                            />
+                          </>
+                        ) : (
+                          <>
+                            <div className="absolute inset-0 bg-primary/40 rounded-md" />
+                            <div className="absolute w-1 h-full bg-primary left-1/2 transform -translate-x-1/2" />
+                          </>
+                        )}
+                      </div>
+                      <div className="flex justify-between text-xs text-muted-foreground">
+                        <span>${pricingSuggestion.priceRange.min.toLocaleString()}</span>
+                        <span className="font-medium text-primary">Target: ${pricingSuggestion.suggestedMid.toLocaleString()}</span>
+                        <span>${pricingSuggestion.priceRange.max.toLocaleString()}</span>
+                      </div>
+                    </div>
+                  );
+                })()}
+
+                {/* Price Strategy Cards */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="p-4 rounded-md bg-green-50 dark:bg-green-950/30 border border-green-200 dark:border-green-800">
+                    <div className="flex items-center gap-2 mb-2">
+                      <Zap className="w-4 h-4 text-green-600 dark:text-green-400" />
+                      <span className="font-medium text-green-700 dark:text-green-400">Quick Sale Price</span>
+                    </div>
+                    <p className="text-2xl font-bold text-green-700 dark:text-green-400">
+                      ${pricingSuggestion.quickSalePrice.toLocaleString()}
+                    </p>
+                    <p className="text-xs text-green-600/80 dark:text-green-400/80 mt-1">
+                      Competitive pricing for faster sale
+                    </p>
+                  </div>
+
+                  <div className="p-4 rounded-md bg-orange-50 dark:bg-orange-950/30 border border-orange-200 dark:border-orange-800">
+                    <div className="flex items-center gap-2 mb-2">
+                      <TrendingUp className="w-4 h-4 text-orange-600 dark:text-orange-400" />
+                      <span className="font-medium text-orange-700 dark:text-orange-400">Maximum Value</span>
+                    </div>
+                    <p className="text-2xl font-bold text-orange-700 dark:text-orange-400">
+                      ${pricingSuggestion.maxValuePrice.toLocaleString()}
+                    </p>
+                    <p className="text-xs text-orange-600/80 dark:text-orange-400/80 mt-1">
+                      Aggressive pricing for maximum return
+                    </p>
+                  </div>
+                </div>
+
+                {/* Market Metrics Grid */}
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                  <div className="text-center p-3 bg-muted/50 rounded-md">
+                    <div className="flex items-center justify-center gap-1 mb-1">
+                      <DollarSign className="w-4 h-4 text-muted-foreground" />
+                      <span className="text-xs text-muted-foreground">Avg $/SqFt</span>
+                    </div>
+                    <p className="text-lg font-bold">${pricingSuggestion.avgPricePerSqFt.toFixed(0)}</p>
+                  </div>
+
+                  <div className="text-center p-3 bg-muted/50 rounded-md">
+                    <div className="flex items-center justify-center gap-1 mb-1">
+                      <TrendingUp className="w-4 h-4 text-muted-foreground" />
+                      <span className="text-xs text-muted-foreground">Market Trend</span>
+                    </div>
+                    <p className={cn(
+                      "text-lg font-bold",
+                      pricingSuggestion.marketTrendAdjustment >= 0 ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"
+                    )}>
+                      {pricingSuggestion.marketTrendAdjustment >= 0 ? '+' : ''}{pricingSuggestion.marketTrendAdjustment.toFixed(1)}%
+                    </p>
+                  </div>
+
+                  <div className="text-center p-3 bg-muted/50 rounded-md">
+                    <div className="flex items-center justify-center gap-1 mb-1">
+                      <BarChart3 className="w-4 h-4 text-muted-foreground" />
+                      <span className="text-xs text-muted-foreground">List/Sale Ratio</span>
+                    </div>
+                    <p className="text-lg font-bold">{pricingSuggestion.avgListToSaleRatio.toFixed(1)}%</p>
+                  </div>
+
+                  <div className="text-center p-3 bg-muted/50 rounded-md">
+                    <div className="flex items-center justify-center gap-1 mb-1">
+                      <Clock className="w-4 h-4 text-muted-foreground" />
+                      <span className="text-xs text-muted-foreground">Avg DOM</span>
+                    </div>
+                    <p className="text-lg font-bold">{Math.round(pricingSuggestion.avgDom)} days</p>
+                  </div>
+                </div>
+
+                {/* Market Condition & Confidence */}
+                <div className="flex flex-wrap items-center justify-between gap-3 pt-2 border-t">
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm text-muted-foreground">Market:</span>
+                    <Badge 
+                      variant="outline"
+                      className={cn(
+                        pricingSuggestion.marketCondition === 'hot' && "bg-red-100 text-red-700 border-red-300 dark:bg-red-950/30 dark:text-red-400 dark:border-red-800",
+                        pricingSuggestion.marketCondition === 'balanced' && "bg-blue-100 text-blue-700 border-blue-300 dark:bg-blue-950/30 dark:text-blue-400 dark:border-blue-800",
+                        pricingSuggestion.marketCondition === 'slow' && "bg-gray-100 text-gray-700 border-gray-300 dark:bg-gray-900/30 dark:text-gray-400 dark:border-gray-700"
+                      )}
+                    >
+                      {pricingSuggestion.marketCondition === 'hot' ? 'Hot Market' : 
+                       pricingSuggestion.marketCondition === 'balanced' ? 'Balanced Market' : 'Slow Market'}
+                    </Badge>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm text-muted-foreground">Confidence:</span>
+                    <div className="flex items-center gap-1">
+                      <div className="w-24 h-2 bg-muted rounded-full overflow-hidden">
+                        <div 
+                          className={cn(
+                            "h-full rounded-full",
+                            pricingSuggestion.confidenceScore >= 70 ? "bg-green-500" :
+                            pricingSuggestion.confidenceScore >= 50 ? "bg-yellow-500" : "bg-red-500"
+                          )}
+                          style={{ width: `${pricingSuggestion.confidenceScore}%` }}
+                        />
+                      </div>
+                      <span className="text-sm font-medium">{pricingSuggestion.confidenceScore}%</span>
+                    </div>
+                  </div>
+                </div>
+
+                <p className="text-xs text-muted-foreground italic">
+                  This analysis is based on comparable sales data and market trends. 
+                  Consult with your agent for a comprehensive pricing strategy.
+                </p>
+              </CardContent>
+            </Card>
+          )}
 
           {/* Property List at Bottom of Home Averages */}
           <Card>
