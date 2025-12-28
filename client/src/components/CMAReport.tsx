@@ -78,14 +78,14 @@ const getCompIcon = (status: string) => {
   });
 };
 
-// Price label marker icon - shows price directly on map
-const getPriceMarkerIcon = (price: number, status: string) => {
+// Price label marker icon - shows price directly on map (CloudCMA style)
+const getPriceMarkerIcon = (price: number, status: string, isSubject: boolean = false) => {
   const statusLower = (status || '').toLowerCase();
   let bgColor = '#22c55e'; // green for active
   let textColor = '#ffffff';
   
   if (statusLower === 'closed' || statusLower === 'sold') {
-    bgColor = '#6b7280'; // gray for sold
+    bgColor = '#ef4444'; // red for sold (CloudCMA style)
   } else if (
     statusLower.includes('under contract') || 
     statusLower.includes('pending') || 
@@ -95,10 +95,15 @@ const getPriceMarkerIcon = (price: number, status: string) => {
     bgColor = '#f59e0b'; // orange for under contract/pending
   }
   
+  // Subject property has special blue color
+  if (isSubject) {
+    bgColor = '#3b82f6'; // blue for subject
+  }
+  
   // Format price to compact form (e.g., $525K or $1.2M)
   const formatCompactPrice = (p: number) => {
     if (p >= 1000000) {
-      return `$${(p / 1000000).toFixed(1)}M`;
+      return `$${(p / 1000000).toFixed(2)}M`;
     }
     return `$${Math.round(p / 1000)}K`;
   };
@@ -107,21 +112,23 @@ const getPriceMarkerIcon = (price: number, status: string) => {
   
   return new L.DivIcon({
     html: `<div style="
-      display:inline-block;
-      padding:4px 8px;
+      display:inline-flex;
+      align-items:center;
+      gap:4px;
+      padding:5px 10px;
       background-color:${bgColor};
       color:${textColor};
-      font-size:11px;
-      font-weight:600;
-      border-radius:4px;
-      box-shadow:0 2px 6px rgba(0,0,0,0.35);
+      font-size:12px;
+      font-weight:700;
+      border-radius:6px;
+      box-shadow:0 2px 8px rgba(0,0,0,0.4);
       white-space:nowrap;
       border:2px solid white;
-    ">${priceLabel}</div>`,
+    ">${isSubject ? '🏠 ' : ''}${priceLabel}</div>`,
     className: 'price-marker-icon',
-    iconSize: [60, 24],
-    iconAnchor: [30, 24],
-    popupAnchor: [0, -24],
+    iconSize: [80, 28],
+    iconAnchor: [40, 28],
+    popupAnchor: [0, -28],
   });
 };
 
@@ -189,10 +196,13 @@ export function CMAReport({
   // Horizontal scroll refs for carousel arrows
   const statsScrollRef = useRef<HTMLDivElement>(null);
   const compareScrollRef = useRef<HTMLDivElement>(null);
+  const listScrollRef = useRef<HTMLDivElement>(null);
   const [statsCanScrollLeft, setStatsCanScrollLeft] = useState(false);
   const [statsCanScrollRight, setStatsCanScrollRight] = useState(false);
   const [compareCanScrollLeft, setCompareCanScrollLeft] = useState(false);
   const [compareCanScrollRight, setCompareCanScrollRight] = useState(false);
+  const [listCanScrollLeft, setListCanScrollLeft] = useState(false);
+  const [listCanScrollRight, setListCanScrollRight] = useState(false);
   
   // Update scroll button visibility for Stats view
   const updateStatsScrollButtons = () => {
@@ -212,11 +222,22 @@ export function CMAReport({
     }
   };
   
+  // Update scroll button visibility for List view
+  const updateListScrollButtons = () => {
+    if (listScrollRef.current) {
+      const { scrollLeft, scrollWidth, clientWidth } = listScrollRef.current;
+      setListCanScrollLeft(scrollLeft > 5);
+      setListCanScrollRight(scrollLeft < scrollWidth - clientWidth - 5);
+    }
+  };
+  
   useEffect(() => {
     updateStatsScrollButtons();
     updateCompareScrollButtons();
+    updateListScrollButtons();
     const statsEl = statsScrollRef.current;
     const compareEl = compareScrollRef.current;
+    const listEl = listScrollRef.current;
     
     if (statsEl) {
       statsEl.addEventListener('scroll', updateStatsScrollButtons);
@@ -224,9 +245,13 @@ export function CMAReport({
     if (compareEl) {
       compareEl.addEventListener('scroll', updateCompareScrollButtons);
     }
+    if (listEl) {
+      listEl.addEventListener('scroll', updateListScrollButtons);
+    }
     window.addEventListener('resize', () => {
       updateStatsScrollButtons();
       updateCompareScrollButtons();
+      updateListScrollButtons();
     });
     
     return () => {
@@ -235,6 +260,9 @@ export function CMAReport({
       }
       if (compareEl) {
         compareEl.removeEventListener('scroll', updateCompareScrollButtons);
+      }
+      if (listEl) {
+        listEl.removeEventListener('scroll', updateListScrollButtons);
       }
     };
   }, [activeTab, properties]);
@@ -260,6 +288,18 @@ export function CMAReport({
   const scrollCompareRight = () => {
     if (compareScrollRef.current) {
       compareScrollRef.current.scrollBy({ left: 300, behavior: 'smooth' });
+    }
+  };
+  
+  const scrollListLeft = () => {
+    if (listScrollRef.current) {
+      listScrollRef.current.scrollBy({ left: -280, behavior: 'smooth' });
+    }
+  };
+  
+  const scrollListRight = () => {
+    if (listScrollRef.current) {
+      listScrollRef.current.scrollBy({ left: 280, behavior: 'smooth' });
     }
   };
   
@@ -784,6 +824,19 @@ export function CMAReport({
               <TrendingUp className="w-4 h-4 mr-1.5" />
               Stats
             </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              className={cn(
+                "text-white hover:bg-white/10",
+                activeTab === "list" && "bg-white/20 text-primary"
+              )}
+              onClick={() => setActiveTab("list")}
+              data-testid="tab-list"
+            >
+              <Home className="w-4 h-4 mr-1.5" />
+              List
+            </Button>
           </div>
         </div>
       </div>
@@ -794,6 +847,7 @@ export function CMAReport({
           <TabsTrigger value="compare" data-testid="tab-compare-hidden">Compare</TabsTrigger>
           <TabsTrigger value="map" data-testid="tab-map-hidden">Map</TabsTrigger>
           <TabsTrigger value="stats" data-testid="tab-stats-hidden">Stats</TabsTrigger>
+          <TabsTrigger value="list" data-testid="tab-list-hidden">List</TabsTrigger>
           <TabsTrigger value="home-averages" data-testid="tab-home-averages">Home Averages</TabsTrigger>
           <TabsTrigger value="listings" data-testid="tab-listings">Listings</TabsTrigger>
           <TabsTrigger value="timeline" data-testid="tab-timeline">Timeline</TabsTrigger>
@@ -1093,7 +1147,7 @@ export function CMAReport({
         </TabsContent>
 
         {/* Map Tab - CloudCMA Style Full-width Map */}
-        <TabsContent value="map" className="space-y-0 mt-0">
+        <TabsContent value="map" className="space-y-0 mt-0 relative">
           <div className="h-[600px] rounded-b-lg overflow-hidden">
             {(() => {
               const validPositions = properties
@@ -1131,18 +1185,22 @@ export function CMAReport({
                       const price = isSold 
                         ? (property.closePrice ? Number(property.closePrice) : Number(property.listPrice || 0))
                         : Number(property.listPrice || 0);
+                      const isSubject = subjectPropertyId ? property.id === subjectPropertyId : false;
                       
                       return (
                         <Marker
                           key={property.id}
                           position={[Number(property.latitude), Number(property.longitude)]}
-                          icon={getPriceMarkerIcon(price, property.standardStatus || 'Active')}
+                          icon={getPriceMarkerIcon(price, property.standardStatus || 'Active', isSubject)}
                           eventHandlers={{
                             click: () => handlePropertyClick(property),
                           }}
                         >
                           <Popup>
                             <div className="min-w-[200px]">
+                              {isSubject && (
+                                <Badge className="mb-2 bg-blue-500 text-white">Subject Property</Badge>
+                              )}
                               <p className="font-semibold">{property.unparsedAddress}</p>
                               <p className="text-lg font-bold text-primary">${price.toLocaleString()}</p>
                               <p className="text-sm text-muted-foreground">
@@ -1158,41 +1216,442 @@ export function CMAReport({
               );
             })()}
           </div>
+          {/* Map Legend */}
+          <div className="absolute bottom-4 left-4 bg-white dark:bg-zinc-900 rounded-lg shadow-lg p-3 z-[1000]">
+            <div className="space-y-2">
+              <div className="flex items-center gap-2">
+                <div className="w-5 h-5 rounded bg-green-500 flex items-center justify-center">
+                  <span className="text-white text-[10px] font-bold">$</span>
+                </div>
+                <span className="text-xs">Active</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="w-5 h-5 rounded bg-orange-500 flex items-center justify-center">
+                  <span className="text-white text-[10px] font-bold">$</span>
+                </div>
+                <span className="text-xs">Under Contract</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="w-5 h-5 rounded bg-red-500 flex items-center justify-center">
+                  <span className="text-white text-[10px] font-bold">$</span>
+                </div>
+                <span className="text-xs">Closed</span>
+              </div>
+              {subjectPropertyId && (
+                <div className="flex items-center gap-2">
+                  <div className="w-5 h-5 rounded bg-blue-500 flex items-center justify-center">
+                    <span className="text-[10px]">🏠</span>
+                  </div>
+                  <span className="text-xs">Subject</span>
+                </div>
+              )}
+            </div>
+          </div>
         </TabsContent>
 
-        {/* Stats Tab - CloudCMA Style Side-by-Side Comparison Cards */}
-        <TabsContent value="stats" className="space-y-0 mt-0">
+        {/* Stats Tab - Statistics Overview with Charts */}
+        <TabsContent value="stats" className="space-y-6 p-4">
+          {/* Header Stats Cards Row */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-lg">Average Price</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-2xl font-bold text-primary">${Math.round(filteredStatistics.price.average).toLocaleString()}</p>
+                <p className="text-xs text-muted-foreground">
+                  Range: ${filteredStatistics.price.range.min.toLocaleString()} - ${filteredStatistics.price.range.max.toLocaleString()}
+                </p>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-lg">Price Per Sqft</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-2xl font-bold">${filteredStatistics.pricePerSqFt.average.toFixed(0)}<span className="text-sm">/sqft</span></p>
+                <p className="text-xs text-muted-foreground">
+                  Range: ${filteredStatistics.pricePerSqFt.range.min.toFixed(0)} - ${filteredStatistics.pricePerSqFt.range.max.toFixed(0)}
+                </p>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-lg">Avg Living Area</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-2xl font-bold">{Math.round(filteredStatistics.livingArea.average).toLocaleString()}<span className="text-sm"> sqft</span></p>
+                <p className="text-xs text-muted-foreground">
+                  {filteredStatistics.bedrooms.average.toFixed(1)} beds / {filteredStatistics.bathrooms.average.toFixed(1)} baths avg
+                </p>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Statistics Summary Table */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Statistics Summary ({includedAll.length} Properties)</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="w-[150px]">Metric</TableHead>
+                    <TableHead>Range</TableHead>
+                    <TableHead>Average</TableHead>
+                    <TableHead>Median</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  <TableRow>
+                    <TableCell className="font-medium">Price</TableCell>
+                    <TableCell>${filteredStatistics.price.range.min.toLocaleString()} - ${filteredStatistics.price.range.max.toLocaleString()}</TableCell>
+                    <TableCell className="font-semibold">${Math.round(filteredStatistics.price.average).toLocaleString()}</TableCell>
+                    <TableCell>${Math.round(filteredStatistics.price.median).toLocaleString()}</TableCell>
+                  </TableRow>
+                  <TableRow>
+                    <TableCell className="font-medium">Price/SqFt</TableCell>
+                    <TableCell>${filteredStatistics.pricePerSqFt.range.min.toFixed(0)} - ${filteredStatistics.pricePerSqFt.range.max.toFixed(0)}</TableCell>
+                    <TableCell className="font-semibold">${filteredStatistics.pricePerSqFt.average.toFixed(0)}</TableCell>
+                    <TableCell>${filteredStatistics.pricePerSqFt.median.toFixed(0)}</TableCell>
+                  </TableRow>
+                  <TableRow>
+                    <TableCell className="font-medium">Living Area</TableCell>
+                    <TableCell>{filteredStatistics.livingArea.range.min.toLocaleString()} - {filteredStatistics.livingArea.range.max.toLocaleString()} sqft</TableCell>
+                    <TableCell className="font-semibold">{Math.round(filteredStatistics.livingArea.average).toLocaleString()} sqft</TableCell>
+                    <TableCell>{Math.round(filteredStatistics.livingArea.median).toLocaleString()} sqft</TableCell>
+                  </TableRow>
+                  <TableRow>
+                    <TableCell className="font-medium">Year Built</TableCell>
+                    <TableCell>{filteredStatistics.yearBuilt.range.min} - {filteredStatistics.yearBuilt.range.max}</TableCell>
+                    <TableCell className="font-semibold">{Math.round(filteredStatistics.yearBuilt.average)}</TableCell>
+                    <TableCell>{Math.round(filteredStatistics.yearBuilt.median)}</TableCell>
+                  </TableRow>
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+
+          {/* Price Comparison Bar Chart */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <BarChart3 className="w-5 h-5" />
+                Price Comparison
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="h-[300px]">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart
+                    data={includedAll.map(property => {
+                      const isSold = property.standardStatus === 'Closed';
+                      const price = isSold 
+                        ? (property.closePrice ? Number(property.closePrice) : Number(property.listPrice || 0))
+                        : Number(property.listPrice || 0);
+                      const address = property.unparsedAddress || '';
+                      const shortAddress = address.length > 20 ? address.slice(0, 18) + '...' : address;
+                      return {
+                        address: shortAddress,
+                        fullAddress: address,
+                        price,
+                        status: property.standardStatus,
+                      };
+                    })}
+                    margin={{ top: 20, right: 30, left: 20, bottom: 60 }}
+                  >
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis 
+                      dataKey="address" 
+                      angle={-45} 
+                      textAnchor="end" 
+                      height={80}
+                      tick={{ fontSize: 10 }}
+                    />
+                    <YAxis 
+                      tickFormatter={(value) => `$${(value / 1000).toFixed(0)}K`}
+                    />
+                    <RechartsTooltip 
+                      formatter={(value: number) => [`$${value.toLocaleString()}`, 'Price']}
+                      labelFormatter={(label, payload) => {
+                        if (payload && payload[0]) {
+                          return payload[0].payload.fullAddress;
+                        }
+                        return label;
+                      }}
+                    />
+                    <Bar dataKey="price" fill="hsl(25, 90%, 52%)" radius={[4, 4, 0, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* CMA Market Review Summary */}
+          <Card className="border-primary/30 bg-primary/5">
+            <CardHeader>
+              <CardTitle className="text-lg flex items-center gap-2">
+                <FileText className="w-5 h-5" />
+                CMA Market Review
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <h4 className="font-semibold text-sm">Market Overview</h4>
+                  <p className="text-sm text-muted-foreground">
+                    Based on {includedAll.length} comparable properties, the average price is{' '}
+                    <span className="font-semibold text-foreground">${Math.round(filteredStatistics.price.average).toLocaleString()}</span>{' '}
+                    with a median of{' '}
+                    <span className="font-semibold text-foreground">${Math.round(filteredStatistics.price.median).toLocaleString()}</span>.
+                    {' '}Prices range from ${filteredStatistics.price.range.min.toLocaleString()} to ${filteredStatistics.price.range.max.toLocaleString()}.
+                  </p>
+                </div>
+                <div className="space-y-2">
+                  <h4 className="font-semibold text-sm">Price Per Square Foot</h4>
+                  <p className="text-sm text-muted-foreground">
+                    Average price per square foot is{' '}
+                    <span className="font-semibold text-foreground">${filteredStatistics.pricePerSqFt.average.toFixed(2)}</span>{' '}
+                    across comparable properties. This ranges from ${filteredStatistics.pricePerSqFt.range.min.toFixed(2)} to ${filteredStatistics.pricePerSqFt.range.max.toFixed(2)}/sqft.
+                  </p>
+                </div>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-2">
+                <div className="space-y-1">
+                  <h4 className="font-semibold text-sm">Days on Market</h4>
+                  <p className="text-sm text-muted-foreground">
+                    Average: <span className="font-semibold text-foreground">{Math.round(filteredStatistics.daysOnMarket.average)} days</span>
+                  </p>
+                </div>
+                <div className="space-y-1">
+                  <h4 className="font-semibold text-sm">Property Size</h4>
+                  <p className="text-sm text-muted-foreground">
+                    Avg: <span className="font-semibold text-foreground">{Math.round(filteredStatistics.livingArea.average).toLocaleString()} sqft</span>
+                  </p>
+                </div>
+                <div className="space-y-1">
+                  <h4 className="font-semibold text-sm">Bed/Bath</h4>
+                  <p className="text-sm text-muted-foreground">
+                    Avg: <span className="font-semibold text-foreground">{filteredStatistics.bedrooms.average.toFixed(1)} beds / {filteredStatistics.bathrooms.average.toFixed(1)} baths</span>
+                  </p>
+                </div>
+              </div>
+              <div className="pt-2 border-t">
+                <p className="text-xs text-muted-foreground italic">
+                  This analysis is based on {includedActive.length} Active, {includedUnderContract.length} Active Under Contract, and {includedSold.length} Closed properties in your selection.
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Days on Market / % of List Price Analysis */}
+          {(() => {
+            const closedWithData = soldProperties.filter(p => 
+              !excludedPropertyIds.has(p.id) &&
+              p.closePrice && p.listPrice && p.daysOnMarket !== null && p.daysOnMarket !== undefined
+            );
+            
+            if (closedWithData.length === 0) return null;
+            
+            const avgDOM = closedWithData.reduce((sum, p) => sum + (p.daysOnMarket || 0), 0) / closedWithData.length;
+            const avgListPriceRatio = closedWithData.reduce((sum, p) => {
+              const listPrice = Number(p.listPrice || 0);
+              const closePrice = Number(p.closePrice || 0);
+              return sum + (listPrice > 0 ? (closePrice / listPrice) * 100 : 0);
+            }, 0) / closedWithData.length;
+            
+            const sortedByPrice = [...closedWithData].sort((a, b) => 
+              Number(b.closePrice || 0) - Number(a.closePrice || 0)
+            );
+            
+            return (
+              <Card>
+                <CardHeader className="pb-2">
+                  <div className="flex items-center justify-between flex-wrap gap-4">
+                    <div className="flex items-center gap-6">
+                      <div>
+                        <span className="text-3xl font-bold text-primary">{Math.round(avgDOM)}</span>
+                        <span className="text-lg font-medium text-muted-foreground ml-2">DAYS ON MARKET</span>
+                      </div>
+                      <div className="h-8 w-px bg-border" />
+                      <div>
+                        <span className="text-3xl font-bold text-primary">{avgListPriceRatio.toFixed(2)}%</span>
+                        <span className="text-lg font-medium text-muted-foreground ml-2">OF LIST PRICE</span>
+                      </div>
+                    </div>
+                  </div>
+                  <p className="text-sm text-muted-foreground mt-2">
+                    Sold homes were on the market for an average of <span className="font-semibold text-foreground">{Math.round(avgDOM)} days</span> before they accepted an offer. 
+                    These homes sold for an average of <span className="font-semibold text-foreground">{avgListPriceRatio.toFixed(2)}%</span> of list price.
+                  </p>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    {/* Left side - Property list */}
+                    <div className="space-y-3">
+                      <div className="flex items-center gap-2">
+                        <Badge variant="outline" className="bg-red-500 text-white border-red-500">
+                          {closedWithData.length}
+                        </Badge>
+                        <span className="font-semibold">Closed</span>
+                      </div>
+                      <div className="space-y-2 max-h-[400px] overflow-y-auto pr-2">
+                        {sortedByPrice.map((property) => {
+                          const photos = getPropertyPhotos(property);
+                          const primaryPhoto = photos[0];
+                          const listPrice = Number(property.listPrice || 0);
+                          const closePrice = Number(property.closePrice || 0);
+                          const ratio = listPrice > 0 ? (closePrice / listPrice * 100) : 0;
+                          
+                          return (
+                            <div 
+                              key={property.id}
+                              className="flex items-center gap-3 p-2 rounded-lg hover-elevate cursor-pointer"
+                              onClick={() => handlePropertyClick(property)}
+                              data-testid={`dom-property-${property.id}`}
+                            >
+                              <div className="w-16 h-12 rounded overflow-hidden flex-shrink-0">
+                                {primaryPhoto ? (
+                                  <img src={primaryPhoto} alt="" className="w-full h-full object-cover" />
+                                ) : (
+                                  <div className="w-full h-full bg-muted flex items-center justify-center">
+                                    <Home className="w-4 h-4 text-muted-foreground" />
+                                  </div>
+                                )}
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <p className="font-medium text-sm truncate">{property.unparsedAddress}</p>
+                                <p className="text-xs text-muted-foreground">
+                                  {property.daysOnMarket} Days • {ratio.toFixed(2)}%
+                                </p>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                    
+                    {/* Right side - Price comparison chart */}
+                    <div className="h-[400px]">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <ScatterChart margin={{ top: 20, right: 60, bottom: 20, left: 20 }}>
+                          <CartesianGrid strokeDasharray="3 3" />
+                          <YAxis 
+                            type="number" 
+                            dataKey="price" 
+                            name="Price"
+                            tickFormatter={(v) => `$${(v / 1000000).toFixed(2)}M`}
+                            domain={['dataMin - 50000', 'dataMax + 50000']}
+                            orientation="right"
+                          />
+                          <XAxis 
+                            type="number" 
+                            dataKey="index" 
+                            name="Property"
+                            hide
+                          />
+                          <RechartsTooltip 
+                            content={({ active, payload }) => {
+                              if (!active || !payload?.length) return null;
+                              const data = payload[0].payload;
+                              return (
+                                <div className="bg-background border rounded-lg p-2 shadow-lg text-sm">
+                                  <p className="font-semibold">{data.address}</p>
+                                  <p>Close: ${data.price.toLocaleString()}</p>
+                                  <p>List: ${data.listPrice.toLocaleString()}</p>
+                                  <p>{data.ratio.toFixed(2)}% of list</p>
+                                </div>
+                              );
+                            }}
+                          />
+                          <Scatter 
+                            data={sortedByPrice.map((p, i) => ({
+                              index: i,
+                              price: Number(p.closePrice || 0),
+                              listPrice: Number(p.listPrice || 0),
+                              ratio: Number(p.listPrice || 0) > 0 ? (Number(p.closePrice || 0) / Number(p.listPrice || 0)) * 100 : 0,
+                              address: p.unparsedAddress,
+                              status: p.standardStatus,
+                            }))}
+                            shape={(props: any) => {
+                              const { cx, cy, payload } = props;
+                              const ratio = payload.ratio;
+                              let color = '#22c55e'; // green - above list
+                              if (ratio < 95) color = '#ef4444'; // red - significantly below
+                              else if (ratio < 100) color = '#eab308'; // yellow - slightly below
+                              return (
+                                <circle 
+                                  cx={cx} 
+                                  cy={cy} 
+                                  r={10} 
+                                  fill={color} 
+                                  stroke="white" 
+                                  strokeWidth={2}
+                                  style={{ cursor: 'pointer' }}
+                                />
+                              );
+                            }}
+                          />
+                        </ScatterChart>
+                      </ResponsiveContainer>
+                    </div>
+                  </div>
+                  
+                  {/* Legend */}
+                  <div className="flex items-center justify-center gap-6 mt-4 pt-4 border-t">
+                    <div className="flex items-center gap-2">
+                      <div className="w-4 h-4 rounded-full bg-green-500" />
+                      <span className="text-sm text-muted-foreground">≥100% of list</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <div className="w-4 h-4 rounded-full bg-yellow-500" />
+                      <span className="text-sm text-muted-foreground">95-99% of list</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <div className="w-4 h-4 rounded-full bg-red-500" />
+                      <span className="text-sm text-muted-foreground">&lt;95% of list</span>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            );
+          })()}
+        </TabsContent>
+
+        {/* List Tab - Property Cards with Horizontal Scroll */}
+        <TabsContent value="list" className="space-y-0 mt-0">
           <div className="bg-white dark:bg-zinc-950 rounded-b-lg p-4 relative">
             {/* Left scroll arrow */}
-            {statsCanScrollLeft && (
+            {listCanScrollLeft && (
               <Button
                 variant="outline"
                 size="icon"
                 className="absolute left-2 top-1/2 -translate-y-1/2 z-10 bg-white/90 dark:bg-zinc-900/90 shadow-lg rounded-full h-10 w-10"
-                onClick={scrollStatsLeft}
-                data-testid="button-stats-scroll-left"
+                onClick={scrollListLeft}
+                data-testid="button-list-scroll-left"
               >
                 <ChevronLeft className="w-5 h-5" />
               </Button>
             )}
             
             {/* Right scroll arrow */}
-            {statsCanScrollRight && (
+            {listCanScrollRight && (
               <Button
                 variant="outline"
                 size="icon"
                 className="absolute right-2 top-1/2 -translate-y-1/2 z-10 bg-white/90 dark:bg-zinc-900/90 shadow-lg rounded-full h-10 w-10"
-                onClick={scrollStatsRight}
-                data-testid="button-stats-scroll-right"
+                onClick={scrollListRight}
+                data-testid="button-list-scroll-right"
               >
                 <ChevronRight className="w-5 h-5" />
               </Button>
             )}
             
             <div 
-              ref={statsScrollRef}
+              ref={listScrollRef}
               className="flex gap-4 overflow-x-auto pb-4 scroll-smooth px-8"
-              onLoad={() => updateStatsScrollButtons()}
+              onLoad={() => updateListScrollButtons()}
             >
               {(() => {
                 // Find the actual subject property using subjectPropertyId prop
@@ -1268,7 +1727,7 @@ export function CMAReport({
                       key={property.id}
                       className="flex-shrink-0 w-64 bg-card border rounded-lg overflow-hidden cursor-pointer hover-elevate"
                       onClick={() => handlePropertyClick(property)}
-                      data-testid={`stats-card-${property.id}`}
+                      data-testid={`list-card-${property.id}`}
                     >
                       {/* Photo */}
                       <div className="relative h-36">

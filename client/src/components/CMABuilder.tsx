@@ -17,6 +17,7 @@ import { cn } from "@/lib/utils";
 import { PolygonMapSearch } from "@/components/PolygonMapSearch";
 import VisualMatchPanel, { type ImageSearchItem } from "@/components/VisualMatchPanel";
 import { apiRequest } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
 import type { Property } from "@shared/schema";
 
 interface AutocompleteInputProps {
@@ -140,7 +141,6 @@ interface UnifiedSearchResponse {
 
 // Property type options for the dropdown - matches Repliers propertySubType values exactly
 const PROPERTY_TYPES = [
-  { value: 'any', label: 'Any' },
   { value: 'Single Family Residence', label: 'Single Family Residence' },
   { value: 'Condominium', label: 'Condominium' },
   { value: 'Townhouse', label: 'Townhouse' },
@@ -191,6 +191,7 @@ interface CMABuilderProps {
 }
 
 export function CMABuilder({ onCreateCMA, initialData }: CMABuilderProps) {
+  const { toast } = useToast();
   const sc = initialData?.searchCriteria || {};
   
   const [cmaName, setCmaName] = useState(initialData?.name || "");
@@ -417,6 +418,30 @@ export function CMABuilder({ onCreateCMA, initialData }: CMABuilderProps) {
   const totalResults = searchResponse?.count || 0;
 
   const handleSearch = () => {
+    const missingFields: string[] = [];
+    
+    if (!searchSoldDays || searchSoldDays === 'any') {
+      missingFields.push('Close Date');
+    }
+    if (!searchPropertyType || searchPropertyType === 'any') {
+      missingFields.push('Property Type');
+    }
+    if (!searchMinSqft) {
+      missingFields.push('Min Sq Ft');
+    }
+    if (!searchMaxSqft) {
+      missingFields.push('Max Sq Ft');
+    }
+    
+    if (missingFields.length > 0) {
+      toast({
+        title: "Required Fields Missing",
+        description: `Please fill in: ${missingFields.join(', ')}`,
+        variant: "destructive",
+      });
+      return;
+    }
+    
     setSearchEnabled(true);
     refetch();
   };
@@ -809,10 +834,10 @@ export function CMABuilder({ onCreateCMA, initialData }: CMABuilderProps) {
                   </Select>
                 </div>
                 <div className="space-y-2">
-                  <Label>Property Type</Label>
+                  <Label>Property Type <span className="text-destructive">*</span></Label>
                   <Select value={searchPropertyType} onValueChange={setSearchPropertyType}>
                     <SelectTrigger data-testid="select-property-type">
-                      <SelectValue placeholder="Any" />
+                      <SelectValue placeholder="Select..." />
                     </SelectTrigger>
                     <SelectContent>
                       {PROPERTY_TYPES.map(type => (
@@ -854,24 +879,25 @@ export function CMABuilder({ onCreateCMA, initialData }: CMABuilderProps) {
               </div>
               <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-4">
                 <div className="space-y-2">
-                  <Label>Close Date</Label>
+                  <Label>Close Date <span className="text-destructive">*</span></Label>
                   <Select value={searchSoldDays} onValueChange={setSearchSoldDays}>
                     <SelectTrigger data-testid="select-sold-days">
-                      <SelectValue placeholder="Any" />
+                      <SelectValue placeholder="Select..." />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="any">Any</SelectItem>
                       <SelectItem value="30">0-30 days</SelectItem>
                       <SelectItem value="60">0-60 days</SelectItem>
                       <SelectItem value="90">0-90 days</SelectItem>
                       <SelectItem value="120">0-120 days</SelectItem>
                       <SelectItem value="150">0-150 days</SelectItem>
                       <SelectItem value="180">0-180 days</SelectItem>
+                      <SelectItem value="200">0-200 days</SelectItem>
+                      <SelectItem value="365">0-365 days</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
                 <div className="space-y-2">
-                  <Label>Min Sq Ft</Label>
+                  <Label>Min Sq Ft <span className="text-destructive">*</span></Label>
                   <Input
                     type="number"
                     placeholder="e.g., 1500"
@@ -881,7 +907,7 @@ export function CMABuilder({ onCreateCMA, initialData }: CMABuilderProps) {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label>Max Sq Ft</Label>
+                  <Label>Max Sq Ft <span className="text-destructive">*</span></Label>
                   <Input
                     type="number"
                     placeholder="e.g., 3000"
@@ -1089,10 +1115,10 @@ export function CMABuilder({ onCreateCMA, initialData }: CMABuilderProps) {
                     </Select>
                   </div>
                   <div className="space-y-2">
-                    <Label>Property Type</Label>
+                    <Label>Property Type <span className="text-destructive">*</span></Label>
                     <Select value={searchPropertyType} onValueChange={setSearchPropertyType}>
                       <SelectTrigger data-testid="select-map-property-type">
-                        <SelectValue placeholder="Any" />
+                        <SelectValue placeholder="Select..." />
                       </SelectTrigger>
                       <SelectContent>
                         {PROPERTY_TYPES.map(type => (
@@ -1134,24 +1160,25 @@ export function CMABuilder({ onCreateCMA, initialData }: CMABuilderProps) {
                 </div>
                 <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-4">
                   <div className="space-y-2">
-                    <Label>Close Date</Label>
+                    <Label>Close Date <span className="text-destructive">*</span></Label>
                     <Select value={searchSoldDays} onValueChange={setSearchSoldDays}>
                       <SelectTrigger data-testid="select-map-sold-days">
-                        <SelectValue placeholder="Any" />
+                        <SelectValue placeholder="Select..." />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="any">Any</SelectItem>
                         <SelectItem value="30">0-30 days</SelectItem>
                         <SelectItem value="60">0-60 days</SelectItem>
                         <SelectItem value="90">0-90 days</SelectItem>
                         <SelectItem value="120">0-120 days</SelectItem>
                         <SelectItem value="150">0-150 days</SelectItem>
                         <SelectItem value="180">0-180 days</SelectItem>
+                        <SelectItem value="200">0-200 days</SelectItem>
+                        <SelectItem value="365">0-365 days</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
                   <div className="space-y-2">
-                    <Label>Min Sq Ft</Label>
+                    <Label>Min Sq Ft <span className="text-destructive">*</span></Label>
                     <Input
                       type="number"
                       placeholder="e.g., 1500"
@@ -1161,7 +1188,7 @@ export function CMABuilder({ onCreateCMA, initialData }: CMABuilderProps) {
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label>Max Sq Ft</Label>
+                    <Label>Max Sq Ft <span className="text-destructive">*</span></Label>
                     <Input
                       type="number"
                       placeholder="e.g., 3000"
