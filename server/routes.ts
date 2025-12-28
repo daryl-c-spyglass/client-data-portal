@@ -524,7 +524,58 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
         console.log(`   =============================================================\n`);
         
-        const response = await repliersClient.searchListings(searchParams);
+        // PAGINATION: When subdivision filtering is active, fetch multiple pages to find enough matches
+        // Repliers API caps at 100 results per page, so subdivision listings may be on page 2+
+        let allListings: any[] = [];
+        const MAX_PAGES = needsLocalSubdivisionFilter ? 5 : 1; // Fetch up to 5 pages when subdivision filtering
+        const TARGET_MATCHES = 20; // Stop early if we find enough matches
+        let currentPage = 1;
+        let totalCount = 0;
+        
+        while (currentPage <= MAX_PAGES) {
+          const paginatedParams = { ...searchParams, pageNum: currentPage };
+          const response = await repliersClient.searchListings(paginatedParams);
+          const pageListings = response.listings || [];
+          totalCount = response.count || totalCount;
+          
+          if (pageListings.length === 0) {
+            // No more results
+            break;
+          }
+          
+          allListings = [...allListings, ...pageListings];
+          
+          // Early exit if we have enough potential matches or exhausted results
+          if (!needsLocalSubdivisionFilter) {
+            break; // Only one page needed if no subdivision filter
+          }
+          
+          // Check if we might have enough subdivision matches
+          // (Quick check before applying full filter)
+          const subdivisionLowerCheck = subdivision?.toLowerCase().trim() || '';
+          const potentialMatches = allListings.filter((l: any) => {
+            const addr = l.address || {};
+            const propNeighborhood = (addr.neighborhood || '').toLowerCase();
+            const propSubdiv = (l.subdivision || l.raw?.subdivision || l.raw?.SubdivisionName || '').toLowerCase();
+            return propNeighborhood.includes(subdivisionLowerCheck) || propSubdiv.includes(subdivisionLowerCheck);
+          });
+          
+          if (potentialMatches.length >= TARGET_MATCHES) {
+            console.log(`📄 [Pagination] Found ${potentialMatches.length} potential matches after ${currentPage} page(s), stopping early`);
+            break;
+          }
+          
+          // Check if we've fetched all available results
+          if (allListings.length >= totalCount || pageListings.length < 100) {
+            break;
+          }
+          
+          currentPage++;
+        }
+        
+        if (currentPage > 1) {
+          console.log(`📄 [Pagination] Fetched ${currentPage} page(s), ${allListings.length} total listings for status ${repliersStatus}`);
+        }
         
         // SUPPLEMENTARY FETCH: Catch properties with missing sqft data
         // When sqft filters are used, do a second larger fetch WITHOUT sqft filters
@@ -556,7 +607,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
         
         // Combine main and supplementary results
-        const allListings = [...(response.listings || []), ...supplementaryListings];
+        allListings = [...allListings, ...supplementaryListings];
         
         // Log detailed results
         const listings = allListings;
