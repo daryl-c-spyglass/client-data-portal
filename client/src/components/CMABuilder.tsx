@@ -1243,19 +1243,16 @@ export function CMABuilder({ onCreateCMA, initialData }: CMABuilderProps) {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <Card>
           <CardHeader>
-            <CardTitle className="flex items-center justify-between gap-2">
-              <span className="flex items-center gap-2">
-                Subject Property
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Info className="w-4 h-4 text-muted-foreground cursor-help" />
-                  </TooltipTrigger>
-                  <TooltipContent side="bottom" className="max-w-xs z-[100]">
-                    <p>The property you are creating this CMA for. This is typically your client's home that they want to sell or a property they're considering buying.</p>
-                  </TooltipContent>
-                </Tooltip>
-              </span>
-              <Badge variant="outline">Optional</Badge>
+            <CardTitle className="flex items-center gap-2">
+              Subject Property
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Info className="w-4 h-4 text-muted-foreground cursor-help" />
+                </TooltipTrigger>
+                <TooltipContent side="bottom" className="max-w-xs z-[100]">
+                  <p>The property you are creating this CMA for. This is typically your client's home that they want to sell or a property they're considering buying.</p>
+                </TooltipContent>
+              </Tooltip>
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -1369,6 +1366,32 @@ export function CMABuilder({ onCreateCMA, initialData }: CMABuilderProps) {
                     name="subject-address"
                   />
                 </div>
+                <div className="grid grid-cols-3 gap-2">
+                  <div className="space-y-1">
+                    <Label className="text-xs">City</Label>
+                    <Input 
+                      placeholder="City" 
+                      className="h-8 text-xs"
+                      data-testid="input-subject-city"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs">State</Label>
+                    <Input 
+                      placeholder="TX" 
+                      className="h-8 text-xs"
+                      data-testid="input-subject-state"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs">Zip</Label>
+                    <Input 
+                      placeholder="Zip" 
+                      className="h-8 text-xs"
+                      data-testid="input-subject-zip"
+                    />
+                  </div>
+                </div>
                 <div className="text-center text-muted-foreground">
                   <p className="text-xs mb-2">or</p>
                   <div 
@@ -1387,19 +1410,19 @@ export function CMABuilder({ onCreateCMA, initialData }: CMABuilderProps) {
 
         <Card>
           <CardHeader>
-            <CardTitle className="flex items-center justify-between gap-2">
-              <span className="flex items-center gap-2">
-                Comparable Properties
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Info className="w-4 h-4 text-muted-foreground cursor-help" />
-                  </TooltipTrigger>
-                  <TooltipContent side="bottom" className="max-w-xs z-[100]">
-                    <p>Similar properties in the area that help establish market value. Select up to 5 properties with similar features, location, and condition to the subject property.</p>
-                  </TooltipContent>
-                </Tooltip>
-              </span>
-              <Badge>{comparables.length} / 5</Badge>
+            <CardTitle className="flex items-center gap-2">
+              Comparable Properties
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Info className="w-4 h-4 text-muted-foreground cursor-help" />
+                </TooltipTrigger>
+                <TooltipContent side="bottom" className="max-w-xs z-[100]">
+                  <p>Similar properties in the area that help establish market value. Select properties with similar features, location, and condition to the subject property.</p>
+                </TooltipContent>
+              </Tooltip>
+              {comparables.length > 0 && (
+                <Badge variant="secondary">{comparables.length} selected</Badge>
+              )}
             </CardTitle>
           </CardHeader>
           <CardContent>
