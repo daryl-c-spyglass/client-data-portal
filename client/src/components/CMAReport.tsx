@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -77,6 +77,53 @@ const getCompIcon = (status: string) => {
   });
 };
 
+// Price label marker icon - shows price directly on map
+const getPriceMarkerIcon = (price: number, status: string) => {
+  const statusLower = (status || '').toLowerCase();
+  let bgColor = '#22c55e'; // green for active
+  let textColor = '#ffffff';
+  
+  if (statusLower === 'closed' || statusLower === 'sold') {
+    bgColor = '#6b7280'; // gray for sold
+  } else if (
+    statusLower.includes('under contract') || 
+    statusLower.includes('pending') || 
+    statusLower.includes('in contract') ||
+    statusLower.includes('contingent')
+  ) {
+    bgColor = '#f59e0b'; // orange for under contract/pending
+  }
+  
+  // Format price to compact form (e.g., $525K or $1.2M)
+  const formatCompactPrice = (p: number) => {
+    if (p >= 1000000) {
+      return `$${(p / 1000000).toFixed(1)}M`;
+    }
+    return `$${Math.round(p / 1000)}K`;
+  };
+  
+  const priceLabel = formatCompactPrice(price);
+  
+  return new L.DivIcon({
+    html: `<div style="
+      display:inline-block;
+      padding:4px 8px;
+      background-color:${bgColor};
+      color:${textColor};
+      font-size:11px;
+      font-weight:600;
+      border-radius:4px;
+      box-shadow:0 2px 6px rgba(0,0,0,0.35);
+      white-space:nowrap;
+      border:2px solid white;
+    ">${priceLabel}</div>`,
+    className: 'price-marker-icon',
+    iconSize: [60, 24],
+    iconAnchor: [30, 24],
+    popupAnchor: [0, -24],
+  });
+};
+
 type StatMetricKey = 'price' | 'pricePerSqFt' | 'daysOnMarket' | 'livingArea' | 'lotSize' | 'acres' | 'bedrooms' | 'bathrooms' | 'yearBuilt';
 
 interface CMAReportProps {
@@ -118,6 +165,12 @@ export function CMAReport({
 }: CMAReportProps) {
   const [activeTab, setActiveTab] = useState("home-averages");
   const [activeListingTab, setActiveListingTab] = useState("all");
+  
+  // Property exclusion state for Include All/Exclude All functionality
+  const [excludedPropertyIds, setExcludedPropertyIds] = useState<Set<string>>(new Set());
+  
+  // Property notes state for Notes & Adjustments
+  const [propertyNotes, setPropertyNotes] = useState<Record<string, string>>({});
   
   // Floating card state
   const [floatingCardOpen, setFloatingCardOpen] = useState(false);
@@ -201,26 +254,98 @@ export function CMAReport({
       rentalProperties.map(p => `${p.unparsedAddress}: $${Number(p.closePrice).toLocaleString()}`));
   }
 
-  // Prepare chart data
+  // Compute filtered counts based on excluded properties
+  const includedAll = useMemo(() => allProperties.filter(p => !excludedPropertyIds.has(p.id)), [allProperties, excludedPropertyIds]);
+  const includedSold = useMemo(() => soldProperties.filter(p => !excludedPropertyIds.has(p.id)), [soldProperties, excludedPropertyIds]);
+  const includedActive = useMemo(() => activeProperties.filter(p => !excludedPropertyIds.has(p.id)), [activeProperties, excludedPropertyIds]);
+  const includedUnderContract = useMemo(() => underContractProperties.filter(p => !excludedPropertyIds.has(p.id)), [underContractProperties, excludedPropertyIds]);
+
+  // Compute filtered statistics based on excluded properties
+  const filteredStatistics = useMemo(() => {
+    const includedProperties = properties.filter(p => !excludedPropertyIds.has(p.id));
+    
+    if (includedProperties.length === 0) {
+      // Return zeros if all properties are excluded
+      return {
+        price: { average: 0, median: 0, range: { min: 0, max: 0 } },
+        pricePerSqFt: { average: 0, median: 0, range: { min: 0, max: 0 } },
+        daysOnMarket: { average: 0, median: 0, range: { min: 0, max: 0 } },
+        livingArea: { average: 0, median: 0, range: { min: 0, max: 0 } },
+        lotSize: { average: 0, median: 0, range: { min: 0, max: 0 } },
+        acres: { average: 0, median: 0, range: { min: 0, max: 0 } },
+        bedrooms: { average: 0, median: 0, range: { min: 0, max: 0 } },
+        bathrooms: { average: 0, median: 0, range: { min: 0, max: 0 } },
+        yearBuilt: { average: 0, median: 0, range: { min: 0, max: 0 } },
+      };
+    }
+
+    const computeStats = (values: number[]) => {
+      const filtered = values.filter(v => v > 0);
+      if (filtered.length === 0) {
+        return { average: 0, median: 0, range: { min: 0, max: 0 } };
+      }
+      const sorted = [...filtered].sort((a, b) => a - b);
+      const average = sorted.reduce((a, b) => a + b, 0) / sorted.length;
+      const median = sorted.length % 2 === 0
+        ? (sorted[sorted.length / 2 - 1] + sorted[sorted.length / 2]) / 2
+        : sorted[Math.floor(sorted.length / 2)];
+      return {
+        average,
+        median,
+        range: { min: sorted[0], max: sorted[sorted.length - 1] }
+      };
+    };
+
+    const prices = includedProperties.map(p => {
+      const isClosed = p.standardStatus === 'Closed';
+      return isClosed 
+        ? (p.closePrice ? Number(p.closePrice) : Number(p.listPrice || 0))
+        : Number(p.listPrice || 0);
+    });
+    
+    const pricesPerSqFt = includedProperties
+      .filter(p => p.livingArea && Number(p.livingArea) > 0)
+      .map(p => {
+        const isClosed = p.standardStatus === 'Closed';
+        const price = isClosed 
+          ? (p.closePrice ? Number(p.closePrice) : Number(p.listPrice || 0))
+          : Number(p.listPrice || 0);
+        return price / Number(p.livingArea);
+      });
+
+    return {
+      price: computeStats(prices),
+      pricePerSqFt: computeStats(pricesPerSqFt),
+      daysOnMarket: computeStats(includedProperties.map(p => p.daysOnMarket || 0)),
+      livingArea: computeStats(includedProperties.map(p => Number(p.livingArea || 0))),
+      lotSize: computeStats(includedProperties.map(p => Number(p.lotSizeSquareFeet || 0))),
+      acres: computeStats(includedProperties.map(p => Number(p.lotSizeAcres || 0))),
+      bedrooms: computeStats(includedProperties.map(p => p.bedroomsTotal || 0)),
+      bathrooms: computeStats(includedProperties.map(p => p.bathroomsTotalInteger || 0)),
+      yearBuilt: computeStats(includedProperties.map(p => p.yearBuilt || 0)),
+    };
+  }, [properties, excludedPropertyIds]);
+
+  // Prepare chart data - use filtered statistics
   const priceRangeData = [
     { 
       name: 'Low', 
-      value: statistics.price.range.min,
+      value: filteredStatistics.price.range.min,
       fill: 'hsl(var(--chart-1))'
     },
     { 
       name: 'Avg', 
-      value: statistics.price.average,
+      value: filteredStatistics.price.average,
       fill: 'hsl(var(--chart-2))'
     },
     { 
       name: 'Med', 
-      value: statistics.price.median,
+      value: filteredStatistics.price.median,
       fill: 'hsl(var(--chart-3))'
     },
     { 
       name: 'High', 
-      value: statistics.price.range.max,
+      value: filteredStatistics.price.range.max,
       fill: 'hsl(var(--chart-4))'
     },
   ];
@@ -276,9 +401,9 @@ export function CMAReport({
               <CardTitle className="text-lg">Average Price</CardTitle>
             </CardHeader>
             <CardContent>
-              <p className="text-2xl font-bold text-primary">${Math.round(statistics.price.average).toLocaleString()}</p>
+              <p className="text-2xl font-bold text-primary">${Math.round(filteredStatistics.price.average).toLocaleString()}</p>
               <p className="text-xs text-muted-foreground">
-                Range: ${statistics.price.range.min.toLocaleString()} - ${statistics.price.range.max.toLocaleString()}
+                Range: ${filteredStatistics.price.range.min.toLocaleString()} - ${filteredStatistics.price.range.max.toLocaleString()}
               </p>
             </CardContent>
           </Card>
@@ -287,9 +412,9 @@ export function CMAReport({
               <CardTitle className="text-lg">Price Per Sqft</CardTitle>
             </CardHeader>
             <CardContent>
-              <p className="text-2xl font-bold">${statistics.pricePerSqFt.average.toFixed(0)}<span className="text-sm">/sqft</span></p>
+              <p className="text-2xl font-bold">${filteredStatistics.pricePerSqFt.average.toFixed(0)}<span className="text-sm">/sqft</span></p>
               <p className="text-xs text-muted-foreground">
-                Range: ${statistics.pricePerSqFt.range.min.toFixed(0)} - ${statistics.pricePerSqFt.range.max.toFixed(0)}
+                Range: ${filteredStatistics.pricePerSqFt.range.min.toFixed(0)} - ${filteredStatistics.pricePerSqFt.range.max.toFixed(0)}
               </p>
             </CardContent>
           </Card>
@@ -298,9 +423,9 @@ export function CMAReport({
               <CardTitle className="text-lg">Avg Living Area</CardTitle>
             </CardHeader>
             <CardContent>
-              <p className="text-2xl font-bold">{Math.round(statistics.livingArea.average).toLocaleString()}<span className="text-sm"> sqft</span></p>
+              <p className="text-2xl font-bold">{Math.round(filteredStatistics.livingArea.average).toLocaleString()}<span className="text-sm"> sqft</span></p>
               <p className="text-xs text-muted-foreground">
-                {statistics.bedrooms.average.toFixed(1)} beds / {statistics.bathrooms.average.toFixed(1)} baths avg
+                {filteredStatistics.bedrooms.average.toFixed(1)} beds / {filteredStatistics.bathrooms.average.toFixed(1)} baths avg
               </p>
             </CardContent>
           </Card>
@@ -319,19 +444,19 @@ export function CMAReport({
               <div className="space-y-2">
                 <h4 className="font-semibold text-sm">Market Overview</h4>
                 <p className="text-sm text-muted-foreground">
-                  Based on {allProperties.length} comparable properties, the average price is{' '}
-                  <span className="font-semibold text-foreground">${Math.round(statistics.price.average).toLocaleString()}</span>{' '}
+                  Based on {includedAll.length} comparable properties, the average price is{' '}
+                  <span className="font-semibold text-foreground">${Math.round(filteredStatistics.price.average).toLocaleString()}</span>{' '}
                   with a median of{' '}
-                  <span className="font-semibold text-foreground">${Math.round(statistics.price.median).toLocaleString()}</span>.
-                  {' '}Prices range from ${statistics.price.range.min.toLocaleString()} to ${statistics.price.range.max.toLocaleString()}.
+                  <span className="font-semibold text-foreground">${Math.round(filteredStatistics.price.median).toLocaleString()}</span>.
+                  {' '}Prices range from ${filteredStatistics.price.range.min.toLocaleString()} to ${filteredStatistics.price.range.max.toLocaleString()}.
                 </p>
               </div>
               <div className="space-y-2">
                 <h4 className="font-semibold text-sm">Price Per Square Foot</h4>
                 <p className="text-sm text-muted-foreground">
                   Average price per square foot is{' '}
-                  <span className="font-semibold text-foreground">${statistics.pricePerSqFt.average.toFixed(2)}</span>{' '}
-                  across comparable properties. This ranges from ${statistics.pricePerSqFt.range.min.toFixed(2)} to ${statistics.pricePerSqFt.range.max.toFixed(2)}/sqft.
+                  <span className="font-semibold text-foreground">${filteredStatistics.pricePerSqFt.average.toFixed(2)}</span>{' '}
+                  across comparable properties. This ranges from ${filteredStatistics.pricePerSqFt.range.min.toFixed(2)} to ${filteredStatistics.pricePerSqFt.range.max.toFixed(2)}/sqft.
                 </p>
               </div>
             </div>
@@ -339,25 +464,25 @@ export function CMAReport({
               <div className="space-y-1">
                 <h4 className="font-semibold text-sm">Days on Market</h4>
                 <p className="text-sm text-muted-foreground">
-                  Average: <span className="font-semibold text-foreground">{Math.round(statistics.daysOnMarket.average)} days</span>
+                  Average: <span className="font-semibold text-foreground">{Math.round(filteredStatistics.daysOnMarket.average)} days</span>
                 </p>
               </div>
               <div className="space-y-1">
                 <h4 className="font-semibold text-sm">Property Size</h4>
                 <p className="text-sm text-muted-foreground">
-                  Avg: <span className="font-semibold text-foreground">{Math.round(statistics.livingArea.average).toLocaleString()} sqft</span>
+                  Avg: <span className="font-semibold text-foreground">{Math.round(filteredStatistics.livingArea.average).toLocaleString()} sqft</span>
                 </p>
               </div>
               <div className="space-y-1">
                 <h4 className="font-semibold text-sm">Bed/Bath</h4>
                 <p className="text-sm text-muted-foreground">
-                  Avg: <span className="font-semibold text-foreground">{statistics.bedrooms.average.toFixed(1)} beds / {statistics.bathrooms.average.toFixed(1)} baths</span>
+                  Avg: <span className="font-semibold text-foreground">{filteredStatistics.bedrooms.average.toFixed(1)} beds / {filteredStatistics.bathrooms.average.toFixed(1)} baths</span>
                 </p>
               </div>
             </div>
             <div className="pt-2 border-t">
               <p className="text-xs text-muted-foreground italic">
-                This analysis is based on {activeProperties.length} Active, {underContractProperties.length} Active Under Contract, and {soldProperties.length} Closed properties in your selection.
+                This analysis is based on {includedActive.length} Active, {includedUnderContract.length} Active Under Contract, and {includedSold.length} Closed properties in your selection.
               </p>
             </div>
           </CardContent>
@@ -433,7 +558,7 @@ export function CMAReport({
         <TabsContent value="home-averages" className="space-y-6">
           <Card>
             <CardHeader>
-              <CardTitle>Statistics ({allProperties.length} Properties)</CardTitle>
+              <CardTitle>Statistics ({includedAll.length} Properties)</CardTitle>
             </CardHeader>
             <CardContent>
               <Table>
@@ -450,13 +575,13 @@ export function CMAReport({
                     <TableRow>
                       <TableCell className="font-medium">Price</TableCell>
                       <TableCell data-testid="text-price-range">
-                        ${statistics.price.range.min.toLocaleString()} - ${statistics.price.range.max.toLocaleString()}
+                        ${filteredStatistics.price.range.min.toLocaleString()} - ${filteredStatistics.price.range.max.toLocaleString()}
                       </TableCell>
                       <TableCell data-testid="text-price-average">
-                        ${Math.round(statistics.price.average).toLocaleString()}
+                        ${Math.round(filteredStatistics.price.average).toLocaleString()}
                       </TableCell>
                       <TableCell data-testid="text-price-median">
-                        ${Math.round(statistics.price.median).toLocaleString()}
+                        ${Math.round(filteredStatistics.price.median).toLocaleString()}
                       </TableCell>
                     </TableRow>
                   )}
@@ -464,13 +589,13 @@ export function CMAReport({
                     <TableRow>
                       <TableCell className="font-medium">Price/SqFt</TableCell>
                       <TableCell>
-                        ${statistics.pricePerSqFt.range.min.toFixed(2)}/SqFt - ${statistics.pricePerSqFt.range.max.toFixed(2)}/SqFt
+                        ${filteredStatistics.pricePerSqFt.range.min.toFixed(2)}/SqFt - ${filteredStatistics.pricePerSqFt.range.max.toFixed(2)}/SqFt
                       </TableCell>
                       <TableCell>
-                        ${statistics.pricePerSqFt.average.toFixed(2)}/SqFt
+                        ${filteredStatistics.pricePerSqFt.average.toFixed(2)}/SqFt
                       </TableCell>
                       <TableCell>
-                        ${statistics.pricePerSqFt.median.toFixed(2)}/SqFt
+                        ${filteredStatistics.pricePerSqFt.median.toFixed(2)}/SqFt
                       </TableCell>
                     </TableRow>
                   )}
@@ -478,70 +603,70 @@ export function CMAReport({
                     <TableRow>
                       <TableCell className="font-medium">Days on Market</TableCell>
                       <TableCell>
-                        {statistics.daysOnMarket.range.min} - {statistics.daysOnMarket.range.max}
+                        {filteredStatistics.daysOnMarket.range.min} - {filteredStatistics.daysOnMarket.range.max}
                       </TableCell>
-                      <TableCell>{Math.round(statistics.daysOnMarket.average)}</TableCell>
-                      <TableCell>{Math.round(statistics.daysOnMarket.median)}</TableCell>
+                      <TableCell>{Math.round(filteredStatistics.daysOnMarket.average)}</TableCell>
+                      <TableCell>{Math.round(filteredStatistics.daysOnMarket.median)}</TableCell>
                     </TableRow>
                   )}
                   {visibleMetrics.includes('livingArea') && (
                     <TableRow>
                       <TableCell className="font-medium">Liv SqFt</TableCell>
                       <TableCell>
-                        {statistics.livingArea.range.min.toLocaleString()} SqFt - {statistics.livingArea.range.max.toLocaleString()} SqFt
+                        {filteredStatistics.livingArea.range.min.toLocaleString()} SqFt - {filteredStatistics.livingArea.range.max.toLocaleString()} SqFt
                       </TableCell>
-                      <TableCell>{Math.round(statistics.livingArea.average).toLocaleString()} SqFt</TableCell>
-                      <TableCell>{Math.round(statistics.livingArea.median).toLocaleString()} SqFt</TableCell>
+                      <TableCell>{Math.round(filteredStatistics.livingArea.average).toLocaleString()} SqFt</TableCell>
+                      <TableCell>{Math.round(filteredStatistics.livingArea.median).toLocaleString()} SqFt</TableCell>
                     </TableRow>
                   )}
                   {visibleMetrics.includes('lotSize') && (
                     <TableRow>
                       <TableCell className="font-medium">Lot SqFt</TableCell>
                       <TableCell>
-                        {statistics.lotSize.range.min.toLocaleString()} SqFt - {statistics.lotSize.range.max.toLocaleString()} SqFt
+                        {filteredStatistics.lotSize.range.min.toLocaleString()} SqFt - {filteredStatistics.lotSize.range.max.toLocaleString()} SqFt
                       </TableCell>
-                      <TableCell>{Math.round(statistics.lotSize.average).toLocaleString()} SqFt</TableCell>
-                      <TableCell>{Math.round(statistics.lotSize.median).toLocaleString()} SqFt</TableCell>
+                      <TableCell>{Math.round(filteredStatistics.lotSize.average).toLocaleString()} SqFt</TableCell>
+                      <TableCell>{Math.round(filteredStatistics.lotSize.median).toLocaleString()} SqFt</TableCell>
                     </TableRow>
                   )}
                   {visibleMetrics.includes('acres') && (
                     <TableRow>
                       <TableCell className="font-medium">Acres</TableCell>
                       <TableCell>
-                        {statistics.acres.range.min.toFixed(2)} Acres - {statistics.acres.range.max.toFixed(2)} Acres
+                        {filteredStatistics.acres.range.min.toFixed(2)} Acres - {filteredStatistics.acres.range.max.toFixed(2)} Acres
                       </TableCell>
-                      <TableCell>{statistics.acres.average.toFixed(2)} Acres</TableCell>
-                      <TableCell>{statistics.acres.median.toFixed(2)} Acres</TableCell>
+                      <TableCell>{filteredStatistics.acres.average.toFixed(2)} Acres</TableCell>
+                      <TableCell>{filteredStatistics.acres.median.toFixed(2)} Acres</TableCell>
                     </TableRow>
                   )}
                   {visibleMetrics.includes('bedrooms') && (
                     <TableRow>
                       <TableCell className="font-medium">Beds</TableCell>
                       <TableCell>
-                        {statistics.bedrooms.range.min} - {statistics.bedrooms.range.max}
+                        {filteredStatistics.bedrooms.range.min} - {filteredStatistics.bedrooms.range.max}
                       </TableCell>
-                      <TableCell>{statistics.bedrooms.average.toFixed(1)}</TableCell>
-                      <TableCell>{statistics.bedrooms.median}</TableCell>
+                      <TableCell>{filteredStatistics.bedrooms.average.toFixed(1)}</TableCell>
+                      <TableCell>{filteredStatistics.bedrooms.median}</TableCell>
                     </TableRow>
                   )}
                   {visibleMetrics.includes('bathrooms') && (
                     <TableRow>
                       <TableCell className="font-medium">Baths</TableCell>
                       <TableCell>
-                        {statistics.bathrooms.range.min} - {statistics.bathrooms.range.max}
+                        {filteredStatistics.bathrooms.range.min} - {filteredStatistics.bathrooms.range.max}
                       </TableCell>
-                      <TableCell>{statistics.bathrooms.average.toFixed(1)}</TableCell>
-                      <TableCell>{statistics.bathrooms.median}</TableCell>
+                      <TableCell>{filteredStatistics.bathrooms.average.toFixed(1)}</TableCell>
+                      <TableCell>{filteredStatistics.bathrooms.median}</TableCell>
                     </TableRow>
                   )}
                   {visibleMetrics.includes('yearBuilt') && (
                     <TableRow>
                       <TableCell className="font-medium">Year Built</TableCell>
                       <TableCell>
-                        {statistics.yearBuilt.range.min} - {statistics.yearBuilt.range.max}
+                        {filteredStatistics.yearBuilt.range.min} - {filteredStatistics.yearBuilt.range.max}
                       </TableCell>
-                      <TableCell>{Math.round(statistics.yearBuilt.average)}</TableCell>
-                      <TableCell>{statistics.yearBuilt.median}</TableCell>
+                      <TableCell>{Math.round(filteredStatistics.yearBuilt.average)}</TableCell>
+                      <TableCell>{filteredStatistics.yearBuilt.median}</TableCell>
                     </TableRow>
                   )}
                 </TableBody>
@@ -552,11 +677,11 @@ export function CMAReport({
           {/* Property List at Bottom of Home Averages */}
           <Card>
             <CardHeader className="pb-2">
-              <CardTitle className="text-base">Properties Used in Analysis ({allProperties.length})</CardTitle>
+              <CardTitle className="text-base">Properties Used in Analysis ({includedAll.length})</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="space-y-3">
-                {[...allProperties].sort((a, b) => {
+                {[...includedAll].sort((a, b) => {
                   const priceA = a.standardStatus === 'Closed' 
                     ? (a.closePrice ? Number(a.closePrice) : Number(a.listPrice || 0))
                     : Number(a.listPrice || 0);
@@ -636,59 +761,102 @@ export function CMAReport({
             {/* Left Column: Property List */}
             <div className="space-y-4">
               <Tabs value={activeListingTab} onValueChange={setActiveListingTab}>
-                <TabsList>
-                  <TabsTrigger value="all" data-testid="subtab-all">All ({allProperties.length})</TabsTrigger>
-                  <TabsTrigger value="sold" data-testid="subtab-sold">Closed ({soldProperties.length})</TabsTrigger>
-                  <TabsTrigger value="under-contract" data-testid="subtab-under-contract">
-                    AUC ({underContractProperties.length})
-                  </TabsTrigger>
-                  <TabsTrigger value="active" data-testid="subtab-active">Active ({activeProperties.length})</TabsTrigger>
-                </TabsList>
+                <div className="flex items-center justify-between flex-wrap gap-2">
+                  <TabsList>
+                    <TabsTrigger value="all" data-testid="subtab-all">All ({includedAll.length})</TabsTrigger>
+                    <TabsTrigger value="sold" data-testid="subtab-sold">Closed ({includedSold.length})</TabsTrigger>
+                    <TabsTrigger value="under-contract" data-testid="subtab-under-contract">
+                      AUC ({includedUnderContract.length})
+                    </TabsTrigger>
+                    <TabsTrigger value="active" data-testid="subtab-active">Active ({includedActive.length})</TabsTrigger>
+                  </TabsList>
+                  
+                  {/* Include All / Exclude All buttons - CloudCMA style */}
+                  <div className="flex items-center gap-2">
+                    <Button 
+                      size="sm" 
+                      variant="outline"
+                      onClick={() => setExcludedPropertyIds(new Set())}
+                      data-testid="button-include-all"
+                    >
+                      Include All
+                    </Button>
+                    <Button 
+                      size="sm" 
+                      variant="outline"
+                      onClick={() => setExcludedPropertyIds(new Set(allProperties.map(p => p.id)))}
+                      data-testid="button-exclude-all"
+                    >
+                      Exclude All
+                    </Button>
+                    {excludedPropertyIds.size > 0 && (
+                      <Badge variant="secondary" className="text-xs">
+                        {excludedPropertyIds.size} excluded
+                      </Badge>
+                    )}
+                  </div>
+                </div>
 
                 <div className="mt-4 space-y-4">
-              {/* Summary Stats Cards at Top */}
+              {/* Summary Stats Cards at Top - CloudCMA style: Low/Median/Average/High */}
               {(() => {
-                const filteredProps = activeListingTab === 'all' ? allProperties :
+                const filteredProps = (activeListingTab === 'all' ? allProperties :
                   activeListingTab === 'sold' ? soldProperties :
-                  activeListingTab === 'under-contract' ? underContractProperties : activeProperties;
+                  activeListingTab === 'under-contract' ? underContractProperties : activeProperties)
+                  .filter(p => !excludedPropertyIds.has(p.id));
                 
-                if (filteredProps.length === 0) return null;
+                const totalCount = activeListingTab === 'all' ? includedAll.length :
+                  activeListingTab === 'sold' ? includedSold.length :
+                  activeListingTab === 'under-contract' ? includedUnderContract.length : includedActive.length;
+                
+                if (totalCount === 0) return null;
                 
                 const prices = filteredProps.map(p => {
                   const isSold = p.standardStatus === 'Closed';
                   return isSold 
                     ? (p.closePrice ? Number(p.closePrice) : (p.listPrice ? Number(p.listPrice) : 0))
                     : (p.listPrice ? Number(p.listPrice) : 0);
-                }).filter(p => p > 0);
+                }).filter(p => p > 0).sort((a, b) => a - b);
                 
                 const avgPrice = prices.length > 0 ? prices.reduce((a, b) => a + b, 0) / prices.length : 0;
-                const minPrice = prices.length > 0 ? Math.min(...prices) : 0;
-                const maxPrice = prices.length > 0 ? Math.max(...prices) : 0;
+                const minPrice = prices.length > 0 ? prices[0] : 0;
+                const maxPrice = prices.length > 0 ? prices[prices.length - 1] : 0;
+                const medianPrice = prices.length > 0 
+                  ? prices.length % 2 === 0 
+                    ? (prices[prices.length / 2 - 1] + prices[prices.length / 2]) / 2
+                    : prices[Math.floor(prices.length / 2)]
+                  : 0;
                 
                 return (
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                  <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
                     <Card>
-                      <CardContent className="pt-4 pb-4">
-                        <div className="text-sm text-muted-foreground">Count</div>
+                      <CardContent className="pt-3 pb-3">
+                        <div className="text-xs text-muted-foreground uppercase tracking-wide">Properties</div>
                         <div className="text-2xl font-bold">{filteredProps.length}</div>
                       </CardContent>
                     </Card>
                     <Card>
-                      <CardContent className="pt-4 pb-4">
-                        <div className="text-sm text-muted-foreground">Avg Price</div>
-                        <div className="text-xl font-bold">${Math.round(avgPrice).toLocaleString()}</div>
+                      <CardContent className="pt-3 pb-3">
+                        <div className="text-xs text-muted-foreground uppercase tracking-wide">Low</div>
+                        <div className="text-lg font-bold text-green-600">${minPrice.toLocaleString()}</div>
                       </CardContent>
                     </Card>
                     <Card>
-                      <CardContent className="pt-4 pb-4">
-                        <div className="text-sm text-muted-foreground">Min Price</div>
-                        <div className="text-xl font-bold">${minPrice.toLocaleString()}</div>
+                      <CardContent className="pt-3 pb-3">
+                        <div className="text-xs text-muted-foreground uppercase tracking-wide">Median</div>
+                        <div className="text-lg font-bold">${Math.round(medianPrice).toLocaleString()}</div>
                       </CardContent>
                     </Card>
                     <Card>
-                      <CardContent className="pt-4 pb-4">
-                        <div className="text-sm text-muted-foreground">Max Price</div>
-                        <div className="text-xl font-bold">${maxPrice.toLocaleString()}</div>
+                      <CardContent className="pt-3 pb-3">
+                        <div className="text-xs text-muted-foreground uppercase tracking-wide">Average</div>
+                        <div className="text-lg font-bold">${Math.round(avgPrice).toLocaleString()}</div>
+                      </CardContent>
+                    </Card>
+                    <Card>
+                      <CardContent className="pt-3 pb-3">
+                        <div className="text-xs text-muted-foreground uppercase tracking-wide">High</div>
+                        <div className="text-lg font-bold text-red-600">${maxPrice.toLocaleString()}</div>
                       </CardContent>
                     </Card>
                   </div>
@@ -706,6 +874,8 @@ export function CMAReport({
                 </CardHeader>
                 <CardContent>
                   {(() => {
+                    // Show all properties (including excluded) for toggle functionality
+                    // Excluded properties are visually indicated with opacity-50
                     const filteredProps = activeListingTab === 'all' ? allProperties :
                       activeListingTab === 'sold' ? soldProperties :
                       activeListingTab === 'under-contract' ? underContractProperties : activeProperties;
@@ -748,17 +918,44 @@ export function CMAReport({
                             'Closed': { bg: 'bg-red-100 dark:bg-red-900/30', text: 'text-red-700 dark:text-red-400', border: 'border-red-200 dark:border-red-800' }
                           };
                           const status = statusConfig[property.standardStatus as keyof typeof statusConfig] || statusConfig['Active'];
+                          const isExcluded = excludedPropertyIds.has(property.id);
+                          
+                          const toggleExclude = (e: React.MouseEvent | React.KeyboardEvent) => {
+                            e.stopPropagation();
+                            const newSet = new Set(excludedPropertyIds);
+                            if (isExcluded) {
+                              newSet.delete(property.id);
+                            } else {
+                              newSet.add(property.id);
+                            }
+                            setExcludedPropertyIds(newSet);
+                          };
                           
                           return (
                             <div 
                               key={property.id} 
-                              className={`flex gap-3 p-3 rounded-md border cursor-pointer hover-elevate transition-colors ${status.border}`}
+                              className={cn(
+                                `flex gap-3 p-3 rounded-md border cursor-pointer hover-elevate transition-colors ${status.border}`,
+                                isExcluded && 'opacity-50 bg-muted/30'
+                              )}
                               onClick={() => handlePropertyClick(property)}
                               onKeyDown={(e) => e.key === 'Enter' && handlePropertyClick(property)}
                               tabIndex={0}
                               role="button"
                               data-testid={`listing-card-${property.id}`}
                             >
+                              {/* Exclude toggle */}
+                              <div 
+                                className="flex items-start pt-1"
+                                onClick={toggleExclude}
+                                onKeyDown={(e) => e.key === 'Enter' && toggleExclude(e)}
+                              >
+                                <Checkbox 
+                                  checked={!isExcluded}
+                                  className="h-4 w-4"
+                                  data-testid={`checkbox-include-${property.id}`}
+                                />
+                              </div>
                               {primaryPhoto ? (
                                 <img src={primaryPhoto} alt={property.unparsedAddress || ''} className="w-24 h-24 object-cover rounded-md flex-shrink-0" />
                               ) : (
@@ -829,10 +1026,11 @@ export function CMAReport({
                 </CardHeader>
                 <CardContent>
                   {(() => {
-                    // Sync map with filter: use filtered properties based on activeListingTab
-                    const filteredForMap = activeListingTab === 'all' ? allProperties :
+                    // Sync map with filter: use filtered properties based on activeListingTab and exclusions
+                    const filteredForMap = (activeListingTab === 'all' ? allProperties :
                       activeListingTab === 'sold' ? soldProperties :
-                      activeListingTab === 'under-contract' ? underContractProperties : activeProperties;
+                      activeListingTab === 'under-contract' ? underContractProperties : activeProperties)
+                      .filter(p => !excludedPropertyIds.has(p.id));
                     
                     const propertiesWithCoords = filteredForMap.filter(
                       p => p.latitude && p.longitude && 
@@ -874,15 +1072,17 @@ export function CMAReport({
                           />
                           <FitBounds positions={positions} />
                           {propertiesWithCoords.map((property) => {
-                            const price = property.closePrice || property.listPrice || 0;
                             const status = property.standardStatus || 'Active';
                             const isClosed = status === 'Closed';
+                            const price = isClosed 
+                              ? (property.closePrice ? Number(property.closePrice) : (property.listPrice ? Number(property.listPrice) : 0))
+                              : (property.listPrice ? Number(property.listPrice) : 0);
                             
                             return (
                               <Marker
                                 key={property.listingId}
                                 position={[Number(property.latitude), Number(property.longitude)]}
-                                icon={getCompIcon(status)}
+                                icon={getPriceMarkerIcon(price, status)}
                               >
                                 <Popup>
                                   <div className="min-w-[200px]">
@@ -941,7 +1141,10 @@ export function CMAReport({
             </CardHeader>
             <CardContent>
               {(() => {
-                const soldPrices = soldProperties
+                // Filter out excluded properties for all calculations
+                const includedSold = soldProperties.filter(p => !excludedPropertyIds.has(p.id));
+                
+                const soldPrices = includedSold
                   .map(p => p.closePrice ? Number(p.closePrice) : null)
                   .filter((p): p is number => p !== null && p > 0)
                   .sort((a, b) => a - b);
@@ -954,11 +1157,11 @@ export function CMAReport({
                   ? soldPrices.reduce((a, b) => a + b, 0) / soldPrices.length
                   : 0;
                 
-                const avgDOMSold = soldProperties.length > 0
-                  ? soldProperties.reduce((sum, p) => sum + (p.daysOnMarket || 0), 0) / soldProperties.length
+                const avgDOMSold = includedSold.length > 0
+                  ? includedSold.reduce((sum, p) => sum + (p.daysOnMarket || 0), 0) / includedSold.length
                   : 0;
                 
-                const ratios = soldProperties
+                const ratios = includedSold
                   .filter(p => p.listPrice && p.closePrice && Number(p.listPrice) > 0)
                   .map(p => (Number(p.closePrice) / Number(p.listPrice)) * 100);
                 const avgListToSaleRatio = ratios.length > 0 
@@ -969,13 +1172,13 @@ export function CMAReport({
                 const oneYearAgo = new Date(now.getFullYear() - 1, now.getMonth(), now.getDate());
                 const twoYearsAgo = new Date(now.getFullYear() - 2, now.getMonth(), now.getDate());
                 
-                const currentYearSold = soldProperties.filter(p => {
+                const currentYearSold = includedSold.filter(p => {
                   if (!p.closeDate) return false;
                   const closeDate = new Date(p.closeDate);
                   return closeDate >= oneYearAgo && closeDate <= now;
                 });
                 
-                const priorYearSold = soldProperties.filter(p => {
+                const priorYearSold = includedSold.filter(p => {
                   if (!p.closeDate) return false;
                   const closeDate = new Date(p.closeDate);
                   return closeDate >= twoYearsAgo && closeDate < oneYearAgo;
@@ -1112,8 +1315,11 @@ export function CMAReport({
             </CardHeader>
             <CardContent>
               {(() => {
-                // Filter timeline data based on status filters
+                // Filter timeline data based on exclusions and status filters
                 const filteredTimelineData = timelineData.filter(d => {
+                  // First filter by excluded property IDs
+                  if (excludedPropertyIds.has(d.propertyId)) return false;
+                  // Then filter by status toggles
                   if (d.status === 'Active' && !showActiveOnTimeline) return false;
                   if (d.status === 'Active Under Contract' && !showUnderContractOnTimeline) return false;
                   if (d.status === 'Closed' && !showSoldOnTimeline) return false;
@@ -1292,8 +1498,8 @@ export function CMAReport({
                 <CardTitle className="text-sm font-medium">Avg Price</CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">${Math.round(statistics.price.average).toLocaleString()}</div>
-                <p className="text-xs text-muted-foreground">Across all {allProperties.length} comparables</p>
+                <div className="text-2xl font-bold">${Math.round(filteredStatistics.price.average).toLocaleString()}</div>
+                <p className="text-xs text-muted-foreground">Across all {includedAll.length} comparables</p>
               </CardContent>
             </Card>
 
@@ -1302,7 +1508,7 @@ export function CMAReport({
                 <CardTitle className="text-sm font-medium">Median Price</CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">${Math.round(statistics.price.median).toLocaleString()}</div>
+                <div className="text-2xl font-bold">${Math.round(filteredStatistics.price.median).toLocaleString()}</div>
                 <p className="text-xs text-muted-foreground">50th percentile</p>
               </CardContent>
             </Card>
@@ -1312,7 +1518,7 @@ export function CMAReport({
                 <CardTitle className="text-sm font-medium">Price/SqFt</CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">${statistics.pricePerSqFt.average.toFixed(2)}</div>
+                <div className="text-2xl font-bold">${filteredStatistics.pricePerSqFt.average.toFixed(2)}</div>
                 <p className="text-xs text-muted-foreground">Per square foot</p>
               </CardContent>
             </Card>
@@ -1322,7 +1528,7 @@ export function CMAReport({
                 <CardTitle className="text-sm font-medium">Avg DOM</CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">{Math.round(statistics.daysOnMarket.average)}</div>
+                <div className="text-2xl font-bold">{Math.round(filteredStatistics.daysOnMarket.average)}</div>
                 <p className="text-xs text-muted-foreground">Days on market</p>
               </CardContent>
             </Card>
@@ -1335,7 +1541,7 @@ export function CMAReport({
                 <CardTitle className="text-sm font-medium">Price Range</CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="text-lg font-bold">${(statistics.price.range.min / 1000).toFixed(0)}K - ${(statistics.price.range.max / 1000).toFixed(0)}K</div>
+                <div className="text-lg font-bold">${(filteredStatistics.price.range.min / 1000).toFixed(0)}K - ${(filteredStatistics.price.range.max / 1000).toFixed(0)}K</div>
                 <p className="text-xs text-muted-foreground">Min to max</p>
               </CardContent>
             </Card>
@@ -1345,7 +1551,7 @@ export function CMAReport({
                 <CardTitle className="text-sm font-medium">Avg SqFt</CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">{Math.round(statistics.livingArea.average).toLocaleString()}</div>
+                <div className="text-2xl font-bold">{Math.round(filteredStatistics.livingArea.average).toLocaleString()}</div>
                 <p className="text-xs text-muted-foreground">Living area</p>
               </CardContent>
             </Card>
@@ -1355,7 +1561,7 @@ export function CMAReport({
                 <CardTitle className="text-sm font-medium">Avg Beds</CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">{statistics.bedrooms.average.toFixed(1)}</div>
+                <div className="text-2xl font-bold">{filteredStatistics.bedrooms.average.toFixed(1)}</div>
                 <p className="text-xs text-muted-foreground">Bedrooms</p>
               </CardContent>
             </Card>
@@ -1365,7 +1571,7 @@ export function CMAReport({
                 <CardTitle className="text-sm font-medium">Avg Baths</CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">{statistics.bathrooms.average.toFixed(1)}</div>
+                <div className="text-2xl font-bold">{filteredStatistics.bathrooms.average.toFixed(1)}</div>
                 <p className="text-xs text-muted-foreground">Bathrooms</p>
               </CardContent>
             </Card>
@@ -1384,19 +1590,19 @@ export function CMAReport({
                 <div className="space-y-2">
                   <h4 className="font-semibold text-sm">Market Overview</h4>
                   <p className="text-sm text-muted-foreground">
-                    Based on {allProperties.length} comparable properties, the average price is{' '}
-                    <span className="font-semibold text-foreground">${Math.round(statistics.price.average).toLocaleString()}</span>{' '}
+                    Based on {includedAll.length} comparable properties, the average price is{' '}
+                    <span className="font-semibold text-foreground">${Math.round(filteredStatistics.price.average).toLocaleString()}</span>{' '}
                     with a median of{' '}
-                    <span className="font-semibold text-foreground">${Math.round(statistics.price.median).toLocaleString()}</span>.
-                    {' '}Prices range from ${statistics.price.range.min.toLocaleString()} to ${statistics.price.range.max.toLocaleString()}.
+                    <span className="font-semibold text-foreground">${Math.round(filteredStatistics.price.median).toLocaleString()}</span>.
+                    {' '}Prices range from ${filteredStatistics.price.range.min.toLocaleString()} to ${filteredStatistics.price.range.max.toLocaleString()}.
                   </p>
                 </div>
                 <div className="space-y-2">
                   <h4 className="font-semibold text-sm">Price Per Square Foot</h4>
                   <p className="text-sm text-muted-foreground">
                     Average price per square foot is{' '}
-                    <span className="font-semibold text-foreground">${statistics.pricePerSqFt.average.toFixed(2)}</span>{' '}
-                    across comparable properties. This ranges from ${statistics.pricePerSqFt.range.min.toFixed(2)} to ${statistics.pricePerSqFt.range.max.toFixed(2)}/sqft.
+                    <span className="font-semibold text-foreground">${filteredStatistics.pricePerSqFt.average.toFixed(2)}</span>{' '}
+                    across comparable properties. This ranges from ${filteredStatistics.pricePerSqFt.range.min.toFixed(2)} to ${filteredStatistics.pricePerSqFt.range.max.toFixed(2)}/sqft.
                   </p>
                 </div>
               </div>
@@ -1404,27 +1610,103 @@ export function CMAReport({
                 <div className="space-y-1">
                   <h4 className="font-semibold text-sm">Days on Market</h4>
                   <p className="text-sm text-muted-foreground">
-                    Average: <span className="font-semibold text-foreground">{Math.round(statistics.daysOnMarket.average)} days</span>
+                    Average: <span className="font-semibold text-foreground">{Math.round(filteredStatistics.daysOnMarket.average)} days</span>
                   </p>
                 </div>
                 <div className="space-y-1">
                   <h4 className="font-semibold text-sm">Property Size</h4>
                   <p className="text-sm text-muted-foreground">
-                    Avg: <span className="font-semibold text-foreground">{Math.round(statistics.livingArea.average).toLocaleString()} sqft</span>
+                    Avg: <span className="font-semibold text-foreground">{Math.round(filteredStatistics.livingArea.average).toLocaleString()} sqft</span>
                   </p>
                 </div>
                 <div className="space-y-1">
                   <h4 className="font-semibold text-sm">Bed/Bath</h4>
                   <p className="text-sm text-muted-foreground">
-                    Avg: <span className="font-semibold text-foreground">{statistics.bedrooms.average.toFixed(1)} beds / {statistics.bathrooms.average.toFixed(1)} baths</span>
+                    Avg: <span className="font-semibold text-foreground">{filteredStatistics.bedrooms.average.toFixed(1)} beds / {filteredStatistics.bathrooms.average.toFixed(1)} baths</span>
                   </p>
                 </div>
               </div>
               <div className="pt-2 border-t">
                 <p className="text-xs text-muted-foreground italic">
-                  This analysis is based on {activeProperties.length} Active, {underContractProperties.length} Active Under Contract, and {soldProperties.length} Closed properties in your selection.
+                  This analysis is based on {includedActive.length} Active, {includedUnderContract.length} Active Under Contract, and {includedSold.length} Closed properties in your selection.
                 </p>
               </div>
+            </CardContent>
+          </Card>
+
+          {/* Time to Sell Analysis - CloudCMA style */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-lg flex items-center gap-2">
+                <Calendar className="w-5 h-5" />
+                Time to Sell Analysis
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {(() => {
+                // Filter out excluded properties from Time to Sell analysis
+                const closedWithData = soldProperties.filter(p => 
+                  !excludedPropertyIds.has(p.id) &&
+                  p.closePrice && p.listPrice && p.daysOnMarket !== null && p.daysOnMarket !== undefined
+                );
+                
+                if (closedWithData.length === 0) {
+                  return (
+                    <div className="text-center py-6 text-muted-foreground">
+                      <Calendar className="w-10 h-10 mx-auto mb-2 opacity-50" />
+                      <p>No closed sales data available for Time to Sell analysis</p>
+                    </div>
+                  );
+                }
+                
+                const avgDOM = closedWithData.reduce((sum, p) => sum + (p.daysOnMarket || 0), 0) / closedWithData.length;
+                const medianDOM = (() => {
+                  const sorted = closedWithData.map(p => p.daysOnMarket || 0).sort((a, b) => a - b);
+                  return sorted.length % 2 === 0
+                    ? (sorted[sorted.length / 2 - 1] + sorted[sorted.length / 2]) / 2
+                    : sorted[Math.floor(sorted.length / 2)];
+                })();
+                
+                const listToSaleRatios = closedWithData.map(p => {
+                  const closePrice = Number(p.closePrice);
+                  const listPrice = Number(p.listPrice);
+                  return listPrice > 0 ? (closePrice / listPrice) * 100 : 0;
+                }).filter(r => r > 0);
+                
+                const avgListToSaleRatio = listToSaleRatios.length > 0 
+                  ? listToSaleRatios.reduce((a, b) => a + b, 0) / listToSaleRatios.length 
+                  : 0;
+                const minRatio = listToSaleRatios.length > 0 ? Math.min(...listToSaleRatios) : 0;
+                const maxRatio = listToSaleRatios.length > 0 ? Math.max(...listToSaleRatios) : 0;
+                
+                return (
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                    <div className="text-center p-4 bg-muted/30 rounded-lg">
+                      <div className="text-3xl font-bold">{Math.round(avgDOM)}</div>
+                      <div className="text-sm text-muted-foreground">Avg Days on Market</div>
+                    </div>
+                    <div className="text-center p-4 bg-muted/30 rounded-lg">
+                      <div className="text-3xl font-bold">{Math.round(medianDOM)}</div>
+                      <div className="text-sm text-muted-foreground">Median Days on Market</div>
+                    </div>
+                    <div className="text-center p-4 bg-muted/30 rounded-lg">
+                      <div className={cn(
+                        "text-3xl font-bold",
+                        avgListToSaleRatio >= 100 ? "text-green-600" : "text-red-600"
+                      )}>
+                        {avgListToSaleRatio.toFixed(1)}%
+                      </div>
+                      <div className="text-sm text-muted-foreground">Avg List-to-Sale Ratio</div>
+                    </div>
+                    <div className="text-center p-4 bg-muted/30 rounded-lg">
+                      <div className="text-lg font-bold">
+                        {minRatio.toFixed(1)}% - {maxRatio.toFixed(1)}%
+                      </div>
+                      <div className="text-sm text-muted-foreground">Ratio Range</div>
+                    </div>
+                  </div>
+                );
+              })()}
             </CardContent>
           </Card>
 
@@ -1433,8 +1715,12 @@ export function CMAReport({
             {/* Left: Market Health Indicator - Inventory Dial */}
             <div>
               {(() => {
-                const activeCount = activeProperties.length;
-                const soldCount = soldProperties.length;
+                // Filter out excluded properties for inventory calculations
+                const includedActive = activeProperties.filter(p => !excludedPropertyIds.has(p.id));
+                const includedSold = soldProperties.filter(p => !excludedPropertyIds.has(p.id));
+                
+                const activeCount = includedActive.length;
+                const soldCount = includedSold.length;
                 const avgSoldPerMonth = soldCount > 0 ? soldCount / 6 : 0;
                 const monthsOfInventory = avgSoldPerMonth > 0 ? activeCount / avgSoldPerMonth : 0;
                 const absorptionRate = avgSoldPerMonth;
@@ -1546,11 +1832,14 @@ export function CMAReport({
                 </CardHeader>
                 <CardContent>
                   {(() => {
-                    const propertiesWithCoords = allProperties.filter(
-                      p => p.latitude && p.longitude && 
-                      typeof p.latitude === 'number' && typeof p.longitude === 'number' &&
-                      !isNaN(p.latitude) && !isNaN(p.longitude)
-                    );
+                    // Filter out excluded properties
+                    const propertiesWithCoords = allProperties
+                      .filter(p => !excludedPropertyIds.has(p.id))
+                      .filter(
+                        p => p.latitude && p.longitude && 
+                        typeof p.latitude === 'number' && typeof p.longitude === 'number' &&
+                        !isNaN(p.latitude) && !isNaN(p.longitude)
+                      );
                     
                     if (propertiesWithCoords.length === 0) {
                       return (
@@ -1590,7 +1879,7 @@ export function CMAReport({
                               <Marker
                                 key={property.listingId}
                                 position={[Number(property.latitude), Number(property.longitude)]}
-                                icon={getCompIcon(status)}
+                                icon={getPriceMarkerIcon(price, status)}
                               >
                                 <Popup>
                                   <div className="min-w-[180px]">
@@ -1623,10 +1912,10 @@ export function CMAReport({
             </CardHeader>
             <CardContent>
               {(() => {
-                // Group sold properties by month for trend analysis
+                // Group sold properties by month for trend analysis (respecting exclusions)
                 const soldByMonth: { [key: string]: { prices: number[]; count: number } } = {};
                 
-                soldProperties.forEach(p => {
+                includedSold.forEach(p => {
                   const closeDate = p.closeDate ? new Date(p.closeDate) : null;
                   const price = p.closePrice ? Number(p.closePrice) : 0;
                   
@@ -1731,7 +2020,7 @@ export function CMAReport({
               {
                 key: 'active',
                 label: 'Active Listings',
-                properties: activeProperties,
+                properties: includedActive,
                 borderClass: 'border-green-200 dark:border-green-800',
                 bgClass: 'bg-green-50 dark:bg-green-950/30',
                 dotClass: 'bg-green-500',
@@ -1742,7 +2031,7 @@ export function CMAReport({
               {
                 key: 'under-contract',
                 label: 'Active Under Contract',
-                properties: underContractProperties,
+                properties: includedUnderContract,
                 borderClass: 'border-yellow-200 dark:border-yellow-800',
                 bgClass: 'bg-yellow-50 dark:bg-yellow-950/30',
                 dotClass: 'bg-yellow-500',
@@ -1753,7 +2042,7 @@ export function CMAReport({
               {
                 key: 'sold',
                 label: 'Closed',
-                properties: soldProperties,
+                properties: includedSold,
                 borderClass: 'border-red-200 dark:border-red-800',
                 bgClass: 'bg-red-50 dark:bg-red-950/30',
                 dotClass: 'bg-red-500',
