@@ -1013,8 +1013,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Apply property subtype filtering to exclude Land/Lots when Single Family selected
       // This is needed because Repliers 'class=residential' includes Land/Lots
-      const { propertyType: reqPropertyType } = req.query as Record<string, string | undefined>;
-      const propertyTypeFiltered = filterByPropertySubtype(nonRentalResults, reqPropertyType);
+      // Support both propertyType and propertySubType query params (frontend sends propertySubType)
+      const { propertyType: reqPropertyType, propertySubType: reqPropertySubType } = req.query as Record<string, string | undefined>;
+      const propertyTypeFiltered = filterByPropertySubtype(nonRentalResults, reqPropertySubType || reqPropertyType);
       if (nonRentalResults.length !== propertyTypeFiltered.length) {
         console.log(`📦 Search: Filtered out ${nonRentalResults.length - propertyTypeFiltered.length} listings due to property type mismatch`);
       }

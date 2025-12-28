@@ -1718,7 +1718,7 @@ export function CMABuilder({ onCreateCMA, initialData }: CMABuilderProps) {
                             size="sm"
                             className="flex-1"
                             onClick={() => handleAddComparable(property)}
-                            disabled={comparables.some(p => p.id === property.id) || comparables.length >= 5}
+                            disabled={comparables.some(p => p.id === property.id) || comparables.length >= 15}
                             data-testid={`button-add-comparable-${property.id}`}
                           >
                             <Plus className="w-3 h-3 mr-1" />
@@ -1906,7 +1906,7 @@ export function CMABuilder({ onCreateCMA, initialData }: CMABuilderProps) {
                           handleAddComparable(selectedProperty);
                           setSelectedProperty(null);
                         }}
-                        disabled={comparables.some(p => p.id === selectedProperty.id) || comparables.length >= 5}
+                        disabled={comparables.some(p => p.id === selectedProperty.id) || comparables.length >= 15}
                         data-testid="button-dialog-add-comparable"
                       >
                         <Plus className="w-4 h-4 mr-2" />
