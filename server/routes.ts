@@ -2123,6 +2123,7 @@ This email was sent by ${senderName} (${senderEmail}) via the MLS Grid IDX Platf
           id: cma.id,
           name: cma.name,
           createdAt: cma.createdAt,
+          subjectPropertyId: cma.subjectPropertyId || null,
         },
         properties,
         statistics,

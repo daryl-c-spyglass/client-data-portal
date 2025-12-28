@@ -186,6 +186,45 @@ export function CMAReport({
   const [showUnderContractOnTimeline, setShowUnderContractOnTimeline] = useState(true);
   const [showSoldOnTimeline, setShowSoldOnTimeline] = useState(true);
   
+  // Horizontal scroll refs for carousel arrows
+  const statsScrollRef = useRef<HTMLDivElement>(null);
+  const [statsCanScrollLeft, setStatsCanScrollLeft] = useState(false);
+  const [statsCanScrollRight, setStatsCanScrollRight] = useState(false);
+  
+  // Update scroll button visibility for Stats view
+  const updateStatsScrollButtons = () => {
+    if (statsScrollRef.current) {
+      const { scrollLeft, scrollWidth, clientWidth } = statsScrollRef.current;
+      setStatsCanScrollLeft(scrollLeft > 5);
+      setStatsCanScrollRight(scrollLeft < scrollWidth - clientWidth - 5);
+    }
+  };
+  
+  useEffect(() => {
+    updateStatsScrollButtons();
+    const scrollEl = statsScrollRef.current;
+    if (scrollEl) {
+      scrollEl.addEventListener('scroll', updateStatsScrollButtons);
+      window.addEventListener('resize', updateStatsScrollButtons);
+      return () => {
+        scrollEl.removeEventListener('scroll', updateStatsScrollButtons);
+        window.removeEventListener('resize', updateStatsScrollButtons);
+      };
+    }
+  }, [activeTab, properties]);
+  
+  const scrollStatsLeft = () => {
+    if (statsScrollRef.current) {
+      statsScrollRef.current.scrollBy({ left: -280, behavior: 'smooth' });
+    }
+  };
+  
+  const scrollStatsRight = () => {
+    if (statsScrollRef.current) {
+      statsScrollRef.current.scrollBy({ left: 280, behavior: 'smooth' });
+    }
+  };
+  
   // Helper to get photos from property
   const getPropertyPhotos = (property: Property): string[] => {
     const photos = (property as any).photos as string[] | undefined;
@@ -1057,8 +1096,38 @@ export function CMAReport({
 
         {/* Stats Tab - CloudCMA Style Side-by-Side Comparison Cards */}
         <TabsContent value="stats" className="space-y-0 mt-0">
-          <div className="bg-white dark:bg-zinc-950 rounded-b-lg p-4">
-            <div className="flex gap-4 overflow-x-auto pb-4">
+          <div className="bg-white dark:bg-zinc-950 rounded-b-lg p-4 relative">
+            {/* Left scroll arrow */}
+            {statsCanScrollLeft && (
+              <Button
+                variant="outline"
+                size="icon"
+                className="absolute left-2 top-1/2 -translate-y-1/2 z-10 bg-white/90 dark:bg-zinc-900/90 shadow-lg rounded-full h-10 w-10"
+                onClick={scrollStatsLeft}
+                data-testid="button-stats-scroll-left"
+              >
+                <ChevronLeft className="w-5 h-5" />
+              </Button>
+            )}
+            
+            {/* Right scroll arrow */}
+            {statsCanScrollRight && (
+              <Button
+                variant="outline"
+                size="icon"
+                className="absolute right-2 top-1/2 -translate-y-1/2 z-10 bg-white/90 dark:bg-zinc-900/90 shadow-lg rounded-full h-10 w-10"
+                onClick={scrollStatsRight}
+                data-testid="button-stats-scroll-right"
+              >
+                <ChevronRight className="w-5 h-5" />
+              </Button>
+            )}
+            
+            <div 
+              ref={statsScrollRef}
+              className="flex gap-4 overflow-x-auto pb-4 scroll-smooth px-8"
+              onLoad={() => updateStatsScrollButtons()}
+            >
               {(() => {
                 // Find the actual subject property using subjectPropertyId prop
                 const subjectProp = subjectPropertyId 
