@@ -579,7 +579,28 @@ export default function CMADetailPage() {
         reportTitle={cma.name}
         onSave={handleSave}
         onShareCMA={() => setEmailShareDialogOpen(true)}
-        onPublicLink={() => setShareDialogOpen(true)}
+        onPublicLink={async () => {
+          try {
+            let shareUrl: string;
+            if (cma?.publicLink) {
+              shareUrl = `${window.location.origin}/share/cma/${cma.publicLink}`;
+            } else {
+              const result = await shareMutation.mutateAsync();
+              shareUrl = `${window.location.origin}/share/cma/${result.shareToken}`;
+            }
+            await navigator.clipboard.writeText(shareUrl);
+            toast({
+              title: "URL copied to clipboard",
+              description: shareUrl,
+            });
+          } catch (error) {
+            toast({
+              title: "Error",
+              description: "Failed to generate or copy share URL",
+              variant: "destructive",
+            });
+          }
+        }}
         onModifySearch={handleModifySearch}
         onModifyStats={handleModifyStats}
         onAddNotes={handleOpenNotesDialog}

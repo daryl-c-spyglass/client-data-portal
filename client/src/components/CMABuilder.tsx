@@ -536,10 +536,6 @@ export function CMABuilder({ onCreateCMA, initialData }: CMABuilderProps) {
       : totalResults;
 
   const handleAddComparable = (property: Property) => {
-    if (comparables.length >= 5) {
-      // Max 5 comparables allowed
-      return;
-    }
     if (!comparables.find(p => p.id === property.id)) {
       setComparables([...comparables, property]);
     }
@@ -586,6 +582,10 @@ export function CMABuilder({ onCreateCMA, initialData }: CMABuilderProps) {
   };
 
   const handleCreate = () => {
+    if (!subjectProperty) {
+      // Subject property is required
+      return;
+    }
     if (comparables.length > 0) {
       const allProperties = subjectProperty 
         ? [subjectProperty, ...comparables] 
@@ -1436,17 +1436,7 @@ export function CMABuilder({ onCreateCMA, initialData }: CMABuilderProps) {
                     </div>
                   </div>
                 ))}
-                {comparables.length < 5 && (
-                  <p className="text-xs text-muted-foreground text-center pt-2">
-                    Add up to {5 - comparables.length} more properties
-                  </p>
-                )}
-                {comparables.length >= 5 && (
-                  <p className="text-xs text-amber-600 text-center pt-2">
-                    Maximum 5 comparables reached
-                  </p>
-                )}
-              </div>
+                </div>
             ) : (
               <div className="text-center py-8 text-muted-foreground">
                 <Plus className="w-8 h-8 mx-auto mb-2 opacity-50" />
@@ -1531,12 +1521,17 @@ export function CMABuilder({ onCreateCMA, initialData }: CMABuilderProps) {
                 <Button 
                   className="w-full" 
                   onClick={handleCreate}
-                  disabled={comparables.length === 0}
+                  disabled={comparables.length === 0 || !subjectProperty}
                   data-testid="button-generate-report"
                 >
                   <TrendingUp className="w-4 h-4 mr-2" />
                   Generate Report
                 </Button>
+                {!subjectProperty && comparables.length > 0 && (
+                  <p className="text-xs text-amber-600 text-center mt-2">
+                    Subject property required
+                  </p>
+                )}
               </>
             ) : (
               <div className="text-center py-8 text-muted-foreground">

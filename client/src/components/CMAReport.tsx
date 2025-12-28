@@ -5,7 +5,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, Legend, ResponsiveContainer, LineChart, Line, ReferenceLine, ScatterChart, Scatter, ZAxis, Cell } from "recharts";
-import { Save, Edit, FileText, Printer, Info, Home, Mail, ChevronLeft, ChevronRight, Bed, Bath, Maximize, MapPin, Calendar, Map as MapIcon } from "lucide-react";
+import { Save, Edit, FileText, Printer, Info, Home, Mail, ChevronLeft, ChevronRight, Bed, Bath, Maximize, MapPin, Calendar, Map as MapIcon, ExternalLink } from "lucide-react";
 import { MapContainer, TileLayer, Marker, Popup, useMap } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
 import L from "leaflet";
@@ -362,6 +362,10 @@ export function CMAReport({
             <Button size="sm" onClick={onSave} data-testid="button-save-cma">
               <Save className="w-4 h-4 mr-2" />
               Save
+            </Button>
+            <Button size="sm" variant="outline" onClick={onPublicLink} data-testid="button-copy-live-url">
+              <ExternalLink className="w-4 h-4 mr-2" />
+              Copy Live URL
             </Button>
             <Button size="sm" variant="outline" onClick={onShareCMA} data-testid="button-share-cma-email">
               <Mail className="w-4 h-4 mr-2" />
