@@ -401,6 +401,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Routes to Repliers for active listings, HomeReview for closed/sold
   app.get("/api/search", async (req, res) => {
     try {
+      // Debug: Log incoming query parameters
+      console.log(`🔎 [Search API] Raw query params: ${JSON.stringify(req.query)}`);
+      
       const {
         status,
         statuses, // Comma-separated list of statuses (active,under_contract,closed)
