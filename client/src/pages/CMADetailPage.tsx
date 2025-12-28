@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
-import { ArrowLeft, Share2, Link as LinkIcon, Copy, Check, Trash2, ExternalLink, Printer, Loader2 } from "lucide-react";
+import { ArrowLeft, Share2, Link as LinkIcon, Copy, Check, Trash2, ExternalLink, Printer, Loader2, Mail } from "lucide-react";
 import { SiFacebook, SiX, SiInstagram, SiTiktok } from "react-icons/si";
 import { Link } from "wouter";
 import { CMAReport } from "@/components/CMAReport";
@@ -291,6 +291,119 @@ export default function CMADetailPage() {
     window.print();
   };
 
+  const generateClientEmail = () => {
+    if (!cma || !statistics) return '';
+    
+    const propertiesData = (cma as any).propertiesData || [];
+    const compCount = propertiesData.length;
+    
+    const subjectProperty = cma.subjectPropertyId 
+      ? propertiesData.find((p: Property) => p.id === cma.subjectPropertyId)
+      : null;
+    
+    const subjectAddress = subjectProperty?.unparsedAddress || cma.name || 'your property';
+    const subdivision = (cma.searchCriteria as any)?.subdivisionName || 
+                        (cma.searchCriteria as any)?.subdivision ||
+                        subjectProperty?.subdivision ||
+                        (cma.searchCriteria as any)?.city || 
+                        'your area';
+    
+    const soldWithinDays = (cma.searchCriteria as any)?.soldWithinDays;
+    const timeframe = soldWithinDays 
+      ? `last ${soldWithinDays} days`
+      : 'last 6 months';
+    
+    const priceMin = statistics.price?.range?.min 
+      ? `$${Math.round(statistics.price.range.min).toLocaleString()}`
+      : 'N/A';
+    const priceMax = statistics.price?.range?.max
+      ? `$${Math.round(statistics.price.range.max).toLocaleString()}`
+      : 'N/A';
+    const avgPricePerSqFt = statistics.pricePerSqFt?.average
+      ? `$${Math.round(statistics.pricePerSqFt.average)}`
+      : 'N/A';
+    const avgDOM = statistics.daysOnMarket?.average
+      ? `${Math.round(statistics.daysOnMarket.average)}`
+      : 'N/A';
+    
+    const subjectSqFt = subjectProperty?.livingArea 
+      ? Number(subjectProperty.livingArea).toLocaleString()
+      : (statistics.livingArea?.average ? Math.round(statistics.livingArea.average).toLocaleString() : 'comparable homes');
+    
+    const lowEstimate = statistics.price?.range?.min && statistics.price?.average
+      ? `$${Math.round((statistics.price.range.min + statistics.price.average) / 2).toLocaleString()}`
+      : priceMin;
+    const highEstimate = statistics.price?.range?.max && statistics.price?.average
+      ? `$${Math.round((statistics.price.average + statistics.price.range.max) / 2).toLocaleString()}`
+      : priceMax;
+    
+    const medianDOM = statistics.daysOnMarket?.median 
+      ? Math.round(statistics.daysOnMarket.median)
+      : null;
+    const domInsight = medianDOM 
+      ? (medianDOM < 14 
+          ? `Properties priced right are going under contract in under ${medianDOM} days`
+          : `Typical time to contract is around ${medianDOM} days`)
+      : 'Market activity is steady';
+    
+    const pricePerSqFtInsight = avgPricePerSqFt !== 'N/A'
+      ? `Comparable homes are averaging ${avgPricePerSqFt}/sq ft`
+      : '';
+
+    const email = `Subject: Market Analysis for ${subjectAddress}
+
+---
+
+Hi there,
+
+I put together a market analysis for your home based on recent activity in ${subdivision}. Here's what the data is showing:
+
+**Comparable Sales Summary**
+- Properties Analyzed: ${compCount} homes in ${subdivision} (${timeframe})
+- Price Range: ${priceMin} – ${priceMax}
+- Average Price/Sq Ft: ${avgPricePerSqFt}
+- Average Days on Market: ${avgDOM} days
+
+Based on your home's size (${subjectSqFt} sq ft) and features, the data suggests a competitive list price in the ${lowEstimate} – ${highEstimate} range.
+
+A few things worth noting:
+- ${pricePerSqFtInsight || 'Market conditions support pricing in this range'}
+- ${domInsight}
+- Well-priced homes are attracting strong buyer interest
+
+I'd love to walk you through the full analysis and talk through your timing and goals. Want to grab 15 minutes this week?
+
+Best regards`;
+
+    return email;
+  };
+
+  const handleCopyClientEmail = async () => {
+    const emailContent = generateClientEmail();
+    if (!emailContent) {
+      toast({
+        title: "Unable to generate email",
+        description: "CMA data is not available.",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    try {
+      await navigator.clipboard.writeText(emailContent);
+      toast({
+        title: "Email copied",
+        description: "Paste into Follow Up Boss to send to your client.",
+      });
+    } catch (error) {
+      toast({
+        title: "Copy failed",
+        description: "Unable to copy to clipboard.",
+        variant: "destructive",
+      });
+    }
+  };
+
   const isLoading = cmaLoading || statsLoading || timelineLoading;
 
   const getShareUrl = () => {
@@ -397,6 +510,14 @@ export default function CMADetailPage() {
         </div>
 
         <div className="flex items-center gap-2">
+          <Button 
+            variant="outline" 
+            onClick={handleCopyClientEmail}
+            data-testid="button-copy-email"
+          >
+            <Mail className="w-4 h-4 mr-2" />
+            Copy Email
+          </Button>
           <Button 
             variant="outline" 
             onClick={async () => {
