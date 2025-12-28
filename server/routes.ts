@@ -922,12 +922,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
             return p.stories === storiesNum;
           });
         }
-        // Filter by sold date (only applies to closed properties)
+        // Filter by sold date (only applies to closed properties - Active/Under Contract pass through)
         if (soldDays) {
           const daysAgo = parseInt(soldDays, 10);
           const cutoffDate = new Date();
           cutoffDate.setDate(cutoffDate.getDate() - daysAgo);
           filtered = filtered.filter((p: any) => {
+            // Active and Under Contract properties always pass through (no closeDate filter)
+            const status = (p.standardStatus || p.status || '').toLowerCase();
+            if (status !== 'closed' && status !== 'sold') {
+              return true; // Let Active/Under Contract through without date check
+            }
+            // For Closed properties, apply the soldDays filter
             if (!p.closeDate) return false;
             const closeDate = new Date(p.closeDate);
             return closeDate >= cutoffDate;
