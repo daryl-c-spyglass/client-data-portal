@@ -1,4 +1,4 @@
-import { Home, Search, FileText, Users, Settings, BarChart3, Mail, Filter, Calendar, TrendingUp, UserCircle, MessageCircle } from "lucide-react";
+import { Home, Search, FileText, Users, Settings, BarChart3, Mail, Filter, Calendar, UserCircle, MessageCircle } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import {
   Sidebar,
@@ -67,15 +67,6 @@ const menuItems = [
   },
 ];
 
-const reportsItems = [
-  {
-    title: "Mission Control",
-    url: "/reports/mission-control",
-    icon: TrendingUp,
-    testId: "link-mission-control",
-  },
-];
-
 const calendarItems = [
   {
     title: "Calendar",
@@ -114,27 +105,6 @@ export function AppSidebar() {
           <SidebarGroupContent>
             <SidebarMenu>
               {menuItems.map((item) => (
-                <SidebarMenuItem key={item.title}>
-                  <SidebarMenuButton 
-                    asChild
-                    className={location === item.url ? "bg-sidebar-accent" : ""}
-                  >
-                    <Link href={item.url} data-testid={item.testId}>
-                      <item.icon className="w-4 h-4" />
-                      <span>{item.title}</span>
-                    </Link>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              ))}
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
-        
-        <SidebarGroup>
-          <SidebarGroupLabel>Reports</SidebarGroupLabel>
-          <SidebarGroupContent>
-            <SidebarMenu>
-              {reportsItems.map((item) => (
                 <SidebarMenuItem key={item.title}>
                   <SidebarMenuButton 
                     asChild

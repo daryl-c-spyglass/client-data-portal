@@ -26,7 +26,6 @@ import Settings from "@/pages/Settings";
 import Clients from "@/pages/Clients";
 import Analytics from "@/pages/Analytics";
 import SharedCMAView from "@/pages/SharedCMAView";
-import MissionControl from "@/pages/MissionControl";
 import CalendarPage from "@/pages/CalendarPage";
 import LeadsPage from "@/pages/LeadsPage";
 import InventoryAudit from "@/pages/InventoryAudit";
@@ -48,7 +47,6 @@ function Router() {
       <Route path="/clients" component={Clients} />
       <Route path="/analytics" component={Analytics} />
       <Route path="/settings" component={Settings} />
-      <Route path="/reports/mission-control" component={MissionControl} />
       <Route path="/calendar" component={CalendarPage} />
       <Route path="/leads" component={LeadsPage} />
       <Route path="/inventory-audit" component={InventoryAudit} />
