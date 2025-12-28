@@ -158,18 +158,18 @@ export default function MissionControl() {
   const { data: production, isLoading, error, refetch } = useQuery<ProductionData>({
     queryKey: [apiPath, effectiveAgentId, startDate, endDate],
     queryFn: async () => {
-      // Safety check: never request live endpoint without an agentId
+      // Safety check: never request live endpoint without an agent name
       if (!useMockData && !effectiveAgentId) {
-        throw new Error('Agent ID is required for live ReZen data');
+        throw new Error('Agent name is required');
       }
-      const url = `${apiPath}?agentId=${encodeURIComponent(effectiveAgentId)}&startDate=${startDate}&endDate=${endDate}`;
+      const url = `${apiPath}?agentName=${encodeURIComponent(effectiveAgentId)}&startDate=${startDate}&endDate=${endDate}`;
       const res = await fetch(url, { credentials: 'include' });
       if (!res.ok) {
         throw new Error(`${res.status}: ${await res.text()}`);
       }
       return res.json();
     },
-    enabled: useMockData || (!!agentId && statusData?.configured === true),
+    enabled: useMockData || !!agentId,
   });
   
   const isConfigured = statusData?.configured === true;
@@ -180,7 +180,7 @@ export default function MissionControl() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold" data-testid="text-page-title">Mission Control</h1>
-          <p className="text-muted-foreground">Agent production volume reporting from ReZen</p>
+          <p className="text-muted-foreground">Agent production volume reporting</p>
         </div>
         {production && (
           <Badge variant="outline" className="text-xs">
@@ -203,19 +203,6 @@ export default function MissionControl() {
         </Card>
       )}
       
-      {!isStatusChecking && !isConfigured && (
-        <Card className="border-amber-200 bg-amber-50 dark:bg-amber-900/20">
-          <CardContent className="flex items-center gap-3 py-4">
-            <AlertCircle className="h-5 w-5 text-amber-600" />
-            <div>
-              <p className="font-medium text-amber-800 dark:text-amber-200">ReZen API Not Configured</p>
-              <p className="text-sm text-amber-700 dark:text-amber-300">
-                {statusData?.message || "Please configure REZEN_API_KEY to enable production reporting."}
-              </p>
-            </div>
-          </CardContent>
-        </Card>
-      )}
       
       <Card>
         <CardHeader>
@@ -224,13 +211,13 @@ export default function MissionControl() {
         <CardContent>
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="agentId">Agent ID (Yenta ID)</Label>
+              <Label htmlFor="agentId">Agent Name</Label>
               <Input
                 id="agentId"
-                placeholder="Enter agent Yenta ID"
+                placeholder="Enter agent name (e.g., Ryan)"
                 value={agentId}
                 onChange={(e) => setAgentId(e.target.value)}
-                data-testid="input-agent-id"
+                data-testid="input-agent-name"
               />
             </div>
             <div className="space-y-2">
@@ -264,7 +251,7 @@ export default function MissionControl() {
             <div className="flex items-end">
               <Button 
                 onClick={() => refetch()} 
-                disabled={!useMockData && (!agentId || !isConfigured)}
+                disabled={!useMockData && !agentId}
                 className="w-full"
                 data-testid="button-refresh"
               >
@@ -288,17 +275,17 @@ export default function MissionControl() {
           </div>
           {useMockData && (
             <p className="text-xs text-muted-foreground mt-2">
-              Using sample data for testing. Agent ID will default to "agent_ryan_001" if empty.
+              Using sample data for testing. Agent name will default to "Ryan Rodenbeck" if empty.
             </p>
           )}
         </CardContent>
       </Card>
       
-      {!useMockData && !agentId && isConfigured && (
+      {!useMockData && !agentId && (
         <Card>
           <CardContent className="py-8 text-center text-muted-foreground">
             <TrendingUp className="h-12 w-12 mx-auto mb-4 opacity-50" />
-            <p>Enter an Agent ID to view production data</p>
+            <p>Enter an agent name to view production data</p>
           </CardContent>
         </Card>
       )}
@@ -324,7 +311,7 @@ export default function MissionControl() {
           <CardContent className="py-4">
             <div className="flex items-center gap-3 text-destructive">
               <AlertCircle className="h-5 w-5" />
-              <p>Failed to load production data. Please check the agent ID and try again.</p>
+              <p>Failed to load production data. Please check the agent name and try again.</p>
             </div>
           </CardContent>
         </Card>

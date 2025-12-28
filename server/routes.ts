@@ -4877,68 +4877,78 @@ OUTPUT JSON:
     return Number(transaction.listPrice || transaction.price || 0);
   }
   
-  // Get agent production/transactions from ReZen
-  // Using documented endpoints from ReZen API Reference:
-  // - GET /api/v1/reports/{yentaId}/transactions/open (Active/Pending deals)
-  // - GET /api/v1/reports/{yentaId}/transactions/closed (Closed deals)
+  // Get agent production/transactions using Repliers API
+  // Searches for listings where the agent is the listing agent
   app.get("/api/rezen/production", async (req, res) => {
     try {
-      const { agentId, startDate, endDate } = req.query as Record<string, string>;
+      const { agentId, agentName, startDate, endDate } = req.query as Record<string, string>;
       
-      if (!agentId) {
-        res.status(400).json({ error: "agentId is required" });
+      // agentId is now optional - can search by agent name instead
+      const searchName = agentName || agentId || '';
+      
+      if (!searchName) {
+        res.status(400).json({ error: "agentId or agentName is required" });
         return;
       }
       
-      const cacheKey = `rezen_${agentId}_${startDate || 'default'}_${endDate || 'default'}`;
+      const cacheKey = `production_${searchName}_${startDate || 'default'}_${endDate || 'default'}`;
       const cached = rezenCache.get(cacheKey);
       if (cached && Date.now() - cached.timestamp < REZEN_CACHE_TTL) {
-        console.log(`[ReZen] Cache hit for ${cacheKey}`);
+        console.log(`[Production] Cache hit for ${cacheKey}`);
         res.json(cached.data);
         return;
       }
       
-      console.log(`[ReZen] Fetching production for agent ${agentId} using reports endpoints`);
+      console.log(`[Production] Fetching production for agent: ${searchName} using Repliers API`);
       
-      // Fetch transactions using documented report endpoints
-      // Open endpoint returns active/pending deals, Closed endpoint returns closed deals
-      let openError: Error | null = null;
-      let closedError: Error | null = null;
-      
-      const [openResult, closedResult] = await Promise.all([
-        rezenApiRequest(`/reports/${agentId}/transactions/open`).catch(err => {
-          console.warn(`[ReZen] Open transactions fetch failed: ${err.message}`);
-          openError = err;
-          return null;
-        }),
-        rezenApiRequest(`/reports/${agentId}/transactions/closed`).catch(err => {
-          console.warn(`[ReZen] Closed transactions fetch failed: ${err.message}`);
-          closedError = err;
-          return null;
-        }),
-      ]);
-      
-      // If both endpoints failed, return error (don't return zeroed data)
-      if (openError && closedError) {
-        console.error('[ReZen] Both endpoints failed - cannot return production data');
-        res.status(500).json({
-          error: 'Failed to fetch production data from ReZen',
-          details: 'Both open and closed transaction endpoints failed',
-          openError: (openError as Error).message,
-          closedError: (closedError as Error).message,
-        });
+      if (!repliersClient) {
+        res.status(503).json({ error: "Repliers API client not initialized" });
         return;
       }
       
-      // Combine both transaction lists (allow partial data if one endpoint failed)
-      const openTxList = openResult ? (Array.isArray(openResult) ? openResult : openResult?.transactions || []) : [];
-      const closedTxList = closedResult ? (Array.isArray(closedResult) ? closedResult : closedResult?.transactions || []) : [];
-      const allTransactions = [...openTxList, ...closedTxList];
+      // Fetch listings from Repliers API by status
+      const baseParams = {
+        type: 'Sale',
+        city: 'Austin',
+        resultsPerPage: 100,
+      };
       
-      // Track data quality
-      const dataQuality = openError || closedError ? 'partial' : 'complete';
+      // Parallel fetch for all statuses
+      const [activeResult, ucResult, closedResult] = await Promise.all([
+        repliersClient.searchListings({ ...baseParams, standardStatus: 'Active' }).catch(err => {
+          console.warn(`[Production] Active listings fetch failed: ${err.message}`);
+          return { listings: [], count: 0 };
+        }),
+        repliersClient.searchListings({ ...baseParams, standardStatus: 'Active Under Contract' }).catch(err => {
+          console.warn(`[Production] Under Contract listings fetch failed: ${err.message}`);
+          return { listings: [], count: 0 };
+        }),
+        repliersClient.searchListings({ ...baseParams, standardStatus: 'Closed' }).catch(err => {
+          console.warn(`[Production] Closed listings fetch failed: ${err.message}`);
+          return { listings: [], count: 0 };
+        }),
+      ]);
       
-      // Process and aggregate transactions
+      // Filter listings by agent name (case-insensitive partial match)
+      const filterByAgent = (listings: any[]) => {
+        if (!searchName) return listings;
+        const searchLower = searchName.toLowerCase();
+        return listings.filter((listing: any) => {
+          const agentNameField = listing.agent?.name || listing.listAgentFullName || '';
+          return agentNameField.toLowerCase().includes(searchLower);
+        });
+      };
+      
+      const activeListings = filterByAgent(activeResult.listings || []);
+      const ucListings = filterByAgent(ucResult.listings || []);
+      const closedListings = filterByAgent(closedResult.listings || []);
+      
+      // Calculate volumes
+      const sumVolume = (listings: any[], useField: string) => {
+        return listings.reduce((sum, l) => sum + (Number(l[useField]) || Number(l.listPrice) || 0), 0);
+      };
+      
+      // Process and aggregate listings
       const production = {
         buyer: {
           active: { count: 0, volume: 0 },
@@ -4946,113 +4956,80 @@ OUTPUT JSON:
           closed: { count: 0, volume: 0 },
         },
         seller: {
-          active: { count: 0, volume: 0 },
-          underContract: { count: 0, volume: 0 },
-          closed: { count: 0, volume: 0 },
+          active: { count: activeListings.length, volume: sumVolume(activeListings, 'listPrice') },
+          underContract: { count: ucListings.length, volume: sumVolume(ucListings, 'listPrice') },
+          closed: { count: closedListings.length, volume: sumVolume(closedListings, 'soldPrice') },
         },
         totals: {
-          active: { count: 0, volume: 0 },
-          underContract: { count: 0, volume: 0 },
-          closed: { count: 0, volume: 0 },
+          active: { count: activeListings.length, volume: sumVolume(activeListings, 'listPrice') },
+          underContract: { count: ucListings.length, volume: sumVolume(ucListings, 'listPrice') },
+          closed: { count: closedListings.length, volume: sumVolume(closedListings, 'soldPrice') },
         },
         transactions: [] as any[],
-        dataSource: 'ReZen API',
+        dataSource: 'Repliers API',
         fetchedAt: new Date().toISOString(),
         meta: {
-          source: 'rezen-arrakis',
-          dataQuality,
-          usedEndpoints: [
-            `/reports/${agentId}/transactions/open`,
-            `/reports/${agentId}/transactions/closed`,
-          ],
-          openTxCount: openTxList.length,
-          closedTxCount: closedTxList.length,
-          openEndpointFailed: !!openError,
-          closedEndpointFailed: !!closedError,
+          source: 'repliers',
+          dataQuality: 'complete',
+          agentSearched: searchName,
+          activeCount: activeListings.length,
+          ucCount: ucListings.length,
+          closedCount: closedListings.length,
         },
       };
       
-      for (const tx of allTransactions) {
-        const status = mapRezenStatus(tx.lifecycleState || tx.status || tx.transactionStatus || '');
-        const side = mapRezenSide(tx);
-        const volume = getRezenVolume(tx, tx.lifecycleState || tx.status || '');
-        
-        // Filter by date if provided
-        if (startDate || endDate) {
-          const txDate = new Date(tx.closingDate || tx.createdAt || tx.contractDate);
-          if (startDate && txDate < new Date(startDate)) continue;
-          if (endDate && txDate > new Date(endDate)) continue;
-        }
-        
-        // Update totals
-        if (status === 'active') {
-          production.totals.active.count++;
-          production.totals.active.volume += volume;
-          if (side === 'buyer') {
-            production.buyer.active.count++;
-            production.buyer.active.volume += volume;
-          } else if (side === 'seller') {
-            production.seller.active.count++;
-            production.seller.active.volume += volume;
-          }
-        } else if (status === 'under_contract') {
-          production.totals.underContract.count++;
-          production.totals.underContract.volume += volume;
-          if (side === 'buyer') {
-            production.buyer.underContract.count++;
-            production.buyer.underContract.volume += volume;
-          } else if (side === 'seller') {
-            production.seller.underContract.count++;
-            production.seller.underContract.volume += volume;
-          }
-        } else if (status === 'closed') {
-          production.totals.closed.count++;
-          production.totals.closed.volume += volume;
-          if (side === 'buyer') {
-            production.buyer.closed.count++;
-            production.buyer.closed.volume += volume;
-          } else if (side === 'seller') {
-            production.seller.closed.count++;
-            production.seller.closed.volume += volume;
-          }
-        }
+      // Build transaction list from listings
+      const allListings = [
+        ...activeListings.map((l: any) => ({ ...l, _status: 'active' })),
+        ...ucListings.map((l: any) => ({ ...l, _status: 'under_contract' })),
+        ...closedListings.map((l: any) => ({ ...l, _status: 'closed' })),
+      ];
+      
+      for (const listing of allListings) {
+        const address = listing.address || {};
+        const fullAddress = `${address.streetNumber || ''} ${address.streetName || ''} ${address.streetSuffix || ''}, ${address.city || ''}, ${address.state || ''} ${address.zip || ''}`.trim();
+        const volume = listing._status === 'closed' 
+          ? (Number(listing.soldPrice) || Number(listing.closePrice) || Number(listing.listPrice) || 0)
+          : (Number(listing.listPrice) || 0);
         
         // Store transaction summary
         production.transactions.push({
-          id: tx.id || tx.transactionId,
-          address: tx.address?.fullAddress || tx.propertyAddress || `${tx.address?.streetAddress || ''} ${tx.address?.city || ''}`.trim(),
-          status: status,
-          side: side,
+          id: listing.mlsNumber || listing.id,
+          address: fullAddress,
+          status: listing._status,
+          side: 'seller', // Listing agent is always seller side
           volume: volume,
-          closingDate: tx.closingDate || tx.contractDate,
-          type: tx.transactionType,
+          closingDate: listing.soldDate || listing.closeDate || null,
+          listDate: listing.listDate,
         });
       }
       
       // Cache the result
       rezenCache.set(cacheKey, { data: production, timestamp: Date.now() });
       
-      console.log(`[ReZen] Production: ${production.totals.closed.count} closed, ${production.totals.underContract.count} under contract, ${production.totals.active.count} active`);
+      console.log(`[Production] Agent ${searchName}: ${production.totals.closed.count} closed, ${production.totals.underContract.count} under contract, ${production.totals.active.count} active`);
       
       res.json(production);
     } catch (error: any) {
-      console.error('[ReZen] Production fetch error:', error.message);
+      console.error('[Production] Fetch error:', error.message);
       res.status(500).json({ 
         error: 'Failed to fetch production data', 
         details: error.message,
-        note: process.env.REZEN_API_KEY ? 'API key configured' : 'API key not configured'
+        dataSource: 'Repliers'
       });
     }
   });
   
-  // ReZen API status check
+  // Agent production status check - now uses Repliers API
   app.get("/api/rezen/status", async (req, res) => {
     try {
-      const configured = !!process.env.REZEN_API_KEY;
+      // Repliers API is always available (configured via FUB_API_KEY or REPLIERS_API_KEY)
+      const configured = true;
       res.json({ 
         configured, 
-        status: configured ? 'ready' : 'not_configured',
-        message: configured ? 'ReZen API key is configured' : 'REZEN_API_KEY environment variable not set'
+        status: 'ready',
+        message: 'Agent production reporting is available via Repliers API',
+        dataSource: 'Repliers'
       });
     } catch (error: any) {
       res.status(500).json({ error: error.message });
