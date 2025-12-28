@@ -188,8 +188,11 @@ export function CMAReport({
   
   // Horizontal scroll refs for carousel arrows
   const statsScrollRef = useRef<HTMLDivElement>(null);
+  const compareScrollRef = useRef<HTMLDivElement>(null);
   const [statsCanScrollLeft, setStatsCanScrollLeft] = useState(false);
   const [statsCanScrollRight, setStatsCanScrollRight] = useState(false);
+  const [compareCanScrollLeft, setCompareCanScrollLeft] = useState(false);
+  const [compareCanScrollRight, setCompareCanScrollRight] = useState(false);
   
   // Update scroll button visibility for Stats view
   const updateStatsScrollButtons = () => {
@@ -200,17 +203,40 @@ export function CMAReport({
     }
   };
   
+  // Update scroll button visibility for Compare view
+  const updateCompareScrollButtons = () => {
+    if (compareScrollRef.current) {
+      const { scrollLeft, scrollWidth, clientWidth } = compareScrollRef.current;
+      setCompareCanScrollLeft(scrollLeft > 5);
+      setCompareCanScrollRight(scrollLeft < scrollWidth - clientWidth - 5);
+    }
+  };
+  
   useEffect(() => {
     updateStatsScrollButtons();
-    const scrollEl = statsScrollRef.current;
-    if (scrollEl) {
-      scrollEl.addEventListener('scroll', updateStatsScrollButtons);
-      window.addEventListener('resize', updateStatsScrollButtons);
-      return () => {
-        scrollEl.removeEventListener('scroll', updateStatsScrollButtons);
-        window.removeEventListener('resize', updateStatsScrollButtons);
-      };
+    updateCompareScrollButtons();
+    const statsEl = statsScrollRef.current;
+    const compareEl = compareScrollRef.current;
+    
+    if (statsEl) {
+      statsEl.addEventListener('scroll', updateStatsScrollButtons);
     }
+    if (compareEl) {
+      compareEl.addEventListener('scroll', updateCompareScrollButtons);
+    }
+    window.addEventListener('resize', () => {
+      updateStatsScrollButtons();
+      updateCompareScrollButtons();
+    });
+    
+    return () => {
+      if (statsEl) {
+        statsEl.removeEventListener('scroll', updateStatsScrollButtons);
+      }
+      if (compareEl) {
+        compareEl.removeEventListener('scroll', updateCompareScrollButtons);
+      }
+    };
   }, [activeTab, properties]);
   
   const scrollStatsLeft = () => {
@@ -222,6 +248,18 @@ export function CMAReport({
   const scrollStatsRight = () => {
     if (statsScrollRef.current) {
       statsScrollRef.current.scrollBy({ left: 280, behavior: 'smooth' });
+    }
+  };
+  
+  const scrollCompareLeft = () => {
+    if (compareScrollRef.current) {
+      compareScrollRef.current.scrollBy({ left: -300, behavior: 'smooth' });
+    }
+  };
+  
+  const scrollCompareRight = () => {
+    if (compareScrollRef.current) {
+      compareScrollRef.current.scrollBy({ left: 300, behavior: 'smooth' });
     }
   };
   
@@ -884,8 +922,35 @@ export function CMAReport({
           })()}
 
           {/* Data Table - CloudCMA Style */}
-          <div className="bg-white dark:bg-zinc-950 rounded-b-lg overflow-hidden">
-            <Table>
+          <div className="bg-white dark:bg-zinc-950 rounded-b-lg relative">
+            {/* Left scroll arrow for table */}
+            {compareCanScrollLeft && (
+              <Button
+                variant="outline"
+                size="icon"
+                className="absolute left-2 top-1/2 -translate-y-1/2 z-10 bg-white/90 dark:bg-zinc-900/90 shadow-lg rounded-full h-10 w-10"
+                onClick={scrollCompareLeft}
+                data-testid="button-compare-scroll-left"
+              >
+                <ChevronLeft className="w-5 h-5" />
+              </Button>
+            )}
+            
+            {/* Right scroll arrow for table */}
+            {compareCanScrollRight && (
+              <Button
+                variant="outline"
+                size="icon"
+                className="absolute right-2 top-1/2 -translate-y-1/2 z-10 bg-white/90 dark:bg-zinc-900/90 shadow-lg rounded-full h-10 w-10"
+                onClick={scrollCompareRight}
+                data-testid="button-compare-scroll-right"
+              >
+                <ChevronRight className="w-5 h-5" />
+              </Button>
+            )}
+            
+            <div ref={compareScrollRef} className="overflow-x-auto scroll-smooth">
+              <Table>
               <TableHeader>
                 <TableRow className="bg-zinc-100 dark:bg-zinc-800">
                   <TableHead className="w-12"></TableHead>
@@ -1022,7 +1087,8 @@ export function CMAReport({
                   });
                 })()}
               </TableBody>
-            </Table>
+              </Table>
+            </div>
           </div>
         </TabsContent>
 
