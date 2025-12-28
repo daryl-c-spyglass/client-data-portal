@@ -199,6 +199,11 @@ export function CMABuilder({ onCreateCMA, initialData }: CMABuilderProps) {
   const [comparables, setComparables] = useState<Property[]>(initialData?.comparables || []);
   const searchSectionRef = useRef<HTMLDivElement>(null);
   
+  const [manualSubjectAddress, setManualSubjectAddress] = useState("");
+  const [manualSubjectCity, setManualSubjectCity] = useState("");
+  const [manualSubjectState, setManualSubjectState] = useState("");
+  const [manualSubjectZip, setManualSubjectZip] = useState("");
+  
   const [searchCity, setSearchCity] = useState(sc.city || "");
   const [searchSubdivision, setSearchSubdivision] = useState(sc.subdivision || "");
   const [searchZipCode, setSearchZipCode] = useState(sc.zipCode || "");
@@ -1347,14 +1352,19 @@ export function CMABuilder({ onCreateCMA, initialData }: CMABuilderProps) {
                   <Label>Search by Address</Label>
                   <AutocompleteInput
                     placeholder="Enter property address..."
-                    value=""
+                    value={manualSubjectAddress}
                     onChange={async (address) => {
+                      setManualSubjectAddress(address);
                       if (address.length > 5) {
                         try {
                           const res = await fetch(`/api/search?address=${encodeURIComponent(address)}&limit=1`);
                           const data = await res.json();
                           if (data.properties?.[0]) {
                             setSubjectProperty(data.properties[0]);
+                            setManualSubjectAddress("");
+                            setManualSubjectCity("");
+                            setManualSubjectState("");
+                            setManualSubjectZip("");
                           }
                         } catch (err) {
                           console.error('Address search error:', err);
@@ -1372,6 +1382,8 @@ export function CMABuilder({ onCreateCMA, initialData }: CMABuilderProps) {
                     <Input 
                       placeholder="City" 
                       className="h-8 text-xs"
+                      value={manualSubjectCity}
+                      onChange={(e) => setManualSubjectCity(e.target.value)}
                       data-testid="input-subject-city"
                     />
                   </div>
@@ -1380,6 +1392,8 @@ export function CMABuilder({ onCreateCMA, initialData }: CMABuilderProps) {
                     <Input 
                       placeholder="TX" 
                       className="h-8 text-xs"
+                      value={manualSubjectState}
+                      onChange={(e) => setManualSubjectState(e.target.value)}
                       data-testid="input-subject-state"
                     />
                   </div>
@@ -1388,10 +1402,64 @@ export function CMABuilder({ onCreateCMA, initialData }: CMABuilderProps) {
                     <Input 
                       placeholder="Zip" 
                       className="h-8 text-xs"
+                      value={manualSubjectZip}
+                      onChange={(e) => setManualSubjectZip(e.target.value)}
                       data-testid="input-subject-zip"
                     />
                   </div>
                 </div>
+                {manualSubjectAddress.trim() && (
+                  <Button
+                    variant="outline"
+                    className="w-full"
+                    onClick={() => {
+                      const manualProperty = {
+                        id: `manual-${Date.now()}`,
+                        listingId: `manual-${Date.now()}`,
+                        unparsedAddress: manualSubjectAddress.trim(),
+                        streetNumber: '',
+                        streetName: manualSubjectAddress.trim(),
+                        city: manualSubjectCity.trim() || 'Unknown',
+                        stateOrProvince: manualSubjectState.trim() || 'TX',
+                        postalCode: manualSubjectZip.trim() || '',
+                        latitude: null,
+                        longitude: null,
+                        listPrice: null,
+                        closePrice: null,
+                        originalListPrice: null,
+                        bedroomsTotal: null,
+                        bathroomsTotalInteger: null,
+                        livingArea: null,
+                        lotSizeAcres: null,
+                        lotSizeSquareFeet: null,
+                        yearBuilt: null,
+                        propertyType: 'Residential',
+                        propertySubType: null,
+                        standardStatus: 'Active',
+                        listingContractDate: null,
+                        closeDate: null,
+                        daysOnMarket: null,
+                        neighborhood: null,
+                        subdivision: null,
+                        subdivisionName: null,
+                        poolPrivateYn: null,
+                        garageSpaces: null,
+                        storiesTotal: null,
+                        elementarySchool: null,
+                        middleSchool: null,
+                        highSchool: null,
+                        publicRemarks: null,
+                        mlsNumber: null,
+                        virtualTourUrl: null,
+                      } as unknown as Property;
+                      setSubjectProperty(manualProperty);
+                    }}
+                    data-testid="button-use-manual-subject"
+                  >
+                    <Home className="w-4 h-4 mr-2" />
+                    Use This Address as Subject
+                  </Button>
+                )}
                 <div className="text-center text-muted-foreground">
                   <p className="text-xs mb-2">or</p>
                   <div 
@@ -1714,16 +1782,29 @@ export function CMABuilder({ onCreateCMA, initialData }: CMABuilderProps) {
                           >
                             Set as Subject
                           </Button>
-                          <Button
-                            size="sm"
-                            className="flex-1"
-                            onClick={() => handleAddComparable(property)}
-                            disabled={comparables.some(p => p.id === property.id) || comparables.length >= 15}
-                            data-testid={`button-add-comparable-${property.id}`}
-                          >
-                            <Plus className="w-3 h-3 mr-1" />
-                            Add
-                          </Button>
+                          {comparables.some(p => p.id === property.id) ? (
+                            <Button
+                              size="sm"
+                              variant="destructive"
+                              className="flex-1"
+                              onClick={() => handleRemoveComparable(property.id)}
+                              data-testid={`button-remove-comparable-${property.id}`}
+                            >
+                              <X className="w-3 h-3 mr-1" />
+                              Remove
+                            </Button>
+                          ) : (
+                            <Button
+                              size="sm"
+                              className="flex-1"
+                              onClick={() => handleAddComparable(property)}
+                              disabled={comparables.length >= 15}
+                              data-testid={`button-add-comparable-${property.id}`}
+                            >
+                              <Plus className="w-3 h-3 mr-1" />
+                              Add
+                            </Button>
+                          )}
                         </div>
                       </CardContent>
                     </div>
@@ -1900,18 +1981,33 @@ export function CMABuilder({ onCreateCMA, initialData }: CMABuilderProps) {
                         <Home className="w-4 h-4 mr-2" />
                         Set as Subject
                       </Button>
-                      <Button
-                        className="flex-1"
-                        onClick={() => {
-                          handleAddComparable(selectedProperty);
-                          setSelectedProperty(null);
-                        }}
-                        disabled={comparables.some(p => p.id === selectedProperty.id) || comparables.length >= 15}
-                        data-testid="button-dialog-add-comparable"
-                      >
-                        <Plus className="w-4 h-4 mr-2" />
-                        Add as Comparable
-                      </Button>
+                      {comparables.some(p => p.id === selectedProperty.id) ? (
+                        <Button
+                          variant="destructive"
+                          className="flex-1"
+                          onClick={() => {
+                            handleRemoveComparable(selectedProperty.id);
+                            setSelectedProperty(null);
+                          }}
+                          data-testid="button-dialog-remove-comparable"
+                        >
+                          <X className="w-4 h-4 mr-2" />
+                          Remove from Comparables
+                        </Button>
+                      ) : (
+                        <Button
+                          className="flex-1"
+                          onClick={() => {
+                            handleAddComparable(selectedProperty);
+                            setSelectedProperty(null);
+                          }}
+                          disabled={comparables.length >= 15}
+                          data-testid="button-dialog-add-comparable"
+                        >
+                          <Plus className="w-4 h-4 mr-2" />
+                          Add as Comparable
+                        </Button>
+                      )}
                     </div>
                   </div>
                 </ScrollArea>
