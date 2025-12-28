@@ -5,7 +5,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, Legend, ResponsiveContainer, LineChart, Line, ReferenceLine, ScatterChart, Scatter, ZAxis, Cell } from "recharts";
-import { Save, Edit, FileText, Printer, Info, Home, Mail, ChevronLeft, ChevronRight, Bed, Bath, Maximize, MapPin, Calendar, Map as MapIcon, ExternalLink, DollarSign, TrendingUp, Target, Zap, Clock, BarChart3 } from "lucide-react";
+import { Save, Edit, FileText, Printer, Info, Home, Mail, ChevronLeft, ChevronRight, Bed, Bath, Maximize, MapPin, Calendar, Map as MapIcon, ExternalLink, DollarSign, TrendingUp, Target, Zap, Clock, BarChart3, Menu, LayoutGrid, MoreHorizontal } from "lucide-react";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
 import { MapContainer, TileLayer, Marker, Popup, useMap } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
 import L from "leaflet";
@@ -135,6 +136,7 @@ interface CMAReportProps {
   visibleMetrics?: StatMetricKey[];
   notes?: string | null;
   reportTitle?: string;
+  subjectPropertyId?: string | null;
   onSave?: () => void;
   onShareCMA?: () => void;
   onPublicLink?: () => void;
@@ -155,6 +157,7 @@ export function CMAReport({
   visibleMetrics = ALL_METRICS,
   notes,
   reportTitle,
+  subjectPropertyId,
   onSave,
   onShareCMA,
   onPublicLink,
@@ -163,7 +166,7 @@ export function CMAReport({
   onAddNotes,
   onPrint
 }: CMAReportProps) {
-  const [activeTab, setActiveTab] = useState("home-averages");
+  const [activeTab, setActiveTab] = useState("compare");
   const [activeListingTab, setActiveListingTab] = useState("all");
   
   // Property exclusion state for Include All/Exclude All functionality
@@ -621,55 +624,630 @@ export function CMAReport({
         </Card>
       )}
 
-      {/* Main Tabs */}
+      {/* CloudCMA-Style Header Bar */}
+      <div className="bg-zinc-900 text-white rounded-t-lg print:hidden">
+        <div className="flex items-center justify-between px-4 py-3">
+          <div className="flex items-center gap-3">
+            {/* Menu for legacy tabs */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="icon" className="text-white hover:bg-white/10" data-testid="button-menu">
+                  <Menu className="w-5 h-5" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start">
+                <DropdownMenuItem onClick={() => setActiveTab("home-averages")} data-testid="menu-home-averages">
+                  <LayoutGrid className="w-4 h-4 mr-2" />
+                  Home Averages
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setActiveTab("listings")} data-testid="menu-listings">
+                  <MapIcon className="w-4 h-4 mr-2" />
+                  Listings
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setActiveTab("timeline")} data-testid="menu-timeline">
+                  <Clock className="w-4 h-4 mr-2" />
+                  Timeline
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setActiveTab("market-stats")} data-testid="menu-market-stats">
+                  <TrendingUp className="w-4 h-4 mr-2" />
+                  Market Stats
+                </DropdownMenuItem>
+                {onModifyStats && (
+                  <>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem onClick={onModifyStats} data-testid="menu-modify-stats">
+                      <Edit className="w-4 h-4 mr-2" />
+                      Modify Stats
+                    </DropdownMenuItem>
+                  </>
+                )}
+              </DropdownMenuContent>
+            </DropdownMenu>
+            <h2 className="text-lg font-semibold tracking-wide">
+              {includedAll.length} COMPARABLE HOMES
+            </h2>
+          </div>
+          <div className="flex items-center gap-1">
+            <Button
+              variant="ghost"
+              size="sm"
+              className={cn(
+                "text-white hover:bg-white/10",
+                activeTab === "compare" && "bg-white/20 text-primary"
+              )}
+              onClick={() => setActiveTab("compare")}
+              data-testid="tab-compare"
+            >
+              <BarChart3 className="w-4 h-4 mr-1.5" />
+              Compare
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              className={cn(
+                "text-white hover:bg-white/10",
+                activeTab === "map" && "bg-white/20 text-primary"
+              )}
+              onClick={() => setActiveTab("map")}
+              data-testid="tab-map"
+            >
+              <MapIcon className="w-4 h-4 mr-1.5" />
+              Map
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              className={cn(
+                "text-white hover:bg-white/10",
+                activeTab === "stats" && "bg-white/20 text-primary"
+              )}
+              onClick={() => setActiveTab("stats")}
+              data-testid="tab-stats"
+            >
+              <TrendingUp className="w-4 h-4 mr-1.5" />
+              Stats
+            </Button>
+          </div>
+        </div>
+      </div>
+
+      {/* Main Tabs - Hidden TabsList since we use the custom header */}
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="grid w-full grid-cols-4">
-          <TabsTrigger value="home-averages" data-testid="tab-home-averages" className="flex items-center gap-1">
-            Home Averages
-            <Tooltip>
-              <TooltipTrigger asChild onClick={(e) => e.stopPropagation()}>
-                <Info className="w-3 h-3 text-muted-foreground cursor-help" />
-              </TooltipTrigger>
-              <TooltipContent side="bottom" sideOffset={8} className="max-w-md z-50">
-                <p>Aggregated statistics including price, price per square foot, days on market, and property features across all comparable properties.</p>
-              </TooltipContent>
-            </Tooltip>
-          </TabsTrigger>
-          <TabsTrigger value="listings" data-testid="tab-listings" className="flex items-center gap-1">
-            <MapIcon className="w-4 h-4" />
-            Listings
-            <Tooltip>
-              <TooltipTrigger asChild onClick={(e) => e.stopPropagation()}>
-                <Info className="w-3 h-3 text-muted-foreground cursor-help" />
-              </TooltipTrigger>
-              <TooltipContent side="bottom" sideOffset={8} className="max-w-md z-50">
-                <p>Detailed breakdown of comparable properties with interactive map showing locations.</p>
-              </TooltipContent>
-            </Tooltip>
-          </TabsTrigger>
-          <TabsTrigger value="timeline" data-testid="tab-timeline" className="flex items-center gap-1">
-            Timeline
-            <Tooltip>
-              <TooltipTrigger asChild onClick={(e) => e.stopPropagation()}>
-                <Info className="w-3 h-3 text-muted-foreground cursor-help" />
-              </TooltipTrigger>
-              <TooltipContent side="bottom" sideOffset={8} className="max-w-md z-50">
-                <p>Visual chart showing property prices over time with status indicators to identify market trends.</p>
-              </TooltipContent>
-            </Tooltip>
-          </TabsTrigger>
-          <TabsTrigger value="market-stats" data-testid="tab-market-stats" className="flex items-center gap-1">
-            Market Stats
-            <Tooltip>
-              <TooltipTrigger asChild onClick={(e) => e.stopPropagation()}>
-                <Info className="w-3 h-3 text-muted-foreground cursor-help" />
-              </TooltipTrigger>
-              <TooltipContent side="bottom" sideOffset={8} className="max-w-md z-50">
-                <p>Key market indicators including average price, price per square foot, days on market, and list-to-sold ratio.</p>
-              </TooltipContent>
-            </Tooltip>
-          </TabsTrigger>
+        <TabsList className="hidden">
+          <TabsTrigger value="compare" data-testid="tab-compare-hidden">Compare</TabsTrigger>
+          <TabsTrigger value="map" data-testid="tab-map-hidden">Map</TabsTrigger>
+          <TabsTrigger value="stats" data-testid="tab-stats-hidden">Stats</TabsTrigger>
+          <TabsTrigger value="home-averages" data-testid="tab-home-averages">Home Averages</TabsTrigger>
+          <TabsTrigger value="listings" data-testid="tab-listings">Listings</TabsTrigger>
+          <TabsTrigger value="timeline" data-testid="tab-timeline">Timeline</TabsTrigger>
+          <TabsTrigger value="market-stats" data-testid="tab-market-stats">Market Stats</TabsTrigger>
         </TabsList>
+
+        {/* Compare Tab - CloudCMA Style Table View */}
+        <TabsContent value="compare" className="space-y-0 mt-0">
+          {/* Status Filter Sub-tabs */}
+          <div className="bg-zinc-800 px-4 py-2 flex items-center gap-4">
+            <Tabs value={activeListingTab} onValueChange={setActiveListingTab} className="w-auto">
+              <TabsList className="bg-transparent h-auto p-0 gap-2">
+                <TabsTrigger 
+                  value="all" 
+                  className="text-zinc-300 data-[state=active]:text-white data-[state=active]:bg-transparent data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none px-2 py-1"
+                  data-testid="compare-subtab-all"
+                >
+                  All
+                </TabsTrigger>
+                <TabsTrigger 
+                  value="sold" 
+                  className="text-zinc-300 data-[state=active]:text-white data-[state=active]:bg-transparent data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none px-2 py-1"
+                  data-testid="compare-subtab-closed"
+                >
+                  Closed
+                </TabsTrigger>
+                <TabsTrigger 
+                  value="under-contract" 
+                  className="text-zinc-300 data-[state=active]:text-white data-[state=active]:bg-transparent data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none px-2 py-1"
+                  data-testid="compare-subtab-auc"
+                >
+                  Active Under Contract
+                </TabsTrigger>
+                <TabsTrigger 
+                  value="pending" 
+                  className="text-zinc-300 data-[state=active]:text-white data-[state=active]:bg-transparent data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none px-2 py-1"
+                  data-testid="compare-subtab-pending"
+                >
+                  Pending
+                </TabsTrigger>
+                <TabsTrigger 
+                  value="active" 
+                  className="text-zinc-300 data-[state=active]:text-white data-[state=active]:bg-transparent data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none px-2 py-1"
+                  data-testid="compare-subtab-active"
+                >
+                  Active
+                </TabsTrigger>
+              </TabsList>
+            </Tabs>
+          </div>
+
+          {/* Summary Stats Bar - CloudCMA Style */}
+          {(() => {
+            const pendingProperties = properties.filter(p => p.standardStatus === 'Pending');
+            const filteredProps = (activeListingTab === 'all' ? allProperties :
+              activeListingTab === 'sold' ? soldProperties :
+              activeListingTab === 'under-contract' ? underContractProperties :
+              activeListingTab === 'pending' ? pendingProperties : activeProperties)
+              .filter(p => !excludedPropertyIds.has(p.id));
+            
+            if (filteredProps.length === 0) return null;
+            
+            const prices = filteredProps.map(p => {
+              const isSold = p.standardStatus === 'Closed';
+              return isSold 
+                ? (p.closePrice ? Number(p.closePrice) : (p.listPrice ? Number(p.listPrice) : 0))
+                : (p.listPrice ? Number(p.listPrice) : 0);
+            }).filter(p => p > 0).sort((a, b) => a - b);
+            
+            const avgPrice = prices.length > 0 ? prices.reduce((a, b) => a + b, 0) / prices.length : 0;
+            const minPrice = prices.length > 0 ? prices[0] : 0;
+            const maxPrice = prices.length > 0 ? prices[prices.length - 1] : 0;
+            const medianPrice = prices.length > 0 
+              ? prices.length % 2 === 0 
+                ? (prices[prices.length / 2 - 1] + prices[prices.length / 2]) / 2
+                : prices[Math.floor(prices.length / 2)]
+              : 0;
+            
+            // Calculate avg $/sqft and avg DOM
+            const pricesPerSqFt = filteredProps
+              .filter(p => p.livingArea && Number(p.livingArea) > 0)
+              .map(p => {
+                const isSold = p.standardStatus === 'Closed';
+                const price = isSold 
+                  ? (p.closePrice ? Number(p.closePrice) : Number(p.listPrice || 0))
+                  : Number(p.listPrice || 0);
+                return price / Number(p.livingArea);
+              });
+            const avgPricePerSqFt = pricesPerSqFt.length > 0 
+              ? pricesPerSqFt.reduce((a, b) => a + b, 0) / pricesPerSqFt.length 
+              : 0;
+            
+            const doms = filteredProps.map(p => p.daysOnMarket || 0).filter(d => d > 0);
+            const avgDOM = doms.length > 0 ? Math.round(doms.reduce((a, b) => a + b, 0) / doms.length) : 0;
+            
+            return (
+              <div className="bg-zinc-900 border-b border-zinc-700">
+                <div className="grid grid-cols-6 divide-x divide-zinc-700">
+                  <div className="px-4 py-3">
+                    <div className="text-xs text-zinc-400 uppercase tracking-wide">Low Price</div>
+                    <div className="text-xl font-bold text-white">${minPrice.toLocaleString()}</div>
+                  </div>
+                  <div className="px-4 py-3">
+                    <div className="text-xs text-zinc-400 uppercase tracking-wide">High Price</div>
+                    <div className="text-xl font-bold text-white">${maxPrice.toLocaleString()}</div>
+                  </div>
+                  <div className="px-4 py-3">
+                    <div className="text-xs text-zinc-400 uppercase tracking-wide">Average Price</div>
+                    <div className="text-xl font-bold text-white">${Math.round(avgPrice).toLocaleString()}</div>
+                  </div>
+                  <div className="px-4 py-3">
+                    <div className="text-xs text-zinc-400 uppercase tracking-wide">Median Price</div>
+                    <div className="text-xl font-bold text-white">${Math.round(medianPrice).toLocaleString()}</div>
+                  </div>
+                  <div className="px-4 py-3">
+                    <div className="text-xs text-zinc-400 uppercase tracking-wide">Avg $ / sq. ft</div>
+                    <div className="text-xl font-bold text-white">${Math.round(avgPricePerSqFt)} / sq. ft</div>
+                  </div>
+                  <div className="px-4 py-3">
+                    <div className="text-xs text-zinc-400 uppercase tracking-wide">Avg days on market</div>
+                    <div className="text-xl font-bold text-white">{avgDOM} Days</div>
+                  </div>
+                </div>
+              </div>
+            );
+          })()}
+
+          {/* Data Table - CloudCMA Style */}
+          <div className="bg-white dark:bg-zinc-950 rounded-b-lg overflow-hidden">
+            <Table>
+              <TableHeader>
+                <TableRow className="bg-zinc-100 dark:bg-zinc-800">
+                  <TableHead className="w-12"></TableHead>
+                  <TableHead className="min-w-[250px]">ADDRESS</TableHead>
+                  <TableHead>STATUS</TableHead>
+                  <TableHead className="text-right">PRICE</TableHead>
+                  <TableHead className="text-right">SOLD DATE</TableHead>
+                  <TableHead className="text-right">$/SQ.FT</TableHead>
+                  <TableHead className="text-right">DOM</TableHead>
+                  <TableHead className="text-right">BEDS</TableHead>
+                  <TableHead className="text-right">BATHS</TableHead>
+                  <TableHead className="text-right">SQ. FT.</TableHead>
+                  <TableHead className="text-right">LOT SIZE</TableHead>
+                  <TableHead className="text-right">GARAGE SPACES</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {(() => {
+                  const pendingProperties = properties.filter(p => p.standardStatus === 'Pending');
+                  const filteredProps = activeListingTab === 'all' ? allProperties :
+                    activeListingTab === 'sold' ? soldProperties :
+                    activeListingTab === 'under-contract' ? underContractProperties :
+                    activeListingTab === 'pending' ? pendingProperties : activeProperties;
+                  
+                  const sortedProps = [...filteredProps].sort((a, b) => {
+                    const priceA = a.standardStatus === 'Closed' 
+                      ? (a.closePrice ? Number(a.closePrice) : Number(a.listPrice || 0))
+                      : Number(a.listPrice || 0);
+                    const priceB = b.standardStatus === 'Closed'
+                      ? (b.closePrice ? Number(b.closePrice) : Number(b.listPrice || 0))
+                      : Number(b.listPrice || 0);
+                    return priceA - priceB;
+                  });
+                  
+                  if (sortedProps.length === 0) {
+                    return (
+                      <TableRow>
+                        <TableCell colSpan={12} className="text-center py-8 text-muted-foreground">
+                          No properties in this category
+                        </TableCell>
+                      </TableRow>
+                    );
+                  }
+                  
+                  return sortedProps.map((property) => {
+                    const isExcluded = excludedPropertyIds.has(property.id);
+                    const isSold = property.standardStatus === 'Closed';
+                    const price = isSold 
+                      ? (property.closePrice ? Number(property.closePrice) : Number(property.listPrice || 0))
+                      : Number(property.listPrice || 0);
+                    const pricePerSqft = property.livingArea && Number(property.livingArea) > 0 
+                      ? Math.round(price / Number(property.livingArea))
+                      : null;
+                    const lotSizeSqFt = property.lotSizeSquareFeet ? Number(property.lotSizeSquareFeet) : null;
+                    
+                    const statusColors: Record<string, string> = {
+                      'Active': 'text-green-600',
+                      'Closed': 'text-red-600',
+                      'Active Under Contract': 'text-yellow-600',
+                      'Pending': 'text-orange-600',
+                    };
+                    
+                    return (
+                      <TableRow 
+                        key={property.id}
+                        className={cn(
+                          "cursor-pointer hover-elevate",
+                          isExcluded && "opacity-40"
+                        )}
+                        onClick={() => handlePropertyClick(property)}
+                        data-testid={`compare-row-${property.id}`}
+                      >
+                        <TableCell>
+                          <div 
+                            className={cn(
+                              "w-8 h-4 rounded-full cursor-pointer transition-colors",
+                              isExcluded ? "bg-zinc-300 dark:bg-zinc-600" : "bg-primary"
+                            )}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setExcludedPropertyIds(prev => {
+                                const next = new Set(prev);
+                                if (next.has(property.id)) {
+                                  next.delete(property.id);
+                                } else {
+                                  next.add(property.id);
+                                }
+                                return next;
+                              });
+                            }}
+                            data-testid={`toggle-${property.id}`}
+                          />
+                        </TableCell>
+                        <TableCell className="font-medium">
+                          <div className="flex flex-col">
+                            <span className="truncate max-w-[220px]">{property.unparsedAddress}</span>
+                            <span className="text-xs text-muted-foreground">
+                              {property.city}, {property.stateOrProvince} {property.postalCode}
+                            </span>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <span className={cn("font-medium text-sm", statusColors[property.standardStatus || ''] || '')}>
+                            {property.standardStatus}
+                          </span>
+                        </TableCell>
+                        <TableCell className="text-right font-semibold">
+                          ${price.toLocaleString()}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          {isSold && property.closeDate 
+                            ? new Date(property.closeDate).toLocaleDateString('en-US', { month: 'numeric', day: 'numeric', year: '2-digit' })
+                            : '-'}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          {pricePerSqft ? `$${pricePerSqft}` : '-'}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          {property.daysOnMarket || '-'}
+                        </TableCell>
+                        <TableCell className="text-right">{property.bedroomsTotal || '-'}</TableCell>
+                        <TableCell className="text-right">{property.bathroomsTotalInteger || '-'}</TableCell>
+                        <TableCell className="text-right">
+                          {property.livingArea ? Number(property.livingArea).toLocaleString() : '-'}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          {lotSizeSqFt ? lotSizeSqFt.toLocaleString() : '-'}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          {(property as any).garageSpaces || '-'}
+                        </TableCell>
+                      </TableRow>
+                    );
+                  });
+                })()}
+              </TableBody>
+            </Table>
+          </div>
+        </TabsContent>
+
+        {/* Map Tab - CloudCMA Style Full-width Map */}
+        <TabsContent value="map" className="space-y-0 mt-0">
+          <div className="h-[600px] rounded-b-lg overflow-hidden">
+            {(() => {
+              const validPositions = properties
+                .filter(p => p.latitude && p.longitude && !excludedPropertyIds.has(p.id))
+                .map(p => [Number(p.latitude), Number(p.longitude)] as [number, number]);
+              
+              if (validPositions.length === 0) {
+                return (
+                  <div className="h-full flex items-center justify-center bg-muted">
+                    <p className="text-muted-foreground">No properties with valid coordinates</p>
+                  </div>
+                );
+              }
+              
+              const center = validPositions.reduce(
+                (acc, pos) => [acc[0] + pos[0] / validPositions.length, acc[1] + pos[1] / validPositions.length],
+                [0, 0]
+              ) as [number, number];
+              
+              return (
+                <MapContainer
+                  center={center}
+                  zoom={13}
+                  style={{ height: '100%', width: '100%' }}
+                >
+                  <TileLayer
+                    url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                    attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+                  />
+                  <FitBounds positions={validPositions} />
+                  {properties
+                    .filter(p => p.latitude && p.longitude && !excludedPropertyIds.has(p.id))
+                    .map((property) => {
+                      const isSold = property.standardStatus === 'Closed';
+                      const price = isSold 
+                        ? (property.closePrice ? Number(property.closePrice) : Number(property.listPrice || 0))
+                        : Number(property.listPrice || 0);
+                      
+                      return (
+                        <Marker
+                          key={property.id}
+                          position={[Number(property.latitude), Number(property.longitude)]}
+                          icon={getPriceMarkerIcon(price, property.standardStatus || 'Active')}
+                          eventHandlers={{
+                            click: () => handlePropertyClick(property),
+                          }}
+                        >
+                          <Popup>
+                            <div className="min-w-[200px]">
+                              <p className="font-semibold">{property.unparsedAddress}</p>
+                              <p className="text-lg font-bold text-primary">${price.toLocaleString()}</p>
+                              <p className="text-sm text-muted-foreground">
+                                {property.bedroomsTotal} beds | {property.bathroomsTotalInteger} baths | {property.livingArea ? Number(property.livingArea).toLocaleString() : 'N/A'} sqft
+                              </p>
+                              <Badge variant="outline" className="mt-1">{property.standardStatus}</Badge>
+                            </div>
+                          </Popup>
+                        </Marker>
+                      );
+                    })}
+                </MapContainer>
+              );
+            })()}
+          </div>
+        </TabsContent>
+
+        {/* Stats Tab - CloudCMA Style Side-by-Side Comparison Cards */}
+        <TabsContent value="stats" className="space-y-0 mt-0">
+          <div className="bg-white dark:bg-zinc-950 rounded-b-lg p-4">
+            <div className="flex gap-4 overflow-x-auto pb-4">
+              {(() => {
+                // Find the actual subject property using subjectPropertyId prop
+                const subjectProp = subjectPropertyId 
+                  ? properties.find(p => p.id === subjectPropertyId)
+                  : null;
+                
+                // Get non-subject properties (comps)
+                const compProps = properties
+                  .filter(p => !excludedPropertyIds.has(p.id) && p.id !== subjectPropertyId)
+                  .sort((a, b) => {
+                    const priceA = a.standardStatus === 'Closed' 
+                      ? (a.closePrice ? Number(a.closePrice) : Number(a.listPrice || 0))
+                      : Number(a.listPrice || 0);
+                    const priceB = b.standardStatus === 'Closed'
+                      ? (b.closePrice ? Number(b.closePrice) : Number(b.listPrice || 0))
+                      : Number(b.listPrice || 0);
+                    return priceA - priceB;
+                  });
+                
+                // Combine: subject first, then sorted comps
+                const displayProps = subjectProp 
+                  ? [subjectProp, ...compProps] 
+                  : compProps;
+                
+                if (displayProps.length === 0) {
+                  return (
+                    <div className="w-full text-center py-8 text-muted-foreground">
+                      No properties to compare
+                    </div>
+                  );
+                }
+                
+                // Use actual subject property for comparison (or first comp if no subject)
+                const referenceProperty = subjectProp || displayProps[0];
+                const subjectBeds = referenceProperty.bedroomsTotal || 0;
+                const subjectBaths = referenceProperty.bathroomsTotalInteger || 0;
+                const subjectSqFt = Number(referenceProperty.livingArea || 0);
+                const subjectLotSize = Number(referenceProperty.lotSizeSquareFeet || 0);
+                const subjectGarage = Number((referenceProperty as any).garageSpaces || 0);
+                
+                return displayProps.map((property) => {
+                  const photos = getPropertyPhotos(property);
+                  const primaryPhoto = photos[0];
+                  const isSold = property.standardStatus === 'Closed';
+                  const price = isSold 
+                    ? (property.closePrice ? Number(property.closePrice) : Number(property.listPrice || 0))
+                    : Number(property.listPrice || 0);
+                  
+                  const beds = property.bedroomsTotal || 0;
+                  const baths = property.bathroomsTotalInteger || 0;
+                  const sqft = Number(property.livingArea || 0);
+                  const lotSize = Number(property.lotSizeSquareFeet || 0);
+                  const garage = Number((property as any).garageSpaces || 0);
+                  
+                  // Calculate differences from subject
+                  const bedsDiff = beds - subjectBeds;
+                  const sqftDiff = subjectSqFt > 0 ? ((sqft - subjectSqFt) / subjectSqFt * 100) : 0;
+                  const lotDiff = subjectLotSize > 0 ? ((lotSize - subjectLotSize) / subjectLotSize * 100) : 0;
+                  const garageDiff = garage - subjectGarage;
+                  
+                  const isSubject = subjectPropertyId ? property.id === subjectPropertyId : false;
+                  
+                  const statusColors: Record<string, string> = {
+                    'Active': 'bg-green-500',
+                    'Closed': 'bg-red-500',
+                    'Active Under Contract': 'bg-yellow-500',
+                    'Pending': 'bg-orange-500',
+                  };
+                  
+                  return (
+                    <div 
+                      key={property.id}
+                      className="flex-shrink-0 w-64 bg-card border rounded-lg overflow-hidden cursor-pointer hover-elevate"
+                      onClick={() => handlePropertyClick(property)}
+                      data-testid={`stats-card-${property.id}`}
+                    >
+                      {/* Photo */}
+                      <div className="relative h-36">
+                        {primaryPhoto ? (
+                          <img src={primaryPhoto} alt={property.unparsedAddress || ''} className="w-full h-full object-cover" />
+                        ) : (
+                          <div className="w-full h-full bg-muted flex items-center justify-center">
+                            <Home className="w-8 h-8 text-muted-foreground/50" />
+                          </div>
+                        )}
+                        {isSubject && (
+                          <div className="absolute top-2 right-2 bg-primary text-primary-foreground text-xs px-2 py-1 rounded">
+                            Subject
+                          </div>
+                        )}
+                      </div>
+                      
+                      {/* Details */}
+                      <div className="p-3">
+                        <div className="flex items-start justify-between gap-2 mb-1">
+                          <h4 className="font-bold text-sm truncate">{property.unparsedAddress?.toUpperCase()}</h4>
+                          <span className="font-bold text-primary">${price.toLocaleString()}</span>
+                        </div>
+                        <p className="text-xs text-muted-foreground mb-2">
+                          {property.city}, {property.stateOrProvince} {property.postalCode}
+                        </p>
+                        <Badge className={cn("text-xs text-white", statusColors[property.standardStatus || ''] || 'bg-gray-500')}>
+                          {property.standardStatus}
+                        </Badge>
+                        
+                        <Separator className="my-3" />
+                        
+                        {/* Comparison Stats */}
+                        <div className="space-y-2 text-sm">
+                          <div className="flex justify-between">
+                            <span className="text-muted-foreground">Beds</span>
+                            <span className="font-medium">
+                              {beds}
+                              {!isSubject && bedsDiff !== 0 && (
+                                <span className={cn("ml-1 text-xs", bedsDiff > 0 ? "text-green-600" : "text-red-600")}>
+                                  {bedsDiff > 0 ? `+${bedsDiff}` : bedsDiff}
+                                </span>
+                              )}
+                            </span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-muted-foreground">Baths</span>
+                            <span className="font-medium">{baths}</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-muted-foreground">Sq. Ft. (Living Area)</span>
+                            <span className="font-medium">
+                              {sqft.toLocaleString()}
+                              {!isSubject && sqftDiff !== 0 && (
+                                <span className={cn("ml-1 text-xs", sqftDiff > 0 ? "text-green-600" : "text-red-600")}>
+                                  {sqftDiff > 0 ? "+" : ""}{sqftDiff.toFixed(1)}%
+                                </span>
+                              )}
+                            </span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-muted-foreground">Lot Size</span>
+                            <span className="font-medium">
+                              {lotSize.toLocaleString()}
+                              {!isSubject && lotDiff !== 0 && (
+                                <span className={cn("ml-1 text-xs", lotDiff > 0 ? "text-green-600" : "text-red-600")}>
+                                  {lotDiff > 0 ? "+" : ""}{lotDiff.toFixed(0)}%
+                                </span>
+                              )}
+                            </span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-muted-foreground">Garage Spaces</span>
+                            <span className="font-medium">
+                              {garage}
+                              {!isSubject && garageDiff !== 0 && (
+                                <span className={cn("ml-1 text-xs", garageDiff > 0 ? "text-green-600" : "text-red-600")}>
+                                  {garageDiff > 0 ? `+${garageDiff}` : garageDiff}
+                                </span>
+                              )}
+                            </span>
+                          </div>
+                        </div>
+                        
+                        <Separator className="my-3" />
+                        
+                        {/* Listing Details */}
+                        <div className="space-y-1 text-sm">
+                          <h5 className="font-semibold text-xs text-muted-foreground uppercase">Listing Details</h5>
+                          <div className="flex justify-between">
+                            <span className="text-muted-foreground">Orig. Price</span>
+                            <span className="font-medium">
+                              ${((property as any).originalListPrice ? Number((property as any).originalListPrice) : price).toLocaleString()}
+                            </span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-muted-foreground">List Price</span>
+                            <span className="font-medium">${Number(property.listPrice || 0).toLocaleString()}</span>
+                          </div>
+                          {isSold && property.closePrice && (
+                            <div className="flex justify-between">
+                              <span className="text-muted-foreground">Sold Price</span>
+                              <span className="font-medium">${Number(property.closePrice).toLocaleString()}</span>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                });
+              })()}
+            </div>
+          </div>
+        </TabsContent>
 
         {/* Home Averages Tab */}
         <TabsContent value="home-averages" className="space-y-6">

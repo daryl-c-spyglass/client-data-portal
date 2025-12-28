@@ -577,6 +577,7 @@ export default function CMADetailPage() {
         visibleMetrics={visibleMetrics}
         notes={cma.notes}
         reportTitle={cma.name}
+        subjectPropertyId={cma.subjectPropertyId}
         onSave={handleSave}
         onShareCMA={() => setEmailShareDialogOpen(true)}
         onPublicLink={async () => {
