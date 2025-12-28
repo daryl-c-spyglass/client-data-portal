@@ -671,14 +671,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
             latitude: toNumber(map.latitude ?? listing.latitude),
             longitude: toNumber(map.longitude ?? listing.longitude),
             photos: photos,
-            // CRITICAL: Repliers "neighborhood" field = subdivision (tract label), NOT geographic neighborhood
-            // Extended fallback chain for Closed listings which may store subdivision in different fields
-            subdivision: addr.neighborhood || listing.subdivisionName || listing.subdivision || 
-                        (listing.raw?.SubdivisionName) || (listing.raw?.Subdivision) || 
-                        details.subdivision || (details as any).SubdivisionName || null,
-            subdivisionName: addr.neighborhood || listing.subdivisionName || listing.subdivision || 
-                            (listing.raw?.SubdivisionName) || (listing.raw?.Subdivision) || 
-                            details.subdivision || (details as any).SubdivisionName || null,
+            // RESO-COMPLIANT: Prioritize raw SubdivisionName field first, neighborhood only as last resort
+            // Raw data contains original RESO field names from the MLS
+            subdivision: (() => {
+              // Priority 1: Raw RESO fields
+              const rawSub = listing.raw?.SubdivisionName || listing.raw?.Subdivision;
+              if (rawSub && rawSub !== 'N/A' && rawSub.trim()) return rawSub;
+              // Priority 2: Structured subdivision fields
+              const structured = listing.subdivisionName || listing.subdivision || details.subdivision || (details as any).SubdivisionName;
+              if (structured && structured !== 'N/A' && structured.trim()) return structured;
+              // Priority 3: Neighborhood as fallback only (some MLS incorrectly maps here)
+              const nbhd = addr.neighborhood || listing.neighborhood;
+              if (nbhd && nbhd !== 'N/A' && nbhd.trim()) return nbhd;
+              return null;
+            })(),
+            subdivisionName: (() => {
+              const rawSub = listing.raw?.SubdivisionName || listing.raw?.Subdivision;
+              if (rawSub && rawSub !== 'N/A' && rawSub.trim()) return rawSub;
+              const structured = listing.subdivisionName || listing.subdivision || details.subdivision || (details as any).SubdivisionName;
+              if (structured && structured !== 'N/A' && structured.trim()) return structured;
+              const nbhd = addr.neighborhood || listing.neighborhood;
+              if (nbhd && nbhd !== 'N/A' && nbhd.trim()) return nbhd;
+              return null;
+            })(),
             neighborhood: null,  // MUST be resolved from boundary polygons, never from listing data
             daysOnMarket: toNumber(listing.daysOnMarket),
             cumulativeDaysOnMarket: toNumber(listing.cumulativeDaysOnMarket) || toNumber(listing.daysOnMarket),

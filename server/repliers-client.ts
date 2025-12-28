@@ -621,10 +621,24 @@ class RepliersClient {
     const state = address.state || listing.stateOrProvince;
     const zip = address.zip || listing.postalCode;
     const country = address.country || listing.country;
-    // CRITICAL: In Repliers API, "neighborhood" field is actually the SUBDIVISION (tract/community label)
-    // True "neighborhood" must come from boundary polygon resolution, NOT from listing data
-    // Repliers uses "neighborhood" to mean subdivision - map it correctly
-    const subdivisionFromRepliers = address.neighborhood || listing.neighborhood || address.subdivisionName || listing.subdivisionName || details.subdivision;
+    // RESO-COMPLIANT: Prioritize proper SubdivisionName field from raw data first
+    // Only fall back to neighborhood field if SubdivisionName is missing/empty/"N/A"
+    // Raw data fields take priority since they contain the original RESO field names
+    const rawSubdivisionName = listing.raw?.SubdivisionName || listing.raw?.Subdivision;
+    const hasValidRawSubdivision = rawSubdivisionName && rawSubdivisionName !== 'N/A' && rawSubdivisionName.trim() !== '';
+    
+    // Check structured fields next
+    const structuredSubdivision = address.subdivisionName || listing.subdivisionName || details.subdivision;
+    const hasValidStructured = structuredSubdivision && structuredSubdivision !== 'N/A' && structuredSubdivision.trim() !== '';
+    
+    // Only use neighborhood as last resort (some MLS data incorrectly maps subdivision to neighborhood)
+    const neighborhoodFallback = address.neighborhood || listing.neighborhood;
+    const hasValidNeighborhood = neighborhoodFallback && neighborhoodFallback !== 'N/A' && neighborhoodFallback.trim() !== '';
+    
+    // Priority: raw SubdivisionName > structured subdivision > neighborhood fallback
+    const subdivisionFromRepliers = hasValidRawSubdivision ? rawSubdivisionName : 
+                                    (hasValidStructured ? structuredSubdivision : 
+                                    (hasValidNeighborhood ? neighborhoodFallback : null));
     // Do NOT set neighborhood from listing data - it must be resolved from boundaries only
     
     const latitude = map.latitude ?? listing.latitude;
