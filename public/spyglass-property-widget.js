@@ -795,13 +795,6 @@
           <div class="spyglass-filters">
             <div class="spyglass-filters-row">
               <div class="spyglass-filter-group">
-                <label>Transaction</label>
-                <div class="spyglass-toggle-group">
-                  <button class="spyglass-toggle-btn active" data-filter="type" data-value="sale">For Sale</button>
-                  <button class="spyglass-toggle-btn" data-filter="type" data-value="lease">For Lease</button>
-                </div>
-              </div>
-              <div class="spyglass-filter-group">
                 <label>Status</label>
                 <select id="${p}-status">
                   <option value="Active">Active</option>
@@ -927,20 +920,6 @@
         }
       });
 
-      // Toggle buttons (sale/lease)
-      this.container.querySelectorAll('.spyglass-toggle-btn').forEach(btn => {
-        btn.addEventListener('click', (e) => {
-          const filter = e.target.dataset.filter;
-          const value = e.target.dataset.value;
-          
-          // Update active state
-          e.target.parentElement.querySelectorAll('.spyglass-toggle-btn').forEach(b => b.classList.remove('active'));
-          e.target.classList.add('active');
-          
-          this.state.filters[filter] = value;
-        });
-      });
-
       // View toggle
       this.container.querySelectorAll('.spyglass-view-btn').forEach(btn => {
         btn.addEventListener('click', (e) => {
@@ -1007,7 +986,7 @@
       params.append('limit', this.options.resultsPerPage);
 
       if (this.state.filters.status) params.append('status', this.state.filters.status);
-      if (this.state.filters.type) params.append('type', this.state.filters.type);
+      params.append('type', 'sale');
       if (this.state.filters.minPrice) params.append('minPrice', this.state.filters.minPrice);
       if (this.state.filters.maxPrice) params.append('maxPrice', this.state.filters.maxPrice);
       if (this.state.filters.beds) params.append('beds', this.state.filters.beds);
@@ -1345,7 +1324,6 @@
           ` : ''}
           <div class="spyglass-modal-cta">
             <button class="spyglass-btn-primary" onclick="window.open('mailto:info@spyglassrealty.com?subject=Inquiry about ${encodeURIComponent(property.streetAddress || 'Property')}', '_blank')">Contact Agent</button>
-            <button class="spyglass-btn-secondary" onclick="window.open('https://spyglassrealty.com/property/${this.escapeHtml(String(property.listingId))}', '_blank')">View on Website</button>
           </div>
         </div>
       `;
