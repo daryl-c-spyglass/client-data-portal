@@ -282,10 +282,11 @@ export class HomeReviewClient {
 
       // Fetch more than requested to allow for server-side filtering
       // since HomeReview API may not filter all location fields correctly
-      // If postal codes are specified, we need to fetch more to find matches
+      // If postal codes or schools are specified, we need to fetch more to find matches
       const hasLocationFilter = params.postalCodes?.length || params.cities?.length || params.subdivisions?.length;
-      const fetchLimit = hasLocationFilter 
-        ? Math.min(500, (params.limit || 50) * 10)  // Fetch more for location filtering
+      const hasSchoolFilter = params.elementarySchools?.length || params.middleSchools?.length || params.highSchools?.length;
+      const fetchLimit = (hasLocationFilter || hasSchoolFilter)
+        ? Math.min(500, (params.limit || 50) * 10)  // Fetch more for location/school filtering
         : Math.min(200, (params.limit || 50) * 4);
       queryParams.set('limit', fetchLimit.toString());
       
@@ -317,6 +318,73 @@ export class HomeReviewClient {
         properties = properties.filter(p => 
           lowerSubdivs.some(s => (p.subdivisionName || '').toLowerCase().includes(s))
         );
+      }
+      
+      // Normalize school name for exact matching
+      const normalizeSchoolName = (name: string | undefined): string => {
+        if (!name) return '';
+        return name
+          .toLowerCase()
+          .trim()
+          .replace(/\s+/g, ' ')
+          .replace(/elem\.?$/i, 'elementary')
+          .replace(/el\.?$/i, 'elementary')
+          .replace(/middle or jr\.?$/i, 'middle')
+          .replace(/jr\.?\s*high/i, 'junior high')
+          .replace(/h\.?s\.?$/i, 'high school')
+          .replace(/[^a-z0-9\s]/g, '');
+      };
+      
+      // Apply server-side exact-match filtering for elementary schools
+      // Filter out empty/whitespace-only values first
+      const validElementarySchools = params.elementarySchools?.filter(s => s && s.trim().length > 0) || [];
+      if (validElementarySchools.length > 0) {
+        const normalizedSearchSchools = validElementarySchools.map(s => normalizeSchoolName(s)).filter(s => s.length > 0);
+        if (normalizedSearchSchools.length > 0) {
+          const beforeCount = properties.length;
+          properties = properties.filter(p => {
+            const propSchool = normalizeSchoolName(p.elementarySchool);
+            if (!propSchool) return false; // Property must have a school to match
+            return normalizedSearchSchools.some(searchSchool => 
+              propSchool === searchSchool || propSchool.includes(searchSchool) || searchSchool.includes(propSchool)
+            );
+          });
+          console.log(`[HomeReview] Elementary school filter: ${beforeCount} -> ${properties.length} (looking for: ${validElementarySchools.join(', ')})`);
+        }
+      }
+      
+      // Apply server-side exact-match filtering for middle schools
+      const validMiddleSchools = params.middleSchools?.filter(s => s && s.trim().length > 0) || [];
+      if (validMiddleSchools.length > 0) {
+        const normalizedSearchSchools = validMiddleSchools.map(s => normalizeSchoolName(s)).filter(s => s.length > 0);
+        if (normalizedSearchSchools.length > 0) {
+          const beforeCount = properties.length;
+          properties = properties.filter(p => {
+            const propSchool = normalizeSchoolName(p.middleOrJuniorSchool);
+            if (!propSchool) return false;
+            return normalizedSearchSchools.some(searchSchool => 
+              propSchool === searchSchool || propSchool.includes(searchSchool) || searchSchool.includes(propSchool)
+            );
+          });
+          console.log(`[HomeReview] Middle school filter: ${beforeCount} -> ${properties.length} (looking for: ${validMiddleSchools.join(', ')})`);
+        }
+      }
+      
+      // Apply server-side exact-match filtering for high schools
+      const validHighSchools = params.highSchools?.filter(s => s && s.trim().length > 0) || [];
+      if (validHighSchools.length > 0) {
+        const normalizedSearchSchools = validHighSchools.map(s => normalizeSchoolName(s)).filter(s => s.length > 0);
+        if (normalizedSearchSchools.length > 0) {
+          const beforeCount = properties.length;
+          properties = properties.filter(p => {
+            const propSchool = normalizeSchoolName(p.highSchool);
+            if (!propSchool) return false;
+            return normalizedSearchSchools.some(searchSchool => 
+              propSchool === searchSchool || propSchool.includes(searchSchool) || searchSchool.includes(propSchool)
+            );
+          });
+          console.log(`[HomeReview] High school filter: ${beforeCount} -> ${properties.length} (looking for: ${validHighSchools.join(', ')})`);
+        }
       }
       
       // Apply requested limit after filtering

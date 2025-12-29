@@ -1925,17 +1925,39 @@ export function CMABuilder({ onCreateCMA, initialData }: CMABuilderProps) {
                         
                         <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-muted-foreground">
                           <span>{property.bedroomsTotal || 0} beds</span>
-                          <span>{property.bathroomsTotalInteger || 0} baths</span>
+                          <span>{property.bathroomsFull || property.bathroomsTotalInteger || 0}F/{property.bathroomsHalf || 0}H baths</span>
                           {property.livingArea && (
                             <span>{Number(property.livingArea).toLocaleString()} sqft</span>
                           )}
+                          {property.yearBuilt && <span>Built {property.yearBuilt}</span>}
                         </div>
                         
-                        {/* Date display based on status */}
+                        {/* Additional details row */}
+                        <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-muted-foreground">
+                          {property.garageParkingSpaces !== null && property.garageParkingSpaces !== undefined && property.garageParkingSpaces > 0 && (
+                            <span>{property.garageParkingSpaces} garage</span>
+                          )}
+                          {property.lotSizeAcres && Number(property.lotSizeAcres) > 0 && (
+                            <span>{Number(property.lotSizeAcres).toFixed(2)} acres</span>
+                          )}
+                          {property.storiesTotal && Number(property.storiesTotal) > 0 && (
+                            <span>{property.storiesTotal} story</span>
+                          )}
+                          {property.daysOnMarket !== null && property.daysOnMarket !== undefined && (
+                            <span>{property.daysOnMarket} DOM</span>
+                          )}
+                        </div>
+                        
+                        {/* Date and close price display based on status */}
                         <div className="flex flex-wrap gap-x-2 gap-y-1 text-xs text-muted-foreground">
                           {listingDate && <span>Listed: {listingDate}</span>}
                           {property.standardStatus === 'Closed' && property.closeDate && (
-                            <span>• Closed: {new Date(property.closeDate).toLocaleDateString()}</span>
+                            <span>Closed: {new Date(property.closeDate).toLocaleDateString()}</span>
+                          )}
+                          {property.standardStatus === 'Closed' && property.closePrice && (
+                            <span className="font-medium text-foreground">
+                              Close: ${Number(property.closePrice).toLocaleString()}
+                            </span>
                           )}
                         </div>
                         
