@@ -557,7 +557,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
             const addr = l.address || {};
             const propNeighborhood = (addr.neighborhood || '').toLowerCase();
             const propSubdiv = (l.subdivision || l.raw?.subdivision || l.raw?.SubdivisionName || '').toLowerCase();
-            return propNeighborhood.includes(subdivisionLowerCheck) || propSubdiv.includes(subdivisionLowerCheck);
+            // Also check if street address contains subdivision name
+            const fullAddress = (addr.unparsedAddress || addr.streetAddress || l.unparsedAddress || '').toLowerCase();
+            return propNeighborhood.includes(subdivisionLowerCheck) || propSubdiv.includes(subdivisionLowerCheck) || fullAddress.includes(subdivisionLowerCheck);
           });
           
           if (potentialMatches.length >= TARGET_MATCHES) {
@@ -976,11 +978,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
             const propSubdivName = (p.subdivisionName || '').toLowerCase().trim();
             // CRITICAL: Also check neighborhood field - Repliers stores subdivision info there for Active listings
             const propNeighborhood = (p.neighborhood || '').toLowerCase().trim();
+            // CRITICAL: Also check street address - MLS data sometimes has subdivision name in street (e.g., "904 OAKLANDS Dr")
+            const propAddress = (p.address || p.unparsedAddress || '').toLowerCase().trim();
             
             // Stricter matching logic:
             // 1. Exact match (case-insensitive)
             // 2. Property subdivision STARTS WITH search term (e.g., "Barton Hills" matches "Barton Hills West")
             // 3. All search term words appear in the subdivision (e.g., "Barton Hills" matches "Barton Hills Section 2")
+            // 4. Street address contains the search term (e.g., "904 Oaklands Dr" matches "oaklands")
             
             const exactMatch = propSubdiv === subdivisionLower || propSubdivName === subdivisionLower || propNeighborhood === subdivisionLower;
             const startsWithMatch = propSubdiv.startsWith(subdivisionLower) || propSubdivName.startsWith(subdivisionLower) || propNeighborhood.startsWith(subdivisionLower);
@@ -994,7 +999,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
               ? searchTerms.every(term => propSubdiv.includes(term) || propSubdivName.includes(term) || propNeighborhood.includes(term))
               : propSubdiv.includes(subdivisionLower) || propSubdivName.includes(subdivisionLower) || propNeighborhood.includes(subdivisionLower);
             
-            return exactMatch || startsWithMatch || (allWordsMatch && hasAllTerms);
+            // Address matching: Check if street name contains the subdivision search term
+            // This catches cases like "904 Oaklands Dr" when searching for "oaklands"
+            const addressContainsSubdiv = propAddress.includes(subdivisionLower);
+            
+            return exactMatch || startsWithMatch || (allWordsMatch && hasAllTerms) || addressContainsSubdiv;
           });
           
           // Log subdivision filtering results
