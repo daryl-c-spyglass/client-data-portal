@@ -204,6 +204,10 @@ export function CMABuilder({ onCreateCMA, initialData }: CMABuilderProps) {
   const [manualSubjectCity, setManualSubjectCity] = useState("");
   const [manualSubjectState, setManualSubjectState] = useState("");
   const [manualSubjectZip, setManualSubjectZip] = useState("");
+  const [manualSubjectListPrice, setManualSubjectListPrice] = useState("");
+  const [manualSubjectBeds, setManualSubjectBeds] = useState("");
+  const [manualSubjectBaths, setManualSubjectBaths] = useState("");
+  const [manualSubjectSqft, setManualSubjectSqft] = useState("");
   
   const [searchCity, setSearchCity] = useState(sc.city || "");
   const [searchSubdivision, setSearchSubdivision] = useState(sc.subdivision || "");
@@ -1435,7 +1439,59 @@ export function CMABuilder({ onCreateCMA, initialData }: CMABuilderProps) {
                     />
                   </div>
                 </div>
-                {manualSubjectAddress.trim() && (
+                <div className="grid grid-cols-4 gap-2">
+                  <div className="space-y-1">
+                    <Label className="text-xs">List Price</Label>
+                    <Input 
+                      type="number"
+                      placeholder="$500,000" 
+                      className="h-8 text-xs"
+                      value={manualSubjectListPrice}
+                      onChange={(e) => setManualSubjectListPrice(e.target.value)}
+                      data-testid="input-subject-listprice"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs">Beds</Label>
+                    <Input 
+                      type="number"
+                      placeholder="3" 
+                      className="h-8 text-xs"
+                      value={manualSubjectBeds}
+                      onChange={(e) => setManualSubjectBeds(e.target.value)}
+                      data-testid="input-subject-beds"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs">Baths</Label>
+                    <Input 
+                      type="number"
+                      placeholder="2" 
+                      className="h-8 text-xs"
+                      value={manualSubjectBaths}
+                      onChange={(e) => setManualSubjectBaths(e.target.value)}
+                      data-testid="input-subject-baths"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs">Sq Ft <span className="text-destructive">*</span></Label>
+                    <Input 
+                      type="number"
+                      placeholder="2000" 
+                      className="h-8 text-xs"
+                      value={manualSubjectSqft}
+                      onChange={(e) => setManualSubjectSqft(e.target.value)}
+                      data-testid="input-subject-sqft"
+                      required
+                    />
+                  </div>
+                </div>
+                {manualSubjectAddress.trim() && !manualSubjectSqft.trim() && (
+                  <p className="text-xs text-muted-foreground text-center">
+                    Square footage is required for pricing analysis
+                  </p>
+                )}
+                {manualSubjectAddress.trim() && manualSubjectSqft.trim() && (
                   <Button
                     variant="outline"
                     className="w-full"
@@ -1451,12 +1507,12 @@ export function CMABuilder({ onCreateCMA, initialData }: CMABuilderProps) {
                         postalCode: manualSubjectZip.trim() || '',
                         latitude: null,
                         longitude: null,
-                        listPrice: null,
+                        listPrice: manualSubjectListPrice ? Number(manualSubjectListPrice) : null,
                         closePrice: null,
                         originalListPrice: null,
-                        bedroomsTotal: null,
-                        bathroomsTotalInteger: null,
-                        livingArea: null,
+                        bedroomsTotal: manualSubjectBeds ? Number(manualSubjectBeds) : null,
+                        bathroomsTotalInteger: manualSubjectBaths ? Number(manualSubjectBaths) : null,
+                        livingArea: manualSubjectSqft ? Number(manualSubjectSqft) : null,
                         lotSizeAcres: null,
                         lotSizeSquareFeet: null,
                         yearBuilt: null,
@@ -1480,6 +1536,15 @@ export function CMABuilder({ onCreateCMA, initialData }: CMABuilderProps) {
                         virtualTourUrl: null,
                       } as unknown as Property;
                       setSubjectProperty(manualProperty);
+                      // Reset form fields after setting subject
+                      setManualSubjectAddress("");
+                      setManualSubjectCity("");
+                      setManualSubjectState("");
+                      setManualSubjectZip("");
+                      setManualSubjectListPrice("");
+                      setManualSubjectBeds("");
+                      setManualSubjectBaths("");
+                      setManualSubjectSqft("");
                     }}
                     data-testid="button-use-manual-subject"
                   >
