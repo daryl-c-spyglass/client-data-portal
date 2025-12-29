@@ -426,6 +426,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         dateFrom,
         dateTo,
         type,  // 'sale' or 'lease' to filter transaction type
+        elementarySchools,  // Comma-separated list of elementary school names
+        middleSchools,      // Comma-separated list of middle school names
+        highSchools,        // Comma-separated list of high school names
+        schoolDistrict,     // School district name
         limit = '50',
       } = req.query as Record<string, string | undefined>;
 
@@ -479,7 +483,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // CRITICAL: When subdivision filter is needed, DON'T pass it to API (API does exact match)
         // Instead, fetch more results and filter locally for partial matches like "Barton Hills Sec 03A"
         const needsLocalSubdivisionFilter = !!subdivision;
-        const effectiveLimit = (needsLocalSubdivisionFilter || needsServerSideFiltering) ? 200 : parsedLimit;
+        // School filters also require larger fetch since they're applied server-side
+        const needsSchoolFilter = !!elementarySchools || !!middleSchools || !!highSchools || !!schoolDistrict;
+        const effectiveLimit = (needsLocalSubdivisionFilter || needsServerSideFiltering || needsSchoolFilter) ? 200 : parsedLimit;
         
         // Build search params - add type=Sale for Closed to exclude leased rentals
         // DO NOT pass subdivision to API - it does exact match which misses "Barton Hills Sec 03A" etc.
@@ -524,10 +530,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
         console.log(`   =============================================================\n`);
         
-        // PAGINATION: When subdivision filtering is active, fetch multiple pages to find enough matches
-        // Repliers API caps at 100 results per page, so subdivision listings may be on page 2+
+        // PAGINATION: When subdivision/school filtering is active, fetch multiple pages to find enough matches
+        // Repliers API caps at 100 results per page, so filtered listings may be on page 2+
         let allListings: any[] = [];
-        const MAX_PAGES = needsLocalSubdivisionFilter ? 5 : 1; // Fetch up to 5 pages when subdivision filtering
+        const MAX_PAGES = (needsLocalSubdivisionFilter || needsSchoolFilter) ? 5 : 1; // Fetch up to 5 pages when filtering
         const TARGET_MATCHES = 20; // Stop early if we find enough matches
         let currentPage = 1;
         let totalCount = 0;
@@ -760,6 +766,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
             stories: toNumber((details as any).stories || (listing as any).storiesTotal || (listing as any).stories),
             propertyType: details.propertyType || listing.propertyType || 'Residential',
             propertySubType: details.style || listing.propertySubType || null,
+            // School fields from Repliers raw data
+            elementarySchool: listing.raw?.ElementarySchool || listing.raw?.elementarySchool || listing.elementarySchool || null,
+            middleSchool: listing.raw?.MiddleOrJuniorSchool || listing.raw?.middleSchool || listing.middleOrJuniorSchool || null,
+            highSchool: listing.raw?.HighSchool || listing.raw?.highSchool || listing.highSchool || null,
+            schoolDistrict: listing.raw?.SchoolDistrict || listing.raw?.schoolDistrict || listing.schoolDistrict || null,
           } as any;
         });
       };
@@ -1026,6 +1037,86 @@ export async function registerRoutes(app: Express): Promise<Server> {
         if (maxSqft) {
           const max = parseInt(maxSqft, 10);
           filtered = filtered.filter(p => p.livingArea === null || p.livingArea === undefined || p.livingArea <= max);
+        }
+        
+        // School filtering with normalization
+        const normalizeSchoolName = (name: string | null | undefined): string => {
+          if (!name) return '';
+          return name
+            .toLowerCase()
+            .trim()
+            .replace(/\s+/g, ' ')
+            .replace(/elem\.?$/i, 'elementary')
+            .replace(/el\.?$/i, 'elementary')
+            .replace(/middle or jr\.?$/i, 'middle')
+            .replace(/jr\.?\s*high/i, 'junior high')
+            .replace(/h\.?s\.?$/i, 'high school')
+            .replace(/[^a-z0-9\s]/g, '');
+        };
+        
+        // Elementary school filter
+        if (elementarySchools) {
+          const schoolList = elementarySchools.split(',').map(s => s.trim()).filter(s => s.length > 0);
+          const normalizedSchools = schoolList.map(s => normalizeSchoolName(s)).filter(s => s.length > 0);
+          if (normalizedSchools.length > 0) {
+            const beforeCount = filtered.length;
+            filtered = filtered.filter((p: any) => {
+              const propSchool = normalizeSchoolName(p.elementarySchool);
+              if (!propSchool) return false;
+              return normalizedSchools.some(searchSchool => 
+                propSchool === searchSchool || propSchool.includes(searchSchool) || searchSchool.includes(propSchool)
+              );
+            });
+            console.log(`🏫 Elementary school filter: ${beforeCount} -> ${filtered.length} (looking for: ${schoolList.join(', ')})`);
+          }
+        }
+        
+        // Middle school filter
+        if (middleSchools) {
+          const schoolList = middleSchools.split(',').map(s => s.trim()).filter(s => s.length > 0);
+          const normalizedSchools = schoolList.map(s => normalizeSchoolName(s)).filter(s => s.length > 0);
+          if (normalizedSchools.length > 0) {
+            const beforeCount = filtered.length;
+            filtered = filtered.filter((p: any) => {
+              const propSchool = normalizeSchoolName(p.middleSchool);
+              if (!propSchool) return false;
+              return normalizedSchools.some(searchSchool => 
+                propSchool === searchSchool || propSchool.includes(searchSchool) || searchSchool.includes(propSchool)
+              );
+            });
+            console.log(`🏫 Middle school filter: ${beforeCount} -> ${filtered.length} (looking for: ${schoolList.join(', ')})`);
+          }
+        }
+        
+        // High school filter
+        if (highSchools) {
+          const schoolList = highSchools.split(',').map(s => s.trim()).filter(s => s.length > 0);
+          const normalizedSchools = schoolList.map(s => normalizeSchoolName(s)).filter(s => s.length > 0);
+          if (normalizedSchools.length > 0) {
+            const beforeCount = filtered.length;
+            filtered = filtered.filter((p: any) => {
+              const propSchool = normalizeSchoolName(p.highSchool);
+              if (!propSchool) return false;
+              return normalizedSchools.some(searchSchool => 
+                propSchool === searchSchool || propSchool.includes(searchSchool) || searchSchool.includes(propSchool)
+              );
+            });
+            console.log(`🏫 High school filter: ${beforeCount} -> ${filtered.length} (looking for: ${schoolList.join(', ')})`);
+          }
+        }
+        
+        // School district filter
+        if (schoolDistrict) {
+          const normalizedDistrict = normalizeSchoolName(schoolDistrict);
+          if (normalizedDistrict.length > 0) {
+            const beforeCount = filtered.length;
+            filtered = filtered.filter((p: any) => {
+              const propDistrict = normalizeSchoolName(p.schoolDistrict);
+              if (!propDistrict) return false;
+              return propDistrict === normalizedDistrict || propDistrict.includes(normalizedDistrict) || normalizedDistrict.includes(propDistrict);
+            });
+            console.log(`🏫 School district filter: ${beforeCount} -> ${filtered.length} (looking for: ${schoolDistrict})`);
+          }
         }
         
         return filtered;
