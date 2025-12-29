@@ -923,6 +923,102 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
         return results;
       };
+      
+      // Helper function to fetch from database with school filters
+      const fetchFromDatabaseWithSchools = async (): Promise<NormalizedProperty[]> => {
+        const filters: any = {};
+        if (city) filters.city = city;
+        if (postalCode) filters.postalCode = postalCode;
+        if (minPrice) filters.minPrice = parseInt(minPrice, 10);
+        if (maxPrice) filters.maxPrice = parseInt(maxPrice, 10);
+        if (bedsMin) filters.minBeds = parseInt(bedsMin, 10);
+        if (bedsMax) filters.maxBeds = parseInt(bedsMax, 10);
+        if (bathsMin) filters.minBaths = parseInt(bathsMin, 10);
+        if (minSqft) filters.minSqft = parseInt(minSqft, 10);
+        if (maxSqft) filters.maxSqft = parseInt(maxSqft, 10);
+        if (subdivision) filters.subdivision = subdivision;
+        // School filters - parsed as arrays for storage.searchProperties
+        if (elementarySchools) filters.elementarySchools = elementarySchools.split(',').map((s: string) => s.trim()).filter((s: string) => s.length > 0);
+        if (middleSchools) filters.middleSchools = middleSchools.split(',').map((s: string) => s.trim()).filter((s: string) => s.length > 0);
+        if (highSchools) filters.highSchools = highSchools.split(',').map((s: string) => s.trim()).filter((s: string) => s.length > 0);
+        if (schoolDistrict) filters.schoolDistrict = [schoolDistrict.trim()];
+        filters.status = 'Closed';
+        filters.limit = 200; // Fetch more for comprehensive school matching
+
+        console.log(`🏫 [DB School Search] Filters:`, JSON.stringify(filters, null, 2));
+
+        const dbResults = await storage.searchProperties(filters);
+        console.log(`🏫 [DB School Search] Found ${dbResults.length} properties`);
+        
+        // Fetch media for all properties in a single batch query
+        const listingIds = dbResults.map((p: any) => p.listingId || p.id).filter(Boolean);
+        const mediaByListing = await storage.getMediaForListingIds(listingIds);
+        
+        const toNum = (val: any): number | null => {
+          if (val == null) return null;
+          const num = Number(val);
+          return isNaN(num) ? null : num;
+        };
+
+        let results = dbResults.map((p: any) => {
+          const address = p.unparsedAddress || [p.streetNumber, p.streetName, p.streetSuffix].filter(Boolean).join(' ');
+          const beds = toNum(p.bedroomsTotal);
+          const baths = toNum(p.bathroomsTotalInteger);
+          const lotSqFt = toNum(p.lotSizeSquareFeet);
+          const lotAcres = toNum(p.lotSizeAcres) || (lotSqFt ? lotSqFt / 43560 : null);
+          
+          // Get photos from media table, sorted by order
+          const propertyId = p.listingId || p.id;
+          const propertyMedia = mediaByListing[propertyId] || [];
+          const photos = propertyMedia.length > 0 
+            ? propertyMedia.map(m => m.mediaURL).filter(Boolean) as string[]
+            : (p.photos || []);
+          
+          return {
+            id: propertyId,
+            address: address,
+            unparsedAddress: address,
+            city: p.city || '',
+            state: p.stateOrProvince || 'TX',
+            postalCode: p.postalCode || '',
+            listPrice: toNum(p.listPrice) || 0,
+            closePrice: toNum(p.closePrice) || null,
+            status: 'Closed',
+            standardStatus: 'Closed',
+            beds: beds,
+            baths: baths,
+            bedroomsTotal: beds,
+            bathroomsTotalInteger: baths,
+            livingArea: toNum(p.livingArea),
+            yearBuilt: toNum(p.yearBuilt),
+            latitude: toNum(p.latitude),
+            longitude: toNum(p.longitude),
+            photos: photos,
+            subdivision: p.subdivision || p.subdivisionName || p.neighborhood || null,
+            subdivisionName: p.subdivision || p.subdivisionName || p.neighborhood || null,
+            neighborhood: null,
+            daysOnMarket: toNum(p.daysOnMarket),
+            cumulativeDaysOnMarket: toNum(p.cumulativeDaysOnMarket) || toNum(p.daysOnMarket),
+            lotSizeSquareFeet: lotSqFt,
+            lotSizeAcres: lotAcres,
+            garageSpaces: toNum(p.garageSpaces),
+            closeDate: p.closeDate || null,
+            listDate: p.listDate || p.listingContractDate || null,
+            listingContractDate: p.listDate || p.listingContractDate || null,
+            description: p.publicRemarks || null,
+            stories: toNum(p.stories) || toNum(p.storiesTotal),
+            propertyType: p.propertyType || 'Residential',
+            propertySubType: p.propertySubType || null,
+            // Include school fields for display
+            elementarySchool: p.elementarySchool || null,
+            middleSchool: p.middleOrJuniorSchool || null,
+            highSchool: p.highSchool || null,
+            schoolDistrict: p.schoolDistrict || null,
+          };
+        }) as any[];
+
+        return results;
+      };
 
       // Apply server-side filters
       const applyFilters = (results: any[]): any[] => {
@@ -1153,11 +1249,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return filtered;
       };
 
+      // Check if school filters are provided - Repliers API doesn't return school data
+      // so school filtering only works with database (Closed/Sold properties)
+      const hasSchoolFilters = !!(elementarySchools || middleSchools || highSchools || schoolDistrict);
+      let schoolFilterWarning: string | null = null;
+      
       // Fetch from each selected status source
       // Per client requirement: Use Repliers as primary data source for ALL statuses
       const fetchPromises: Promise<{ results: NormalizedProperty[]; expectedStatus: string }>[] = [];
       
+      // If school filters are provided but Active/Under Contract is selected, warn user
+      if (hasSchoolFilters) {
+        const nonClosedStatuses = statusList.filter(s => s !== 'closed' && s !== 'sold');
+        if (nonClosedStatuses.length > 0) {
+          schoolFilterWarning = 'School filtering is only available for Closed/Sold properties. Active and Under Contract listings will be excluded from results.';
+          console.log(`⚠️ School filters provided but non-closed statuses selected: ${nonClosedStatuses.join(', ')}`);
+          console.log(`⚠️ Will only search database for Closed properties with school data`);
+        }
+      }
+      
       for (const statusType of statusList) {
+        // If school filters are active, skip Repliers searches for Active/Under Contract
+        // since Repliers doesn't return school data
+        if (hasSchoolFilters && statusType !== 'closed' && statusType !== 'sold') {
+          console.log(`⏭️ Skipping ${statusType} search - school filters require database (Closed only)`);
+          continue;
+        }
+        
         if (statusType === 'active') {
           // RESO-compliant: standardStatus=Active
           fetchPromises.push(fetchFromRepliers('Active').then(results => ({ results, expectedStatus: 'Active' })));
@@ -1170,19 +1288,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
           // Pending only - use standardStatus=Pending
           fetchPromises.push(fetchFromRepliers('Pending').then(results => ({ results, expectedStatus: 'Pending' })));
         } else if (statusType === 'closed' || statusType === 'sold') {
-          // RESO-compliant: standardStatus=Closed for sold/closed listings
-          // Per Repliers: ClosedDate → soldDate, ClosePrice → soldPrice
-          // CRITICAL: Pass isSaleOnly=true to exclude leased rentals from Closed results
-          fetchPromises.push(
-            fetchFromRepliers('Closed', true)  // true = filter to Sale type only
-              .then(results => ({ results, expectedStatus: 'Closed' }))
-              .catch(async (err) => {
-                // Repliers doesn't support sold status for this feed - fall back to database
-                console.log(`⚠️ Repliers sold data not available, using database fallback`);
-                const dbResults = await fetchFromDatabase();
-                return { results: dbResults, expectedStatus: 'Closed' };
-              })
-          );
+          // When school filters are provided, use database exclusively for accurate school matching
+          if (hasSchoolFilters) {
+            console.log(`🏫 Using database for Closed search with school filters`);
+            fetchPromises.push(
+              fetchFromDatabaseWithSchools().then(results => ({ results, expectedStatus: 'Closed' }))
+            );
+          } else {
+            // RESO-compliant: standardStatus=Closed for sold/closed listings
+            // Per Repliers: ClosedDate → soldDate, ClosePrice → soldPrice
+            // CRITICAL: Pass isSaleOnly=true to exclude leased rentals from Closed results
+            fetchPromises.push(
+              fetchFromRepliers('Closed', true)  // true = filter to Sale type only
+                .then(results => ({ results, expectedStatus: 'Closed' }))
+                .catch(async (err) => {
+                  // Repliers doesn't support sold status for this feed - fall back to database
+                  console.log(`⚠️ Repliers sold data not available, using database fallback`);
+                  const dbResults = await fetchFromDatabase();
+                  return { results: dbResults, expectedStatus: 'Closed' };
+                })
+            );
+          }
         }
       }
 
@@ -1249,6 +1375,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         properties: finalResults,
         count: finalResults.length,
         statuses: statusList,
+        schoolFilterWarning: schoolFilterWarning,
       });
     } catch (error) {
       console.error('Unified search error:', error);

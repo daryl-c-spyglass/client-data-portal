@@ -57,12 +57,17 @@ export interface IStorage {
     minPrice?: number;
     maxPrice?: number;
     minBeds?: number;
+    maxBeds?: number;
     minBaths?: number;
     minSqft?: number;
     maxSqft?: number;
     subdivision?: string;
     status?: string;
     limit?: number;
+    elementarySchools?: string[];
+    middleSchools?: string[];
+    highSchools?: string[];
+    schoolDistrict?: string[];
   }): Promise<Property[]>;
   createProperty(property: InsertProperty): Promise<Property>;
   updateProperty(id: string, property: Partial<Property>): Promise<Property | undefined>;
@@ -380,12 +385,17 @@ export class MemStorage implements IStorage {
     minPrice?: number;
     maxPrice?: number;
     minBeds?: number;
+    maxBeds?: number;
     minBaths?: number;
     minSqft?: number;
     maxSqft?: number;
     subdivision?: string;
     status?: string;
     limit?: number;
+    elementarySchools?: string[];
+    middleSchools?: string[];
+    highSchools?: string[];
+    schoolDistrict?: string[];
   }): Promise<Property[]> {
     let props = Array.from(this.properties.values()).filter(p => p.mlgCanView);
 
@@ -404,6 +414,9 @@ export class MemStorage implements IStorage {
     if (filters.minBeds !== undefined) {
       props = props.filter(p => p.bedroomsTotal && p.bedroomsTotal >= filters.minBeds!);
     }
+    if (filters.maxBeds !== undefined) {
+      props = props.filter(p => p.bedroomsTotal && p.bedroomsTotal <= filters.maxBeds!);
+    }
     if (filters.minBaths !== undefined) {
       props = props.filter(p => p.bathroomsTotalInteger && p.bathroomsTotalInteger >= filters.minBaths!);
     }
@@ -418,6 +431,31 @@ export class MemStorage implements IStorage {
     }
     if (filters.status) {
       props = props.filter(p => p.standardStatus === filters.status);
+    }
+    // School filters (case-insensitive partial match)
+    if (filters.elementarySchools && filters.elementarySchools.length > 0) {
+      props = props.filter(p => {
+        const school = p.elementarySchool?.toLowerCase() || '';
+        return filters.elementarySchools!.some(s => school.includes(s.toLowerCase()));
+      });
+    }
+    if (filters.middleSchools && filters.middleSchools.length > 0) {
+      props = props.filter(p => {
+        const school = p.middleOrJuniorSchool?.toLowerCase() || '';
+        return filters.middleSchools!.some(s => school.includes(s.toLowerCase()));
+      });
+    }
+    if (filters.highSchools && filters.highSchools.length > 0) {
+      props = props.filter(p => {
+        const school = p.highSchool?.toLowerCase() || '';
+        return filters.highSchools!.some(s => school.includes(s.toLowerCase()));
+      });
+    }
+    if (filters.schoolDistrict && filters.schoolDistrict.length > 0) {
+      props = props.filter(p => {
+        const district = p.schoolDistrict?.toLowerCase() || '';
+        return filters.schoolDistrict!.some(s => district.includes(s.toLowerCase()));
+      });
     }
 
     const effectiveLimit = filters.limit ?? 100;
@@ -1204,12 +1242,17 @@ export class DbStorage implements IStorage {
     minPrice?: number;
     maxPrice?: number;
     minBeds?: number;
+    maxBeds?: number;
     minBaths?: number;
     minSqft?: number;
     maxSqft?: number;
     subdivision?: string;
     status?: string;
     limit?: number;
+    elementarySchools?: string[];
+    middleSchools?: string[];
+    highSchools?: string[];
+    schoolDistrict?: string[];
   }): Promise<Property[]> {
     const conditions = [eq(properties.mlgCanView, true)];
 
@@ -1228,6 +1271,9 @@ export class DbStorage implements IStorage {
     if (filters.minBeds !== undefined) {
       conditions.push(gte(properties.bedroomsTotal, filters.minBeds));
     }
+    if (filters.maxBeds !== undefined) {
+      conditions.push(lte(properties.bedroomsTotal, filters.maxBeds));
+    }
     if (filters.minBaths !== undefined) {
       conditions.push(gte(properties.bathroomsTotalInteger, filters.minBaths));
     }
@@ -1242,6 +1288,31 @@ export class DbStorage implements IStorage {
     }
     if (filters.status) {
       conditions.push(eq(properties.standardStatus, filters.status));
+    }
+    // School filters - case-insensitive partial match using ILIKE with OR conditions
+    if (filters.elementarySchools && filters.elementarySchools.length > 0) {
+      const schoolConditions = filters.elementarySchools.map(s => 
+        ilike(properties.elementarySchool, `%${s}%`)
+      );
+      conditions.push(or(...schoolConditions)!);
+    }
+    if (filters.middleSchools && filters.middleSchools.length > 0) {
+      const schoolConditions = filters.middleSchools.map(s => 
+        ilike(properties.middleOrJuniorSchool, `%${s}%`)
+      );
+      conditions.push(or(...schoolConditions)!);
+    }
+    if (filters.highSchools && filters.highSchools.length > 0) {
+      const schoolConditions = filters.highSchools.map(s => 
+        ilike(properties.highSchool, `%${s}%`)
+      );
+      conditions.push(or(...schoolConditions)!);
+    }
+    if (filters.schoolDistrict && filters.schoolDistrict.length > 0) {
+      const districtConditions = filters.schoolDistrict.map(s => 
+        ilike(properties.schoolDistrict, `%${s}%`)
+      );
+      conditions.push(or(...districtConditions)!);
     }
 
     const effectiveLimit = filters.limit ?? 100;

@@ -137,6 +137,7 @@ interface UnifiedSearchResponse {
   properties: Property[];
   count: number;
   status: string;
+  schoolFilterWarning?: string | null;
 }
 
 // Property type options for the dropdown - matches Repliers propertySubType values exactly
@@ -436,6 +437,7 @@ export function CMABuilder({ onCreateCMA, initialData }: CMABuilderProps) {
 
   const searchResults = searchResponse?.properties || [];
   const totalResults = searchResponse?.count || 0;
+  const schoolFilterWarning = searchResponse?.schoolFilterWarning;
 
   const handleSearch = () => {
     const missingFields: string[] = [];
@@ -1815,6 +1817,15 @@ export function CMABuilder({ onCreateCMA, initialData }: CMABuilderProps) {
           </CardTitle>
         </CardHeader>
         <CardContent>
+          {/* School filter warning */}
+          {schoolFilterWarning && searchEnabled && !isLoading && (
+            <div className="mb-4 p-3 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-md">
+              <div className="flex items-start gap-2">
+                <AlertCircle className="w-4 h-4 text-amber-600 dark:text-amber-400 mt-0.5 flex-shrink-0" />
+                <p className="text-sm text-amber-800 dark:text-amber-200">{schoolFilterWarning}</p>
+              </div>
+            </div>
+          )}
           {(isLoading || isMapSearching) ? (
             <div className="text-center py-12">
               <Loader2 className="w-8 h-8 mx-auto animate-spin text-muted-foreground mb-2" />
