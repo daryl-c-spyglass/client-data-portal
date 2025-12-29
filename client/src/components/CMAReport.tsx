@@ -1844,7 +1844,11 @@ export function CMAReport({
                       
                       {/* Legend */}
                       <div className="flex items-center gap-6 mt-4 pt-4 border-t">
-                        <div className="flex items-center gap-2">
+                        <div 
+                          className="flex items-center gap-2 cursor-pointer select-none"
+                          onClick={() => setShowSubjectOnPricingChart(!showSubjectOnPricingChart)}
+                          data-testid="toggle-subject-pricing"
+                        >
                           <Checkbox 
                             id="show-subject-pricing"
                             checked={showSubjectOnPricingChart}
@@ -1854,9 +1858,9 @@ export function CMAReport({
                           <div className="w-5 h-5 rounded-full bg-blue-500 flex items-center justify-center">
                             <span className="text-white text-[10px]">⌂</span>
                           </div>
-                          <label htmlFor="show-subject-pricing" className="text-sm text-muted-foreground cursor-pointer">
+                          <span className="text-sm text-muted-foreground">
                             Subject Property
-                          </label>
+                          </span>
                         </div>
                       </div>
                     </div>
