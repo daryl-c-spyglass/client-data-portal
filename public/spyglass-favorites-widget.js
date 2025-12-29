@@ -589,7 +589,7 @@
 
       // Show login prompt if no user or if explicitly set to login view
       if (this.state.currentView === 'login' || (!this.options.wpUserId && this.state.currentView === 'favorites')) {
-        content.innerHTML = this.renderLoginPromptHTML();
+        this.renderLoginPrompt(content);
         this.attachLoginHandler();
         return;
       }
@@ -633,19 +633,40 @@
       }
     }
 
-    renderLoginPromptHTML() {
-      return `
-        <div class="spyglass-login-prompt">
-          <div class="icon">
-            <svg width="48" height="48" viewBox="0 0 24 24" fill="currentColor">
-              <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
-            </svg>
-          </div>
-          <h3>Sign in to save favorites</h3>
-          <p>Create an account or sign in to save properties and view them later.</p>
-          <button class="spyglass-login-btn" id="${this.containerId}-login-btn">Sign In</button>
-        </div>
-      `;
+    renderLoginPrompt(content) {
+      content.innerHTML = '';
+      
+      const container = document.createElement('div');
+      container.className = 'spyglass-login-prompt';
+      
+      const iconDiv = document.createElement('div');
+      iconDiv.className = 'icon';
+      const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+      svg.setAttribute('width', '48');
+      svg.setAttribute('height', '48');
+      svg.setAttribute('viewBox', '0 0 24 24');
+      svg.setAttribute('fill', 'currentColor');
+      const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+      path.setAttribute('d', 'M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z');
+      svg.appendChild(path);
+      iconDiv.appendChild(svg);
+      container.appendChild(iconDiv);
+      
+      const h3 = document.createElement('h3');
+      h3.textContent = 'Sign in to save favorites';
+      container.appendChild(h3);
+      
+      const p = document.createElement('p');
+      p.textContent = 'Create an account or sign in to save properties and view them later.';
+      container.appendChild(p);
+      
+      const btn = document.createElement('button');
+      btn.className = 'spyglass-login-btn';
+      btn.id = this.containerId + '-login-btn';
+      btn.textContent = 'Sign In';
+      container.appendChild(btn);
+      
+      content.appendChild(container);
     }
 
     attachLoginHandler() {
