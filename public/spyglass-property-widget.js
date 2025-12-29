@@ -1049,15 +1049,16 @@
 
     renderError() {
       const p = this.containerId;
+      const escapedP = this.escapeHtml(p);
       const resultsContainer = this.container.querySelector(`#${p}-results`);
       resultsContainer.innerHTML = `
         <div class="spyglass-no-results">
           <p>Unable to load properties. Please try again.</p>
-          <button class="spyglass-btn-secondary" id="${p}-retry-btn">Retry</button>
+          <button class="spyglass-btn-secondary" id="${escapedP}-retry-btn">Retry</button>
         </div>
       `;
       // Attach retry handler
-      const retryBtn = resultsContainer.querySelector(`#${p}-retry-btn`);
+      const retryBtn = resultsContainer.querySelector(`#${escapedP}-retry-btn`);
       if (retryBtn) {
         retryBtn.addEventListener('click', () => this.search());
       }
