@@ -1443,46 +1443,62 @@ export function CMABuilder({ onCreateCMA, initialData }: CMABuilderProps) {
                   <div className="space-y-1">
                     <Label className="text-xs">List Price</Label>
                     <Input 
-                      type="number"
-                      placeholder="$500,000" 
+                      type="text"
+                      inputMode="numeric"
+                      placeholder="500000" 
                       className="h-8 text-xs"
                       value={manualSubjectListPrice}
-                      onChange={(e) => setManualSubjectListPrice(e.target.value)}
+                      onChange={(e) => {
+                        const val = e.target.value.replace(/[^0-9]/g, '');
+                        setManualSubjectListPrice(val);
+                      }}
                       data-testid="input-subject-listprice"
                     />
                   </div>
                   <div className="space-y-1">
                     <Label className="text-xs">Beds</Label>
                     <Input 
-                      type="number"
+                      type="text"
+                      inputMode="numeric"
                       placeholder="3" 
                       className="h-8 text-xs"
                       value={manualSubjectBeds}
-                      onChange={(e) => setManualSubjectBeds(e.target.value)}
+                      onChange={(e) => {
+                        const val = e.target.value.replace(/[^0-9]/g, '');
+                        setManualSubjectBeds(val);
+                      }}
                       data-testid="input-subject-beds"
                     />
                   </div>
                   <div className="space-y-1">
                     <Label className="text-xs">Baths</Label>
                     <Input 
-                      type="number"
+                      type="text"
+                      inputMode="numeric"
                       placeholder="2" 
                       className="h-8 text-xs"
                       value={manualSubjectBaths}
-                      onChange={(e) => setManualSubjectBaths(e.target.value)}
+                      onChange={(e) => {
+                        const val = e.target.value.replace(/[^0-9]/g, '');
+                        setManualSubjectBaths(val);
+                      }}
                       data-testid="input-subject-baths"
                     />
                   </div>
                   <div className="space-y-1">
                     <Label className="text-xs">Sq Ft <span className="text-destructive">*</span></Label>
                     <Input 
-                      type="number"
+                      type="text"
+                      inputMode="numeric"
+                      pattern="[0-9]*"
                       placeholder="2000" 
                       className="h-8 text-xs"
                       value={manualSubjectSqft}
-                      onChange={(e) => setManualSubjectSqft(e.target.value)}
+                      onChange={(e) => {
+                        const val = e.target.value.replace(/[^0-9]/g, '');
+                        setManualSubjectSqft(val);
+                      }}
                       data-testid="input-subject-sqft"
-                      required
                     />
                   </div>
                 </div>
