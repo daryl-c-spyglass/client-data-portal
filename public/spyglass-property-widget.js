@@ -1096,19 +1096,19 @@
                          status === 'Pending' ? 'pending' : 'under-contract';
 
       return `
-        <div class="spyglass-property-card" data-mls-id="${property.listingId}">
+        <div class="spyglass-property-card" data-mls-id="${this.escapeHtml(String(property.listingId))}">
           <div class="spyglass-card-image">
-            <img src="${imageUrl}" alt="${property.streetAddress || 'Property'}" loading="lazy" onerror="this.src='https://placehold.co/400x300/e0e0e0/666?text=No+Photo'">
-            <span class="spyglass-card-status spyglass-status-${statusClass}">${status}</span>
+            <img src="${this.escapeHtml(imageUrl)}" alt="${this.escapeHtml(property.streetAddress || 'Property')}" loading="lazy" onerror="this.src='https://placehold.co/400x300/e0e0e0/666?text=No+Photo'">
+            <span class="spyglass-card-status spyglass-status-${statusClass}">${this.escapeHtml(status)}</span>
           </div>
           <div class="spyglass-card-body">
             <div class="spyglass-card-price">$${this.formatNumber(property.listPrice)}</div>
             <div class="spyglass-card-address">
-              ${property.streetAddress || ''}${property.city ? ', ' + property.city : ''}
+              ${this.escapeHtml(property.streetAddress || '')}${property.city ? ', ' + this.escapeHtml(property.city) : ''}
             </div>
             <div class="spyglass-card-features">
-              ${property.bedroomsTotal ? `<span class="spyglass-card-feature">${ICONS.bed} ${property.bedroomsTotal} beds</span>` : ''}
-              ${property.bathroomsTotalInteger ? `<span class="spyglass-card-feature">${ICONS.bath} ${property.bathroomsTotalInteger} baths</span>` : ''}
+              ${property.bedroomsTotal ? `<span class="spyglass-card-feature">${ICONS.bed} ${this.escapeHtml(String(property.bedroomsTotal))} beds</span>` : ''}
+              ${property.bathroomsTotalInteger ? `<span class="spyglass-card-feature">${ICONS.bath} ${this.escapeHtml(String(property.bathroomsTotalInteger))} baths</span>` : ''}
               ${property.livingArea ? `<span class="spyglass-card-feature">${ICONS.sqft} ${this.formatNumber(property.livingArea)} sqft</span>` : ''}
             </div>
           </div>
