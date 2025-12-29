@@ -621,6 +621,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const listings = allListings;
         console.log(`📊 [CMA Search Results] Status: ${repliersStatus}`);
         console.log(`   Total returned: ${listings.length}`);
+        
+        // DEBUG: Log school-related fields from first listing
+        if (listings.length > 0) {
+          const firstListing = listings[0];
+          const schoolKeys = firstListing.raw ? Object.keys(firstListing.raw).filter(k => k.toLowerCase().includes('school')) : [];
+          console.log(`🏫 [DEBUG] First listing school data inspection:`);
+          console.log(`   - listing.schools: ${JSON.stringify(firstListing.schools)}`);
+          console.log(`   - listing.elementarySchool: ${firstListing.elementarySchool}`);
+          console.log(`   - listing.raw school keys: ${schoolKeys.length > 0 ? schoolKeys.join(', ') : 'NONE'}`);
+          if (schoolKeys.length > 0) {
+            schoolKeys.forEach(k => console.log(`     - raw.${k}: ${firstListing.raw[k]}`));
+          }
+        }
+        
         if (listings.length > 0 && listings.length <= 20) {
           console.log(`   Listings returned:`);
           listings.forEach((l: any, i: number) => {
@@ -766,11 +780,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
             stories: toNumber((details as any).stories || (listing as any).storiesTotal || (listing as any).stories),
             propertyType: details.propertyType || listing.propertyType || 'Residential',
             propertySubType: details.style || listing.propertySubType || null,
-            // School fields from Repliers raw data
-            elementarySchool: listing.raw?.ElementarySchool || listing.raw?.elementarySchool || listing.elementarySchool || null,
-            middleSchool: listing.raw?.MiddleOrJuniorSchool || listing.raw?.middleSchool || listing.middleOrJuniorSchool || null,
-            highSchool: listing.raw?.HighSchool || listing.raw?.highSchool || listing.highSchool || null,
-            schoolDistrict: listing.raw?.SchoolDistrict || listing.raw?.schoolDistrict || listing.schoolDistrict || null,
+            // School fields from Repliers - check multiple possible locations
+            elementarySchool: listing.raw?.ElementarySchool || listing.raw?.elementarySchool || 
+              listing.elementarySchool || listing.schools?.elementary || 
+              (listing.schools && Array.isArray(listing.schools) ? listing.schools.find((s: any) => s.level === 'elementary')?.name : null) || null,
+            middleSchool: listing.raw?.MiddleOrJuniorSchool || listing.raw?.middleSchool || 
+              listing.middleOrJuniorSchool || listing.schools?.middle ||
+              (listing.schools && Array.isArray(listing.schools) ? listing.schools.find((s: any) => s.level === 'middle')?.name : null) || null,
+            highSchool: listing.raw?.HighSchool || listing.raw?.highSchool || 
+              listing.highSchool || listing.schools?.high ||
+              (listing.schools && Array.isArray(listing.schools) ? listing.schools.find((s: any) => s.level === 'high')?.name : null) || null,
+            schoolDistrict: listing.raw?.SchoolDistrict || listing.raw?.schoolDistrict || 
+              listing.schoolDistrict || listing.schools?.district || null,
+            // Debug: store raw schools data to inspect structure
+            _rawSchools: listing.schools || listing.raw?.schools || null,
           } as any;
         });
       };
@@ -1064,6 +1087,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
             const sampleSchools = filtered.slice(0, 10).map((p: any) => p.elementarySchool).filter(Boolean);
             console.log(`🏫 [DEBUG] Sample elementary school values in data: ${sampleSchools.length > 0 ? sampleSchools.join(', ') : 'NONE FOUND'}`);
             console.log(`🏫 [DEBUG] Normalized search terms: ${normalizedSchools.join(', ')}`);
+            // Debug: Log raw schools data structure from first few listings
+            const sampleRawSchools = filtered.slice(0, 3).map((p: any) => JSON.stringify(p._rawSchools));
+            console.log(`🏫 [DEBUG] Raw schools structure samples: ${sampleRawSchools.join(' | ')}`);
             
             filtered = filtered.filter((p: any) => {
               const propSchool = normalizeSchoolName(p.elementarySchool);
