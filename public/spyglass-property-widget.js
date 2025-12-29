@@ -1245,12 +1245,12 @@
         });
 
         marker.addListener('click', () => {
-          const propJson = JSON.stringify(property).replace(/"/g, '&quot;');
+          const propJson = JSON.stringify(property).replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
           const infoContent = `
             <div class="spyglass-info-window">
-              <img src="${property.primaryPhoto || 'https://placehold.co/200x120/e0e0e0/666?text=No+Photo'}" alt="${property.streetAddress}" onerror="this.src='https://placehold.co/200x120/e0e0e0/666?text=No+Photo'">
+              <img src="${this.escapeHtml(property.primaryPhoto) || 'https://placehold.co/200x120/e0e0e0/666?text=No+Photo'}" alt="${this.escapeHtml(property.streetAddress)}" onerror="this.src='https://placehold.co/200x120/e0e0e0/666?text=No+Photo'">
               <div class="spyglass-info-window-price">$${this.formatNumber(property.listPrice)}</div>
-              <div class="spyglass-info-window-address">${property.streetAddress || ''}</div>
+              <div class="spyglass-info-window-address">${this.escapeHtml(property.streetAddress) || ''}</div>
               <button class="spyglass-info-window-btn" onclick="document.getElementById('${this.containerId}').__spyglassWidget.openPropertyDetail(${propJson})">View Details</button>
             </div>
           `;
@@ -1280,11 +1280,11 @@
 
       content.innerHTML = `
         <div class="spyglass-modal-gallery">
-          <img class="spyglass-modal-main-image" id="${p}-main-image" src="${mainPhoto}" alt="${property.streetAddress}" onerror="this.src='https://placehold.co/900x400/e0e0e0/666?text=No+Photo'">
+          <img class="spyglass-modal-main-image" id="${p}-main-image" src="${this.escapeHtml(mainPhoto)}" alt="${this.escapeHtml(property.streetAddress)}" onerror="this.src='https://placehold.co/900x400/e0e0e0/666?text=No+Photo'">
           ${photos.length > 1 ? `
             <div class="spyglass-modal-thumbnails">
               ${photos.slice(0, 10).map((photo, i) => `
-                <img class="spyglass-modal-thumb ${i === 0 ? 'active' : ''}" src="${photo.mediaUrl}" alt="Photo ${i + 1}" data-url="${photo.mediaUrl}" onerror="this.style.display='none'">
+                <img class="spyglass-modal-thumb ${i === 0 ? 'active' : ''}" src="${this.escapeHtml(photo.mediaUrl)}" alt="Photo ${i + 1}" data-url="${this.escapeHtml(photo.mediaUrl)}" onerror="this.style.display='none'">
               `).join('')}
             </div>
           ` : ''}
@@ -1292,18 +1292,18 @@
         <div class="spyglass-modal-body">
           <div class="spyglass-modal-price">$${this.formatNumber(property.listPrice)}</div>
           <div class="spyglass-modal-address">
-            ${property.streetAddress || ''}${property.city ? ', ' + property.city : ''}${property.stateOrProvince ? ', ' + property.stateOrProvince : ''} ${property.postalCode || ''}
+            ${this.escapeHtml(property.streetAddress) || ''}${property.city ? ', ' + this.escapeHtml(property.city) : ''}${property.stateOrProvince ? ', ' + this.escapeHtml(property.stateOrProvince) : ''} ${this.escapeHtml(property.postalCode) || ''}
           </div>
           <div class="spyglass-modal-features">
             ${property.bedroomsTotal ? `
               <div class="spyglass-modal-feature">
-                <div class="spyglass-modal-feature-value">${property.bedroomsTotal}</div>
+                <div class="spyglass-modal-feature-value">${this.escapeHtml(String(property.bedroomsTotal))}</div>
                 <div class="spyglass-modal-feature-label">Bedrooms</div>
               </div>
             ` : ''}
             ${property.bathroomsTotalInteger ? `
               <div class="spyglass-modal-feature">
-                <div class="spyglass-modal-feature-value">${property.bathroomsTotalInteger}</div>
+                <div class="spyglass-modal-feature-value">${this.escapeHtml(String(property.bathroomsTotalInteger))}</div>
                 <div class="spyglass-modal-feature-label">Bathrooms</div>
               </div>
             ` : ''}
@@ -1315,7 +1315,7 @@
             ` : ''}
             ${property.yearBuilt ? `
               <div class="spyglass-modal-feature">
-                <div class="spyglass-modal-feature-value">${property.yearBuilt}</div>
+                <div class="spyglass-modal-feature-value">${this.escapeHtml(String(property.yearBuilt))}</div>
                 <div class="spyglass-modal-feature-label">Year Built</div>
               </div>
             ` : ''}
@@ -1329,12 +1329,12 @@
           ${property.publicRemarks ? `
             <div class="spyglass-modal-description">
               <h4 style="margin: 0 0 12px 0; font-size: 1rem;">Description</h4>
-              <p style="margin: 0;">${property.publicRemarks}</p>
+              <p style="margin: 0;">${this.escapeHtml(property.publicRemarks)}</p>
             </div>
           ` : ''}
           <div class="spyglass-modal-cta">
             <button class="spyglass-btn-primary" onclick="window.open('mailto:info@spyglassrealty.com?subject=Inquiry about ${encodeURIComponent(property.streetAddress || 'Property')}', '_blank')">Contact Agent</button>
-            <button class="spyglass-btn-secondary" onclick="window.open('https://spyglassrealty.com/property/${property.listingId}', '_blank')">View on Website</button>
+            <button class="spyglass-btn-secondary" onclick="window.open('https://spyglassrealty.com/property/${this.escapeHtml(String(property.listingId))}', '_blank')">View on Website</button>
           </div>
         </div>
       `;
@@ -1365,6 +1365,13 @@
     formatNumber(num) {
       if (!num) return '0';
       return parseInt(num).toLocaleString();
+    }
+
+    escapeHtml(str) {
+      if (!str) return '';
+      const div = document.createElement('div');
+      div.textContent = str;
+      return div.innerHTML;
     }
 
     destroy() {
