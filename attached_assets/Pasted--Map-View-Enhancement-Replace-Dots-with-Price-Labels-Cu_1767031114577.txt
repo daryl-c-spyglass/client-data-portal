@@ -1,0 +1,82 @@
+## Map View Enhancement - Replace Dots with Price Labels
+
+Currently the map shows red dot markers. Please replace them with price label pins like CloudCMA uses.
+
+### Requirements:
+
+1. PIN DESIGN:
+   - Shape: Rounded rectangle/pill with small triangle pointer at bottom
+   - Background color: #E03103 (Spyglass red)
+   - Text: White, bold, centered
+   - Drop shadow for visibility
+
+2. PRICE FORMATTING:
+   - Under $1,000,000: Show as "$XXK" (e.g., "$350K", "$595K", "$875K")
+   - $1,000,000 and over: Show as "$X.XXM" (e.g., "$1.07M", "$1.35M", "$2.5M")
+   - Round appropriately for clean display
+
+3. SELECTED/CLICKED STATE:
+   - When user clicks a pin, change its appearance:
+   - Background: #F5A623 (orange/gold)
+   - Add checkmark: "✓ $350K"
+   - This shows which property is currently being viewed
+
+4. PIN HOVER STATE:
+   - Slight scale up (1.1x) on hover
+   - Cursor: pointer
+
+5. CSS EXAMPLE:
+```css
+.map-price-pin {
+  background: #E03103;
+  color: white;
+  font-weight: 700;
+  font-size: 11px;
+  padding: 4px 8px;
+  border-radius: 4px;
+  white-space: nowrap;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+  cursor: pointer;
+  position: relative;
+}
+
+.map-price-pin::after {
+  content: '';
+  position: absolute;
+  bottom: -6px;
+  left: 50%;
+  transform: translateX(-50%);
+  border-left: 6px solid transparent;
+  border-right: 6px solid transparent;
+  border-top: 6px solid #E03103;
+}
+
+.map-price-pin.selected {
+  background: #F5A623;
+}
+
+.map-price-pin.selected::after {
+  border-top-color: #F5A623;
+}
+
+.map-price-pin:hover {
+  transform: scale(1.1);
+}
+```
+
+6. PRICE FORMATTING FUNCTION:
+```javascript
+function formatPinPrice(price) {
+  if (price >= 1000000) {
+    return '$' + (price / 1000000).toFixed(2).replace(/\.?0+$/, '') + 'M';
+  } else {
+    return '$' + Math.round(price / 1000) + 'K';
+  }
+}
+// Examples:
+// 350000 → "$350K"
+// 1070000 → "$1.07M"
+// 2500000 → "$2.5M"
+```
+
+Please implement these map pin changes.

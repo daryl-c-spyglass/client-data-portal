@@ -677,6 +677,48 @@
       cursor: pointer;
       width: 100%;
     }
+
+    /* Map Price Pins */
+    .spyglass-price-pin {
+      background: #E03103;
+      color: white;
+      font-weight: 700;
+      font-size: 11px;
+      padding: 4px 8px;
+      border-radius: 4px;
+      white-space: nowrap;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+      cursor: pointer;
+      position: relative;
+      font-family: 'Poppins', sans-serif;
+      transition: transform 0.15s ease, background 0.15s ease;
+      user-select: none;
+    }
+
+    .spyglass-price-pin::after {
+      content: '';
+      position: absolute;
+      bottom: -6px;
+      left: 50%;
+      transform: translateX(-50%);
+      border-left: 6px solid transparent;
+      border-right: 6px solid transparent;
+      border-top: 6px solid #E03103;
+      transition: border-top-color 0.15s ease;
+    }
+
+    .spyglass-price-pin:hover {
+      transform: scale(1.1);
+      z-index: 1000;
+    }
+
+    .spyglass-price-pin.selected {
+      background: #F5A623;
+    }
+
+    .spyglass-price-pin.selected::after {
+      border-top-color: #F5A623;
+    }
   `;
 
   const ICONS = {
@@ -1208,8 +1250,14 @@
       if (!this.map) return;
 
       // Clear existing markers
-      this.markers.forEach(marker => marker.setMap(null));
+      this.markers.forEach(marker => {
+        if (marker.setMap) marker.setMap(null);
+        if (marker.overlay) marker.overlay.setMap(null);
+      });
       this.markers = [];
+
+      // Clear selected marker reference
+      this.selectedMarker = null;
 
       const bounds = new google.maps.LatLngBounds();
       const properties = this.state.properties.slice(0, 500); // Limit to 500 pins
@@ -1220,40 +1268,96 @@
         const position = { lat: parseFloat(property.latitude), lng: parseFloat(property.longitude) };
         bounds.extend(position);
 
-        const marker = new google.maps.Marker({
-          position,
-          map: this.map,
-          title: property.streetAddress,
-          icon: {
-            path: google.maps.SymbolPath.CIRCLE,
-            scale: 8,
-            fillColor: '#E03103',
-            fillOpacity: 1,
-            strokeColor: '#fff',
-            strokeWeight: 2
-          }
-        });
+        // Create price pin overlay
+        const priceLabel = this.formatPinPrice(property.listPrice);
+        const overlay = this.createPricePinOverlay(position, priceLabel, property);
+        overlay.setMap(this.map);
 
-        marker.addListener('click', () => {
-          const propJson = JSON.stringify(property).replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-          const infoContent = `
-            <div class="spyglass-info-window">
-              <img src="${this.escapeHtml(property.primaryPhoto) || 'https://placehold.co/200x120/e0e0e0/666?text=No+Photo'}" alt="${this.escapeHtml(property.streetAddress)}" onerror="this.src='https://placehold.co/200x120/e0e0e0/666?text=No+Photo'">
-              <div class="spyglass-info-window-price">$${this.formatNumber(property.listPrice)}</div>
-              <div class="spyglass-info-window-address">${this.escapeHtml(property.streetAddress) || ''}</div>
-              <button class="spyglass-info-window-btn" onclick="document.getElementById('${this.containerId}').__spyglassWidget.openPropertyDetail(${propJson})">View Details</button>
-            </div>
-          `;
-          this.infoWindow.setContent(infoContent);
-          this.infoWindow.open(this.map, marker);
-        });
-
-        this.markers.push(marker);
+        this.markers.push({ overlay, property });
       });
 
       if (this.markers.length > 0) {
         this.map.fitBounds(bounds);
       }
+    }
+
+    createPricePinOverlay(position, priceLabel, property) {
+      const widget = this;
+
+      class PricePinOverlay extends google.maps.OverlayView {
+        constructor(position, priceLabel, property) {
+          super();
+          this.position = position;
+          this.priceLabel = priceLabel;
+          this.property = property;
+          this.div = null;
+        }
+
+        onAdd() {
+          this.div = document.createElement('div');
+          this.div.className = 'spyglass-price-pin';
+          this.div.textContent = this.priceLabel;
+          this.div.style.position = 'absolute';
+
+          this.div.addEventListener('click', (e) => {
+            e.stopPropagation();
+
+            // Deselect previous marker
+            if (widget.selectedMarker && widget.selectedMarker !== this.div) {
+              widget.selectedMarker.classList.remove('selected');
+              widget.selectedMarker.textContent = widget.selectedMarker.dataset.price;
+            }
+
+            // Select this marker
+            this.div.classList.add('selected');
+            this.div.dataset.price = this.priceLabel;
+            this.div.textContent = '\u2713 ' + this.priceLabel;
+            widget.selectedMarker = this.div;
+
+            // Show info window
+            const propJson = JSON.stringify(this.property).replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+            const infoContent = `
+              <div class="spyglass-info-window">
+                <img src="${widget.escapeHtml(this.property.primaryPhoto) || 'https://placehold.co/200x120/e0e0e0/666?text=No+Photo'}" alt="${widget.escapeHtml(this.property.streetAddress)}" onerror="this.src='https://placehold.co/200x120/e0e0e0/666?text=No+Photo'">
+                <div class="spyglass-info-window-price">$${widget.formatNumber(this.property.listPrice)}</div>
+                <div class="spyglass-info-window-address">${widget.escapeHtml(this.property.streetAddress) || ''}</div>
+                <button class="spyglass-info-window-btn" onclick="document.getElementById('${widget.containerId}').__spyglassWidget.openPropertyDetail(${propJson})">View Details</button>
+              </div>
+            `;
+            widget.infoWindow.setContent(infoContent);
+            widget.infoWindow.setPosition(this.position);
+            widget.infoWindow.open(widget.map);
+          });
+
+          const panes = this.getPanes();
+          panes.overlayMouseTarget.appendChild(this.div);
+        }
+
+        draw() {
+          const overlayProjection = this.getProjection();
+          const pos = overlayProjection.fromLatLngToDivPixel(new google.maps.LatLng(this.position.lat, this.position.lng));
+
+          if (this.div) {
+            // Center the pin horizontally and position the pointer at the location
+            this.div.style.left = pos.x + 'px';
+            this.div.style.top = pos.y + 'px';
+            this.div.style.transform = 'translate(-50%, -100%) translateY(-6px)';
+          }
+        }
+
+        onRemove() {
+          if (this.div) {
+            this.div.parentNode.removeChild(this.div);
+            this.div = null;
+          }
+        }
+
+        setMap(map) {
+          super.setMap(map);
+        }
+      }
+
+      return new PricePinOverlay(position, priceLabel, property);
     }
 
     openPropertyDetail(property) {
@@ -1356,6 +1460,15 @@
       return parseInt(num).toLocaleString();
     }
 
+    formatPinPrice(price) {
+      if (!price) return '$0';
+      if (price >= 1000000) {
+        return '$' + (price / 1000000).toFixed(2).replace(/\.?0+$/, '') + 'M';
+      } else {
+        return '$' + Math.round(price / 1000) + 'K';
+      }
+    }
+
     escapeHtml(str) {
       if (!str) return '';
       const div = document.createElement('div');
@@ -1369,13 +1482,17 @@
       
       // Clear map resources
       if (this.markers) {
-        this.markers.forEach(marker => marker.setMap(null));
+        this.markers.forEach(marker => {
+          if (marker.setMap) marker.setMap(null);
+          if (marker.overlay) marker.overlay.setMap(null);
+        });
         this.markers = [];
       }
       if (this.infoWindow) {
         this.infoWindow.close();
       }
       this.map = null;
+      this.selectedMarker = null;
       
       // Clear container
       if (this.container) {
