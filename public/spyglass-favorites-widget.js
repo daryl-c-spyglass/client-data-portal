@@ -1,6 +1,16 @@
 (function() {
   'use strict';
 
+  function escapeHtml(str) {
+    if (str == null) return '';
+    return String(str)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+  }
+
   const WIDGET_VERSION = '1.0.0';
   const DEFAULT_OPTIONS = {
     apiUrl: '',
@@ -725,20 +735,21 @@
     }
 
     renderPropertyCard(property, isFavorited) {
-      const id = property.listingId || property.id;
+      const id = escapeHtml(property.listingId || property.id);
       const price = property.listPrice || property.price;
-      const address = property.streetAddress || property.address || '';
-      const city = property.city || '';
-      const state = property.stateOrProvince || property.state || 'TX';
-      const zip = property.postalCode || property.zipCode || '';
-      const beds = property.bedroomsTotal || property.bedrooms || '-';
-      const baths = property.bathroomsTotalInteger || property.bathrooms || '-';
+      const address = escapeHtml(property.streetAddress || property.address || '');
+      const city = escapeHtml(property.city || '');
+      const state = escapeHtml(property.stateOrProvince || property.state || 'TX');
+      const zip = escapeHtml(property.postalCode || property.zipCode || '');
+      const beds = escapeHtml(property.bedroomsTotal || property.bedrooms || '-');
+      const baths = escapeHtml(property.bathroomsTotalInteger || property.bathrooms || '-');
       const sqft = property.livingArea || property.squareFeet || '-';
-      const status = property.standardStatus || 'Active';
-      const photo = property.primaryPhoto || (property.photos?.[0]?.mediaUrl);
+      const status = escapeHtml(property.standardStatus || 'Active');
+      const statusRaw = property.standardStatus || 'Active';
+      const photo = escapeHtml(property.primaryPhoto || (property.photos?.[0]?.mediaUrl) || '');
 
-      const statusClass = status.toLowerCase().includes('pending') ? 'pending' : 
-                         status.toLowerCase().includes('closed') || status.toLowerCase().includes('sold') ? 'sold' : '';
+      const statusClass = statusRaw.toLowerCase().includes('pending') ? 'pending' : 
+                         statusRaw.toLowerCase().includes('closed') || statusRaw.toLowerCase().includes('sold') ? 'sold' : '';
 
       return `
         <div class="spyglass-property-card" data-property-id="${id}">
