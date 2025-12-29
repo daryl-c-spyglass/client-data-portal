@@ -1121,14 +1121,24 @@
       const paginationContainer = this.container.querySelector(`#${p}-pagination`);
       const totalPages = Math.ceil(this.state.totalCount / this.options.resultsPerPage);
 
+      paginationContainer.replaceChildren();
+
       if (totalPages <= 1) {
-        paginationContainer.innerHTML = '';
         return;
       }
 
-      let html = `
-        <button class="spyglass-page-btn" ${this.state.currentPage === 1 ? 'disabled' : ''} data-page="${this.state.currentPage - 1}">Prev</button>
-      `;
+      const createPageButton = (pageNum, label, isDisabled, isActive) => {
+        const btn = document.createElement('button');
+        btn.className = 'spyglass-page-btn' + (isActive ? ' active' : '');
+        btn.disabled = isDisabled;
+        btn.dataset.page = pageNum;
+        btn.textContent = label;
+        return btn;
+      };
+
+      paginationContainer.appendChild(
+        createPageButton(this.state.currentPage - 1, 'Prev', this.state.currentPage === 1, false)
+      );
 
       const maxPages = 5;
       let startPage = Math.max(1, this.state.currentPage - Math.floor(maxPages / 2));
@@ -1139,14 +1149,14 @@
       }
 
       for (let i = startPage; i <= endPage; i++) {
-        html += `<button class="spyglass-page-btn ${i === this.state.currentPage ? 'active' : ''}" data-page="${i}">${i}</button>`;
+        paginationContainer.appendChild(
+          createPageButton(i, String(i), false, i === this.state.currentPage)
+        );
       }
 
-      html += `
-        <button class="spyglass-page-btn" ${this.state.currentPage === totalPages ? 'disabled' : ''} data-page="${this.state.currentPage + 1}">Next</button>
-      `;
-
-      paginationContainer.innerHTML = html;
+      paginationContainer.appendChild(
+        createPageButton(this.state.currentPage + 1, 'Next', this.state.currentPage === totalPages, false)
+      );
 
       // Add click handlers
       paginationContainer.querySelectorAll('.spyglass-page-btn').forEach(btn => {
