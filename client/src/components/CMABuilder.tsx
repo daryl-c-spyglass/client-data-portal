@@ -1441,7 +1441,7 @@ export function CMABuilder({ onCreateCMA, initialData }: CMABuilderProps) {
                 </div>
                 <div className="grid grid-cols-4 gap-2">
                   <div className="space-y-1">
-                    <Label className="text-xs">List Price</Label>
+                    <Label className="text-xs">List Price <span className="text-destructive">*</span></Label>
                     <Input 
                       type="text"
                       inputMode="numeric"
@@ -1502,12 +1502,12 @@ export function CMABuilder({ onCreateCMA, initialData }: CMABuilderProps) {
                     />
                   </div>
                 </div>
-                {manualSubjectAddress.trim() && !manualSubjectSqft.trim() && (
+                {manualSubjectAddress.trim() && (!manualSubjectSqft.trim() || !manualSubjectListPrice.trim()) && (
                   <p className="text-xs text-muted-foreground text-center">
-                    Square footage is required for pricing analysis
+                    List price and square footage are required for pricing analysis
                   </p>
                 )}
-                {manualSubjectAddress.trim() && manualSubjectSqft.trim() && (
+                {manualSubjectAddress.trim() && manualSubjectSqft.trim() && manualSubjectListPrice.trim() && (
                   <Button
                     variant="outline"
                     className="w-full"
