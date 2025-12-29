@@ -157,6 +157,10 @@ interface InitialCMAData {
     city?: string;
     subdivision?: string;
     zipCode?: string;
+    schoolDistrict?: string;
+    elementarySchool?: string;
+    middleSchool?: string;
+    highSchool?: string;
     minBeds?: string;
     maxBeds?: string;
     minPrice?: string;
@@ -212,6 +216,10 @@ export function CMABuilder({ onCreateCMA, initialData }: CMABuilderProps) {
   const [searchCity, setSearchCity] = useState(sc.city || "");
   const [searchSubdivision, setSearchSubdivision] = useState(sc.subdivision || "");
   const [searchZipCode, setSearchZipCode] = useState(sc.zipCode || "");
+  const [searchSchoolDistrict, setSearchSchoolDistrict] = useState(sc.schoolDistrict || "");
+  const [searchElementarySchool, setSearchElementarySchool] = useState(sc.elementarySchool || "");
+  const [searchMiddleSchool, setSearchMiddleSchool] = useState(sc.middleSchool || "");
+  const [searchHighSchool, setSearchHighSchool] = useState(sc.highSchool || "");
   const [searchMinBeds, setSearchMinBeds] = useState(sc.minBeds || "");
   const [searchMaxBeds, setSearchMaxBeds] = useState(sc.maxBeds || "");
   const [searchMinPrice, setSearchMinPrice] = useState(sc.minPrice || "");
@@ -338,6 +346,10 @@ export function CMABuilder({ onCreateCMA, initialData }: CMABuilderProps) {
     setSearchCity("");
     setSearchSubdivision("");
     setSearchZipCode("");
+    setSearchSchoolDistrict("");
+    setSearchElementarySchool("");
+    setSearchMiddleSchool("");
+    setSearchHighSchool("");
     setSearchMinBeds("");
     setSearchMaxBeds("");
     setSearchMinPrice("");
@@ -369,6 +381,10 @@ export function CMABuilder({ onCreateCMA, initialData }: CMABuilderProps) {
     if (searchCity) params.set('city', searchCity.trim());
     if (searchSubdivision) params.set('subdivision', searchSubdivision.trim());
     if (searchZipCode) params.set('postalCode', searchZipCode.trim());
+    if (searchSchoolDistrict) params.set('schoolDistrict', searchSchoolDistrict.trim());
+    if (searchElementarySchool) params.set('elementarySchools', searchElementarySchool.trim());
+    if (searchMiddleSchool) params.set('middleSchools', searchMiddleSchool.trim());
+    if (searchHighSchool) params.set('highSchools', searchHighSchool.trim());
     if (searchMinBeds && searchMinBeds !== 'any') params.set('bedsMin', searchMinBeds);
     if (searchMaxBeds && searchMaxBeds !== 'any') params.set('bedsMax', searchMaxBeds);
     if (searchMinPrice && searchMinPrice !== 'any') params.set('minPrice', searchMinPrice);
@@ -771,6 +787,50 @@ export function CMABuilder({ onCreateCMA, initialData }: CMABuilderProps) {
                     endpoint="/api/autocomplete/postalCodes"
                     testId="input-search-zipcode"
                     name="zipCode"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>School District</Label>
+                  <AutocompleteInput
+                    placeholder="e.g., Austin ISD"
+                    value={searchSchoolDistrict}
+                    onChange={setSearchSchoolDistrict}
+                    endpoint="/api/autocomplete/schoolDistricts"
+                    testId="input-search-school-district"
+                    name="schoolDistrict"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Elementary School</Label>
+                  <AutocompleteInput
+                    placeholder="e.g., Barton Hills"
+                    value={searchElementarySchool}
+                    onChange={setSearchElementarySchool}
+                    endpoint="/api/autocomplete/elementarySchools"
+                    testId="input-search-elementary"
+                    name="elementarySchool"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Middle School</Label>
+                  <AutocompleteInput
+                    placeholder="e.g., O Henry"
+                    value={searchMiddleSchool}
+                    onChange={setSearchMiddleSchool}
+                    endpoint="/api/autocomplete/middleSchools"
+                    testId="input-search-middle"
+                    name="middleSchool"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>High School</Label>
+                  <AutocompleteInput
+                    placeholder="e.g., Austin High"
+                    value={searchHighSchool}
+                    onChange={setSearchHighSchool}
+                    endpoint="/api/autocomplete/highSchools"
+                    testId="input-search-high"
+                    name="highSchool"
                   />
                 </div>
                 <div className="space-y-2">

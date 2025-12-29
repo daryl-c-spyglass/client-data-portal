@@ -2997,6 +2997,7 @@ This email was sent by ${senderName} (${senderEmail}) via the MLS Grid IDX Platf
         elementarySchools: parseArray(req.query.elementarySchools),
         middleSchools: parseArray(req.query.middleSchools),
         highSchools: parseArray(req.query.highSchools),
+        schoolDistrict: req.query.schoolDistrict as string,
         keywords: req.query.keywords as string,
         listingAgentName: req.query.listingAgentName as string,
         listingOfficeName: req.query.listingOfficeName as string,

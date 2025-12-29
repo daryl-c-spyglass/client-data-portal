@@ -141,6 +141,7 @@ export interface PropertySearchParams {
   elementarySchools?: string[];
   middleSchools?: string[];
   highSchools?: string[];
+  schoolDistrict?: string;
   keywords?: string;
   listingAgentName?: string;
   listingOfficeName?: string;
@@ -262,6 +263,9 @@ export class HomeReviewClient {
       }
       if (params.highSchools?.length) {
         params.highSchools.forEach(s => queryParams.append('highSchool', s));
+      }
+      if (params.schoolDistrict) {
+        queryParams.append('schoolDistrict', params.schoolDistrict);
       }
 
       if (params.keywords) queryParams.append('keywords', params.keywords);
