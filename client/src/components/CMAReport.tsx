@@ -4122,6 +4122,30 @@ export function CMAReport({
                     <span className="font-medium">{floatingCardProperty.subdivision || (floatingCardProperty as any).subdivisionName}</span>
                   </div>
                 )}
+                {floatingCardProperty.schoolDistrict && (
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">School District</span>
+                    <span className="font-medium">{floatingCardProperty.schoolDistrict}</span>
+                  </div>
+                )}
+                {floatingCardProperty.elementarySchool && (
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Elementary</span>
+                    <span className="font-medium">{floatingCardProperty.elementarySchool}</span>
+                  </div>
+                )}
+                {floatingCardProperty.middleOrJuniorSchool && (
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Middle School</span>
+                    <span className="font-medium">{floatingCardProperty.middleOrJuniorSchool}</span>
+                  </div>
+                )}
+                {floatingCardProperty.highSchool && (
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">High School</span>
+                    <span className="font-medium">{floatingCardProperty.highSchool}</span>
+                  </div>
+                )}
                 {floatingCardProperty.daysOnMarket !== null && floatingCardProperty.daysOnMarket !== undefined && (
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Days on Market</span>
