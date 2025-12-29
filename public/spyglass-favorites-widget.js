@@ -516,32 +516,56 @@
       const hasUser = !!this.options.wpUserId;
       const logoUrl = this.options.logoUrl || (this.options.apiUrl ? `${this.options.apiUrl}/spyglass-logo-white.png` : '/spyglass-logo-white.png');
       
-      this.container.innerHTML = `
-        <div class="spyglass-favorites-header">
-          <img src="${logoUrl}" alt="Spyglass Realty" class="spyglass-favorites-header-logo">
-          <div class="spyglass-favorites-header-content">
-            <h2>
-              <svg class="heart-icon" width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
-                <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
-              </svg>
-              My Favorites
-            </h2>
-          </div>
-          ${this.options.showPropertySearch ? `
-            <div class="spyglass-favorites-tabs">
-              <button class="spyglass-favorites-tab ${this.state.currentView === 'favorites' ? 'active' : ''}" 
-                      data-view="favorites" id="${this.containerId}-tab-favorites">
-                Saved (${this.state.favorites.length})
-              </button>
-              <button class="spyglass-favorites-tab ${this.state.currentView === 'browse' ? 'active' : ''}" 
-                      data-view="browse" id="${this.containerId}-tab-browse">
-                Browse
-              </button>
-            </div>
-          ` : ''}
-        </div>
-        <div class="spyglass-favorites-content" id="${this.containerId}-content"></div>
+      this.container.innerHTML = '';
+      
+      const header = document.createElement('div');
+      header.className = 'spyglass-favorites-header';
+      
+      const logo = document.createElement('img');
+      logo.src = logoUrl;
+      logo.alt = 'Spyglass Realty';
+      logo.className = 'spyglass-favorites-header-logo';
+      header.appendChild(logo);
+      
+      const headerContent = document.createElement('div');
+      headerContent.className = 'spyglass-favorites-header-content';
+      headerContent.innerHTML = `
+        <h2>
+          <svg class="heart-icon" width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
+          </svg>
+          My Favorites
+        </h2>
       `;
+      header.appendChild(headerContent);
+      
+      if (this.options.showPropertySearch) {
+        const tabs = document.createElement('div');
+        tabs.className = 'spyglass-favorites-tabs';
+        
+        const favoritesTab = document.createElement('button');
+        favoritesTab.className = 'spyglass-favorites-tab' + (this.state.currentView === 'favorites' ? ' active' : '');
+        favoritesTab.setAttribute('data-view', 'favorites');
+        favoritesTab.id = this.containerId + '-tab-favorites';
+        favoritesTab.textContent = 'Saved (' + this.state.favorites.length + ')';
+        tabs.appendChild(favoritesTab);
+        
+        const browseTab = document.createElement('button');
+        browseTab.className = 'spyglass-favorites-tab' + (this.state.currentView === 'browse' ? ' active' : '');
+        browseTab.setAttribute('data-view', 'browse');
+        browseTab.id = this.containerId + '-tab-browse';
+        browseTab.textContent = 'Browse';
+        tabs.appendChild(browseTab);
+        
+        header.appendChild(tabs);
+      }
+      
+      this.container.appendChild(header);
+      
+      const content = document.createElement('div');
+      content.className = 'spyglass-favorites-content';
+      content.id = this.containerId + '-content';
+      this.container.appendChild(content);
 
       this.attachTabListeners();
       this.renderContent();
@@ -581,19 +605,24 @@
       }
 
       if (this.state.error) {
-        content.innerHTML = `
-          <div class="spyglass-error">
-            <p>${this.state.error}</p>
-            <button id="${this.containerId}-retry">Try Again</button>
-          </div>
-        `;
-        document.getElementById(`${this.containerId}-retry`)?.addEventListener('click', () => {
+        content.innerHTML = '';
+        const errorDiv = document.createElement('div');
+        errorDiv.className = 'spyglass-error';
+        const errorP = document.createElement('p');
+        errorP.textContent = this.state.error;
+        errorDiv.appendChild(errorP);
+        const retryBtn = document.createElement('button');
+        retryBtn.id = this.containerId + '-retry';
+        retryBtn.textContent = 'Try Again';
+        retryBtn.addEventListener('click', () => {
           if (this.state.currentView === 'favorites') {
             this.loadFavorites();
           } else {
             this.loadProperties(this.state.currentPage);
           }
         });
+        errorDiv.appendChild(retryBtn);
+        content.appendChild(errorDiv);
         return;
       }
 
