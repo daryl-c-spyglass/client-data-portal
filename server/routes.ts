@@ -1060,6 +1060,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const normalizedSchools = schoolList.map(s => normalizeSchoolName(s)).filter(s => s.length > 0);
           if (normalizedSchools.length > 0) {
             const beforeCount = filtered.length;
+            // Debug: Log sample of school values in data
+            const sampleSchools = filtered.slice(0, 10).map((p: any) => p.elementarySchool).filter(Boolean);
+            console.log(`🏫 [DEBUG] Sample elementary school values in data: ${sampleSchools.length > 0 ? sampleSchools.join(', ') : 'NONE FOUND'}`);
+            console.log(`🏫 [DEBUG] Normalized search terms: ${normalizedSchools.join(', ')}`);
+            
             filtered = filtered.filter((p: any) => {
               const propSchool = normalizeSchoolName(p.elementarySchool);
               if (!propSchool) return false;
