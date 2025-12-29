@@ -193,6 +193,10 @@ export function CMAReport({
   const [showUnderContractOnTimeline, setShowUnderContractOnTimeline] = useState(true);
   const [showSoldOnTimeline, setShowSoldOnTimeline] = useState(true);
   
+  // Pricing Strategy state
+  const [showSubjectOnPricingChart, setShowSubjectOnPricingChart] = useState(true);
+  const [selectedPricingProperty, setSelectedPricingProperty] = useState<Property | null>(null);
+  
   // Horizontal scroll refs for carousel arrows
   const statsScrollRef = useRef<HTMLDivElement>(null);
   const compareScrollRef = useRef<HTMLDivElement>(null);
@@ -1612,6 +1616,360 @@ export function CMAReport({
                       <div className="w-4 h-4 rounded-full bg-red-500" />
                       <span className="text-sm text-muted-foreground">&lt;95% of list</span>
                     </div>
+                  </div>
+                </CardContent>
+              </Card>
+            );
+          })()}
+
+          {/* Pricing Strategy - Average Price/Sq.Ft. Chart */}
+          {(() => {
+            const subjectProp = subjectPropertyId 
+              ? properties.find(p => p.id === subjectPropertyId)
+              : null;
+            
+            const closedComps = soldProperties.filter(p => 
+              !excludedPropertyIds.has(p.id) && 
+              p.id !== subjectPropertyId &&
+              p.livingArea && Number(p.livingArea) > 0 &&
+              (p.closePrice || p.listPrice)
+            );
+            
+            if (closedComps.length === 0) return null;
+            
+            const avgPricePerSqFt = closedComps.reduce((sum, p) => {
+              const price = p.closePrice ? Number(p.closePrice) : Number(p.listPrice || 0);
+              const sqft = Number(p.livingArea || 0);
+              return sum + (sqft > 0 ? price / sqft : 0);
+            }, 0) / closedComps.length;
+            
+            const chartData = closedComps.map(p => {
+              const price = p.closePrice ? Number(p.closePrice) : Number(p.listPrice || 0);
+              const sqft = Number(p.livingArea || 0);
+              const pricePerSqFt = sqft > 0 ? price / sqft : 0;
+              const address = p.unparsedAddress || '';
+              const shortAddress = address.split(' ').slice(0, 3).join(' ');
+              return {
+                id: p.id,
+                address: shortAddress,
+                fullAddress: address,
+                sqft,
+                price,
+                pricePerSqFt,
+                isSubject: false,
+                property: p
+              };
+            });
+            
+            if (subjectProp && showSubjectOnPricingChart) {
+              const subjectPrice = subjectProp.listPrice ? Number(subjectProp.listPrice) : 0;
+              const subjectSqft = Number(subjectProp.livingArea || 0);
+              if (subjectSqft > 0 && subjectPrice > 0) {
+                chartData.push({
+                  id: subjectProp.id,
+                  address: 'Subject',
+                  fullAddress: subjectProp.unparsedAddress || 'Subject Property',
+                  sqft: subjectSqft,
+                  price: subjectPrice,
+                  pricePerSqFt: subjectPrice / subjectSqft,
+                  isSubject: true,
+                  property: subjectProp
+                });
+              }
+            }
+            
+            const getPropertyPhotos = (property: Property): string[] => {
+              const photos = (property as any).photos as string[] | undefined;
+              const media = (property as any).media as any[] | undefined;
+              if (photos && photos.length > 0) return photos;
+              if (media && media.length > 0) {
+                return media.map((m: any) => m.mediaURL || m.mediaUrl).filter(Boolean);
+              }
+              return [];
+            };
+            
+            const sidebarProperties: Array<{ property: Property; isSubject: boolean }> = [];
+            
+            if (subjectProp && showSubjectOnPricingChart) {
+              const subjectSqft = Number(subjectProp.livingArea || 0);
+              const subjectPrice = subjectProp.listPrice ? Number(subjectProp.listPrice) : 0;
+              if (subjectSqft > 0 && subjectPrice > 0) {
+                sidebarProperties.push({ property: subjectProp, isSubject: true });
+              }
+            }
+            
+            closedComps.forEach(p => {
+              sidebarProperties.push({ property: p, isSubject: false });
+            });
+            
+            return (
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-xl uppercase tracking-wide">Average Price/Sq. Ft.</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="flex gap-4">
+                    {/* Left Sidebar - Property List */}
+                    <div className="w-64 flex-shrink-0 border-r pr-4">
+                      <div className="text-xs text-muted-foreground mb-2">
+                        {showSubjectOnPricingChart && subjectProp ? '1 Subject, ' : ''}{closedComps.length} Closed
+                      </div>
+                      <div className="space-y-2 max-h-[400px] overflow-y-auto">
+                        {sidebarProperties.map(({ property, isSubject }) => {
+                          const photos = getPropertyPhotos(property);
+                          const photo = photos[0];
+                          const price = isSubject 
+                            ? Number(property.listPrice || 0)
+                            : (property.closePrice ? Number(property.closePrice) : Number(property.listPrice || 0));
+                          const sqft = Number(property.livingArea || 0);
+                          const pricePerSqFt = sqft > 0 ? price / sqft : 0;
+                          const address = property.unparsedAddress || '';
+                          const shortAddress = address.split(' ').slice(0, 3).join(' ') + '...';
+                          const isSelected = selectedPricingProperty?.id === property.id;
+                          
+                          return (
+                            <div 
+                              key={property.id}
+                              className={cn(
+                                "flex items-center gap-2 p-2 rounded cursor-pointer transition-colors",
+                                isSelected ? "bg-primary/10 border border-primary" : "hover:bg-muted",
+                                isSubject && "border-l-4 border-l-blue-500"
+                              )}
+                              onClick={() => setSelectedPricingProperty(isSelected ? null : property)}
+                              data-testid={`pricing-property-${property.id}`}
+                            >
+                              <div className="w-12 h-12 flex-shrink-0 rounded overflow-hidden bg-muted relative">
+                                {photo ? (
+                                  <img src={photo} alt="" className="w-full h-full object-cover" />
+                                ) : (
+                                  <div className="w-full h-full flex items-center justify-center text-muted-foreground">
+                                    <Home className="w-5 h-5" />
+                                  </div>
+                                )}
+                                {isSubject && (
+                                  <div className="absolute -top-1 -right-1 w-5 h-5 bg-blue-500 rounded-full flex items-center justify-center">
+                                    <span className="text-white text-[10px]">⌂</span>
+                                  </div>
+                                )}
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <div className="text-sm font-medium truncate">
+                                  {isSubject && <span className="text-blue-500 font-semibold">Subject: </span>}
+                                  {shortAddress}
+                                </div>
+                                <div className="text-xs text-primary font-semibold">${Math.round(pricePerSqFt)} / sq. ft.</div>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                    
+                    {/* Main Content - Chart and Stats */}
+                    <div className="flex-1">
+                      {/* Large Price/SqFt Header */}
+                      <div className="mb-4">
+                        <div className="flex items-baseline gap-2">
+                          <span className="text-4xl font-bold text-primary">${Math.round(avgPricePerSqFt)}</span>
+                          <span className="text-xl text-muted-foreground">/ Sq. Ft.</span>
+                        </div>
+                        <p className="text-sm text-muted-foreground mt-1">
+                          Comparable homes sold for an average of <span className="text-primary font-medium">${Math.round(avgPricePerSqFt)}</span>/sq. ft. 
+                          Many factors such as location, use of space, condition, quality, and amenities determine the market value per square foot, 
+                          so reviewing each comp carefully is important.
+                        </p>
+                      </div>
+                      
+                      {/* Scatter Chart */}
+                      <div className="h-[350px]">
+                        <ResponsiveContainer width="100%" height="100%">
+                          <ScatterChart margin={{ top: 20, right: 20, bottom: 40, left: 60 }}>
+                            <CartesianGrid strokeDasharray="3 3" />
+                            <XAxis 
+                              type="number" 
+                              dataKey="sqft" 
+                              name="Square Feet"
+                              tickFormatter={(value) => value.toLocaleString()}
+                              label={{ value: 'Square feet', position: 'bottom', offset: 20 }}
+                            />
+                            <YAxis 
+                              type="number" 
+                              dataKey="price" 
+                              name="Price"
+                              tickFormatter={(value) => `$${(value / 1000).toFixed(0)}K`}
+                            />
+                            <ZAxis type="number" range={[200, 200]} />
+                            <RechartsTooltip 
+                              formatter={(value: number, name: string) => {
+                                if (name === 'Price') return [`$${value.toLocaleString()}`, 'Price'];
+                                if (name === 'Square Feet') return [value.toLocaleString(), 'Sq Ft'];
+                                return [value, name];
+                              }}
+                              labelFormatter={(label, payload) => {
+                                if (payload && payload[0]) {
+                                  return payload[0].payload.fullAddress;
+                                }
+                                return label;
+                              }}
+                            />
+                            <Scatter 
+                              name="Properties" 
+                              data={chartData}
+                              shape={(props: any) => {
+                                const { cx, cy, payload } = props;
+                                if (payload.isSubject) {
+                                  return (
+                                    <g>
+                                      <circle cx={cx} cy={cy} r={16} fill="#3b82f6" stroke="white" strokeWidth={2} />
+                                      <text x={cx} y={cy + 4} textAnchor="middle" fill="white" fontSize={12}>⌂</text>
+                                    </g>
+                                  );
+                                }
+                                return (
+                                  <circle 
+                                    cx={cx} 
+                                    cy={cy} 
+                                    r={10} 
+                                    fill="#dc2626"
+                                    stroke="white" 
+                                    strokeWidth={2}
+                                    style={{ cursor: 'pointer' }}
+                                  />
+                                );
+                              }}
+                            />
+                          </ScatterChart>
+                        </ResponsiveContainer>
+                      </div>
+                      
+                      {/* Legend */}
+                      <div className="flex items-center gap-6 mt-4 pt-4 border-t">
+                        <div className="flex items-center gap-2">
+                          <Checkbox 
+                            id="show-subject-pricing"
+                            checked={showSubjectOnPricingChart}
+                            onCheckedChange={(checked) => setShowSubjectOnPricingChart(checked === true)}
+                            data-testid="checkbox-show-subject"
+                          />
+                          <div className="w-5 h-5 rounded-full bg-blue-500 flex items-center justify-center">
+                            <span className="text-white text-[10px]">⌂</span>
+                          </div>
+                          <label htmlFor="show-subject-pricing" className="text-sm text-muted-foreground cursor-pointer">
+                            Subject Property
+                          </label>
+                        </div>
+                      </div>
+                    </div>
+                    
+                    {/* Right Panel - Selected Property Details */}
+                    {selectedPricingProperty && (
+                      <div className="w-72 flex-shrink-0 border-l pl-4">
+                        <div className="flex items-center justify-between mb-2">
+                          <Badge 
+                            variant="secondary" 
+                            className={cn("text-xs", selectedPricingProperty.id === subjectPropertyId && "bg-blue-500 text-white")}
+                          >
+                            {selectedPricingProperty.id === subjectPropertyId 
+                              ? 'Subject Property' 
+                              : (selectedPricingProperty.standardStatus === 'Closed' ? 'Closed' : selectedPricingProperty.standardStatus)}
+                          </Badge>
+                          <Button 
+                            variant="ghost" 
+                            size="icon" 
+                            className="h-6 w-6"
+                            onClick={() => setSelectedPricingProperty(null)}
+                            data-testid="button-close-pricing-detail"
+                          >
+                            ×
+                          </Button>
+                        </div>
+                        
+                        {(() => {
+                          const photos = getPropertyPhotos(selectedPricingProperty);
+                          const photo = photos[0];
+                          const price = selectedPricingProperty.closePrice 
+                            ? Number(selectedPricingProperty.closePrice) 
+                            : Number(selectedPricingProperty.listPrice || 0);
+                          const sqft = Number(selectedPricingProperty.livingArea || 0);
+                          const pricePerSqFt = sqft > 0 ? price / sqft : 0;
+                          const listPrice = Number(selectedPricingProperty.listPrice || 0);
+                          const closePrice = Number(selectedPricingProperty.closePrice || 0);
+                          const soldPriceRatio = listPrice > 0 && closePrice > 0 
+                            ? ((closePrice / listPrice) * 100).toFixed(1) 
+                            : null;
+                          
+                          return (
+                            <>
+                              <div className="aspect-video rounded overflow-hidden bg-muted mb-3">
+                                {photo ? (
+                                  <img src={photo} alt="" className="w-full h-full object-cover" />
+                                ) : (
+                                  <div className="w-full h-full flex items-center justify-center text-muted-foreground">
+                                    <Home className="w-8 h-8" />
+                                  </div>
+                                )}
+                              </div>
+                              
+                              <h4 className="font-semibold text-sm truncate">{selectedPricingProperty.unparsedAddress}</h4>
+                              <p className="text-xs text-muted-foreground mb-3">
+                                {selectedPricingProperty.city}, {selectedPricingProperty.stateOrProvince} {selectedPricingProperty.postalCode}
+                              </p>
+                              
+                              <div className="text-xl font-bold text-primary mb-3">
+                                ${price.toLocaleString()}
+                              </div>
+                              
+                              <div className="space-y-2 text-sm">
+                                <div className="flex justify-between">
+                                  <span className="text-muted-foreground">Beds</span>
+                                  <span className="font-medium">{selectedPricingProperty.bedroomsTotal || '-'}</span>
+                                </div>
+                                <div className="flex justify-between">
+                                  <span className="text-muted-foreground">Baths</span>
+                                  <span className="font-medium">{selectedPricingProperty.bathroomsTotalInteger || '-'}</span>
+                                </div>
+                                <div className="flex justify-between">
+                                  <span className="text-muted-foreground">Sq. Ft.</span>
+                                  <span className="font-medium">{sqft > 0 ? sqft.toLocaleString() : '-'}</span>
+                                </div>
+                                <div className="flex justify-between">
+                                  <span className="text-muted-foreground">Lot Size</span>
+                                  <span className="font-medium">{selectedPricingProperty.lotSizeSquareFeet ? Number(selectedPricingProperty.lotSizeSquareFeet).toLocaleString() : '-'}</span>
+                                </div>
+                                <div className="flex justify-between">
+                                  <span className="text-muted-foreground">Garage Spaces</span>
+                                  <span className="font-medium">{(selectedPricingProperty as any).garageSpaces || '-'}</span>
+                                </div>
+                              </div>
+                              
+                              <Separator className="my-3" />
+                              
+                              <div className="space-y-2 text-sm">
+                                <div className="font-medium">Listing Details</div>
+                                <div className="flex justify-between">
+                                  <span className="text-muted-foreground">Orig. Price</span>
+                                  <span className="font-medium">${listPrice.toLocaleString()}</span>
+                                </div>
+                                <div className="flex justify-between">
+                                  <span className="text-muted-foreground">List Price</span>
+                                  <span className="font-medium">${listPrice.toLocaleString()}</span>
+                                </div>
+                                {closePrice > 0 && (
+                                  <div className="flex justify-between">
+                                    <span className="text-muted-foreground">Sold Price {soldPriceRatio && <span className="text-xs">({soldPriceRatio}%)</span>}</span>
+                                    <span className="font-medium">${closePrice.toLocaleString()}</span>
+                                  </div>
+                                )}
+                                <div className="flex justify-between">
+                                  <span className="text-muted-foreground">Price per Sq. Ft.</span>
+                                  <span className="font-medium">${Math.round(pricePerSqFt)}</span>
+                                </div>
+                              </div>
+                            </>
+                          );
+                        })()}
+                      </div>
+                    )}
                   </div>
                 </CardContent>
               </Card>
