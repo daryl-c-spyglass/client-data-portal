@@ -780,8 +780,8 @@
     }
 
     render() {
-      const p = this.containerId;
-      const logoUrl = this.options.logoUrl || (this.options.apiUrl ? `${this.options.apiUrl}/spyglass-logo-white.png` : '/spyglass-logo-white.png');
+      const p = this.escapeHtml(this.containerId);
+      const logoUrl = this.escapeHtml(this.options.logoUrl || (this.options.apiUrl ? `${this.options.apiUrl}/spyglass-logo-white.png` : '/spyglass-logo-white.png'));
       this.container.innerHTML = `
         <div class="spyglass-widget">
           <div class="spyglass-header">
