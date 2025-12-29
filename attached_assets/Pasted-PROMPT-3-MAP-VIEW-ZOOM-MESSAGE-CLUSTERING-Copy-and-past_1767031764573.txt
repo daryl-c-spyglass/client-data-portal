@@ -1,0 +1,499 @@
+PROMPT 3: MAP VIEW - ZOOM MESSAGE & CLUSTERING
+Copy and paste this into Replit:
+## Map View Enhancement - Zoom Message and Pin Clustering
+
+### Feature 1: "Zoom In" Message
+When the map is zoomed out too far (showing too large an area), display a floating message:
+
+- Text: "⊕ Zoom in to see more listings"
+- Position: Top center of map, floating over the map
+- Style: 
+  - Background: white with slight transparency (rgba(255,255,255,0.95))
+  - Border: 1px solid #ccc
+  - Border-radius: 20px
+  - Padding: 8px 16px
+  - Font-size: 14px
+  - Box-shadow: 0 2px 8px rgba(0,0,0,0.15)
+- Show when: Zoom level is less than 10 (or adjust based on testing)
+- Hide when: User zooms in enough to see individual properties clearly
+
+### Feature 2: Pin Clustering
+When multiple properties are close together (pins would overlap):
+
+- Cluster them into a single circle
+- Show count: "12" or "12 homes"
+- Circle style:
+  - Background: #E03103
+  - Color: white
+  - Size: 36px diameter
+  - Border-radius: 50%
+  - Font-weight: bold
+- On click: Zoom in to show individual properties
+- Clustering threshold: When pins are within ~50 pixels of each other
+
+### CSS for Zoom Message:
+```css
+.map-zoom-message {
+  position: absolute;
+  top: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(255, 255, 255, 0.95);
+  border: 1px solid #ccc;
+  border-radius: 20px;
+  padding: 8px 16px;
+  font-size: 14px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.map-cluster {
+  background: #E03103;
+  color: white;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: bold;
+  font-size: 14px;
+  cursor: pointer;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+}
+```
+
+Please implement these map enhancements.
+
+PROMPT 4: PROPERTY DETAIL - ADD PRICE PER SQFT & STATUS BADGE
+Copy and paste this into Replit:
+## Property Detail Modal - Add Key Metrics
+
+Add these new data points to the property detail modal:
+
+### 1. PRICE PER SQUARE FOOT
+- Calculation: Price ÷ Square Footage
+- Format: "$XXX/sqft"
+- Example: $550,000 ÷ 1,930 sqft = "$285/sqft"
+- Position: Display next to or below the main price
+- Style: Smaller font, gray color
+
+### 2. STATUS BADGE WITH DAYS ON MARKET
+Show the property status with days on market:
+
+Format: "STATUS • X DAYS"
+
+Examples:
+- "ACTIVE • 15 DAYS"
+- "PENDING • 8 DAYS" 
+- "UNDER CONTRACT • 12 DAYS"
+- "CLOSED • 4 DAYS"
+
+Color coding:
+- ACTIVE: Green background (#28a745)
+- PENDING: Orange background (#fd7e14)
+- UNDER CONTRACT: Orange background (#fd7e14)
+- CLOSED: Red background (#dc3545)
+
+Style:
+```css
+.status-badge {
+  display: inline-block;
+  padding: 4px 12px;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: white;
+}
+.status-badge.active { background: #28a745; }
+.status-badge.pending { background: #fd7e14; }
+.status-badge.under-contract { background: #fd7e14; }
+.status-badge.closed { background: #dc3545; }
+```
+
+### 3. Calculate Days on Market
+- If property has listDate or listingDate field: Today - List Date
+- If property is closed and has soldDate: Sold Date - List Date
+- Display as whole number of days
+
+### Updated Property Header Layout:
+┌─────────────────────────────────────────────────────┐
+│ ACTIVE • 15 DAYS                                    │
+│                                                     │
+│ $550,000                              $285/sqft     │
+│ 123 Main Street, Austin, TX 78704                   │
+│                                                     │
+│ 3 beds    2 baths    1,930 sqft    2015    0.25 ac │
+└─────────────────────────────────────────────────────┘
+
+Please implement these additions to the property detail modal.
+
+PROMPT 5: PROPERTY DETAIL - ADD LISTING DATES & MLS INFO
+Copy and paste this into Replit:
+## Property Detail Modal - Add Dates and MLS Information
+
+Add a property information sidebar/card showing key dates and MLS data:
+
+### Information to Display:
+
+1. LISTING DATE
+   - Label: "Listed:"
+   - Format: "MM/DD/YY" (e.g., "12/15/25")
+   - Source: listDate or listingDate field from MLS data
+
+2. SOLD DATE (for closed properties only)
+   - Label: "Sold:"
+   - Format: "MM/DD/YY" (e.g., "1/15/26")
+   - Only show if property status is CLOSED
+
+3. ORIGINAL LIST PRICE (if available)
+   - Label: "Original Price:"
+   - Format: "$XXX,XXX"
+   - Source: originalListPrice field if available
+
+4. CURRENT/FINAL LIST PRICE
+   - Label: "List Price:"
+   - Format: "$XXX,XXX"
+   - Source: listPrice field
+
+5. SOLD PRICE PERCENTAGE (for closed properties)
+   - Label: "Sold Price:"
+   - Format: "XX.X%" followed by the price
+   - Calculation: (Sold Price ÷ List Price) × 100
+   - Example: "97.5%  $1,068,000"
+   - Color: Green if >= 100%, Red if < 95%, Orange if 95-99%
+
+6. MLS NUMBER
+   - Label: "MLS #"
+   - Display the MLS ID number
+   - Make it a clickable link if MLS URL is available in data
+
+7. LAST UPDATED
+   - Label: "Last Updated:"
+   - Format: "MM/DD/YY at HH:MM AM/PM"
+   - Source: lastModified or updatedAt field
+
+### Layout - Right Sidebar Card:
+┌─────────────────────────────┐
+│ ACTIVE • 15 DAYS            │
+│                             │
+│ $550,000         $285/sqft  │
+│ 3 beds  2 baths  1,930 sqft │
+│                             │
+│ Listed: 12/15/25            │
+│                             │
+│ Original Price:   $575,000  │
+│ List Price:       $550,000  │
+│                             │
+│ MLS # 1234567     📋        │
+│ Updated: 12/29/25 10:30 AM  │
+└─────────────────────────────┘
+
+### For CLOSED Properties, also show:
+│ Listed: 7/10/25             │
+│ Sold: 8/14/25               │
+│                             │
+│ Original Price: $1,095,000  │
+│ List Price:     $1,095,000  │
+│ Sold Price: 97.5% $1,068,000│
+
+Please add this information sidebar to the property detail modal.
+
+PROMPT 6: PROPERTY DETAIL - PHOTO COUNT BADGE
+Copy and paste this into Replit:
+## Property Detail Modal - Add Photo Count Badge
+
+Add a photo count indicator to the property photo carousel.
+
+### Requirements:
+
+1. POSITION: Bottom left corner of the main/hero photo
+
+2. DISPLAY FORMAT: 
+   - Show camera icon + number
+   - Example: "📷 33" or "🖼 33"
+   - Or just the number with a small camera icon
+
+3. STYLE:
+```css
+.photo-count-badge {
+  position: absolute;
+  bottom: 12px;
+  left: 12px;
+  background: rgba(0, 0, 0, 0.7);
+  color: white;
+  padding: 4px 10px;
+  border-radius: 4px;
+  font-size: 13px;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  z-index: 10;
+}
+
+.photo-count-badge svg {
+  width: 16px;
+  height: 16px;
+}
+```
+
+4. ICON OPTIONS (use one):
+   - Camera emoji: 📷
+   - Image emoji: 🖼
+   - SVG camera icon
+   - SVG gallery/images icon
+
+5. COUNT SOURCE:
+   - Count the total number of photos in the photos array
+   - Example: If property has 33 photos, show "📷 33"
+
+6. EXAMPLE HTML:
+```html
+<div class="photo-count-badge">
+  <svg><!-- camera icon --></svg>
+  <span>33</span>
+</div>
+```
+
+Please add this photo count badge to the property photo carousel.
+
+PROMPT 7: SCHOOLS SECTION (FUTURE ENHANCEMENT)
+Copy and paste this into Replit when ready to add schools:
+## Property Detail Modal - Add Schools Section
+
+Note: This requires GreatSchools API integration. You'll need to:
+1. Sign up for GreatSchools API at https://www.greatschools.org/api/
+2. Add API key to environment variables: GREATSCHOOLS_API_KEY
+
+### Feature: Nearby Schools List
+Add a "Schools" section below the property description showing nearby schools.
+
+### API Call:
+GET https://api.greatschools.org/schools/nearby
+Parameters:
+- lat: property latitude
+- lon: property longitude
+- radius: 3 (miles)
+- limit: 10
+
+### Display Table:
+| GreatSchools Rating | Grades | School Name | Distance |
+|---------------------|--------|-------------|----------|
+| (color circle 1-10) | PK-5   | School Name | 0.39 mi  |
+
+### Rating Circle Colors:
+- 8-10: Green (#28a745)
+- 5-7: Yellow (#ffc107) 
+- 1-4: Red (#dc3545)
+- NA: Gray (#6c757d)
+
+### Table CSS:
+```css
+.schools-section {
+  margin-top: 24px;
+  border-top: 1px solid #eee;
+  padding-top: 24px;
+}
+
+.schools-section h3 {
+  color: #E03103;
+  font-size: 18px;
+  margin-bottom: 16px;
+}
+
+.schools-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.schools-table th {
+  text-align: left;
+  padding: 8px;
+  border-bottom: 2px solid #eee;
+  font-size: 12px;
+  color: #666;
+  text-transform: uppercase;
+}
+
+.schools-table td {
+  padding: 12px 8px;
+  border-bottom: 1px solid #eee;
+}
+
+.rating-circle {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-weight: bold;
+  font-size: 12px;
+}
+
+.rating-circle.high { background: #28a745; }
+.rating-circle.medium { background: #ffc107; color: #333; }
+.rating-circle.low { background: #dc3545; }
+.rating-circle.na { background: #6c757d; }
+```
+
+### Footer:
+Add at bottom: "Data provided by GreatSchools.org © 2024. All rights reserved."
+
+### Example Layout:
+┌─────────────────────────────────────────────────────────────┐
+│ Schools                                                     │
+├─────────────────────────────────────────────────────────────┤
+│ Rating  Grades  School Name                      Distance   │
+│ ┌──┐                                                        │
+│ │8 │    KG-6   Barton Hills Elementary School   0.387 mi   │
+│ └──┘                                                        │
+│ ┌──┐                                                        │
+│ │9 │    PK-5   Zilker Elementary School         0.718 mi   │
+│ └──┘                                                        │
+│ ┌──┐                                                        │
+│ │7 │    9-12   Austin High School               1.338 mi   │
+│ └──┘                                                        │
+├─────────────────────────────────────────────────────────────┤
+│ Data provided by GreatSchools.org © 2024                    │
+└─────────────────────────────────────────────────────────────┘
+
+Please implement this schools section. Skip if GreatSchools API is not yet available.
+
+PROMPT 8: PROPERTY HISTORY TIMELINE (FUTURE ENHANCEMENT)
+Copy and paste this into Replit when ready to add history:
+## Property Detail Modal - Add History Timeline
+
+Note: This requires property history data from MLS. Check if your MLS feed includes price/status change history.
+
+### Feature: Property History Timeline
+Show a timeline of price changes and status changes for the property.
+
+### Data Needed:
+- Price change history (dates and prices)
+- Status change history (dates and statuses)
+
+### Timeline Format:
+┌─────────────────────────────────────────────────────────────┐
+│ History                                                     │
+├─────────────────────────────────────────────────────────────┤
+│ July 11, 2025   💰 Initial listing price set to $1,095,000  │
+│                                                             │
+│ July 15, 2025   📋 Status changed from Active to           │
+│                    Active Under Contract                    │
+│                                                             │
+│ August 1, 2025  📋 Status changed from Active Under        │
+│                    Contract to Pending                      │
+│                                                             │
+│ August 15, 2025 📋 Status changed from Pending to Closed   │
+├─────────────────────────────────────────────────────────────┤
+│ Last Updated 12/29/25 at 12:24 AM                          │
+└─────────────────────────────────────────────────────────────┘
+
+### Timeline Item Types:
+
+1. PRICE CHANGE:
+   - Icon: 💰 or $ or dollar sign icon
+   - Text: "Initial listing price set to $X,XXX,XXX"
+   - Or: "Price reduced from $X to $Y"
+   - Or: "Price increased from $X to $Y"
+
+2. STATUS CHANGE:
+   - Icon: 📋 or status icon
+   - Text: "Status changed from [Old Status] to [New Status]"
+
+### CSS:
+```css
+.history-section {
+  margin-top: 24px;
+  border-top: 1px solid #eee;
+  padding-top: 24px;
+}
+
+.history-section h3 {
+  color: #E03103;
+  font-size: 18px;
+  margin-bottom: 16px;
+}
+
+.history-timeline {
+  position: relative;
+  padding-left: 24px;
+}
+
+.history-timeline::before {
+  content: '';
+  position: absolute;
+  left: 8px;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: #eee;
+}
+
+.history-item {
+  position: relative;
+  padding-bottom: 20px;
+}
+
+.history-item::before {
+  content: '';
+  position: absolute;
+  left: -20px;
+  top: 4px;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #E03103;
+  border: 2px solid white;
+  box-shadow: 0 0 0 2px #E03103;
+}
+
+.history-date {
+  font-weight: 600;
+  color: #333;
+  margin-bottom: 4px;
+}
+
+.history-event {
+  color: #666;
+  font-size: 14px;
+}
+
+.history-footer {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid #eee;
+  font-size: 12px;
+  color: #999;
+}
+```
+
+### If History Data Not Available:
+- Don't show this section at all
+- Or show message: "Property history not available"
+
+Please implement this history timeline if property history data is available from the MLS feed.
+
+SUMMARY: ORDER OF IMPLEMENTATION
+
+PROMPT 1 - Bug Fixes (CRITICAL - Do First)
+
+Remove For Lease tab
+Remove View on Website button
+Ensure For Sale filter works
+
+
+PROMPT 2 - Map Price Label Pins (High Priority)
+PROMPT 3 - Map Zoom Message & Clustering (High Priority)
+PROMPT 4 - Price/Sqft & Status Badge (Medium Priority)
+PROMPT 5 - Listing Dates & MLS Info (Medium Priority)
+PROMPT 6 - Photo Count Badge (Low Priority)
+PROMPT 7 - Schools Section (Future - Needs API)
+PROMPT 8 - Property History (Future - Needs MLS Data)

@@ -719,6 +719,132 @@
     .spyglass-price-pin.selected::after {
       border-top-color: #F5A623;
     }
+
+    /* Map Zoom Message */
+    .spyglass-zoom-message {
+      position: absolute;
+      top: 16px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(255, 255, 255, 0.95);
+      border: 1px solid #ccc;
+      border-radius: 20px;
+      padding: 8px 16px;
+      font-size: 14px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+      z-index: 1000;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-family: 'Poppins', sans-serif;
+      pointer-events: none;
+    }
+
+    /* Map Cluster */
+    .spyglass-cluster {
+      background: #E03103;
+      color: white;
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: bold;
+      font-size: 14px;
+      cursor: pointer;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+      font-family: 'Poppins', sans-serif;
+      transition: transform 0.15s ease;
+      position: absolute;
+    }
+
+    .spyglass-cluster:hover {
+      transform: scale(1.1);
+    }
+
+    /* Photo Count Badge */
+    .spyglass-photo-count {
+      position: absolute;
+      bottom: 12px;
+      left: 12px;
+      background: rgba(0, 0, 0, 0.7);
+      color: white;
+      padding: 4px 10px;
+      border-radius: 4px;
+      font-size: 13px;
+      font-weight: 500;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      z-index: 10;
+    }
+
+    .spyglass-photo-count svg {
+      width: 16px;
+      height: 16px;
+    }
+
+    /* Status Badge */
+    .spyglass-status-badge {
+      display: inline-block;
+      padding: 4px 12px;
+      border-radius: 4px;
+      font-size: 12px;
+      font-weight: 700;
+      text-transform: uppercase;
+      color: white;
+      font-family: 'Poppins', sans-serif;
+    }
+
+    .spyglass-status-badge.active { background: #28a745; }
+    .spyglass-status-badge.pending { background: #fd7e14; }
+    .spyglass-status-badge.under-contract { background: #fd7e14; }
+    .spyglass-status-badge.closed { background: #dc3545; }
+
+    /* Price Per Sqft */
+    .spyglass-price-per-sqft {
+      font-size: 0.9rem;
+      color: #666;
+      font-family: 'Lato', sans-serif;
+    }
+
+    /* Property Info Sidebar */
+    .spyglass-modal-info-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px 16px;
+      margin-top: 16px;
+      padding: 16px;
+      background: #f9f9f9;
+      border-radius: 8px;
+      font-size: 0.875rem;
+    }
+
+    .spyglass-modal-info-label {
+      color: #666;
+      font-family: 'Lato', sans-serif;
+    }
+
+    .spyglass-modal-info-value {
+      font-weight: 600;
+      text-align: right;
+      font-family: 'Poppins', sans-serif;
+    }
+
+    .spyglass-modal-info-value.green { color: #28a745; }
+    .spyglass-modal-info-value.orange { color: #fd7e14; }
+    .spyglass-modal-info-value.red { color: #dc3545; }
+
+    .spyglass-mls-link {
+      color: #E03103;
+      text-decoration: none;
+      cursor: pointer;
+    }
+
+    .spyglass-mls-link:hover {
+      text-decoration: underline;
+    }
   `;
 
   const ICONS = {
@@ -1224,9 +1350,35 @@
         });
 
         this.infoWindow = new google.maps.InfoWindow();
-      }
 
-      this.updateMapMarkers();
+        // Add zoom message overlay
+        this.zoomMessage = document.createElement('div');
+        this.zoomMessage.className = 'spyglass-zoom-message';
+        this.zoomMessage.innerHTML = '\u2295 Zoom in to see more listings';
+        this.zoomMessage.style.display = 'none';
+        mapContainer.style.position = 'relative';
+        mapContainer.appendChild(this.zoomMessage);
+
+        // Listen for zoom changes - only update markers and message, not bounds
+        this.map.addListener('zoom_changed', () => {
+          this.updateZoomMessage();
+          this.updateMapMarkers(false); // false = don't fit bounds
+        });
+
+        // Wait for map to be idle before initial clustering (ensures projection is available)
+        google.maps.event.addListenerOnce(this.map, 'idle', () => {
+          this.updateMapMarkers(true); // fit bounds on initial load
+        });
+      } else {
+        // Map already exists, update markers directly
+        this.updateMapMarkers(true);
+      }
+    }
+
+    updateZoomMessage() {
+      if (!this.zoomMessage || !this.map) return;
+      const zoom = this.map.getZoom();
+      this.zoomMessage.style.display = zoom < 10 ? 'flex' : 'none';
     }
 
     loadGoogleMaps() {
@@ -1246,39 +1398,180 @@
       });
     }
 
-    updateMapMarkers() {
+    updateMapMarkers(fitBounds = true) {
       if (!this.map) return;
 
       // Clear existing markers
-      this.markers.forEach(marker => {
-        if (marker.setMap) marker.setMap(null);
-        if (marker.overlay) marker.overlay.setMap(null);
-      });
+      if (this.markers) {
+        this.markers.forEach(marker => {
+          if (marker.overlay && marker.overlay.setMap) {
+            marker.overlay.setMap(null);
+          }
+        });
+      }
       this.markers = [];
+      
+      // Clear existing clusters
+      if (this.clusters) {
+        this.clusters.forEach(cluster => {
+          if (cluster && cluster.setMap) cluster.setMap(null);
+        });
+      }
+      this.clusters = [];
 
       // Clear selected marker reference
       this.selectedMarker = null;
 
+      // Update zoom message
+      this.updateZoomMessage();
+
       const bounds = new google.maps.LatLngBounds();
       const properties = this.state.properties.slice(0, 500); // Limit to 500 pins
+      const validProperties = properties.filter(p => p.latitude && p.longitude);
 
-      properties.forEach(property => {
-        if (!property.latitude || !property.longitude) return;
-
+      // Convert properties to points
+      const points = validProperties.map(property => {
         const position = { lat: parseFloat(property.latitude), lng: parseFloat(property.longitude) };
         bounds.extend(position);
-
-        // Create price pin overlay
-        const priceLabel = this.formatPinPrice(property.listPrice);
-        const overlay = this.createPricePinOverlay(position, priceLabel, property);
-        overlay.setMap(this.map);
-
-        this.markers.push({ overlay, property });
+        return { property, position };
       });
 
-      if (this.markers.length > 0) {
+      // Cluster properties based on zoom level
+      const zoom = this.map.getZoom() || 11;
+      const clustered = this.clusterProperties(points, zoom);
+
+      clustered.forEach(item => {
+        if (item.isCluster) {
+          // Create cluster overlay
+          const overlay = this.createClusterOverlay(item.position, item.properties);
+          overlay.setMap(this.map);
+          this.clusters.push(overlay);
+        } else {
+          // Create single price pin
+          const priceLabel = this.formatPinPrice(item.property.listPrice);
+          const overlay = this.createPricePinOverlay(item.position, priceLabel, item.property);
+          overlay.setMap(this.map);
+          this.markers.push({ overlay, property: item.property });
+        }
+      });
+
+      // Only fit bounds on initial load or when data changes, not on zoom changes
+      if (fitBounds && validProperties.length > 0) {
         this.map.fitBounds(bounds);
       }
+    }
+
+    clusterProperties(points, zoom) {
+      if (points.length === 0) return [];
+
+      // At high zoom levels (close up), don't cluster - show all individual pins
+      if (zoom >= 15) {
+        return points.map(p => ({ ...p, isCluster: false }));
+      }
+
+      // Distance threshold in degrees - adjusted by zoom level
+      // At zoom 10: ~0.02 degrees (~2km)
+      // At zoom 12: ~0.005 degrees (~500m)
+      // At zoom 14: ~0.001 degrees (~100m)
+      const baseRadius = 0.02;
+      const radiusMultiplier = Math.pow(2, 12 - zoom);
+      const clusterRadius = baseRadius * radiusMultiplier;
+
+      const clustered = [];
+      const used = new Set();
+
+      for (let i = 0; i < points.length; i++) {
+        if (used.has(i)) continue;
+
+        const point = points[i];
+        const nearby = [point];
+        used.add(i);
+
+        for (let j = i + 1; j < points.length; j++) {
+          if (used.has(j)) continue;
+
+          const other = points[j];
+          const dLat = point.position.lat - other.position.lat;
+          const dLng = point.position.lng - other.position.lng;
+          const distance = Math.sqrt(dLat * dLat + dLng * dLng);
+
+          if (distance < clusterRadius) {
+            nearby.push(other);
+            used.add(j);
+          }
+        }
+
+        if (nearby.length > 1) {
+          // Calculate cluster center
+          const avgLat = nearby.reduce((sum, p) => sum + p.position.lat, 0) / nearby.length;
+          const avgLng = nearby.reduce((sum, p) => sum + p.position.lng, 0) / nearby.length;
+          clustered.push({
+            isCluster: true,
+            position: { lat: avgLat, lng: avgLng },
+            properties: nearby.map(p => p.property)
+          });
+        } else {
+          clustered.push({
+            isCluster: false,
+            position: point.position,
+            property: point.property
+          });
+        }
+      }
+
+      return clustered;
+    }
+
+    createClusterOverlay(position, properties) {
+      const widget = this;
+
+      class ClusterOverlay extends google.maps.OverlayView {
+        constructor(position, properties) {
+          super();
+          this.position = position;
+          this.properties = properties;
+          this.div = null;
+        }
+
+        onAdd() {
+          this.div = document.createElement('div');
+          this.div.className = 'spyglass-cluster';
+          this.div.textContent = String(this.properties.length);
+
+          this.div.addEventListener('click', (e) => {
+            e.stopPropagation();
+            // Zoom in to show individual properties
+            widget.map.setCenter(new google.maps.LatLng(this.position.lat, this.position.lng));
+            widget.map.setZoom(widget.map.getZoom() + 2);
+          });
+
+          const panes = this.getPanes();
+          panes.overlayMouseTarget.appendChild(this.div);
+        }
+
+        draw() {
+          const overlayProjection = this.getProjection();
+          const pos = overlayProjection.fromLatLngToDivPixel(new google.maps.LatLng(this.position.lat, this.position.lng));
+
+          if (this.div) {
+            this.div.style.left = (pos.x - 18) + 'px';
+            this.div.style.top = (pos.y - 18) + 'px';
+          }
+        }
+
+        onRemove() {
+          if (this.div) {
+            this.div.parentNode.removeChild(this.div);
+            this.div = null;
+          }
+        }
+
+        setMap(map) {
+          super.setMap(map);
+        }
+      }
+
+      return new ClusterOverlay(position, properties);
     }
 
     createPricePinOverlay(position, priceLabel, property) {
@@ -1371,10 +1664,39 @@
 
       const photos = property.photos || [];
       const mainPhoto = property.primaryPhoto || (photos[0]?.mediaUrl) || 'https://placehold.co/900x400/e0e0e0/666?text=No+Photo';
+      const photoCount = photos.length || (property.primaryPhoto ? 1 : 0);
+
+      // Calculate derived values
+      const daysOnMarket = this.calculateDaysOnMarket(property);
+      const pricePerSqft = this.calculatePricePerSqft(property);
+      const status = property.standardStatus || 'Active';
+      const statusClass = this.getStatusBadgeClass(status);
+      const isClosed = statusClass === 'closed';
+
+      // Date fields
+      const listDate = property.listDate || property.listingDate || property.onMarketDate;
+      const soldDate = property.soldDate || property.closeDate;
+      const lastUpdated = property.lastModified || property.updatedAt || property.modificationTimestamp;
+
+      // Calculate sold price percentage if closed
+      let soldPricePercent = null;
+      let soldPriceClass = '';
+      if (isClosed && property.closePrice && property.listPrice) {
+        soldPricePercent = ((property.closePrice / property.listPrice) * 100).toFixed(1);
+        if (soldPricePercent >= 100) soldPriceClass = 'green';
+        else if (soldPricePercent >= 95) soldPriceClass = 'orange';
+        else soldPriceClass = 'red';
+      }
 
       content.innerHTML = `
-        <div class="spyglass-modal-gallery">
+        <div class="spyglass-modal-gallery" style="position: relative;">
           <img class="spyglass-modal-main-image" id="${p}-main-image" src="${this.escapeHtml(mainPhoto)}" alt="${this.escapeHtml(property.streetAddress)}" onerror="this.src='https://placehold.co/900x400/e0e0e0/666?text=No+Photo'">
+          ${photoCount > 0 ? `
+            <div class="spyglass-photo-count">
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/></svg>
+              <span>${photoCount}</span>
+            </div>
+          ` : ''}
           ${photos.length > 1 ? `
             <div class="spyglass-modal-thumbnails">
               ${photos.slice(0, 10).map((photo, i) => `
@@ -1384,6 +1706,10 @@
           ` : ''}
         </div>
         <div class="spyglass-modal-body">
+          <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 8px; margin-bottom: 8px;">
+            <span class="spyglass-status-badge ${statusClass}">${this.escapeHtml(status)}${daysOnMarket !== null ? ` &bull; ${daysOnMarket} DAYS` : ''}</span>
+            ${pricePerSqft ? `<span class="spyglass-price-per-sqft">$${this.formatNumber(pricePerSqft)}/sqft</span>` : ''}
+          </div>
           <div class="spyglass-modal-price">$${this.formatNumber(property.listPrice)}</div>
           <div class="spyglass-modal-address">
             ${this.escapeHtml(property.streetAddress) || ''}${property.city ? ', ' + this.escapeHtml(property.city) : ''}${property.stateOrProvince ? ', ' + this.escapeHtml(property.stateOrProvince) : ''} ${this.escapeHtml(property.postalCode) || ''}
@@ -1420,6 +1746,36 @@
               </div>
             ` : ''}
           </div>
+
+          <div class="spyglass-modal-info-grid">
+            ${listDate ? `
+              <span class="spyglass-modal-info-label">Listed:</span>
+              <span class="spyglass-modal-info-value">${this.formatDate(listDate)}</span>
+            ` : ''}
+            ${isClosed && soldDate ? `
+              <span class="spyglass-modal-info-label">Sold:</span>
+              <span class="spyglass-modal-info-value">${this.formatDate(soldDate)}</span>
+            ` : ''}
+            ${property.originalListPrice ? `
+              <span class="spyglass-modal-info-label">Original Price:</span>
+              <span class="spyglass-modal-info-value">$${this.formatNumber(property.originalListPrice)}</span>
+            ` : ''}
+            <span class="spyglass-modal-info-label">List Price:</span>
+            <span class="spyglass-modal-info-value">$${this.formatNumber(property.listPrice)}</span>
+            ${isClosed && property.closePrice ? `
+              <span class="spyglass-modal-info-label">Sold Price:</span>
+              <span class="spyglass-modal-info-value ${soldPriceClass}">${soldPricePercent}% $${this.formatNumber(property.closePrice)}</span>
+            ` : ''}
+            ${property.listingId ? `
+              <span class="spyglass-modal-info-label">MLS #</span>
+              <span class="spyglass-modal-info-value"><span class="spyglass-mls-link">${this.escapeHtml(String(property.listingId))}</span></span>
+            ` : ''}
+            ${lastUpdated ? `
+              <span class="spyglass-modal-info-label">Updated:</span>
+              <span class="spyglass-modal-info-value">${this.formatDateTime(lastUpdated)}</span>
+            ` : ''}
+          </div>
+
           ${property.publicRemarks ? `
             <div class="spyglass-modal-description">
               <h4 style="margin: 0 0 12px 0; font-size: 1rem;">Description</h4>
@@ -1467,6 +1823,57 @@
       } else {
         return '$' + Math.round(price / 1000) + 'K';
       }
+    }
+
+    formatDate(dateStr) {
+      if (!dateStr) return '';
+      const date = new Date(dateStr);
+      if (isNaN(date.getTime())) return '';
+      return `${date.getMonth() + 1}/${date.getDate()}/${String(date.getFullYear()).slice(-2)}`;
+    }
+
+    formatDateTime(dateStr) {
+      if (!dateStr) return '';
+      const date = new Date(dateStr);
+      if (isNaN(date.getTime())) return '';
+      const hours = date.getHours();
+      const minutes = date.getMinutes();
+      const ampm = hours >= 12 ? 'PM' : 'AM';
+      const displayHours = hours % 12 || 12;
+      const displayMinutes = String(minutes).padStart(2, '0');
+      return `${date.getMonth() + 1}/${date.getDate()}/${String(date.getFullYear()).slice(-2)} ${displayHours}:${displayMinutes} ${ampm}`;
+    }
+
+    calculateDaysOnMarket(property) {
+      const listDate = property.listDate || property.listingDate || property.onMarketDate;
+      if (!listDate) return null;
+      
+      const start = new Date(listDate);
+      if (isNaN(start.getTime())) return null;
+
+      let end;
+      if ((property.standardStatus || '').toLowerCase() === 'closed' && property.soldDate) {
+        end = new Date(property.soldDate);
+      } else {
+        end = new Date();
+      }
+
+      const diffTime = Math.abs(end - start);
+      return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    }
+
+    calculatePricePerSqft(property) {
+      if (!property.listPrice || !property.livingArea) return null;
+      return Math.round(property.listPrice / property.livingArea);
+    }
+
+    getStatusBadgeClass(status) {
+      const s = (status || '').toLowerCase();
+      if (s === 'active') return 'active';
+      if (s === 'pending') return 'pending';
+      if (s.includes('under contract') || s.includes('active under contract')) return 'under-contract';
+      if (s === 'closed' || s === 'sold') return 'closed';
+      return 'active';
     }
 
     escapeHtml(str) {
