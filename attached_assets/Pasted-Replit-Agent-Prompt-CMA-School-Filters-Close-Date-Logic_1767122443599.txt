@@ -1,0 +1,151 @@
+Replit Agent Prompt — CMA School Filters + Close Date Logic Fix (Del Valle returns 0)
+
+You are working on the CMA → Search Properties (Search by Criteria) screen (see screenshot). The Elementary School filter currently shows “Del Valle” but no results appear. Fix the filter wiring and improve the Close Date UX/logic.
+
+Context / Test Screen
+
+CMA Search Properties page (criteria form with City/Subdivision/Schools/Status/Close Date/etc.).
+
+Problems Observed
+
+Elementary School = “Del Valle” returns 0 results, even though Repliers supports this via raw.ElementarySchool=contains:<input> and we’ve confirmed “Del” works in Repliers (Del Valle / Delco Primary).
+
+Close Date filter appears required/active even when Status is Active or Active Under Contract. Close date should only apply when querying Closed comps.
+
+Unclear whether School District / Middle School / High School are necessary. At minimum, they must not break searches, and they should be correctly wired if kept.
+
+1) Requirements (Strict)
+A) Fix Elementary School query (must work)
+
+The Elementary School input must map to Repliers query param:
+
+raw.ElementarySchool=contains:<USER_INPUT>
+
+Always URL-encode user input.
+
+Do not send the param if input is empty.
+
+Critical: The API expects contains: prefix for partial matching. If you send exact values without contains: it will often return 0 (as confirmed by Repliers demo).
+
+B) Add server-side debug logging for the final query (temporary)
+
+Log the final outgoing Repliers URL + key params on the server route used for CMA searches (do not log API keys).
+
+Also log the count of results returned.
+
+If 0 results, log the first 1–2 returned “raw.ElementarySchool” samples when available (for verification when it does return).
+
+C) Close Date filter logic (status-aware)
+
+Close Date filter must be enabled and applied ONLY when Status includes Closed.
+
+If user selects Active and/or Active Under Contract without Closed:
+
+Close Date UI should be hidden or disabled
+
+Close Date must NOT be added to the query
+
+Close Date must NOT block the search or be “required”
+
+If Closed is selected (alone or mixed):
+
+Close Date applies only to the Closed slice of the query (see implementation note below)
+
+D) School District / Middle School / High School (make safe)
+
+Keep these fields in UI for now, but ensure they are correctly wired and do not break searches.
+
+If wired, they must follow the same pattern as Elementary School:
+
+raw.SchoolDistrict=contains:<input> (or the correct raw field name used in your listing objects)
+
+raw.MiddleSchool=contains:<input>
+
+raw.HighSchool=contains:<input>
+
+If raw field names differ in ACTRIS payload, detect actual keys from returned listing raw objects and update mapping accordingly.
+
+If you cannot confirm the correct raw field names, then do not include these params in the query yet (better to not filter than to filter incorrectly to 0 results). Leave UI but show helper text: “Coming soon” and prevent submission of those params until confirmed.
+
+2) Implementation Notes (How to make this reliable)
+A) Where bug likely is
+
+One of these is happening:
+
+Using wrong param key (e.g., elementarySchool= instead of raw.ElementarySchool=)
+
+Missing contains: prefix
+
+Not URL-encoding spaces (Del Valle → Del%20Valle)
+
+Query is being built client-side incorrectly and overwritten by other filters
+
+Status query is restricting results unexpectedly (e.g., only Closed being sent)
+
+B) Status strategy (important)
+
+If your backend currently sends a single standardStatus value, and you allow multiple statuses (Active + AUC + Closed), you must implement one of these:
+
+Option 1 (recommended): make multiple requests and merge
+
+Request 1: standardStatus=Active
+
+Request 2: standardStatus=Active Under Contract (or the exact standardStatus string Repliers supports)
+
+Request 3: standardStatus=Closed (+ Close Date filters)
+
+Merge results by listing id and return unified list to UI.
+
+Option 2: if Repliers supports repeated query params
+
+Use multiple standardStatus= params (only if confirmed supported).
+
+Otherwise do Option 1.
+
+C) Close Date filter application
+
+Only apply date-range constraints to the Closed query (Request 3).
+
+Do not apply close-date constraints to Active or AUC queries.
+
+3) QA Tests (Must perform and report back)
+Elementary School tests (must pass)
+
+City=Austin, Elementary School=Del → returns results (expect Del Valle / Delco Primary style matches)
+
+City=Austin, Elementary School=Del Valle → returns results (contains match)
+
+Try 3 more values to prove it’s not hardcoded:
+
+Barton
+
+Zilker
+
+Sunset
+(If any return 0, log the outgoing URL and try with/without City restriction)
+
+Close Date behavior
+
+Status=Active only → Close Date disabled/hidden and not included in query
+
+Status=AUC only → Close Date disabled/hidden and not included in query
+
+Status=Closed → Close Date enabled and included in query
+
+Status=Closed + Active → Close Date applies only to Closed results (Active results still show)
+
+School District / Middle / High
+
+If implemented: verify each filter actually changes results when using partial match.
+
+If not implemented: ensure they do not affect query and UI shows “Coming soon”.
+
+4) Deliverables
+
+List file paths changed
+
+Screenshot/video showing Del Valle (and at least 2 other elementary names) returning results
+
+Paste server logs showing final query URLs (with API key redacted) + returned counts
+
+Confirm Close Date only applies to Closed status and does not block other statuses

@@ -638,16 +638,42 @@ export async function registerRoutes(app: Express): Promise<Server> {
         console.log(`📊 [CMA Search Results] Status: ${repliersStatus}`);
         console.log(`   Total returned: ${listings.length}`);
         
-        // DEBUG: Log school-related fields from first listing
-        if (listings.length > 0) {
+        // Enhanced debug logging for school filters
+        if (elementarySchools || middleSchools || highSchools) {
+          console.log(`🏫 [School Filter Debug] ===================================`);
+          if (elementarySchools) console.log(`   Requested Elementary: "${elementarySchools}" → raw.ElementarySchool=contains:${elementarySchools.trim()}`);
+          if (middleSchools) console.log(`   Requested Middle: "${middleSchools}" → raw.MiddleOrJuniorSchool=contains:${middleSchools.trim()}`);
+          if (highSchools) console.log(`   Requested High: "${highSchools}" → raw.HighSchool=contains:${highSchools.trim()}`);
+          console.log(`   Results found: ${listings.length}`);
+          
+          if (listings.length === 0) {
+            console.log(`   ⚠️ ZERO RESULTS - Possible issues:`);
+            console.log(`      1. School name might be misspelled or not in MLS`);
+            console.log(`      2. Check if raw.ElementarySchool field name is correct`);
+            console.log(`      3. Try partial match (first word only)`);
+          }
+          console.log(`   =============================================================`);
+        }
+        
+        // DEBUG: Log school-related fields from first few listings
+        if (listings.length > 0 && (elementarySchools || middleSchools || highSchools)) {
+          console.log(`🏫 [School Data Samples] First ${Math.min(3, listings.length)} listings:`);
+          listings.slice(0, 3).forEach((listing: any, i: number) => {
+            const addr = listing.address || {};
+            const schoolKeys = listing.raw ? Object.keys(listing.raw).filter(k => k.toLowerCase().includes('school')) : [];
+            console.log(`   ${i+1}. ${addr.streetNumber || ''} ${addr.streetName || ''} (${addr.city || ''})`);
+            if (schoolKeys.length > 0) {
+              schoolKeys.forEach(k => console.log(`      - raw.${k}: ${listing.raw[k]}`));
+            } else {
+              console.log(`      - No school fields in raw object`);
+            }
+          });
+        } else if (listings.length > 0) {
+          // Original debug logging when no school filter
           const firstListing = listings[0];
           const schoolKeys = firstListing.raw ? Object.keys(firstListing.raw).filter(k => k.toLowerCase().includes('school')) : [];
-          console.log(`🏫 [DEBUG] First listing school data inspection:`);
-          console.log(`   - listing.schools: ${JSON.stringify(firstListing.schools)}`);
-          console.log(`   - listing.elementarySchool: ${firstListing.elementarySchool}`);
-          console.log(`   - listing.raw school keys: ${schoolKeys.length > 0 ? schoolKeys.join(', ') : 'NONE'}`);
           if (schoolKeys.length > 0) {
-            schoolKeys.forEach(k => console.log(`     - raw.${k}: ${firstListing.raw[k]}`));
+            console.log(`🏫 [DEBUG] First listing school data: ${schoolKeys.map(k => `${k}="${firstListing.raw[k]}"`).join(', ')}`);
           }
         }
         

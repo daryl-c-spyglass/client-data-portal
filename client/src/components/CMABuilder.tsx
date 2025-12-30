@@ -400,7 +400,10 @@ export function CMABuilder({ onCreateCMA, initialData }: CMABuilderProps) {
     if (searchStories && searchStories !== 'any') params.set('stories', searchStories);
     if (searchMinYearBuilt) params.set('minYearBuilt', searchMinYearBuilt);
     if (searchMaxYearBuilt) params.set('maxYearBuilt', searchMaxYearBuilt);
-    if (searchSoldDays && searchSoldDays !== 'any') params.set('soldDays', searchSoldDays);
+    // Only include soldDays when searching for Closed status
+    if (searchStatuses.includes('closed') && searchSoldDays && searchSoldDays !== 'any') {
+      params.set('soldDays', searchSoldDays);
+    }
     if (searchPropertyType && searchPropertyType !== 'any') params.set('propertySubType', searchPropertyType);
     // Sort by listing date for active/under contract
     if (searchStatuses.includes('active') || searchStatuses.includes('under_contract')) {
@@ -953,24 +956,27 @@ export function CMABuilder({ onCreateCMA, initialData }: CMABuilderProps) {
                 </div>
               </div>
               <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-4">
-                <div className="space-y-2">
-                  <Label>Close Date <span className="text-destructive">*</span></Label>
-                  <Select value={searchSoldDays} onValueChange={setSearchSoldDays}>
-                    <SelectTrigger data-testid="select-sold-days">
-                      <SelectValue placeholder="Select..." />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="30">0-30 days</SelectItem>
-                      <SelectItem value="60">0-60 days</SelectItem>
-                      <SelectItem value="90">0-90 days</SelectItem>
-                      <SelectItem value="120">0-120 days</SelectItem>
-                      <SelectItem value="150">0-150 days</SelectItem>
-                      <SelectItem value="180">0-180 days</SelectItem>
-                      <SelectItem value="200">0-200 days</SelectItem>
-                      <SelectItem value="365">0-365 days</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
+                {/* Close Date - Only show when Closed status is selected */}
+                {searchStatuses.includes("closed") && (
+                  <div className="space-y-2">
+                    <Label>Close Date <span className="text-destructive">*</span></Label>
+                    <Select value={searchSoldDays} onValueChange={setSearchSoldDays}>
+                      <SelectTrigger data-testid="select-sold-days">
+                        <SelectValue placeholder="Select..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="30">0-30 days</SelectItem>
+                        <SelectItem value="60">0-60 days</SelectItem>
+                        <SelectItem value="90">0-90 days</SelectItem>
+                        <SelectItem value="120">0-120 days</SelectItem>
+                        <SelectItem value="150">0-150 days</SelectItem>
+                        <SelectItem value="180">0-180 days</SelectItem>
+                        <SelectItem value="200">0-200 days</SelectItem>
+                        <SelectItem value="365">0-365 days</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
                 <div className="space-y-2">
                   <Label>Min Sq Ft <span className="text-destructive">*</span></Label>
                   <Input
@@ -1236,24 +1242,27 @@ export function CMABuilder({ onCreateCMA, initialData }: CMABuilderProps) {
                   </div>
                 </div>
                 <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-4">
-                  <div className="space-y-2">
-                    <Label>Close Date <span className="text-destructive">*</span></Label>
-                    <Select value={searchSoldDays} onValueChange={setSearchSoldDays}>
-                      <SelectTrigger data-testid="select-map-sold-days">
-                        <SelectValue placeholder="Select..." />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="30">0-30 days</SelectItem>
-                        <SelectItem value="60">0-60 days</SelectItem>
-                        <SelectItem value="90">0-90 days</SelectItem>
-                        <SelectItem value="120">0-120 days</SelectItem>
-                        <SelectItem value="150">0-150 days</SelectItem>
-                        <SelectItem value="180">0-180 days</SelectItem>
-                        <SelectItem value="200">0-200 days</SelectItem>
-                        <SelectItem value="365">0-365 days</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
+                  {/* Close Date - Only show when Closed status is selected */}
+                  {searchStatuses.includes("closed") && (
+                    <div className="space-y-2">
+                      <Label>Close Date <span className="text-destructive">*</span></Label>
+                      <Select value={searchSoldDays} onValueChange={setSearchSoldDays}>
+                        <SelectTrigger data-testid="select-map-sold-days">
+                          <SelectValue placeholder="Select..." />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="30">0-30 days</SelectItem>
+                          <SelectItem value="60">0-60 days</SelectItem>
+                          <SelectItem value="90">0-90 days</SelectItem>
+                          <SelectItem value="120">0-120 days</SelectItem>
+                          <SelectItem value="150">0-150 days</SelectItem>
+                          <SelectItem value="180">0-180 days</SelectItem>
+                          <SelectItem value="200">0-200 days</SelectItem>
+                          <SelectItem value="365">0-365 days</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )}
                   <div className="space-y-2">
                     <Label>Min Sq Ft <span className="text-destructive">*</span></Label>
                     <Input
