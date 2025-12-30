@@ -2197,6 +2197,19 @@ export function CMAReport({
                             </div>
                           )}
                         </div>
+                        
+                        {/* Public Remarks */}
+                        {property.publicRemarks && (
+                          <>
+                            <Separator className="my-3" />
+                            <div className="space-y-1 text-sm">
+                              <h5 className="font-semibold text-xs text-muted-foreground uppercase">Public Remarks</h5>
+                              <p className="text-xs text-muted-foreground line-clamp-4">
+                                {property.publicRemarks}
+                              </p>
+                            </div>
+                          </>
+                        )}
                       </div>
                     </div>
                   );
