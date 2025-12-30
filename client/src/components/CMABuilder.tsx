@@ -442,7 +442,8 @@ export function CMABuilder({ onCreateCMA, initialData }: CMABuilderProps) {
   const handleSearch = () => {
     const missingFields: string[] = [];
     
-    if (!searchSoldDays || searchSoldDays === 'any') {
+    // Close Date is only required when searching for Closed/Sold properties
+    if (searchStatuses.includes('closed') && (!searchSoldDays || searchSoldDays === 'any')) {
       missingFields.push('Close Date');
     }
     if (!searchPropertyType || searchPropertyType === 'any') {

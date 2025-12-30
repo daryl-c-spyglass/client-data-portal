@@ -1274,23 +1274,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Per client requirement: Use Repliers as primary data source for ALL statuses
       const fetchPromises: Promise<{ results: NormalizedProperty[]; expectedStatus: string }>[] = [];
       
-      // If school filters are provided but Active/Under Contract is selected, warn user
+      // School filters now work via Repliers API using raw.ElementarySchool=contains: format
+      // No longer need to skip Active/Under Contract searches
       if (hasSchoolFilters) {
-        const nonClosedStatuses = statusList.filter(s => s !== 'closed' && s !== 'sold');
-        if (nonClosedStatuses.length > 0) {
-          schoolFilterWarning = 'School filtering is only available for Closed/Sold properties. Active and Under Contract listings will be excluded from results.';
-          console.log(`⚠️ School filters provided but non-closed statuses selected: ${nonClosedStatuses.join(', ')}`);
-          console.log(`⚠️ Will only search database for Closed properties with school data`);
-        }
+        console.log(`🏫 School filters will be applied via Repliers API: raw.ElementarySchool/MiddleOrJuniorSchool/HighSchool=contains:`);
       }
       
       for (const statusType of statusList) {
-        // If school filters are active, skip Repliers searches for Active/Under Contract
-        // since Repliers doesn't return school data
-        if (hasSchoolFilters && statusType !== 'closed' && statusType !== 'sold') {
-          console.log(`⏭️ Skipping ${statusType} search - school filters require database (Closed only)`);
-          continue;
-        }
         
         if (statusType === 'active') {
           // RESO-compliant: standardStatus=Active
