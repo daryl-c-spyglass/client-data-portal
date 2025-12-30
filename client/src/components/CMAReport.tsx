@@ -861,40 +861,41 @@ export function CMAReport({
         {/* Compare Tab - CloudCMA Style Table View */}
         <TabsContent value="compare" className="space-y-0 mt-0">
           {/* Status Filter Sub-tabs */}
-          <div className="bg-zinc-800 px-4 py-2 flex items-center gap-4">
+          <div className="bg-zinc-800 px-2 sm:px-4 py-2 overflow-x-auto">
             <Tabs value={activeListingTab} onValueChange={setActiveListingTab} className="w-auto">
-              <TabsList className="bg-transparent h-auto p-0 gap-2">
+              <TabsList className="bg-transparent h-auto p-0 gap-1 sm:gap-2 flex-wrap sm:flex-nowrap">
                 <TabsTrigger 
                   value="all" 
-                  className="text-zinc-300 data-[state=active]:text-white data-[state=active]:bg-transparent data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none px-2 py-1"
+                  className="text-zinc-300 data-[state=active]:text-white data-[state=active]:bg-transparent data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none px-2 py-1 text-sm sm:text-base"
                   data-testid="compare-subtab-all"
                 >
                   All
                 </TabsTrigger>
                 <TabsTrigger 
                   value="sold" 
-                  className="text-zinc-300 data-[state=active]:text-white data-[state=active]:bg-transparent data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none px-2 py-1"
+                  className="text-zinc-300 data-[state=active]:text-white data-[state=active]:bg-transparent data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none px-2 py-1 text-sm sm:text-base"
                   data-testid="compare-subtab-closed"
                 >
                   Closed
                 </TabsTrigger>
                 <TabsTrigger 
                   value="under-contract" 
-                  className="text-zinc-300 data-[state=active]:text-white data-[state=active]:bg-transparent data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none px-2 py-1"
+                  className="text-zinc-300 data-[state=active]:text-white data-[state=active]:bg-transparent data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none px-2 py-1 text-sm sm:text-base whitespace-nowrap"
                   data-testid="compare-subtab-auc"
                 >
-                  Active Under Contract
+                  <span className="hidden sm:inline">Active Under Contract</span>
+                  <span className="sm:hidden">AUC</span>
                 </TabsTrigger>
                 <TabsTrigger 
                   value="pending" 
-                  className="text-zinc-300 data-[state=active]:text-white data-[state=active]:bg-transparent data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none px-2 py-1"
+                  className="text-zinc-300 data-[state=active]:text-white data-[state=active]:bg-transparent data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none px-2 py-1 text-sm sm:text-base"
                   data-testid="compare-subtab-pending"
                 >
                   Pending
                 </TabsTrigger>
                 <TabsTrigger 
                   value="active" 
-                  className="text-zinc-300 data-[state=active]:text-white data-[state=active]:bg-transparent data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none px-2 py-1"
+                  className="text-zinc-300 data-[state=active]:text-white data-[state=active]:bg-transparent data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none px-2 py-1 text-sm sm:text-base"
                   data-testid="compare-subtab-active"
                 >
                   Active
@@ -949,30 +950,30 @@ export function CMAReport({
             
             return (
               <div className="bg-zinc-900 border-b border-zinc-700">
-                <div className="grid grid-cols-6 divide-x divide-zinc-700">
-                  <div className="px-4 py-3">
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-px bg-zinc-700">
+                  <div className="px-3 py-3 bg-zinc-900">
                     <div className="text-xs text-zinc-400 uppercase tracking-wide">Low Price</div>
-                    <div className="text-xl font-bold text-white">${minPrice.toLocaleString()}</div>
+                    <div className="text-lg sm:text-xl font-bold text-white">${minPrice.toLocaleString()}</div>
                   </div>
-                  <div className="px-4 py-3">
+                  <div className="px-3 py-3 bg-zinc-900">
                     <div className="text-xs text-zinc-400 uppercase tracking-wide">High Price</div>
-                    <div className="text-xl font-bold text-white">${maxPrice.toLocaleString()}</div>
+                    <div className="text-lg sm:text-xl font-bold text-white">${maxPrice.toLocaleString()}</div>
                   </div>
-                  <div className="px-4 py-3">
-                    <div className="text-xs text-zinc-400 uppercase tracking-wide">Average Price</div>
-                    <div className="text-xl font-bold text-white">${Math.round(avgPrice).toLocaleString()}</div>
+                  <div className="px-3 py-3 bg-zinc-900">
+                    <div className="text-xs text-zinc-400 uppercase tracking-wide">Avg Price</div>
+                    <div className="text-lg sm:text-xl font-bold text-white">${Math.round(avgPrice).toLocaleString()}</div>
                   </div>
-                  <div className="px-4 py-3">
-                    <div className="text-xs text-zinc-400 uppercase tracking-wide">Median Price</div>
-                    <div className="text-xl font-bold text-white">${Math.round(medianPrice).toLocaleString()}</div>
+                  <div className="px-3 py-3 bg-zinc-900">
+                    <div className="text-xs text-zinc-400 uppercase tracking-wide">Median</div>
+                    <div className="text-lg sm:text-xl font-bold text-white">${Math.round(medianPrice).toLocaleString()}</div>
                   </div>
-                  <div className="px-4 py-3">
-                    <div className="text-xs text-zinc-400 uppercase tracking-wide">Avg $ / sq. ft</div>
-                    <div className="text-xl font-bold text-white">${Math.round(avgPricePerSqFt)} / sq. ft</div>
+                  <div className="px-3 py-3 bg-zinc-900">
+                    <div className="text-xs text-zinc-400 uppercase tracking-wide">Avg $/sqft</div>
+                    <div className="text-lg sm:text-xl font-bold text-white">${Math.round(avgPricePerSqFt)}</div>
                   </div>
-                  <div className="px-4 py-3">
-                    <div className="text-xs text-zinc-400 uppercase tracking-wide">Avg days on market</div>
-                    <div className="text-xl font-bold text-white">{avgDOM} Days</div>
+                  <div className="px-3 py-3 bg-zinc-900">
+                    <div className="text-xs text-zinc-400 uppercase tracking-wide">Avg DOM</div>
+                    <div className="text-lg sm:text-xl font-bold text-white">{avgDOM} Days</div>
                   </div>
                 </div>
               </div>
