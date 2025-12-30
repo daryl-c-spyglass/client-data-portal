@@ -1063,7 +1063,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       };
 
       // Apply server-side filters
-      const applyFilters = (results: any[]): any[] => {
+      // skipSchoolFilters: true when data comes from Repliers API (school filtering already done at API level)
+      const applyFilters = (results: any[], skipSchoolFilters: boolean = false): any[] => {
         let filtered = results;
         
         if (minLotAcres) {
@@ -1201,6 +1202,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
         
         // School filtering with normalization
+        // SKIP when Repliers API already filtered by school (Active/Under Contract/Pending statuses)
+        // APPLY only for database results (Closed status) where local filtering is needed
         const normalizeSchoolName = (name: string | null | undefined): string => {
           if (!name) return '';
           return name
@@ -1215,8 +1218,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
             .replace(/[^a-z0-9\s]/g, '');
         };
         
-        // Elementary school filter
-        if (elementarySchools) {
+        // Elementary school filter - skip if Repliers API already handled this
+        if (elementarySchools && !skipSchoolFilters) {
           const schoolList = elementarySchools.split(',').map(s => s.trim()).filter(s => s.length > 0);
           const normalizedSchools = schoolList.map(s => normalizeSchoolName(s)).filter(s => s.length > 0);
           if (normalizedSchools.length > 0) {
@@ -1240,8 +1243,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           }
         }
         
-        // Middle school filter
-        if (middleSchools) {
+        // Middle school filter - skip if Repliers API already handled this
+        if (middleSchools && !skipSchoolFilters) {
           const schoolList = middleSchools.split(',').map(s => s.trim()).filter(s => s.length > 0);
           const normalizedSchools = schoolList.map(s => normalizeSchoolName(s)).filter(s => s.length > 0);
           if (normalizedSchools.length > 0) {
@@ -1257,8 +1260,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           }
         }
         
-        // High school filter
-        if (highSchools) {
+        // High school filter - skip if Repliers API already handled this
+        if (highSchools && !skipSchoolFilters) {
           const schoolList = highSchools.split(',').map(s => s.trim()).filter(s => s.length > 0);
           const normalizedSchools = schoolList.map(s => normalizeSchoolName(s)).filter(s => s.length > 0);
           if (normalizedSchools.length > 0) {
@@ -1274,8 +1277,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           }
         }
         
-        // School district filter
-        if (schoolDistrict) {
+        // School district filter - skip if Repliers API already handled this
+        if (schoolDistrict && !skipSchoolFilters) {
           const normalizedDistrict = normalizeSchoolName(schoolDistrict);
           if (normalizedDistrict.length > 0) {
             const beforeCount = filtered.length;
@@ -1298,7 +1301,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Fetch from each selected status source
       // Per client requirement: Use Repliers as primary data source for ALL statuses
-      const fetchPromises: Promise<{ results: NormalizedProperty[]; expectedStatus: string }>[] = [];
+      // Track source to determine if local school filtering should be skipped (Repliers handles it at API level)
+      const fetchPromises: Promise<{ results: NormalizedProperty[]; expectedStatus: string; fromRepliers: boolean }>[] = [];
       
       // School filters now work via Repliers API using raw.ElementarySchool=contains: format
       // No longer need to skip Active/Under Contract searches
@@ -1310,21 +1314,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
         
         if (statusType === 'active') {
           // RESO-compliant: standardStatus=Active
-          fetchPromises.push(fetchFromRepliers('Active').then(results => ({ results, expectedStatus: 'Active' })));
+          fetchPromises.push(fetchFromRepliers('Active').then(results => ({ results, expectedStatus: 'Active', fromRepliers: true })));
         } else if (statusType === 'under_contract') {
           // RESO-compliant: Query BOTH Active Under Contract AND Pending statuses
           // This ensures we capture all under-contract properties (AU and Pending)
-          fetchPromises.push(fetchFromRepliers('Active Under Contract').then(results => ({ results, expectedStatus: 'Active Under Contract' })));
-          fetchPromises.push(fetchFromRepliers('Pending').then(results => ({ results, expectedStatus: 'Pending' })));
+          fetchPromises.push(fetchFromRepliers('Active Under Contract').then(results => ({ results, expectedStatus: 'Active Under Contract', fromRepliers: true })));
+          fetchPromises.push(fetchFromRepliers('Pending').then(results => ({ results, expectedStatus: 'Pending', fromRepliers: true })));
         } else if (statusType === 'pending') {
           // Pending only - use standardStatus=Pending
-          fetchPromises.push(fetchFromRepliers('Pending').then(results => ({ results, expectedStatus: 'Pending' })));
+          fetchPromises.push(fetchFromRepliers('Pending').then(results => ({ results, expectedStatus: 'Pending', fromRepliers: true })));
         } else if (statusType === 'closed' || statusType === 'sold') {
           // When school filters are provided, use database exclusively for accurate school matching
           if (hasSchoolFilters) {
             console.log(`🏫 Using database for Closed search with school filters`);
             fetchPromises.push(
-              fetchFromDatabaseWithSchools().then(results => ({ results, expectedStatus: 'Closed' }))
+              fetchFromDatabaseWithSchools().then(results => ({ results, expectedStatus: 'Closed', fromRepliers: false }))
             );
           } else {
             // RESO-compliant: standardStatus=Closed for sold/closed listings
@@ -1332,12 +1336,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
             // CRITICAL: Pass isSaleOnly=true to exclude leased rentals from Closed results
             fetchPromises.push(
               fetchFromRepliers('Closed', true)  // true = filter to Sale type only
-                .then(results => ({ results, expectedStatus: 'Closed' }))
+                .then(results => ({ results, expectedStatus: 'Closed', fromRepliers: true }))
                 .catch(async (err) => {
                   // Repliers doesn't support sold status for this feed - fall back to database
                   console.log(`⚠️ Repliers sold data not available, using database fallback`);
                   const dbResults = await fetchFromDatabase();
-                  return { results: dbResults, expectedStatus: 'Closed' };
+                  return { results: dbResults, expectedStatus: 'Closed', fromRepliers: false };
                 })
             );
           }
@@ -1350,7 +1354,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Combine and apply filters WITH strict status matching
       // This ensures that when we query for 'Active', we only return truly Active listings
       // (not 'Active Under Contract' which should be mapped to 'Under Contract')
-      for (const { results, expectedStatus } of resultsArrays) {
+      for (const { results, expectedStatus, fromRepliers } of resultsArrays) {
         // Filter to only include listings matching the expected status after mapping
         const statusFilteredResults = results.filter(p => {
           const propertyStatus = (p.status || '').toLowerCase();
@@ -1375,7 +1379,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
           console.log(`⚠️ Status filter: Removed ${filteredOut} listings with mismatched status (expected: ${expectedStatus})`);
         }
         
-        allResults = allResults.concat(applyFilters(statusFilteredResults));
+        // Skip local school filtering for Repliers results - Repliers already filters at API level
+        // Only apply local school filters for database results (Closed status with school filters)
+        const skipSchoolFilters = fromRepliers && hasSchoolFilters;
+        if (skipSchoolFilters) {
+          console.log(`🏫 [Skip Local Filter] Repliers already filtered by school, skipping local school filter`);
+        }
+        allResults = allResults.concat(applyFilters(statusFilteredResults, skipSchoolFilters));
       }
 
       // Remove duplicates (by id)

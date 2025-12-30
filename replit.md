@@ -31,7 +31,8 @@ The UI incorporates Spyglass Realty branding with an orange primary color scheme
 - **AI Assistant**: Conversational property search and CMA intake assistant powered by OpenAI GPT-4o, including voice input and intent detection (`IDX_SEARCH`, `CMA_INTAKE`). Requires user confirmation for CMA creation.
 - **AI Search Assistant**: Natural language search for property criteria in Buyer Search, using OpenAI for parsing and sanitization with RESO-compliant validation.
 - **AI Image Search**: Visual similarity ranking for property listings powered by Repliers AI, integrated into Buyer Search and CMA Builder for finding visually similar comps.
-- **Property Type Filtering**: Post-fetch filtering handles Repliers API limitations for property types like "Single Family" and "Land," using regex-based exclusions.
+- **Property Type Filtering**: Post-fetch filtering handles Repliers API limitations for property types like "Single Family" and "Land," using regex-based exclusions. PropertyTypeGuard recognizes "Single Family Residence" from UI dropdown.
+- **School Filter Architecture**: Repliers API handles school filtering at API level for Active/Under Contract/Pending statuses using `raw.ElementarySchool=contains:` format. Local server-side school filtering is skipped for Repliers results to prevent double-filtering. Database results (Closed status) use local school filter with normalized matching.
 
 ### Feature Specifications
 - **IDX Platform**: Comprehensive property browsing, search, and filtering.

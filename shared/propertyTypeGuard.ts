@@ -31,6 +31,7 @@ export const LAND_INDICATORS = [
 export const PROPERTY_TYPE_EXCLUSIONS: Record<string, string[]> = {
   'single-family': LAND_INDICATORS as unknown as string[],
   'single family': LAND_INDICATORS as unknown as string[],
+  'single family residence': LAND_INDICATORS as unknown as string[],  // Matches UI dropdown value
   'single_family': LAND_INDICATORS as unknown as string[],
   'sfr': LAND_INDICATORS as unknown as string[],
   'detached': LAND_INDICATORS as unknown as string[],
@@ -138,9 +139,12 @@ export function matchesPropertySubtype(
   const combined = fields.join(' ');
   
   // Handle different subtype patterns
-  if (subtypeLower === 'single-family' || subtypeLower === 'single family' || subtypeLower === 'sfr') {
+  // Note: UI dropdown sends "Single Family Residence", so must check for that too
+  if (subtypeLower === 'single-family' || subtypeLower === 'single family' || 
+      subtypeLower === 'single family residence' || subtypeLower === 'sfr') {
     // Must have explicit Single Family markers AND not be land/condo/multi/townhouse/manufactured
-    // CRITICAL: Do NOT match generic "residential" - it includes all property types
+    // CRITICAL: Do NOT match generic "residential" or "residence" - it includes all property types
+    // We specifically match "single family residence" (which has 'single family' in it) but NOT just 'residence'
     const hasSingleFamilyMarker = combined.includes('single family') || 
                                    combined.includes('single-family') ||
                                    combined.includes('sfr') ||
