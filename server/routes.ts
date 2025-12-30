@@ -986,6 +986,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         if (schoolDistrict) filters.schoolDistrict = [schoolDistrict.trim()];
         filters.status = 'Closed';
         filters.limit = 200; // Fetch more for comprehensive school matching
+        
+        // Apply soldDays filter at database level for Closed properties
+        if (soldDays) {
+          const daysAgo = parseInt(soldDays, 10);
+          const cutoffDate = new Date();
+          cutoffDate.setDate(cutoffDate.getDate() - daysAgo);
+          filters.closeDateAfter = cutoffDate.toISOString().split('T')[0]; // YYYY-MM-DD format
+        }
 
         console.log(`🏫 [DB School Search] Filters:`, JSON.stringify(filters, null, 2));
 
@@ -1324,27 +1332,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
           // Pending only - use standardStatus=Pending
           fetchPromises.push(fetchFromRepliers('Pending').then(results => ({ results, expectedStatus: 'Pending', fromRepliers: true })));
         } else if (statusType === 'closed' || statusType === 'sold') {
-          // When school filters are provided, use database exclusively for accurate school matching
-          if (hasSchoolFilters) {
-            console.log(`🏫 Using database for Closed search with school filters`);
-            fetchPromises.push(
-              fetchFromDatabaseWithSchools().then(results => ({ results, expectedStatus: 'Closed', fromRepliers: false }))
-            );
-          } else {
-            // RESO-compliant: standardStatus=Closed for sold/closed listings
-            // Per Repliers: ClosedDate → soldDate, ClosePrice → soldPrice
-            // CRITICAL: Pass isSaleOnly=true to exclude leased rentals from Closed results
-            fetchPromises.push(
-              fetchFromRepliers('Closed', true)  // true = filter to Sale type only
-                .then(results => ({ results, expectedStatus: 'Closed', fromRepliers: true }))
-                .catch(async (err) => {
-                  // Repliers doesn't support sold status for this feed - fall back to database
-                  console.log(`⚠️ Repliers sold data not available, using database fallback`);
-                  const dbResults = await fetchFromDatabase();
-                  return { results: dbResults, expectedStatus: 'Closed', fromRepliers: false };
-                })
-            );
-          }
+          // RESO-compliant: standardStatus=Closed for sold/closed listings
+          // Per Repliers: ClosedDate → soldDate, ClosePrice → soldPrice
+          // CRITICAL: Pass isSaleOnly=true to exclude leased rentals from Closed results
+          // School filters are now handled by Repliers API using raw.ElementarySchool=contains: format
+          console.log(`🏠 Using Repliers API for Closed search${hasSchoolFilters ? ' with school filters' : ''}`);
+          fetchPromises.push(
+            fetchFromRepliers('Closed', true)  // true = filter to Sale type only
+              .then(results => ({ results, expectedStatus: 'Closed', fromRepliers: true }))
+              .catch(async (err) => {
+                // Repliers doesn't support sold status for this feed - fall back to database
+                console.log(`⚠️ Repliers sold data not available, using database fallback`);
+                const dbResults = hasSchoolFilters 
+                  ? await fetchFromDatabaseWithSchools() 
+                  : await fetchFromDatabase();
+                return { results: dbResults, expectedStatus: 'Closed', fromRepliers: false };
+              })
+          );
         }
       }
 

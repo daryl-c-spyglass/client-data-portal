@@ -68,6 +68,7 @@ export interface IStorage {
     middleSchools?: string[];
     highSchools?: string[];
     schoolDistrict?: string[];
+    closeDateAfter?: string; // YYYY-MM-DD format for filtering closed properties by date
   }): Promise<Property[]>;
   createProperty(property: InsertProperty): Promise<Property>;
   updateProperty(id: string, property: Partial<Property>): Promise<Property | undefined>;
@@ -396,6 +397,7 @@ export class MemStorage implements IStorage {
     middleSchools?: string[];
     highSchools?: string[];
     schoolDistrict?: string[];
+    closeDateAfter?: string; // YYYY-MM-DD format for filtering closed properties by date
   }): Promise<Property[]> {
     let props = Array.from(this.properties.values()).filter(p => p.mlgCanView);
 
@@ -431,6 +433,11 @@ export class MemStorage implements IStorage {
     }
     if (filters.status) {
       props = props.filter(p => p.standardStatus === filters.status);
+    }
+    // Close date filter for Closed/Sold properties
+    if (filters.closeDateAfter) {
+      const cutoffDate = new Date(filters.closeDateAfter);
+      props = props.filter(p => p.closeDate && new Date(p.closeDate) >= cutoffDate);
     }
     // School filters (case-insensitive partial match)
     if (filters.elementarySchools && filters.elementarySchools.length > 0) {
@@ -1253,6 +1260,7 @@ export class DbStorage implements IStorage {
     middleSchools?: string[];
     highSchools?: string[];
     schoolDistrict?: string[];
+    closeDateAfter?: string; // YYYY-MM-DD format for filtering closed properties by date
   }): Promise<Property[]> {
     const conditions = [eq(properties.mlgCanView, true)];
 
@@ -1288,6 +1296,11 @@ export class DbStorage implements IStorage {
     }
     if (filters.status) {
       conditions.push(eq(properties.standardStatus, filters.status));
+    }
+    // Close date filter for Closed/Sold properties
+    if (filters.closeDateAfter) {
+      // Convert string to Date object for Drizzle timestamp comparison
+      conditions.push(gte(properties.closeDate, new Date(filters.closeDateAfter)));
     }
     // School filters - case-insensitive partial match using ILIKE with OR conditions
     if (filters.elementarySchools && filters.elementarySchools.length > 0) {
