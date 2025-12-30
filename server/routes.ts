@@ -505,9 +505,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
           resultsPerPage: effectiveLimit,
           // Raw school filters - use contains: prefix for partial matching via Repliers API
           // Reference: https://api.repliers.io/listings?raw.ElementarySchool=contains:{input}
-          rawElementarySchool: elementarySchools?.trim() || undefined,
-          rawMiddleSchool: middleSchools?.trim() || undefined,
-          rawHighSchool: highSchools?.trim() || undefined,
+          // Note: Repliers API handles one value per raw.* parameter, so we take the first school name
+          // if multiple are provided (comma-separated). The UI is designed for single school input.
+          rawElementarySchool: elementarySchools?.split(',')[0]?.trim() || undefined,
+          rawMiddleSchool: middleSchools?.split(',')[0]?.trim() || undefined,
+          rawHighSchool: highSchools?.split(',')[0]?.trim() || undefined,
         };
         
         // CRITICAL: For Closed status, add type=sale to exclude leased rentals
