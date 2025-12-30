@@ -503,6 +503,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
           minSqft: minSqft ? parseInt(minSqft, 10) : undefined,
           maxSqft: maxSqft ? parseInt(maxSqft, 10) : undefined,
           resultsPerPage: effectiveLimit,
+          // Raw school filters - use contains: prefix for partial matching via Repliers API
+          // Reference: https://api.repliers.io/listings?raw.ElementarySchool=contains:{input}
+          rawElementarySchool: elementarySchools?.trim() || undefined,
+          rawMiddleSchool: middleSchools?.trim() || undefined,
+          rawHighSchool: highSchools?.trim() || undefined,
         };
         
         // CRITICAL: For Closed status, add type=sale to exclude leased rentals
@@ -527,6 +532,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         if (subdivision) {
           console.log(`   NOTE: Subdivision filter applied LOCALLY (API does exact match only)`);
           console.log(`   Local subdivision filter: "${subdivision}"`);
+        }
+        if (elementarySchools) {
+          console.log(`   🏫 Elementary School filter: raw.ElementarySchool=contains:${elementarySchools.trim()}`);
+        }
+        if (middleSchools) {
+          console.log(`   🏫 Middle School filter: raw.MiddleOrJuniorSchool=contains:${middleSchools.trim()}`);
+        }
+        if (highSchools) {
+          console.log(`   🏫 High School filter: raw.HighSchool=contains:${highSchools.trim()}`);
         }
         console.log(`   =============================================================\n`);
         
