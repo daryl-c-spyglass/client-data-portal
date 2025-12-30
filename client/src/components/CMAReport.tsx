@@ -196,6 +196,7 @@ export function CMAReport({
   // Pricing Strategy state
   const [showSubjectOnPricingChart, setShowSubjectOnPricingChart] = useState(true);
   const [selectedPricingProperty, setSelectedPricingProperty] = useState<Property | null>(null);
+  const [pricingPhotoIndex, setPricingPhotoIndex] = useState(0);
   
   // Horizontal scroll refs for carousel arrows
   const statsScrollRef = useRef<HTMLDivElement>(null);
@@ -360,6 +361,28 @@ export function CMAReport({
     const photos = getPropertyPhotos(floatingCardProperty);
     if (photos.length > 1) {
       setCarouselIndex((prev) => (prev + 1) % photos.length);
+    }
+  };
+
+  // Reset pricing photo index when selected property changes
+  useEffect(() => {
+    setPricingPhotoIndex(0);
+  }, [selectedPricingProperty]);
+
+  // Pricing panel navigation handlers
+  const handlePricingPrevImage = () => {
+    if (!selectedPricingProperty) return;
+    const photos = getPropertyPhotos(selectedPricingProperty);
+    if (photos.length > 1) {
+      setPricingPhotoIndex((prev) => (prev - 1 + photos.length) % photos.length);
+    }
+  };
+
+  const handlePricingNextImage = () => {
+    if (!selectedPricingProperty) return;
+    const photos = getPropertyPhotos(selectedPricingProperty);
+    if (photos.length > 1) {
+      setPricingPhotoIndex((prev) => (prev + 1) % photos.length);
     }
   };
 
@@ -1891,7 +1914,7 @@ export function CMAReport({
                         
                         {(() => {
                           const photos = getPropertyPhotos(selectedPricingProperty);
-                          const photo = photos[0];
+                          const currentPhoto = photos[pricingPhotoIndex] || photos[0];
                           const price = selectedPricingProperty.closePrice 
                             ? Number(selectedPricingProperty.closePrice) 
                             : Number(selectedPricingProperty.listPrice || 0);
@@ -1905,9 +1928,41 @@ export function CMAReport({
                           
                           return (
                             <>
-                              <div className="aspect-video rounded overflow-hidden bg-muted mb-3">
-                                {photo ? (
-                                  <img src={photo} alt="" className="w-full h-full object-cover" />
+                              <div className="aspect-video rounded overflow-hidden bg-muted mb-3 relative group">
+                                {currentPhoto ? (
+                                  <>
+                                    <img 
+                                      src={currentPhoto} 
+                                      alt={selectedPricingProperty.unparsedAddress || 'Property'} 
+                                      className="w-full h-full object-cover"
+                                      data-testid="img-pricing-property"
+                                    />
+                                    {photos.length > 1 && (
+                                      <>
+                                        <div 
+                                          className="absolute left-0 top-0 h-full w-1/3 cursor-pointer flex items-center justify-start pl-1 opacity-0 group-hover:opacity-100 transition-opacity"
+                                          onClick={handlePricingPrevImage}
+                                          data-testid="button-pricing-prev-photo"
+                                        >
+                                          <div className="bg-black/50 rounded-full p-1">
+                                            <ChevronLeft className="w-4 h-4 text-white" />
+                                          </div>
+                                        </div>
+                                        <div 
+                                          className="absolute right-0 top-0 h-full w-1/3 cursor-pointer flex items-center justify-end pr-1 opacity-0 group-hover:opacity-100 transition-opacity"
+                                          onClick={handlePricingNextImage}
+                                          data-testid="button-pricing-next-photo"
+                                        >
+                                          <div className="bg-black/50 rounded-full p-1">
+                                            <ChevronRight className="w-4 h-4 text-white" />
+                                          </div>
+                                        </div>
+                                        <div className="absolute bottom-1 left-1/2 -translate-x-1/2 bg-black/60 text-white text-xs px-2 py-0.5 rounded-full">
+                                          {pricingPhotoIndex + 1} / {photos.length}
+                                        </div>
+                                      </>
+                                    )}
+                                  </>
                                 ) : (
                                   <div className="w-full h-full flex items-center justify-center text-muted-foreground">
                                     <Home className="w-8 h-8" />
