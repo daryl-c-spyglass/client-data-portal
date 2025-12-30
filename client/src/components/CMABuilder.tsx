@@ -298,6 +298,7 @@ export function CMABuilder({ onCreateCMA, initialData }: CMABuilderProps) {
   const [visualMatchItems, setVisualMatchItems] = useState<ImageSearchItem[]>([]);
   const [visualMatchResults, setVisualMatchResults] = useState<Property[]>([]);
   const [isVisualSearching, setIsVisualSearching] = useState(false);
+  const [visualMatchError, setVisualMatchError] = useState<string>("");
   
   // Property detail dialog state
   const [selectedProperty, setSelectedProperty] = useState<Property | null>(null);
@@ -474,6 +475,7 @@ export function CMABuilder({ onCreateCMA, initialData }: CMABuilderProps) {
     if (visualMatchItems.length === 0) return;
     
     setIsVisualSearching(true);
+    setVisualMatchError("");
     
     try {
       // Build criteria from current search filters
@@ -513,15 +515,21 @@ export function CMABuilder({ onCreateCMA, initialData }: CMABuilderProps) {
         }),
       });
       
+      const data = await response.json();
+      
       if (!response.ok) {
-        throw new Error('Visual search failed');
+        throw new Error(data.error || 'Visual search failed');
       }
       
-      const data = await response.json();
       setVisualMatchResults(data.listings || []);
-    } catch (error) {
+      
+      if ((data.listings || []).length === 0) {
+        setVisualMatchError("No matching properties found. Try different search criteria.");
+      }
+    } catch (error: any) {
       console.error('Visual search error:', error);
       setVisualMatchResults([]);
+      setVisualMatchError(error.message || "Visual search failed. Please try again.");
     } finally {
       setIsVisualSearching(false);
     }
@@ -1050,6 +1058,7 @@ export function CMABuilder({ onCreateCMA, initialData }: CMABuilderProps) {
                   setVisualMatchEnabled(enabled);
                   if (!enabled) {
                     setVisualMatchResults([]);
+                    setVisualMatchError("");
                   }
                 }}
                 items={visualMatchItems}
@@ -1057,6 +1066,7 @@ export function CMABuilder({ onCreateCMA, initialData }: CMABuilderProps) {
                 isSearching={isVisualSearching}
                 onSearch={handleVisualSearch}
                 compact={true}
+                error={visualMatchError}
               />
               
               <Separator className="my-4" />
