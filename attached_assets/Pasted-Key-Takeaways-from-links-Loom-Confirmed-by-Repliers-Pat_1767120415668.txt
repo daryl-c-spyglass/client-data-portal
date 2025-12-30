@@ -1,0 +1,126 @@
+Key Takeaways (from links + Loom)
+
+Confirmed by Repliers (Pat) and Loom demo:
+
+✅ School-based filtering is supported via raw.* fields
+
+✅ contains: is required for partial matches
+
+❌ Exact matches will return zero results unless the full MLS value is used
+
+✅ This behavior is expected and correct per Repliers API design
+
+✅ This applies to any raw MLS field, not just schools
+
+Example confirmed working:
+raw.ElementarySchool=contains:Del
+
+Example confirmed NOT working unless exact:
+raw.ElementarySchool=Delco
+
+Replit Agent Prompt — Elementary School Filter (CMA + Buyer Search)
+Context
+
+We want to add Elementary School filtering to CMA (and Buyer Search if shared) using the Repliers API raw.ElementarySchool field, following Repliers’ documented and demonstrated behavior.
+
+Official References (use these)
+
+API example (contains search):
+https://api.repliers.io/listings?raw.ElementarySchool=contains:{input}
+
+Repliers Workspace (Dec 30, 2025)
+
+Loom demo + transcript:
+https://www.loom.com/share/38f85ef2afa14ce4bd44af5f5e2b97d1
+
+Requirements (Strict)
+1. Filter Field
+
+Add a filter labeled: Elementary School
+
+Free-text input
+
+2. Matching Logic (Important)
+
+Default behavior: partial match using contains:
+
+Always prefix user input with:
+
+raw.ElementarySchool=contains:<userInput>
+
+
+⚠️ Do NOT use exact match by default
+Exact match only works if the full MLS value is provided (per Loom demo).
+
+Optional (nice-to-have, not required):
+
+Add a small helper text:
+
+“Partial names supported (e.g. ‘Del’ → Del Valle, Delco Primary)”
+
+3. Query Construction Rules
+
+Trim whitespace
+
+URL-encode input
+
+Do not include the parameter if the input is empty
+
+Combine safely with existing filters:
+
+status
+
+city
+
+subdivision
+
+beds/baths
+
+price
+
+polygon
+
+CMA mode
+
+Example combined query:
+
+/listings?
+status=U
+&cities=Austin
+&raw.ElementarySchool=contains:Del
+
+4. CMA-Specific Behavior
+
+This filter must affect:
+
+CMA comp selection
+
+CMA stats
+
+CMA map view
+
+Ensure it does not reset status filters (Active / Pending / Closed)
+
+Acceptance Criteria
+
+Typing Del returns listings with:
+
+Del Valle
+
+Delco Primary
+
+Typing Delco still works only when contains: is used
+
+No silent failures
+
+No console errors
+
+CMA output updates correctly (counts, averages, map pins)
+
+Deliverables
+
+File paths changed
+
+Final Repliers query logged in console (for verification)
+
+Screenshot showing results filtered by Elementary School

@@ -40,6 +40,10 @@ interface ListingsSearchParams {
   search?: string;  // Free-text search (address, MLS#, keywords)
   searchFields?: string;  // Comma-separated fields to search in (e.g., address.streetName,address.streetNumber)
   fuzzySearch?: boolean;  // Enable typo tolerance
+  // Raw MLS field filters - use contains: prefix for partial matching
+  rawElementarySchool?: string;  // Filters using raw.ElementarySchool=contains:{value}
+  rawMiddleSchool?: string;      // Filters using raw.MiddleOrJuniorSchool=contains:{value}
+  rawHighSchool?: string;        // Filters using raw.HighSchool=contains:{value}
 }
 
 interface RepliersListing {
@@ -421,6 +425,18 @@ class RepliersClient {
     if (params.search) queryParams.append('search', params.search);
     if (params.searchFields) queryParams.append('searchFields', params.searchFields);
     if (params.fuzzySearch) queryParams.append('fuzzySearch', 'true');
+    
+    // Raw MLS field filters - use contains: prefix for partial matching per Repliers API
+    // Reference: https://api.repliers.io/listings?raw.ElementarySchool=contains:{input}
+    if (params.rawElementarySchool) {
+      queryParams.append('raw.ElementarySchool', `contains:${params.rawElementarySchool}`);
+    }
+    if (params.rawMiddleSchool) {
+      queryParams.append('raw.MiddleOrJuniorSchool', `contains:${params.rawMiddleSchool}`);
+    }
+    if (params.rawHighSchool) {
+      queryParams.append('raw.HighSchool', `contains:${params.rawHighSchool}`);
+    }
 
     try {
       const url = `/listings?${queryParams.toString()}`;
