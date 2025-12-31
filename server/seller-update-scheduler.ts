@@ -41,8 +41,8 @@ async function findMatchingPropertiesForUpdate(sellerUpdate: SellerUpdate): Prom
   
   try {
     const result = await repliersClient.searchListings({
-      postalCodes: [sellerUpdate.postalCode],
-      status: ['Closed'],
+      postalCode: sellerUpdate.postalCode,
+      standardStatus: 'Closed',
       pageSize: 20,
       sortBy: 'closeDate',
       sortOrder: 'desc',
