@@ -1,6 +1,6 @@
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { useMutation } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { z } from "zod";
 import { Button } from "@/components/ui/button";
@@ -25,12 +25,147 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { insertSellerUpdateSchema } from "@shared/schema";
-import { useState, useEffect } from "react";
-import { Search, ArrowLeft, X, Bed, Bath, Maximize, MapPin, Home } from "lucide-react";
+import { useState, useEffect, useRef, useCallback } from "react";
+import { ArrowLeft, X, Bed, Bath, Maximize, MapPin, Home, Calendar, DollarSign, Ruler } from "lucide-react";
 import { Link, useSearch } from "wouter";
 import { Badge } from "@/components/ui/badge";
-import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { cn } from "@/lib/utils";
+
+interface AutocompleteInputProps {
+  placeholder?: string;
+  value: string;
+  onChange: (value: string) => void;
+  endpoint: string;
+  testId?: string;
+  className?: string;
+}
+
+function AutocompleteInput({ placeholder, value, onChange, endpoint, testId, className }: AutocompleteInputProps) {
+  const [inputValue, setInputValue] = useState(value || '');
+  const [suggestions, setSuggestions] = useState<string[]>([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    setInputValue(value || '');
+  }, [value]);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
+        setShowSuggestions(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const fetchSuggestions = useCallback(async (query: string) => {
+    if (query.length < 2) {
+      setSuggestions([]);
+      return;
+    }
+    setIsLoading(true);
+    try {
+      const res = await fetch(`${endpoint}?q=${encodeURIComponent(query)}`);
+      if (!res.ok) {
+        setSuggestions([]);
+        return;
+      }
+      const data = await res.json();
+      
+      // Helper to extract string from various formats
+      const toStringValue = (item: any): string => {
+        if (typeof item === 'string') return item;
+        if (item == null) return '';
+        // Try common property names for suggestion objects
+        if (typeof item.value === 'string') return item.value;
+        if (typeof item.name === 'string') return item.name;
+        if (typeof item.display === 'string') return item.display;
+        if (typeof item.label === 'string') return item.label;
+        if (typeof item.text === 'string') return item.text;
+        return '';
+      };
+      
+      if (Array.isArray(data)) {
+        setSuggestions(data.map(toStringValue).filter(Boolean));
+      } else if (data && Array.isArray(data.suggestions)) {
+        setSuggestions(data.suggestions.map(toStringValue).filter(Boolean));
+      } else {
+        setSuggestions([]);
+      }
+    } catch {
+      setSuggestions([]);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [endpoint]);
+
+  useEffect(() => {
+    const debounceTimer = setTimeout(() => {
+      fetchSuggestions(inputValue);
+    }, 300);
+    return () => clearTimeout(debounceTimer);
+  }, [inputValue, fetchSuggestions]);
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const newValue = e.target.value;
+    setInputValue(newValue);
+    setShowSuggestions(true);
+    onChange(newValue);
+  };
+
+  const handleSuggestionClick = (suggestion: string) => {
+    setInputValue(suggestion);
+    onChange(suggestion);
+    setShowSuggestions(false);
+  };
+
+  return (
+    <div ref={containerRef} className="relative">
+      <Input
+        ref={inputRef}
+        placeholder={placeholder}
+        value={inputValue}
+        onChange={handleInputChange}
+        onFocus={() => setShowSuggestions(true)}
+        data-testid={testId}
+        autoComplete="off"
+        className={cn("h-10", className)}
+      />
+      {showSuggestions && suggestions.length > 0 && (
+        <div className="absolute z-50 w-full mt-1 bg-card border rounded-md shadow-lg max-h-48 overflow-y-auto">
+          {suggestions.map((suggestion, index) => (
+            <div
+              key={index}
+              className="px-3 py-2 cursor-pointer hover-elevate text-sm"
+              onClick={() => handleSuggestionClick(suggestion)}
+            >
+              {suggestion}
+            </div>
+          ))}
+        </div>
+      )}
+      {isLoading && inputValue.length >= 2 && (
+        <div className="absolute right-3 top-1/2 -translate-y-1/2">
+          <div className="h-4 w-4 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+        </div>
+      )}
+    </div>
+  );
+}
+
+const PROPERTY_TYPES = [
+  { value: 'Single Family Residence', label: 'Single Family Residence' },
+  { value: 'Condominium', label: 'Condominium' },
+  { value: 'Townhouse', label: 'Townhouse' },
+  { value: 'Multi-Family', label: 'Multi-Family' },
+  { value: 'Ranch', label: 'Ranch' },
+  { value: 'Manufactured Home', label: 'Manufactured Home' },
+  { value: 'Unimproved Land', label: 'Unimproved Land' },
+];
 
 const formSchema = insertSellerUpdateSchema.extend({
   userId: z.string().default("demo-user-id"), // TODO: Replace with actual user ID from auth
@@ -54,8 +189,6 @@ export default function SellerUpdateNew() {
   const [, setLocation] = useLocation();
   const search = useSearch();
   const { toast } = useToast();
-  const [schoolSearch, setSchoolSearch] = useState("");
-  const [schoolOpen, setSchoolOpen] = useState(false);
   
   // Check if coming from Properties page with pre-selected properties
   const params = new URLSearchParams(search);
@@ -90,29 +223,32 @@ export default function SellerUpdateNew() {
       userId: "demo-user-id",
       name: "",
       email: "",
+      // Location criteria
       postalCode: "",
+      city: "",
+      subdivision: "",
+      // School criteria
       elementarySchool: "",
+      middleSchool: "",
+      highSchool: "",
+      // Property criteria
       propertySubType: "",
+      minBeds: "",
+      maxBeds: "",
+      minBaths: "",
+      maxBaths: "",
+      minSqft: "",
+      maxSqft: "",
+      minPrice: "",
+      maxPrice: "",
+      minYearBuilt: "",
+      maxYearBuilt: "",
+      // Search settings
+      soldDays: "90",
       emailFrequency: "weekly",
       isActive: true,
     },
   });
-
-  // Get property subtypes from properties
-  const { data: propertyTypes } = useQuery<string[]>({
-    queryKey: ['/api/properties/types'],
-  });
-
-  // School autocomplete - using the autocomplete endpoint
-  const { data: schoolsResponse } = useQuery<{ suggestions: string[] }>({
-    queryKey: ['/api/autocomplete/elementarySchools', schoolSearch],
-    queryFn: async () => {
-      const res = await fetch(`/api/autocomplete/elementarySchools?q=${encodeURIComponent(schoolSearch)}`);
-      return res.json();
-    },
-    enabled: schoolSearch.length >= 2,
-  });
-  const schools = schoolsResponse?.suggestions || [];
 
   const createMutation = useMutation({
     mutationFn: async (values: z.infer<typeof formSchema>) => {
@@ -313,94 +449,156 @@ export default function SellerUpdateNew() {
               />
 
               <div className="border-t pt-6">
-                <h3 className="font-semibold mb-4">Property Criteria</h3>
-                <div className="space-y-6">
+                <h3 className="font-semibold mb-4 flex items-center gap-2">
+                  <MapPin className="w-4 h-4" />
+                  Location Criteria
+                </h3>
+                <p className="text-sm text-muted-foreground mb-4">
+                  Provide at least one location filter (city, zip code, or subdivision)
+                </p>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {/* City Field */}
+                  <FormField
+                    control={form.control}
+                    name="city"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>City</FormLabel>
+                        <FormControl>
+                          <AutocompleteInput
+                            placeholder="Austin"
+                            value={field.value || ""}
+                            onChange={field.onChange}
+                            endpoint="/api/autocomplete/cities"
+                            testId="input-city"
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
                   {/* Zip Code Field */}
                   <FormField
                     control={form.control}
                     name="postalCode"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Zip Code *</FormLabel>
+                        <FormLabel>Zip Code</FormLabel>
                         <FormControl>
                           <Input
                             placeholder="78745"
                             data-testid="input-postalcode"
                             {...field}
+                            value={field.value || ""}
                           />
                         </FormControl>
-                        <FormDescription>
-                          Required - Properties in this zip code
-                        </FormDescription>
                         <FormMessage />
                       </FormItem>
                     )}
                   />
 
-                  {/* Elementary School Field (Autocomplete) */}
+                  {/* Subdivision Field */}
+                  <FormField
+                    control={form.control}
+                    name="subdivision"
+                    render={({ field }) => (
+                      <FormItem className="md:col-span-2">
+                        <FormLabel>Subdivision</FormLabel>
+                        <FormControl>
+                          <AutocompleteInput
+                            placeholder="Circle C Ranch"
+                            value={field.value || ""}
+                            onChange={field.onChange}
+                            endpoint="/api/autocomplete/subdivisions"
+                            testId="input-subdivision"
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+              </div>
+
+              <div className="border-t pt-6">
+                <h3 className="font-semibold mb-4 flex items-center gap-2">
+                  <Home className="w-4 h-4" />
+                  School Criteria
+                </h3>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  {/* Elementary School Field */}
                   <FormField
                     control={form.control}
                     name="elementarySchool"
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel>Elementary School</FormLabel>
-                        <Popover open={schoolOpen} onOpenChange={setSchoolOpen}>
-                          <PopoverTrigger asChild>
-                            <FormControl>
-                              <Button
-                                variant="outline"
-                                role="combobox"
-                                className="w-full justify-between"
-                                data-testid="input-elementaryschool"
-                              >
-                                {field.value || "Select school (optional)"}
-                                <Search className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                              </Button>
-                            </FormControl>
-                          </PopoverTrigger>
-                          <PopoverContent className="w-full p-0" align="start">
-                            <Command>
-                              <CommandInput
-                                placeholder="Search schools..."
-                                value={schoolSearch}
-                                onValueChange={setSchoolSearch}
-                              />
-                              <CommandList>
-                                <CommandEmpty>
-                                  {schoolSearch.length < 2
-                                    ? "Type at least 2 characters to search"
-                                    : "No schools found"}
-                                </CommandEmpty>
-                                {schools && schools.length > 0 && (
-                                  <CommandGroup>
-                                    {schools.map((school) => (
-                                      <CommandItem
-                                        key={school}
-                                        value={school}
-                                        onSelect={() => {
-                                          field.onChange(school);
-                                          setSchoolOpen(false);
-                                          setSchoolSearch("");
-                                        }}
-                                      >
-                                        {school}
-                                      </CommandItem>
-                                    ))}
-                                  </CommandGroup>
-                                )}
-                              </CommandList>
-                            </Command>
-                          </PopoverContent>
-                        </Popover>
-                        <FormDescription>
-                          Optional - Filter by elementary school
-                        </FormDescription>
+                        <FormControl>
+                          <AutocompleteInput
+                            placeholder="Search schools..."
+                            value={field.value || ""}
+                            onChange={field.onChange}
+                            endpoint="/api/autocomplete/elementarySchools"
+                            testId="input-elementaryschool"
+                          />
+                        </FormControl>
                         <FormMessage />
                       </FormItem>
                     )}
                   />
 
-                  {/* Property Sub Type Field */}
+                  {/* Middle School Field */}
+                  <FormField
+                    control={form.control}
+                    name="middleSchool"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Middle School</FormLabel>
+                        <FormControl>
+                          <AutocompleteInput
+                            placeholder="Search schools..."
+                            value={field.value || ""}
+                            onChange={field.onChange}
+                            endpoint="/api/autocomplete/middleSchools"
+                            testId="input-middleschool"
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  {/* High School Field */}
+                  <FormField
+                    control={form.control}
+                    name="highSchool"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>High School</FormLabel>
+                        <FormControl>
+                          <AutocompleteInput
+                            placeholder="Search schools..."
+                            value={field.value || ""}
+                            onChange={field.onChange}
+                            endpoint="/api/autocomplete/highSchools"
+                            testId="input-highschool"
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+              </div>
+
+              <div className="border-t pt-6">
+                <h3 className="font-semibold mb-4 flex items-center gap-2">
+                  <Ruler className="w-4 h-4" />
+                  Property Criteria
+                </h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {/* Property Type Field */}
                   <FormField
                     control={form.control}
                     name="propertySubType"
@@ -409,24 +607,278 @@ export default function SellerUpdateNew() {
                         <FormLabel>Property Type</FormLabel>
                         <Select
                           onValueChange={field.onChange}
-                          defaultValue={field.value || ""}
+                          value={field.value || ""}
                         >
                           <FormControl>
                             <SelectTrigger data-testid="select-propertysubtype">
-                              <SelectValue placeholder="Select type (optional)" />
+                              <SelectValue placeholder="All Types" />
                             </SelectTrigger>
                           </FormControl>
                           <SelectContent>
                             <SelectItem value="all">All Types</SelectItem>
-                            {propertyTypes && propertyTypes.map((type) => (
-                              <SelectItem key={type} value={type}>
-                                {type}
+                            {PROPERTY_TYPES.map((type) => (
+                              <SelectItem key={type.value} value={type.value}>
+                                {type.label}
                               </SelectItem>
                             ))}
                           </SelectContent>
                         </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  {/* Bedrooms */}
+                  <FormField
+                    control={form.control}
+                    name="minBeds"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="flex items-center gap-1">
+                          <Bed className="w-3 h-3" /> Min Beds
+                        </FormLabel>
+                        <FormControl>
+                          <Input
+                            type="number"
+                            placeholder="Any"
+                            data-testid="input-minbeds"
+                            {...field}
+                            value={field.value || ""}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="maxBeds"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="flex items-center gap-1">
+                          <Bed className="w-3 h-3" /> Max Beds
+                        </FormLabel>
+                        <FormControl>
+                          <Input
+                            type="number"
+                            placeholder="Any"
+                            data-testid="input-maxbeds"
+                            {...field}
+                            value={field.value || ""}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  {/* Bathrooms */}
+                  <FormField
+                    control={form.control}
+                    name="minBaths"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="flex items-center gap-1">
+                          <Bath className="w-3 h-3" /> Min Baths
+                        </FormLabel>
+                        <FormControl>
+                          <Input
+                            type="number"
+                            placeholder="Any"
+                            data-testid="input-minbaths"
+                            {...field}
+                            value={field.value || ""}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="maxBaths"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="flex items-center gap-1">
+                          <Bath className="w-3 h-3" /> Max Baths
+                        </FormLabel>
+                        <FormControl>
+                          <Input
+                            type="number"
+                            placeholder="Any"
+                            data-testid="input-maxbaths"
+                            {...field}
+                            value={field.value || ""}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  {/* Square Footage */}
+                  <FormField
+                    control={form.control}
+                    name="minSqft"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="flex items-center gap-1">
+                          <Maximize className="w-3 h-3" /> Min Sq Ft
+                        </FormLabel>
+                        <FormControl>
+                          <Input
+                            type="number"
+                            placeholder="Any"
+                            data-testid="input-minsqft"
+                            {...field}
+                            value={field.value || ""}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="maxSqft"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="flex items-center gap-1">
+                          <Maximize className="w-3 h-3" /> Max Sq Ft
+                        </FormLabel>
+                        <FormControl>
+                          <Input
+                            type="number"
+                            placeholder="Any"
+                            data-testid="input-maxsqft"
+                            {...field}
+                            value={field.value || ""}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  {/* Price Range */}
+                  <FormField
+                    control={form.control}
+                    name="minPrice"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="flex items-center gap-1">
+                          <DollarSign className="w-3 h-3" /> Min Price
+                        </FormLabel>
+                        <FormControl>
+                          <Input
+                            type="number"
+                            placeholder="Any"
+                            data-testid="input-minprice"
+                            {...field}
+                            value={field.value || ""}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="maxPrice"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="flex items-center gap-1">
+                          <DollarSign className="w-3 h-3" /> Max Price
+                        </FormLabel>
+                        <FormControl>
+                          <Input
+                            type="number"
+                            placeholder="Any"
+                            data-testid="input-maxprice"
+                            {...field}
+                            value={field.value || ""}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  {/* Year Built */}
+                  <FormField
+                    control={form.control}
+                    name="minYearBuilt"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="flex items-center gap-1">
+                          <Calendar className="w-3 h-3" /> Min Year Built
+                        </FormLabel>
+                        <FormControl>
+                          <Input
+                            type="number"
+                            placeholder="Any"
+                            data-testid="input-minyearbuilt"
+                            {...field}
+                            value={field.value || ""}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="maxYearBuilt"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="flex items-center gap-1">
+                          <Calendar className="w-3 h-3" /> Max Year Built
+                        </FormLabel>
+                        <FormControl>
+                          <Input
+                            type="number"
+                            placeholder="Any"
+                            data-testid="input-maxyearbuilt"
+                            {...field}
+                            value={field.value || ""}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  {/* Sold Days */}
+                  <FormField
+                    control={form.control}
+                    name="soldDays"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Sold Within (Days)</FormLabel>
+                        <Select
+                          onValueChange={field.onChange}
+                          value={field.value || "90"}
+                        >
+                          <FormControl>
+                            <SelectTrigger data-testid="select-solddays">
+                              <SelectValue />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            <SelectItem value="30">Last 30 Days</SelectItem>
+                            <SelectItem value="60">Last 60 Days</SelectItem>
+                            <SelectItem value="90">Last 90 Days</SelectItem>
+                            <SelectItem value="180">Last 6 Months</SelectItem>
+                            <SelectItem value="365">Last Year</SelectItem>
+                          </SelectContent>
+                        </Select>
                         <FormDescription>
-                          Optional - Filter by property subtype
+                          How far back to search for closed sales
                         </FormDescription>
                         <FormMessage />
                       </FormItem>

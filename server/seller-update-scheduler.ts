@@ -40,16 +40,79 @@ async function findMatchingPropertiesForUpdate(sellerUpdate: SellerUpdate): Prom
   }
   
   try {
-    const result = await repliersClient.searchListings({
-      postalCode: sellerUpdate.postalCode,
+    // Build search params from all criteria
+    const searchParams: any = {
       standardStatus: 'Closed',
-      pageSize: 20,
+      pageSize: 50,
       sortBy: 'closeDate',
       sortOrder: 'desc',
-    });
+    };
 
+    // Location criteria - at least one should be set
+    if (sellerUpdate.postalCode) {
+      searchParams.postalCode = sellerUpdate.postalCode;
+    }
+    if (sellerUpdate.city) {
+      searchParams.city = sellerUpdate.city;
+    }
+    if (sellerUpdate.subdivision) {
+      searchParams.area = sellerUpdate.subdivision;
+    }
+
+    // Helper to safely parse integer values - returns undefined if invalid
+    const safeParseInt = (value: string | null | undefined): number | undefined => {
+      if (!value || value.trim() === '') return undefined;
+      const parsed = parseInt(value, 10);
+      return isNaN(parsed) ? undefined : parsed;
+    };
+    
+    // Helper to safely parse float values (for baths which can be 2.5, etc.)
+    const safeParseFloat = (value: string | null | undefined): number | undefined => {
+      if (!value || value.trim() === '') return undefined;
+      const parsed = parseFloat(value);
+      return isNaN(parsed) ? undefined : parsed;
+    };
+
+    // Property criteria that Repliers API supports
+    const minBeds = safeParseInt(sellerUpdate.minBeds);
+    if (minBeds !== undefined) searchParams.minBeds = minBeds;
+    
+    const maxBeds = safeParseInt(sellerUpdate.maxBeds);
+    if (maxBeds !== undefined) searchParams.maxBeds = maxBeds;
+    
+    // Baths can be fractional (e.g., 2.5)
+    const minBaths = safeParseFloat(sellerUpdate.minBaths);
+    if (minBaths !== undefined) searchParams.minBaths = minBaths;
+    
+    const maxBaths = safeParseFloat(sellerUpdate.maxBaths);
+    if (maxBaths !== undefined) searchParams.maxBaths = maxBaths;
+    
+    const minSqft = safeParseInt(sellerUpdate.minSqft);
+    if (minSqft !== undefined) searchParams.minSqft = minSqft;
+    
+    const maxSqft = safeParseInt(sellerUpdate.maxSqft);
+    if (maxSqft !== undefined) searchParams.maxSqft = maxSqft;
+    
+    const minPrice = safeParseInt(sellerUpdate.minPrice);
+    if (minPrice !== undefined) searchParams.minPrice = minPrice;
+    
+    const maxPrice = safeParseInt(sellerUpdate.maxPrice);
+    if (maxPrice !== undefined) searchParams.maxPrice = maxPrice;
+
+    // Sold within X days (default to 90 if not set or invalid)
+    const soldDays = safeParseInt(sellerUpdate.soldDays) || 90;
+    if (soldDays > 0) {
+      const soldAfter = new Date();
+      soldAfter.setDate(soldAfter.getDate() - soldDays);
+      searchParams.soldDateAfter = soldAfter.toISOString().split('T')[0];
+    }
+
+    const result = await repliersClient.searchListings(searchParams);
     let properties = result.listings || [];
 
+    // Client-side filtering for criteria not supported by API
+
+    // Filter by elementary school
     if (sellerUpdate.elementarySchool) {
       properties = properties.filter((p: any) => {
         const school = p.raw?.ElementarySchool || p.elementarySchool || '';
@@ -57,14 +120,47 @@ async function findMatchingPropertiesForUpdate(sellerUpdate: SellerUpdate): Prom
       });
     }
 
-    if (sellerUpdate.propertySubType) {
+    // Filter by middle school
+    if (sellerUpdate.middleSchool) {
+      properties = properties.filter((p: any) => {
+        const school = p.raw?.MiddleOrJuniorSchool || p.middleSchool || '';
+        return school.toLowerCase().includes(sellerUpdate.middleSchool!.toLowerCase());
+      });
+    }
+
+    // Filter by high school
+    if (sellerUpdate.highSchool) {
+      properties = properties.filter((p: any) => {
+        const school = p.raw?.HighSchool || p.highSchool || '';
+        return school.toLowerCase().includes(sellerUpdate.highSchool!.toLowerCase());
+      });
+    }
+
+    // Filter by property subtype
+    if (sellerUpdate.propertySubType && sellerUpdate.propertySubType !== 'all') {
       properties = properties.filter((p: any) => {
         const subType = p.propertySubType || p.class || '';
         return subType.toLowerCase().includes(sellerUpdate.propertySubType!.toLowerCase());
       });
     }
 
-    return properties;
+    // Filter by year built
+    const minYearBuilt = safeParseInt(sellerUpdate.minYearBuilt);
+    const maxYearBuilt = safeParseInt(sellerUpdate.maxYearBuilt);
+    if (minYearBuilt !== undefined || maxYearBuilt !== undefined) {
+      properties = properties.filter((p: any) => {
+        const yearBuilt = p.yearBuilt || p.raw?.YearBuilt;
+        if (!yearBuilt) return true; // Include if year unknown
+        const year = parseInt(String(yearBuilt), 10);
+        if (isNaN(year)) return true;
+        if (minYearBuilt !== undefined && year < minYearBuilt) return false;
+        if (maxYearBuilt !== undefined && year > maxYearBuilt) return false;
+        return true;
+      });
+    }
+
+    // Limit results for email
+    return properties.slice(0, 20);
   } catch (error) {
     console.error('Error fetching properties for seller update:', error);
     return [];

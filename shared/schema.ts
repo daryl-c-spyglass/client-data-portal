@@ -203,9 +203,28 @@ export const sellerUpdates = pgTable("seller_updates", {
   userId: varchar("user_id").notNull().references(() => users.id),
   name: text("name").notNull(), // Property address for identification
   email: text("email").notNull(), // Email to send updates to
-  postalCode: text("postal_code").notNull(),
+  // Location criteria
+  postalCode: text("postal_code"),
+  city: text("city"),
+  subdivision: text("subdivision"),
+  // School criteria
   elementarySchool: text("elementary_school"),
+  middleSchool: text("middle_school"),
+  highSchool: text("high_school"),
+  // Property criteria
   propertySubType: text("property_sub_type"),
+  minBeds: text("min_beds"),
+  maxBeds: text("max_beds"),
+  minBaths: text("min_baths"),
+  maxBaths: text("max_baths"),
+  minSqft: text("min_sqft"),
+  maxSqft: text("max_sqft"),
+  minPrice: text("min_price"),
+  maxPrice: text("max_price"),
+  minYearBuilt: text("min_year_built"),
+  maxYearBuilt: text("max_year_built"),
+  // Search settings
+  soldDays: text("sold_days"), // Limit to properties sold within X days
   emailFrequency: text("email_frequency").notNull(), // 'weekly', 'bimonthly', 'quarterly'
   lastSentAt: timestamp("last_sent_at"),
   nextSendAt: timestamp("next_send_at"),
@@ -228,9 +247,28 @@ export const insertSellerUpdateSchema = createInsertSchema(sellerUpdates).omit({
 export const updateSellerUpdateSchema = z.object({
   name: z.string().optional(),
   email: z.string().email().optional(),
+  // Location criteria
   postalCode: z.string().optional(),
+  city: z.string().optional(),
+  subdivision: z.string().optional(),
+  // School criteria
   elementarySchool: z.string().optional(),
+  middleSchool: z.string().optional(),
+  highSchool: z.string().optional(),
+  // Property criteria
   propertySubType: z.string().optional(),
+  minBeds: z.string().optional(),
+  maxBeds: z.string().optional(),
+  minBaths: z.string().optional(),
+  maxBaths: z.string().optional(),
+  minSqft: z.string().optional(),
+  maxSqft: z.string().optional(),
+  minPrice: z.string().optional(),
+  maxPrice: z.string().optional(),
+  minYearBuilt: z.string().optional(),
+  maxYearBuilt: z.string().optional(),
+  // Search settings
+  soldDays: z.string().optional(),
   emailFrequency: z.enum(['weekly', 'bimonthly', 'quarterly']).optional(),
   isActive: z.boolean().optional(),
 });
