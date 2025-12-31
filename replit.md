@@ -57,7 +57,7 @@ The UI incorporates Spyglass Realty branding with an orange primary color scheme
 - **`connect-pg-simple`**: PostgreSQL-backed session management.
 - **Google Fonts CDN**: Typography (Inter font family).
 - **Recharts**: Charting and data visualization.
-- **SendGrid**: Email services.
+- **Resend**: Email services for seller update notifications.
 - **FEMA NFHL API**: National Flood Hazard Layer data for flood zone overlays.
 - **City of Austin ArcGIS**: School district boundary data for map layers.
 

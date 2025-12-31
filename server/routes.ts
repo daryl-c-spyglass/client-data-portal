@@ -2534,7 +2534,7 @@ This email was sent by ${senderName} (${senderEmail}) via the MLS Grid IDX Platf
       }
       
       // Calculate initial next send date based on frequency
-      const { calculateNextSendDate } = await import('./sendgrid-service');
+      const { calculateNextSendDate } = await import('./resend-service');
       const nextSendAt = calculateNextSendDate(updateData.emailFrequency);
       
       const update = await storage.createSellerUpdate({
@@ -2636,15 +2636,15 @@ This email was sent by ${senderName} (${senderEmail}) via the MLS Grid IDX Platf
   // Send test email for a seller update
   app.post("/api/seller-updates/:id/send-test", async (req, res) => {
     try {
-      const { sendSellerUpdateEmail, isSendGridConfigured, initSendGrid } = await import('./sendgrid-service');
+      const { sendSellerUpdateEmail, isResendConfigured, initResend } = await import('./resend-service');
       const { findMatchingPropertiesForUpdate, getAgentInfoForUpdate } = await import('./seller-update-scheduler');
       
-      if (!isSendGridConfigured()) {
-        res.status(400).json({ error: "SendGrid is not configured. Please add SENDGRID_API_KEY and SENDGRID_TEMPLATE_ID environment variables." });
+      if (!isResendConfigured()) {
+        res.status(400).json({ error: "Resend is not configured. Please add RESEND_API_KEY environment variable." });
         return;
       }
       
-      initSendGrid();
+      initResend();
       
       const sellerUpdate = await storage.getSellerUpdate(req.params.id);
       if (!sellerUpdate) {
@@ -2696,7 +2696,7 @@ This email was sent by ${senderName} (${senderEmail}) via the MLS Grid IDX Platf
   // Toggle active status for a seller update
   app.post("/api/seller-updates/:id/toggle-active", async (req, res) => {
     try {
-      const { calculateNextSendDate } = await import('./sendgrid-service');
+      const { calculateNextSendDate } = await import('./resend-service');
       
       const sellerUpdate = await storage.getSellerUpdate(req.params.id);
       if (!sellerUpdate) {

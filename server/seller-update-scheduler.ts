@@ -3,9 +3,9 @@ import { storage } from './storage';
 import { 
   sendSellerUpdateEmail, 
   calculateNextSendDate, 
-  initSendGrid, 
-  isSendGridConfigured 
-} from './sendgrid-service';
+  initResend, 
+  isResendConfigured 
+} from './resend-service';
 import { isRepliersConfigured, getRepliersClient } from './repliers-client';
 import type { SellerUpdate } from '@shared/schema';
 
@@ -195,12 +195,12 @@ async function runScheduledJob(): Promise<void> {
 }
 
 export function startScheduler(): boolean {
-  if (!isSendGridConfigured()) {
-    console.warn('⚠️ SendGrid not configured. Seller update scheduler disabled.');
+  if (!isResendConfigured()) {
+    console.warn('⚠️ Resend not configured. Seller update scheduler disabled.');
     return false;
   }
 
-  initSendGrid();
+  initResend();
 
   scheduledTask = cron.schedule('0 9 * * *', runScheduledJob, {
     timezone: 'America/Chicago',
