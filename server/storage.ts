@@ -9,6 +9,8 @@ import {
   type InsertCma,
   type SellerUpdate,
   type InsertSellerUpdate,
+  type SellerUpdateSendHistory,
+  type InsertSellerUpdateSendHistory,
   type LeadGateSettings,
   type InsertLeadGateSettings,
   type UpdateLeadGateSettings,
@@ -26,6 +28,7 @@ import {
   savedSearches,
   cmas,
   sellerUpdates,
+  sellerUpdateSendHistory,
   leadGateSettings,
   displayPreferences,
   users,
@@ -110,9 +113,14 @@ export interface IStorage {
   getSellerUpdatesByUser(userId: string): Promise<SellerUpdate[]>;
   getAllSellerUpdates(): Promise<SellerUpdate[]>;
   getActiveSellerUpdates(): Promise<SellerUpdate[]>;
+  getDueSellerUpdates(): Promise<SellerUpdate[]>;
   createSellerUpdate(update: InsertSellerUpdate): Promise<SellerUpdate>;
   updateSellerUpdate(id: string, update: Partial<SellerUpdate>): Promise<SellerUpdate | undefined>;
   deleteSellerUpdate(id: string): Promise<boolean>;
+  
+  // Seller Update Send History operations
+  getSendHistory(sellerUpdateId: string, limit?: number): Promise<SellerUpdateSendHistory[]>;
+  createSendHistory(history: InsertSellerUpdateSendHistory): Promise<SellerUpdateSendHistory>;
   
   // Statistics calculation
   calculateStatistics(propertyIds: string[]): Promise<PropertyStatistics>;
@@ -650,6 +658,34 @@ export class MemStorage implements IStorage {
 
   async deleteSellerUpdate(id: string): Promise<boolean> {
     return this.sellerUpdates.delete(id);
+  }
+
+  async getDueSellerUpdates(): Promise<SellerUpdate[]> {
+    const now = new Date();
+    return Array.from(this.sellerUpdates.values()).filter(u => 
+      u.isActive && u.nextSendAt && u.nextSendAt <= now
+    );
+  }
+
+  // Send History operations (in-memory just stores in array)
+  private sendHistory: Map<string, SellerUpdateSendHistory> = new Map();
+
+  async getSendHistory(sellerUpdateId: string, limit: number = 20): Promise<SellerUpdateSendHistory[]> {
+    return Array.from(this.sendHistory.values())
+      .filter(h => h.sellerUpdateId === sellerUpdateId)
+      .sort((a, b) => new Date(b.sentAt).getTime() - new Date(a.sentAt).getTime())
+      .slice(0, limit);
+  }
+
+  async createSendHistory(history: InsertSellerUpdateSendHistory): Promise<SellerUpdateSendHistory> {
+    const id = randomUUID();
+    const newHistory: SellerUpdateSendHistory = {
+      ...history,
+      id,
+      sentAt: history.sentAt || new Date(),
+    };
+    this.sendHistory.set(id, newHistory);
+    return newHistory;
   }
 
   // Statistics calculation
@@ -1482,6 +1518,30 @@ export class DbStorage implements IStorage {
   async deleteSellerUpdate(id: string): Promise<boolean> {
     const result = await this.db.delete(sellerUpdates).where(eq(sellerUpdates.id, id));
     return result.rowCount! > 0;
+  }
+
+  async getDueSellerUpdates(): Promise<SellerUpdate[]> {
+    const now = new Date();
+    return await this.db.select().from(sellerUpdates).where(
+      and(
+        eq(sellerUpdates.isActive, true),
+        lte(sellerUpdates.nextSendAt, now)
+      )
+    );
+  }
+
+  // Seller Update Send History operations
+  async getSendHistory(sellerUpdateId: string, limit: number = 20): Promise<SellerUpdateSendHistory[]> {
+    return await this.db.select()
+      .from(sellerUpdateSendHistory)
+      .where(eq(sellerUpdateSendHistory.sellerUpdateId, sellerUpdateId))
+      .orderBy(drizzleSql`${sellerUpdateSendHistory.sentAt} DESC`)
+      .limit(limit);
+  }
+
+  async createSendHistory(history: InsertSellerUpdateSendHistory): Promise<SellerUpdateSendHistory> {
+    const result = await this.db.insert(sellerUpdateSendHistory).values(history).returning();
+    return result[0];
   }
 
   async calculateStatistics(propertyIds: string[]): Promise<PropertyStatistics> {

@@ -1,0 +1,54 @@
+I need to add SendGrid email integration to my existing Seller Updates feature. Here's what I need:
+
+## What Exists
+- Seller Updates UI where agents can create updates with: update name, client email, zip code, and property criteria
+- MLS Grid API integration that pulls property data by zip code
+- Database with seller_updates table storing the update configurations
+- Agents and clients tables already exist
+
+## What I Need Built
+
+### 1. Database Schema Updates
+Add these columns to seller_updates table:
+- frequency (enum: 'weekly', 'bimonthly', 'quarterly') 
+- last_sent_at (timestamp)
+- next_send_at (timestamp)
+- is_active (boolean, default true)
+
+### 2. SendGrid Email Service
+Create a service module that:
+- Uses @sendgrid/mail package
+- Sends from: updates@spyglassrealty.com (env var: SENDGRID_FROM_EMAIL)
+- Sets reply-to as the individual agent's email (from agents table)
+- Uses SendGrid dynamic templates (I'll create the template in SendGrid UI)
+- Passes these dynamic template variables: client_name, agent_name, agent_email, agent_phone, update_name, properties array, market_stats object, current_date
+- Enables open and click tracking
+
+### 3. Scheduled Job
+Create a cron job that:
+- Runs daily at 9 AM Central time
+- Queries seller_updates where is_active=true AND next_send_at <= NOW()
+- For each due update: fetches fresh MLS data for that zip, calculates market stats, sends email via SendGrid
+- On successful send: updates last_sent_at to NOW() and calculates next_send_at based on frequency
+
+### 4. API Endpoints
+- POST /api/seller-updates/:id/send-test - sends a test email to the agent's email
+- POST /api/seller-updates/:id/toggle-active - activates/deactivates the update
+- GET /api/seller-updates/:id/history - returns send history for that update
+
+### 5. UI Updates
+On the Create Seller Update form, add:
+- Frequency dropdown (Weekly, Twice Monthly, Quarterly)
+- Active/Inactive toggle
+- "Send Test Email" button
+- Show last_sent_at and next_send_at dates
+
+## Environment Variables Needed
+- SENDGRID_API_KEY
+- SENDGRID_FROM_EMAIL=updates@spyglassrealty.com
+- SENDGRID_TEMPLATE_ID (I'll add this after creating the template)
+
+## Notes
+- Don't store email content in database, just send history/logs
+- Use node-cron for scheduling
+- Handle errors gracefully and log failed sends for retry

@@ -206,8 +206,9 @@ export const sellerUpdates = pgTable("seller_updates", {
   postalCode: text("postal_code").notNull(),
   elementarySchool: text("elementary_school"),
   propertySubType: text("property_sub_type"),
-  emailFrequency: text("email_frequency").notNull(), // 'daily', 'weekly', 'bi-weekly', 'monthly'
+  emailFrequency: text("email_frequency").notNull(), // 'weekly', 'bimonthly', 'quarterly'
   lastSentAt: timestamp("last_sent_at"),
+  nextSendAt: timestamp("next_send_at"),
   isActive: boolean("is_active").notNull().default(true),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
@@ -218,8 +219,9 @@ export const insertSellerUpdateSchema = createInsertSchema(sellerUpdates).omit({
   createdAt: true, 
   updatedAt: true,
   lastSentAt: true,
+  nextSendAt: true,
 }).extend({
-  emailFrequency: z.enum(['daily', 'weekly', 'bi-weekly', 'monthly']),
+  emailFrequency: z.enum(['weekly', 'bimonthly', 'quarterly']),
   email: z.string().email(),
 });
 
@@ -229,13 +231,31 @@ export const updateSellerUpdateSchema = z.object({
   postalCode: z.string().optional(),
   elementarySchool: z.string().optional(),
   propertySubType: z.string().optional(),
-  emailFrequency: z.enum(['daily', 'weekly', 'bi-weekly', 'monthly']).optional(),
+  emailFrequency: z.enum(['weekly', 'bimonthly', 'quarterly']).optional(),
   isActive: z.boolean().optional(),
 });
 
 export type InsertSellerUpdate = z.infer<typeof insertSellerUpdateSchema>;
 export type UpdateSellerUpdate = z.infer<typeof updateSellerUpdateSchema>;
 export type SellerUpdate = typeof sellerUpdates.$inferSelect;
+
+// Seller Update Send History - Track email send logs
+export const sellerUpdateSendHistory = pgTable("seller_update_send_history", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  sellerUpdateId: varchar("seller_update_id").notNull().references(() => sellerUpdates.id, { onDelete: 'cascade' }),
+  sentAt: timestamp("sent_at").notNull().defaultNow(),
+  recipientEmail: text("recipient_email").notNull(),
+  status: text("status").notNull(), // 'success', 'failed', 'bounced'
+  propertyCount: integer("property_count").default(0),
+  errorMessage: text("error_message"),
+  sendgridMessageId: text("sendgrid_message_id"),
+});
+
+export const insertSellerUpdateSendHistorySchema = createInsertSchema(sellerUpdateSendHistory).omit({ 
+  id: true,
+});
+export type InsertSellerUpdateSendHistory = z.infer<typeof insertSellerUpdateSendHistorySchema>;
+export type SellerUpdateSendHistory = typeof sellerUpdateSendHistory.$inferSelect;
 
 // CMA Schema
 export const cmas = pgTable("cmas", {

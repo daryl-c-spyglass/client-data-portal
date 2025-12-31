@@ -1,23 +1,65 @@
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { Link } from "wouter";
-import { Plus, Mail, Pause, Play, Trash2, Eye } from "lucide-react";
+import { Plus, Mail, Pause, Play, Trash2, Eye, Send, Clock, CheckCircle2, XCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import { apiRequest, queryClient } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
 import type { SellerUpdate } from "@shared/schema";
 
 export default function SellerUpdates() {
+  const { toast } = useToast();
   const { data: updates, isLoading } = useQuery<SellerUpdate[]>({
     queryKey: ['/api/seller-updates'],
   });
 
+  const toggleActiveMutation = useMutation({
+    mutationFn: async (id: string) => {
+      return await apiRequest(`/api/seller-updates/${id}/toggle-active`, 'POST');
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/seller-updates'] });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: async (id: string) => {
+      return await apiRequest(`/api/seller-updates/${id}`, 'DELETE');
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/seller-updates'] });
+      toast({ title: "Deleted", description: "Seller update removed successfully" });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const sendTestMutation = useMutation({
+    mutationFn: async (id: string) => {
+      return await apiRequest(`/api/seller-updates/${id}/send-test`, 'POST');
+    },
+    onSuccess: (data: any) => {
+      toast({ 
+        title: "Test Email Sent", 
+        description: data.message || "Check your inbox for the test email" 
+      });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    },
+  });
+
   const getFrequencyLabel = (frequency: string) => {
     const labels: Record<string, string> = {
-      daily: 'Daily',
       weekly: 'Weekly',
-      'bi-weekly': 'Bi-Weekly',
-      monthly: 'Monthly',
+      bimonthly: 'Twice Monthly',
+      quarterly: 'Quarterly',
     };
     return labels[frequency] || frequency;
   };
@@ -101,19 +143,28 @@ export default function SellerUpdates() {
                   {update.lastSentAt && (
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">Last Sent:</span>
-                      <span className="font-medium">
+                      <span className="font-medium text-green-600 dark:text-green-400 flex items-center gap-1">
+                        <CheckCircle2 className="w-3 h-3" />
                         {new Date(update.lastSentAt).toLocaleDateString()}
+                      </span>
+                    </div>
+                  )}
+                  {update.nextSendAt && update.isActive && (
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Next Send:</span>
+                      <span className="font-medium flex items-center gap-1">
+                        <Clock className="w-3 h-3" />
+                        {new Date(update.nextSendAt).toLocaleDateString()}
                       </span>
                     </div>
                   )}
                 </div>
 
-                <div className="flex gap-2 pt-2">
+                <div className="flex flex-wrap gap-2 pt-2">
                   <Link href={`/seller-updates/${update.id}/preview`}>
                     <Button 
                       variant="outline" 
-                      size="sm" 
-                      className="flex-1"
+                      size="sm"
                       data-testid={`button-preview-${update.id}`}
                     >
                       <Eye className="w-3 h-3 mr-1" />
@@ -123,6 +174,18 @@ export default function SellerUpdates() {
                   <Button
                     variant="outline"
                     size="sm"
+                    onClick={() => sendTestMutation.mutate(update.id)}
+                    disabled={sendTestMutation.isPending}
+                    data-testid={`button-test-${update.id}`}
+                  >
+                    <Send className="w-3 h-3 mr-1" />
+                    Test
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => toggleActiveMutation.mutate(update.id)}
+                    disabled={toggleActiveMutation.isPending}
                     data-testid={`button-toggle-${update.id}`}
                   >
                     {update.isActive ? (
@@ -140,6 +203,12 @@ export default function SellerUpdates() {
                   <Button
                     variant="outline"
                     size="sm"
+                    onClick={() => {
+                      if (confirm('Are you sure you want to delete this seller update?')) {
+                        deleteMutation.mutate(update.id);
+                      }
+                    }}
+                    disabled={deleteMutation.isPending}
                     data-testid={`button-delete-${update.id}`}
                   >
                     <Trash2 className="w-3 h-3" />

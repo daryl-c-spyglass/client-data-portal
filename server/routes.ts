@@ -200,6 +200,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
   const mlsGridClient = createMLSGridClient();
   const repliersClient = initRepliersClient();
   
+  // Start the seller update email scheduler
+  import('./seller-update-scheduler').then(({ startScheduler }) => {
+    startScheduler();
+  }).catch(err => {
+    console.warn('⚠️ Failed to start seller update scheduler:', err.message);
+  });
+  
   // Register WordPress API routes with CORS
   registerWordPressRoutes(app);
   registerWidgetRoutes(app);
@@ -2526,11 +2533,19 @@ This email was sent by ${senderName} (${senderEmail}) via the MLS Grid IDX Platf
         }
       }
       
+      // Calculate initial next send date based on frequency
+      const { calculateNextSendDate } = await import('./sendgrid-service');
+      const nextSendAt = calculateNextSendDate(updateData.emailFrequency);
+      
       const update = await storage.createSellerUpdate({
         ...updateData,
         userId,
       });
-      res.status(201).json(update);
+      
+      // Update with next send date (storage doesn't accept it in insert)
+      const updatedWithNextSend = await storage.updateSellerUpdate(update.id, { nextSendAt });
+      
+      res.status(201).json(updatedWithNextSend || update);
     } catch (error) {
       if (error instanceof z.ZodError) {
         res.status(400).json({ error: "Invalid seller update data", details: error.errors });
@@ -2615,6 +2630,110 @@ This email was sent by ${senderName} (${senderEmail}) via the MLS Grid IDX Platf
       });
     } catch (error) {
       res.status(500).json({ error: "Failed to preview matching properties" });
+    }
+  });
+
+  // Send test email for a seller update
+  app.post("/api/seller-updates/:id/send-test", async (req, res) => {
+    try {
+      const { sendSellerUpdateEmail, isSendGridConfigured, initSendGrid } = await import('./sendgrid-service');
+      const { findMatchingPropertiesForUpdate, getAgentInfoForUpdate } = await import('./seller-update-scheduler');
+      
+      if (!isSendGridConfigured()) {
+        res.status(400).json({ error: "SendGrid is not configured. Please add SENDGRID_API_KEY and SENDGRID_TEMPLATE_ID environment variables." });
+        return;
+      }
+      
+      initSendGrid();
+      
+      const sellerUpdate = await storage.getSellerUpdate(req.params.id);
+      if (!sellerUpdate) {
+        res.status(404).json({ error: "Seller update not found" });
+        return;
+      }
+      
+      const agent = await getAgentInfoForUpdate(sellerUpdate.userId);
+      if (!agent) {
+        res.status(400).json({ error: "Could not find agent information for this update" });
+        return;
+      }
+      
+      const properties = await findMatchingPropertiesForUpdate(sellerUpdate);
+      
+      const result = await sendSellerUpdateEmail(
+        sellerUpdate,
+        properties,
+        agent,
+        sellerUpdate.name,
+        true // isTest = true, sends to agent's email
+      );
+      
+      // Log the test send
+      await storage.createSendHistory({
+        sellerUpdateId: sellerUpdate.id,
+        recipientEmail: agent.email,
+        status: result.success ? 'success' : 'failed',
+        propertyCount: properties.length,
+        errorMessage: result.error,
+        sendgridMessageId: result.messageId,
+      });
+      
+      if (result.success) {
+        res.json({ 
+          success: true, 
+          message: `Test email sent to ${agent.email}`,
+          propertyCount: properties.length 
+        });
+      } else {
+        res.status(500).json({ error: result.error || "Failed to send test email" });
+      }
+    } catch (error: any) {
+      console.error("Error sending test email:", error);
+      res.status(500).json({ error: error.message || "Failed to send test email" });
+    }
+  });
+
+  // Toggle active status for a seller update
+  app.post("/api/seller-updates/:id/toggle-active", async (req, res) => {
+    try {
+      const { calculateNextSendDate } = await import('./sendgrid-service');
+      
+      const sellerUpdate = await storage.getSellerUpdate(req.params.id);
+      if (!sellerUpdate) {
+        res.status(404).json({ error: "Seller update not found" });
+        return;
+      }
+      
+      const newIsActive = !sellerUpdate.isActive;
+      
+      // If activating, calculate next send date
+      const updates: any = { isActive: newIsActive };
+      if (newIsActive && !sellerUpdate.nextSendAt) {
+        updates.nextSendAt = calculateNextSendDate(sellerUpdate.emailFrequency);
+      }
+      
+      const updated = await storage.updateSellerUpdate(req.params.id, updates);
+      res.json(updated);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to toggle seller update status" });
+    }
+  });
+
+  // Get send history for a seller update
+  app.get("/api/seller-updates/:id/history", async (req, res) => {
+    try {
+      const limit = parseInt(req.query.limit as string) || 20;
+      
+      const sellerUpdate = await storage.getSellerUpdate(req.params.id);
+      if (!sellerUpdate) {
+        res.status(404).json({ error: "Seller update not found" });
+        return;
+      }
+      
+      const history = await storage.getSendHistory(req.params.id, limit);
+      res.json(history);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch send history" });
     }
   });
 

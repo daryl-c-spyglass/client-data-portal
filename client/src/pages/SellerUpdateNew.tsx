@@ -454,10 +454,9 @@ export default function SellerUpdateNew() {
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
-                          <SelectItem value="daily">Daily</SelectItem>
                           <SelectItem value="weekly">Weekly</SelectItem>
-                          <SelectItem value="bi-weekly">Bi-Weekly</SelectItem>
-                          <SelectItem value="monthly">Monthly</SelectItem>
+                          <SelectItem value="bimonthly">Twice Monthly</SelectItem>
+                          <SelectItem value="quarterly">Quarterly</SelectItem>
                         </SelectContent>
                       </Select>
                       <FormDescription>
