@@ -1463,31 +1463,59 @@ export function CMABuilder({ onCreateCMA, initialData }: CMABuilderProps) {
               <div className="space-y-4">
                 <div className="space-y-2">
                   <Label>Search by Address</Label>
-                  <AutocompleteInput
-                    placeholder="Enter property address..."
-                    value={manualSubjectAddress}
-                    onChange={async (address) => {
-                      setManualSubjectAddress(address);
-                      if (address.length > 5) {
-                        try {
-                          const res = await fetch(`/api/search?address=${encodeURIComponent(address)}&limit=1`);
-                          const data = await res.json();
-                          if (data.properties?.[0]) {
-                            setSubjectProperty(data.properties[0]);
-                            setManualSubjectAddress("");
-                            setManualSubjectCity("");
-                            setManualSubjectState("");
-                            setManualSubjectZip("");
+                  <div className="flex gap-2">
+                    <Input
+                      placeholder="Enter property address..."
+                      value={manualSubjectAddress}
+                      onChange={(e) => setManualSubjectAddress(e.target.value)}
+                      onKeyDown={async (e) => {
+                        if (e.key === 'Enter' && manualSubjectAddress.length > 5) {
+                          e.preventDefault();
+                          try {
+                            const res = await fetch(`/api/search?address=${encodeURIComponent(manualSubjectAddress)}&limit=1`);
+                            const data = await res.json();
+                            if (data.properties?.[0]) {
+                              setSubjectProperty(data.properties[0]);
+                              setManualSubjectAddress("");
+                              setManualSubjectCity("");
+                              setManualSubjectState("");
+                              setManualSubjectZip("");
+                            }
+                          } catch (err) {
+                            console.error('Address search error:', err);
                           }
-                        } catch (err) {
-                          console.error('Address search error:', err);
                         }
-                      }
-                    }}
-                    endpoint="/api/autocomplete/addresses"
-                    testId="input-subject-address"
-                    name="subject-address"
-                  />
+                      }}
+                      autoComplete="off"
+                      data-testid="input-subject-address"
+                      className="flex-1"
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="icon"
+                      onClick={async () => {
+                        if (manualSubjectAddress.length > 5) {
+                          try {
+                            const res = await fetch(`/api/search?address=${encodeURIComponent(manualSubjectAddress)}&limit=1`);
+                            const data = await res.json();
+                            if (data.properties?.[0]) {
+                              setSubjectProperty(data.properties[0]);
+                              setManualSubjectAddress("");
+                              setManualSubjectCity("");
+                              setManualSubjectState("");
+                              setManualSubjectZip("");
+                            }
+                          } catch (err) {
+                            console.error('Address search error:', err);
+                          }
+                        }
+                      }}
+                      data-testid="button-search-subject-address"
+                    >
+                      <Search className="w-4 h-4" />
+                    </Button>
+                  </div>
                 </div>
                 <div className="grid grid-cols-3 gap-2">
                   <div className="space-y-1">
