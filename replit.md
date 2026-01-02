@@ -20,6 +20,15 @@ The platform uses Drizzle ORM with PostgreSQL, adhering to type-safe schema defi
 ### UI/UX Decisions
 The UI incorporates Spyglass Realty branding with an orange primary color scheme. `shadcn/ui` (New York style variant) based on Radix UI is used for components, prioritizing visual appeal and functional efficiency. Styling is managed with Tailwind CSS, incorporating custom design tokens and supporting light/dark modes.
 
+### Authentication
+- **Google OAuth**: Team-only authentication via Google OAuth (passport-google-oauth20).
+- **Domain Restriction**: Access limited to @spyglassrealty.com emails or explicitly allowed emails.
+- **Session Management**: PostgreSQL-backed sessions via connect-pg-simple.
+- **Auth Routes**: `/auth/google` (initiate), `/auth/google/callback` (callback), `/auth/logout` (logout), `/api/auth/me` (current user).
+- **Public Routes**: `/login`, `/embed/seller-update`, `/share/cma/:token` are accessible without authentication.
+- **Security**: Return URL sanitization prevents open redirect vulnerabilities.
+- **User Schema**: Supports both password-based and OAuth users (passwordHash optional, googleId for OAuth).
+
 ### Technical Implementations
 - **Data Sourcing**: Primary property data from Repliers API (active, pending, closed listings) and MLS Grid API.
 - **Location Data**: Neighborhood information derived from boundary polygon resolution.
