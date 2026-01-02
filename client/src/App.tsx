@@ -36,24 +36,51 @@ import { useEffect } from "react";
 function AuthGuard({ children }: { children: React.ReactNode }) {
   const [location, setLocation] = useLocation();
   
-  const { data: user, isLoading, error } = useQuery({
+  const { data: user, isLoading, error, isError } = useQuery({
     queryKey: ["/api/auth/me"],
     retry: false,
+    staleTime: 0,
+    refetchOnMount: "always",
   });
 
+  const is401Error = (err: unknown): boolean => {
+    if (!(err instanceof Error)) return false;
+    return err.message.startsWith("401:");
+  };
+
   useEffect(() => {
-    if (!isLoading && !user && error) {
+    if (!isLoading && isError && is401Error(error)) {
       const currentPath = location;
       if (currentPath !== "/login") {
         setLocation(`/login?next=${encodeURIComponent(currentPath)}`);
       }
     }
-  }, [user, isLoading, error, location, setLocation]);
+  }, [isLoading, isError, error, location, setLocation]);
 
   if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
         <div className="h-8 w-8 border-4 border-primary border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
+
+  if (isError) {
+    if (is401Error(error)) {
+      return null;
+    }
+    
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <div className="text-center space-y-4">
+          <p className="text-muted-foreground">Unable to verify authentication</p>
+          <button 
+            onClick={() => window.location.reload()} 
+            className="text-primary hover:underline"
+          >
+            Retry
+          </button>
+        </div>
       </div>
     );
   }

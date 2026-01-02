@@ -10,28 +10,25 @@ export default function Login() {
   const error = urlParams.get("error");
   const next = urlParams.get("next") || "/";
 
-  const { data: user, isLoading } = useQuery({
+  const { data: user, isSuccess, refetch } = useQuery({
     queryKey: ["/api/auth/me"],
     retry: false,
+    staleTime: 0,
+    refetchOnMount: "always",
   });
 
   useEffect(() => {
-    if (user && !isLoading) {
+    if (isSuccess && user) {
       setLocation(next);
     }
-  }, [user, isLoading, next, setLocation]);
+  }, [user, isSuccess, next, setLocation]);
 
   const handleGoogleLogin = () => {
-    window.location.href = "/auth/google";
+    const loginUrl = next !== "/" 
+      ? `/auth/google?next=${encodeURIComponent(next)}`
+      : "/auth/google";
+    window.location.href = loginUrl;
   };
-
-  if (isLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
-        <div className="h-8 w-8 border-4 border-primary border-t-transparent rounded-full animate-spin" />
-      </div>
-    );
-  }
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background to-muted p-4">

@@ -169,16 +169,38 @@ export function requireRole(roles: string[]) {
   };
 }
 
+function sanitizeRedirectUrl(url: string | undefined): string {
+  if (!url) return "/";
+  
+  // Only allow relative paths starting with /
+  if (!url.startsWith("/")) return "/";
+  
+  // Prevent protocol-relative URLs (//evil.com)
+  if (url.startsWith("//")) return "/";
+  
+  // Block any URL with : before the first / (prevents javascript:, data:, etc.)
+  const colonIndex = url.indexOf(":");
+  const slashIndex = url.indexOf("/", 1);
+  if (colonIndex !== -1 && (slashIndex === -1 || colonIndex < slashIndex)) {
+    return "/";
+  }
+  
+  return url;
+}
+
 export function setupAuthRoutes(app: any) {
-  app.get("/auth/google", passport.authenticate("google", { 
+  app.get("/auth/google", (req: Request, res: Response, next: NextFunction) => {
+    const nextUrl = sanitizeRedirectUrl(req.query.next as string);
+    (req.session as any).returnTo = nextUrl;
+    next();
+  }, passport.authenticate("google", { 
     scope: ["email", "profile"],
     prompt: "select_account"
   }));
 
   app.get("/auth/google/callback", 
     passport.authenticate("google", { 
-      failureRedirect: "/login?error=access_denied",
-      failureMessage: true
+      failureRedirect: "/login?error=access_denied"
     }),
     (req: Request, res: Response) => {
       const redirectTo = (req.session as any)?.returnTo || "/";
