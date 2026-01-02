@@ -12,6 +12,7 @@ import { setupAuth, setupAuthRoutes } from "./auth";
 import { createMLSGridClient } from "./mlsgrid-client";
 import { startMLSGridScheduledSync, triggerManualSync } from "./mlsgrid-sync";
 import { startEmailScheduler } from "./email-scheduler";
+import { startRepliersScheduledSync, registerRepliersSyncRoutes, triggerRepliersSync } from "./repliers-sync";
 
 const app = express();
 
@@ -116,7 +117,19 @@ app.use((req, res, next) => {
     startEmailScheduler();
   }
   
+  // Start Repliers inventory scheduled sync (daily at 12 AM CST)
+  console.log('🏠 Starting Repliers inventory scheduled sync...');
+  startRepliersScheduledSync();
+  
+  // Register Repliers sync admin routes
+  registerRepliersSyncRoutes(app);
+  
   const server = await registerRoutes(app);
+  
+  // Trigger initial Repliers inventory sync (after routes are registered so client is initialized)
+  triggerRepliersSync().catch(err => {
+    console.error('⚠️ Initial Repliers inventory sync failed:', err.message);
+  });
 
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
     const status = err.status || err.statusCode || 500;
