@@ -8,7 +8,7 @@ import path from "path";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 import { seedData } from "./seed-data";
-import { setupAuth } from "./auth";
+import { setupAuth, setupAuthRoutes } from "./auth";
 import { createMLSGridClient } from "./mlsgrid-client";
 import { startMLSGridScheduledSync, triggerManualSync } from "./mlsgrid-sync";
 import { startEmailScheduler } from "./email-scheduler";
@@ -65,6 +65,7 @@ app.use(passport.initialize());
 app.use(passport.session());
 
 setupAuth();
+setupAuthRoutes(app);
 
 app.use((req, res, next) => {
   const start = Date.now();

@@ -1,11 +1,12 @@
-import { Switch, Route } from "wouter";
+import { Switch, Route, useLocation } from "wouter";
 import { queryClient } from "./lib/queryClient";
-import { QueryClientProvider } from "@tanstack/react-query";
+import { QueryClientProvider, useQuery } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/AppSidebar";
 import { ChatAssistant } from "@/components/ChatAssistant";
+import { UserMenu } from "@/components/UserMenu";
 import { LeadGateProvider } from "@/contexts/LeadGateContext";
 import { SelectedPropertyProvider } from "@/contexts/SelectedPropertyContext";
 import { ChatProvider } from "@/contexts/ChatContext";
@@ -29,6 +30,40 @@ import SharedCMAView from "@/pages/SharedCMAView";
 import CalendarPage from "@/pages/CalendarPage";
 import LeadsPage from "@/pages/LeadsPage";
 import InventoryAudit from "@/pages/InventoryAudit";
+import Login from "@/pages/Login";
+import { useEffect } from "react";
+
+function AuthGuard({ children }: { children: React.ReactNode }) {
+  const [location, setLocation] = useLocation();
+  
+  const { data: user, isLoading, error } = useQuery({
+    queryKey: ["/api/auth/me"],
+    retry: false,
+  });
+
+  useEffect(() => {
+    if (!isLoading && !user && error) {
+      const currentPath = location;
+      if (currentPath !== "/login") {
+        setLocation(`/login?next=${encodeURIComponent(currentPath)}`);
+      }
+    }
+  }, [user, isLoading, error, location, setLocation]);
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <div className="h-8 w-8 border-4 border-primary border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
+
+  if (!user) {
+    return null;
+  }
+
+  return <>{children}</>;
+}
 
 function Router() {
   return (
@@ -56,7 +91,6 @@ function Router() {
 }
 
 export default function App() {
-  // Custom sidebar width for better content display
   const style = {
     "--sidebar-width": "16rem",
     "--sidebar-width-icon": "3rem",
@@ -69,32 +103,36 @@ export default function App() {
           <LeadGateProvider>
             <SelectedPropertyProvider>
               <Switch>
-                {/* Embed route without sidebar */}
+                {/* Public routes without auth */}
+                <Route path="/login" component={Login} />
                 <Route path="/embed/seller-update" component={SellerUpdateEmbed} />
-                
-                {/* Public shared CMA view without sidebar */}
                 <Route path="/share/cma/:token" component={SharedCMAView} />
                 
-                {/* All other routes with sidebar */}
+                {/* Protected routes with sidebar */}
                 <Route>
-                  <SidebarProvider style={style as React.CSSProperties}>
-                    <div className="flex h-screen w-full">
-                      <AppSidebar />
-                      <div className="flex flex-col flex-1 overflow-hidden">
-                        <header className="flex items-center justify-between p-4 border-b bg-background">
-                          <SidebarTrigger data-testid="button-sidebar-toggle" />
-                          <div className="text-sm text-muted-foreground">
-                            MLS Grid IDX Platform
-                          </div>
-                        </header>
-                        <main className="flex-1 overflow-auto p-6">
-                          <div className="max-w-7xl mx-auto">
-                            <Router />
-                          </div>
-                        </main>
+                  <AuthGuard>
+                    <SidebarProvider style={style as React.CSSProperties}>
+                      <div className="flex h-screen w-full">
+                        <AppSidebar />
+                        <div className="flex flex-col flex-1 overflow-hidden">
+                          <header className="flex items-center justify-between p-4 border-b bg-background gap-4">
+                            <SidebarTrigger data-testid="button-sidebar-toggle" />
+                            <div className="flex items-center gap-4">
+                              <div className="text-sm text-muted-foreground hidden sm:block">
+                                MLS Grid IDX Platform
+                              </div>
+                              <UserMenu />
+                            </div>
+                          </header>
+                          <main className="flex-1 overflow-auto p-6">
+                            <div className="max-w-7xl mx-auto">
+                              <Router />
+                            </div>
+                          </main>
+                        </div>
                       </div>
-                    </div>
-                  </SidebarProvider>
+                    </SidebarProvider>
+                  </AuthGuard>
                 </Route>
               </Switch>
             </SelectedPropertyProvider>

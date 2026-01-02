@@ -160,13 +160,17 @@ export type Media = typeof media.$inferSelect;
 export const users = pgTable("users", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   email: text("email").notNull().unique(),
-  passwordHash: text("password_hash").notNull(),
-  role: text("role").notNull().default("client"),
+  passwordHash: text("password_hash"), // Optional for Google OAuth users
+  role: text("role").notNull().default("agent"),
   firstName: text("first_name"),
   lastName: text("last_name"),
   phone: text("phone"),
   company: text("company"),
   licenseNumber: text("license_number"),
+  // Google OAuth fields
+  googleId: text("google_id").unique(),
+  picture: text("picture"),
+  lastLoginAt: timestamp("last_login_at"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });

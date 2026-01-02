@@ -221,7 +221,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Auth routes
   app.post("/api/auth/register", async (req, res) => {
     try {
-      // Rename passwordHash field to password for client-facing API
       const { passwordHash, ...rest } = insertUserSchema.parse(req.body);
       
       const existingUser = await storage.getUserByEmail(rest.email);
@@ -230,10 +229,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return;
       }
 
+      if (!passwordHash) {
+        res.status(400).json({ error: "Password is required" });
+        return;
+      }
+
       const hashedPassword = await bcrypt.hash(passwordHash, 10);
       const user = await storage.createUser({ ...rest, passwordHash: hashedPassword });
       
-      // SECURITY: Never return password hash to client
       const { passwordHash: _, ...safeUser } = user;
       res.json(safeUser);
     } catch (error) {
