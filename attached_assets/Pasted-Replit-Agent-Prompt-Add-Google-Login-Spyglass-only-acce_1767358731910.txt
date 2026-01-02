@@ -1,0 +1,147 @@
+Replit Agent Prompt — Add Google Login (Spyglass-only access)
+
+You are working in the existing Spyglass “Client Data Portal / Mission Control” Replit web app. Implement Google Sign-In via Google OAuth 2.0 so only approved Spyglass users can access the app.
+
+References attached for context: 
+
+API - Bolt
+
+ 
+
+Understanding the Fundamentals …
+
+1) Goal
+
+Add Login with Google and require auth for the entire app (except /login, /auth/*, and health checks). Only allow users who match Spyglass rules (see below).
+
+2) Constraints / Requirements
+A) Use Google Cloud Console OAuth credentials (DO NOT hardcode)
+
+Read from environment variables:
+
+GOOGLE_CLIENT_ID
+
+GOOGLE_CLIENT_SECRET
+
+GOOGLE_REDIRECT_URI (example: https://<replit-domain>/auth/google/callback)
+
+SESSION_SECRET
+
+ALLOWED_EMAIL_DOMAIN (set to spyglassrealty.com and/or any other Ryan-approved domain)
+
+Optional: ALLOWED_EMAILS (comma-separated allowlist override)
+
+✅ Never commit secrets to repo. Use Replit Secrets.
+
+B) Spyglass-only access (strict)
+
+Authorize a user if ANY of these match:
+
+Email ends with @${ALLOWED_EMAIL_DOMAIN} (ex: @spyglassrealty.com)
+
+Email is explicitly included in ALLOWED_EMAILS allowlist
+
+(Optional if Ryan wants) Google Workspace hosted domain (“hd”) claim matches the domain
+
+If user fails checks → show “Access not allowed” and immediately log them out.
+
+C) Session-based auth
+
+Use secure, httpOnly cookies
+
+Persist a minimal user object in session:
+
+type AuthedUser = {
+  email: string
+  name?: string
+  picture?: string
+  sub: string // google subject
+  lastLoginAt: string
+}
+
+D) UX
+
+Add /login page with:
+
+“Continue with Google” button
+
+Small caption: “Spyglass team access only”
+
+Add a simple user menu in header/nav:
+
+avatar + name/email
+
+“Sign out”
+
+E) Protect routes
+
+Add middleware/guard so unauthenticated users get redirected to /login?next=<currentPath>
+
+After successful login, redirect to next (default /dashboard)
+
+3) Implementation Approach (choose what fits codebase)
+Option 1 (Preferred): If app is Node/Express backend
+
+Use passport + passport-google-oauth20 + express-session.
+
+Required endpoints:
+
+GET /auth/google → start OAuth
+
+GET /auth/google/callback → finish OAuth
+
+POST /auth/logout → destroy session
+
+Middleware:
+
+requireAuth(req,res,next) for protected routes
+
+authorizeSpyglass(user) for domain/allowlist enforcement
+
+Option 2: If app is Next.js
+
+Use next-auth with Google provider.
+
+Enforce authorization in callbacks.signIn
+
+Use middleware to protect pages
+
+Use NEXTAUTH_SECRET, NEXTAUTH_URL, Google env vars
+
+Pick the option that matches the project structure. Do not mix both.
+
+4) Deliverables
+
+Files changed (list paths)
+
+Working login flow on Replit deployed URL:
+
+unauthenticated → forced to /login
+
+authenticate with Google → back to app
+
+non-Spyglass email → blocked
+
+Confirm secure cookie/session settings in production
+
+Quick manual test checklist:
+
+Login success
+
+Logout works
+
+Redirect to original page works (next=)
+
+Blocked user cannot access any protected route even via direct URL
+
+5) Acceptance Criteria
+
+✅ No one can access app pages without Google login
+
+✅ Access restricted to Spyglass-approved users (domain or allowlist)
+
+✅ Secrets stored in Replit Secrets (not in code)
+
+✅ Clean UI for login + user menu + logout
+
+✅ No breaking changes to existing app features
