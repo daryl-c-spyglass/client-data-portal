@@ -1,0 +1,276 @@
+# CRITICAL BUG: Multi-Status Search Returns Wrong Count
+
+## The Problem
+
+Individual status searches return:
+- Active: 18 results
+- Active Under Contract: 13 results  
+- Closed: 17 results
+- Expected Total: 48 results
+
+But searching with ALL statuses selected returns only 20 results.
+
+This violates the Single Source of Truth rule:
+totalProperties = active + underContract + soldClosed
+
+---
+
+## Debug Task 1: Log Each Status Query Separately
+
+When all statuses are selected, log the count from each:
+```javascript
+async function searchCMA(criteria) {
+  const { statuses, ...otherCriteria } = criteria;
+  
+  console.log('[MULTI-STATUS DEBUG] Requested statuses:', statuses);
+  
+  // If multiple statuses, query each separately and merge
+  if (statuses.length > 1) {
+    const resultsByStatus = {};
+    
+    for (const status of statuses) {
+      const statusResults = await querySingleStatus(status, otherCriteria);
+      resultsByStatus[status] = statusResults;
+      console.log(`[MULTI-STATUS DEBUG] ${status}: ${statusResults.length} results`);
+    }
+    
+    // Merge all results
+    const allResults = [
+      ...resultsByStatus['Active'] || [],
+      ...resultsByStatus['Active Under Contract'] || [],
+      ...resultsByStatus['Closed'] || []
+    ];
+    
+    // Dedupe by MLS number (in case of overlap)
+    const deduped = dedupeByMlsNumber(allResults);
+    
+    console.log('[MULTI-STATUS DEBUG] Total before dedupe:', allResults.length);
+    console.log('[MULTI-STATUS DEBUG] Total after dedupe:', deduped.length);
+    console.log('[MULTI-STATUS DEBUG] Duplicates removed:', allResults.length - deduped.length);
+    
+    return deduped;
+  }
+  
+  // Single status query
+  return await querySingleStatus(statuses[0], otherCriteria);
+}
+```
+
+---
+
+## Debug Task 2: Check for Pagination Issues
+
+The Repliers API may be limiting results. Check if pagination is being handled:
+```javascript
+async function queryAllPages(params) {
+  let allListings = [];
+  let page = 1;
+  let hasMore = true;
+  
+  while (hasMore) {
+    const response = await repliersClient.get('/listings', {
+      params: { ...params, page, pageSize: 100 }
+    });
+    
+    console.log(`[PAGINATION] Page ${page}: ${response.data.listings.length} listings`);
+    
+    allListings = [...allListings, ...response.data.listings];
+    
+    // Check if more pages exist
+    hasMore = page < response.data.numPages;
+    page++;
+    
+    // Safety limit
+    if (page > 10) {
+      console.warn('[PAGINATION] Hit safety limit of 10 pages');
+      break;
+    }
+  }
+  
+  console.log(`[PAGINATION] Total fetched: ${allListings.length}`);
+  return allListings;
+}
+```
+
+---
+
+## Debug Task 3: Verify Repliers Query for Multi-Status
+
+Check if the status parameter is being sent correctly:
+```javascript
+// WRONG - May not work as expected
+params.status = ['Active', 'Active Under Contract', 'Closed'];
+
+// CORRECT for Repliers - Use standardStatus or separate queries
+// Option A: Multiple standardStatus values
+params.standardStatus = 'Active,Active Under Contract,Closed';
+
+// Option B: Separate queries merged (RECOMMENDED)
+const activeResults = await query({ standardStatus: 'Active', ...filters });
+const ucResults = await query({ standardStatus: 'Active Under Contract', ...filters });
+const closedResults = await query({ status: 'U', lastStatus: 'Sld', ...filters });
+const merged = [...activeResults, ...ucResults, ...closedResults];
+```
+
+---
+
+## Required Fix: Implement Three-Query Strategy
+
+Based on ChatGPT's earlier Repliers analysis, implement separate queries:
+```javascript
+async function searchCMAMultiStatus(criteria) {
+  const results = {
+    active: [],
+    underContract: [],
+    closed: []
+  };
+  
+  const baseFilters = {
+    type: 'Sale',
+    zip: criteria.zipCode,
+    search: criteria.subdivision,
+    searchFields: 'address.neighborhood',
+    minSqft: criteria.minSqft,
+    maxSqft: criteria.maxSqft,
+    // ... other filters
+  };
+  
+  // Query 1: Active
+  if (criteria.statuses.includes('Active')) {
+    const activeResponse = await repliersClient.get('/listings', {
+      params: {
+        ...baseFilters,
+        standardStatus: 'Active'
+      }
+    });
+    results.active = activeResponse.data.listings;
+    console.log('[CMA] Active results:', results.active.length);
+  }
+  
+  // Query 2: Active Under Contract
+  if (criteria.statuses.includes('Active Under Contract')) {
+    const ucResponse = await repliersClient.get('/listings', {
+      params: {
+        ...baseFilters,
+        standardStatus: 'Active Under Contract'
+      }
+    });
+    results.underContract = ucResponse.data.listings;
+    console.log('[CMA] Under Contract results:', results.underContract.length);
+  }
+  
+  // Query 3: Closed (with date filter)
+  if (criteria.statuses.includes('Closed')) {
+    const closedResponse = await repliersClient.get('/listings', {
+      params: {
+        ...baseFilters,
+        status: 'U',
+        lastStatus: 'Sld',
+        minSoldDate: calculateMinSoldDate(criteria.closeDateDays)
+      }
+    });
+    results.closed = closedResponse.data.listings;
+    console.log('[CMA] Closed results:', results.closed.length);
+  }
+  
+  // Merge all results
+  const allResults = [
+    ...results.active,
+    ...results.underContract,
+    ...results.closed
+  ];
+  
+  // Dedupe by MLS number
+  const deduped = dedupeByMlsNumber(allResults);
+  
+  console.log('[CMA] Final count:', {
+    active: results.active.length,
+    underContract: results.underContract.length,
+    closed: results.closed.length,
+    total: allResults.length,
+    afterDedupe: deduped.length
+  });
+  
+  // VALIDATION: Total should equal sum of parts (minus duplicates)
+  const expectedTotal = results.active.length + results.underContract.length + results.closed.length;
+  if (deduped.length < expectedTotal * 0.9) {
+    console.warn('[CMA] WARNING: Significant data loss during merge!', {
+      expected: expectedTotal,
+      actual: deduped.length,
+      loss: expectedTotal - deduped.length
+    });
+  }
+  
+  return deduped;
+}
+
+function dedupeByMlsNumber(listings) {
+  const seen = new Map();
+  for (const listing of listings) {
+    const mlsNumber = listing.mlsNumber || listing.listingId;
+    if (!seen.has(mlsNumber)) {
+      seen.set(mlsNumber, listing);
+    }
+  }
+  return Array.from(seen.values());
+}
+```
+
+---
+
+## Task 4: Add Count Validation in UI
+
+Display the breakdown to verify counts:
+```jsx
+// In SearchResults component
+<div className="text-sm text-gray-500 mb-2">
+  Search Results ({totalCount} found)
+  {showBreakdown && (
+    <span className="ml-2">
+      (Active: {activeCount} | Under Contract: {ucCount} | Closed: {closedCount})
+    </span>
+  )}
+</div>
+```
+
+---
+
+## Acceptance Criteria
+
+Run these tests and verify counts match:
+
+| Test | Active | UC | Closed | Expected Total | Actual Total | Pass? |
+|------|--------|-----|--------|----------------|--------------|-------|
+| ZIP 78732, SFR | 18 | 13 | 17 | 48 | ? | |
+| With subdivision filter | ? | ? | ? | Sum | ? | |
+
+- [ ] Active-only search returns X results
+- [ ] UC-only search returns Y results  
+- [ ] Closed-only search returns Z results
+- [ ] All-status search returns X + Y + Z results (or close, with duplicates logged)
+- [ ] Console logs show count breakdown for each status
+- [ ] No silent data loss during merge
+
+---
+
+## Root Cause Hypothesis
+
+The current implementation likely:
+1. Uses a single Repliers query with multiple statuses that doesn't work as expected, OR
+2. Has pagination limiting results to ~20, OR
+3. Has aggressive deduplication removing valid listings, OR
+4. Is applying filters that exclude listings from the combined query
+
+The three-query strategy ensures each status is queried independently and merged properly.
+
+---
+
+## Logging Output Required
+
+After fix, provide logs showing:
+[CMA] Active results: 18
+[CMA] Under Contract results: 13
+[CMA] Closed results: 17
+[CMA] Final count: { active: 18, underContract: 13, closed: 17, total: 48, afterDedupe: 48 }
+
+If afterDedupe is significantly less than total, explain which MLS numbers are duplicates.

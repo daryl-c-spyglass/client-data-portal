@@ -1528,15 +1528,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
         allResults = allResults.concat(afterFilters);
       }
 
+      // MULTI-STATUS DEBUG: Log combined results before dedupe
+      console.log(`\n📊 [MULTI-STATUS DEBUG] =====================================`);
+      console.log(`   Statuses requested: ${statusList.join(', ')}`);
+      console.log(`   Combined results before dedupe: ${allResults.length}`);
+      
+      // Count per status before dedupe
+      const statusCounts: Record<string, number> = {};
+      allResults.forEach(r => {
+        const s = (r as any).standardStatus || r.status || 'Unknown';
+        statusCounts[s] = (statusCounts[s] || 0) + 1;
+      });
+      console.log(`   Per-status breakdown (before dedupe):`);
+      Object.entries(statusCounts).forEach(([s, count]) => {
+        console.log(`     - ${s}: ${count}`);
+      });
+
       // Remove duplicates (by id)
       const uniqueResults = Array.from(new Map(allResults.map(r => [r.id, r])).values());
+      const duplicatesRemoved = allResults.length - uniqueResults.length;
+      console.log(`   After dedupe: ${uniqueResults.length} (removed ${duplicatesRemoved} duplicates)`);
       
       // Apply rental filtering to remove properties that are actually rentals
       // (e.g., closePrice is monthly rent, not sale price)
       const beforeRentalFilter = uniqueResults.length;
       const nonRentalResults = filterOutRentals(uniqueResults);
       if (beforeRentalFilter !== nonRentalResults.length) {
-        console.log(`📦 Search: Filtered out ${beforeRentalFilter - nonRentalResults.length} rental properties from search results`);
+        console.log(`   Rental filter: removed ${beforeRentalFilter - nonRentalResults.length} rental properties`);
       }
       
       // Apply property subtype filtering to exclude Land/Lots when Single Family selected
@@ -1545,16 +1563,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { propertyType: reqPropertyType, propertySubType: reqPropertySubType } = req.query as Record<string, string | undefined>;
       const propertyTypeFiltered = filterByPropertySubtype(nonRentalResults, reqPropertySubType || reqPropertyType);
       if (nonRentalResults.length !== propertyTypeFiltered.length) {
-        console.log(`📦 Search: Filtered out ${nonRentalResults.length - propertyTypeFiltered.length} listings due to property type mismatch`);
+        console.log(`   Property type filter: removed ${nonRentalResults.length - propertyTypeFiltered.length} listings`);
       }
       
-      // Apply limit after all filtering
-      const finalResults = propertyTypeFiltered.slice(0, parsedLimit);
+      // CRITICAL FIX: For multi-status searches, scale the limit by number of statuses
+      // This ensures that searching with 3 statuses returns 3x the per-status limit
+      // rather than applying the single-status limit to the merged result set
+      const effectiveLimit = parsedLimit * Math.max(statusList.length, 1);
+      const finalResults = propertyTypeFiltered.slice(0, effectiveLimit);
+      
+      // Validate: total should equal sum of parts (minus duplicates)
+      const expectedSum = Object.values(statusCounts).reduce((a, b) => a + b, 0);
+      if (finalResults.length < expectedSum - duplicatesRemoved && finalResults.length < propertyTypeFiltered.length) {
+        console.log(`   ⚠️ WARNING: Final results (${finalResults.length}) less than expected (${expectedSum - duplicatesRemoved})`);
+      }
+      console.log(`   =============================================================\n`);
 
       // FINAL RESULT SUMMARY
       console.log(`\n📦 [CMA Search Complete] ====================================`);
       console.log(`   Statuses: ${statusList.join(', ')}`);
-      console.log(`   Final results: ${finalResults.length}`);
+      console.log(`   Final results: ${finalResults.length} (limit: ${effectiveLimit})`);
       if (subdivision) console.log(`   Subdivision filter: "${subdivision}"`);
       if (postalCode) console.log(`   ZIP filter: "${postalCode}"`);
       if (finalResults.length === 0) {
@@ -1565,8 +1593,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json({
         properties: finalResults,
         count: finalResults.length,
+        totalCount: propertyTypeFiltered.length, // True count before limit
         statuses: statusList,
         schoolFilterWarning: schoolFilterWarning,
+        statusBreakdown: statusCounts, // Per-status counts for UI display
       });
     } catch (error) {
       console.error('Unified search error:', error);
