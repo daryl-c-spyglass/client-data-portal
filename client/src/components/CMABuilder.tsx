@@ -2009,6 +2009,84 @@ export function CMABuilder({ onCreateCMA, initialData }: CMABuilderProps) {
               </div>
             </div>
           )}
+          
+          {/* Warning 1: No subdivision filter when ZIP is filled */}
+          {!searchSubdivision && searchZipCode && searchEnabled && !isLoading && baseSearchResults.length > 0 && (
+            <div className="mb-4 p-3 bg-yellow-50 dark:bg-yellow-950/30 border border-yellow-200 dark:border-yellow-800 rounded-md" data-testid="warning-no-subdivision">
+              <div className="flex items-start gap-2">
+                <Info className="w-4 h-4 text-yellow-600 dark:text-yellow-400 mt-0.5 flex-shrink-0" />
+                <p className="text-sm text-yellow-800 dark:text-yellow-200">
+                  <span className="font-medium">Tip:</span> No subdivision filter applied. Results include ALL subdivisions in ZIP {searchZipCode}.
+                </p>
+              </div>
+            </div>
+          )}
+          
+          {/* Warning 2: Closed status selected but 0 results */}
+          {searchStatuses.includes('closed') && statusCounts.closed === 0 && searchEnabled && !isLoading && (
+            <div className="mb-4 p-3 bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 rounded-md" data-testid="warning-no-closed">
+              <div className="flex flex-col gap-2">
+                <div className="flex items-start gap-2">
+                  <Info className="w-4 h-4 text-blue-600 dark:text-blue-400 mt-0.5 flex-shrink-0" />
+                  <div>
+                    <p className="text-sm font-medium text-blue-800 dark:text-blue-200">No Closed Listings Found</p>
+                    <p className="text-sm text-blue-700 dark:text-blue-300 mt-1">
+                      No properties matching your criteria have closed in the last {searchSoldDays || 365} days.
+                    </p>
+                  </div>
+                </div>
+                <div className="flex flex-wrap gap-2 ml-6">
+                  {searchSoldDays !== '365' && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-7 text-xs bg-blue-100 dark:bg-blue-900 border-blue-200 dark:border-blue-700 text-blue-800 dark:text-blue-200 hover:bg-blue-200 dark:hover:bg-blue-800"
+                      onClick={() => {
+                        setSearchSoldDays('365');
+                        setSearchEnabled(true);
+                        setTimeout(() => refetch(), 100);
+                      }}
+                      data-testid="button-try-365-days"
+                    >
+                      Try 365 days
+                    </Button>
+                  )}
+                  {(searchMinSqft || searchMaxSqft) && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-7 text-xs bg-blue-100 dark:bg-blue-900 border-blue-200 dark:border-blue-700 text-blue-800 dark:text-blue-200 hover:bg-blue-200 dark:hover:bg-blue-800"
+                      onClick={() => {
+                        setSearchMinSqft('');
+                        setSearchMaxSqft('');
+                        setSearchEnabled(true);
+                        setTimeout(() => refetch(), 100);
+                      }}
+                      data-testid="button-remove-sqft-limits"
+                    >
+                      Remove sqft limits
+                    </Button>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+          
+          {/* Warning 3: Very narrow sqft range */}
+          {searchMinSqft && searchMaxSqft && 
+           (parseInt(searchMaxSqft) - parseInt(searchMinSqft)) < 2000 && 
+           (parseInt(searchMaxSqft) - parseInt(searchMinSqft)) > 0 &&
+           searchEnabled && !isLoading && (
+            <div className="mb-4 p-3 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-md" data-testid="warning-narrow-sqft">
+              <div className="flex items-start gap-2">
+                <AlertCircle className="w-4 h-4 text-amber-600 dark:text-amber-400 mt-0.5 flex-shrink-0" />
+                <p className="text-sm text-amber-800 dark:text-amber-200">
+                  <span className="font-medium">Note:</span> Narrow sqft range ({parseInt(searchMaxSqft) - parseInt(searchMinSqft)} sqft) may limit results.
+                </p>
+              </div>
+            </div>
+          )}
+          
           {(isLoading || isMapSearching) ? (
             <div className="text-center py-12">
               <Loader2 className="w-8 h-8 mx-auto animate-spin text-muted-foreground mb-2" />
