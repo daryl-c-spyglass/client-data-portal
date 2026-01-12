@@ -1149,21 +1149,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const applyFilters = (results: any[], skipSchoolFilters: boolean = false): any[] => {
         let filtered = results;
         
+        // FILTER PIPELINE LOGGING
+        console.log(`\n📊 [FILTER PIPELINE] === Starting Filter Pipeline ===`);
+        console.log(`📊 [FILTER PIPELINE] Input: ${filtered.length} listings`);
+        console.log(`📊 [FILTER PIPELINE] Criteria: subdivision="${subdivision || 'none'}", minSqft=${minSqft || 'none'}, maxSqft=${maxSqft || 'none'}, minLotAcres=${minLotAcres || 'none'}, maxLotAcres=${maxLotAcres || 'none'}`);
+        
         // CRITICAL: Include properties WITHOUT lot size data (null lotSizeAcres)
         // This ensures properties with missing lot data are not excluded from search
         if (minLotAcres) {
+          const beforeCount = filtered.length;
           const minAcres = parseFloat(minLotAcres);
           filtered = filtered.filter((p: any) => {
             const acres = p.lotSizeAcres || (p.lotSizeSquareFeet ? p.lotSizeSquareFeet / 43560 : null);
             return acres === null || acres >= minAcres;
           });
+          console.log(`📊 [FILTER PIPELINE] After minLotAcres (>= ${minAcres}): ${filtered.length} (removed ${beforeCount - filtered.length})`);
         }
         if (maxLotAcres) {
+          const beforeCount = filtered.length;
           const maxAcres = parseFloat(maxLotAcres);
           filtered = filtered.filter((p: any) => {
             const acres = p.lotSizeAcres || (p.lotSizeSquareFeet ? p.lotSizeSquareFeet / 43560 : null);
             return acres === null || acres <= maxAcres;
           });
+          console.log(`📊 [FILTER PIPELINE] After maxLotAcres (<= ${maxAcres}): ${filtered.length} (removed ${beforeCount - filtered.length})`);
         }
         if (minYearBuilt) {
           const minYear = parseInt(minYearBuilt, 10);
@@ -1291,16 +1300,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
             });
           }
           console.log(`   ================================================`);
+          
+          // DATA SAMPLE: Show sqft and lot sizes of matched properties
+          console.log(`📋 [STEINER RANCH DATA SAMPLE] (after subdivision filter, before other filters):`);
+          filtered.slice(0, 15).forEach((p: any) => {
+            console.log(`   ${p.address}: sqft=${p.livingArea || 'N/A'}, lotAcres=${p.lotSizeAcres || 'N/A'}, type=${p.propertySubType || 'N/A'}`);
+          });
+          if (filtered.length > 15) {
+            console.log(`   ... and ${filtered.length - 15} more properties`);
+          }
         }
         // CRITICAL: Include properties WITHOUT sqft data (null/undefined livingArea)
         // This ensures properties like 2400 Rockingham Cir (no sqft in Repliers) are not excluded
         if (minSqft) {
+          const beforeCount = filtered.length;
           const min = parseInt(minSqft, 10);
           filtered = filtered.filter(p => p.livingArea === null || p.livingArea === undefined || p.livingArea >= min);
+          console.log(`📊 [FILTER PIPELINE] After minSqft (>= ${min}): ${filtered.length} (removed ${beforeCount - filtered.length})`);
         }
         if (maxSqft) {
+          const beforeCount = filtered.length;
           const max = parseInt(maxSqft, 10);
           filtered = filtered.filter(p => p.livingArea === null || p.livingArea === undefined || p.livingArea <= max);
+          console.log(`📊 [FILTER PIPELINE] After maxSqft (<= ${max}): ${filtered.length} (removed ${beforeCount - filtered.length})`);
         }
         
         // School filtering with normalization
@@ -1392,6 +1414,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
             console.log(`🏫 School district filter: ${beforeCount} -> ${filtered.length} (looking for: ${schoolDistrict})`);
           }
         }
+        
+        // FINAL PIPELINE SUMMARY
+        console.log(`📊 [FILTER PIPELINE] === FINAL RESULT: ${filtered.length} properties ===\n`);
         
         return filtered;
       };

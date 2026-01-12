@@ -1,0 +1,214 @@
+# CRITICAL: Backend Shows 48 Results, UI Shows 0 — Debug Required
+
+## The Problem
+
+Your logs claim 48 Steiner Ranch properties matched, but I see 0 results in the browser.
+
+There is a disconnect between:
+- Backend filter results (48 properties)
+- What reaches the frontend (0 properties)
+
+---
+
+## Task 1: Add Filter Pipeline Logging
+
+Log the count at EVERY step of the filter pipeline:
+```javascript
+function applyAllFilters(listings, criteria) {
+  console.log('[FILTER PIPELINE] === Starting Filter Pipeline ===');
+  console.log('[FILTER PIPELINE] Input:', listings.length, 'listings');
+  console.log('[FILTER PIPELINE] Criteria:', JSON.stringify(criteria));
+  
+  let results = listings;
+  
+  // Step 1: Subdivision
+  if (criteria.subdivision) {
+    const before = results.length;
+    results = filterBySubdivision(results, criteria.subdivision);
+    console.log('[FILTER PIPELINE] After subdivision:', results.length, `(removed ${before - results.length})`);
+  }
+  
+  // Step 2: Property Type
+  if (criteria.propertyType) {
+    const before = results.length;
+    results = results.filter(l => l.propertyType === criteria.propertyType);
+    console.log('[FILTER PIPELINE] After propertyType:', results.length, `(removed ${before - results.length})`);
+  }
+  
+  // Step 3: Sqft
+  if (criteria.minSqft || criteria.maxSqft) {
+    const before = results.length;
+    results = filterBySqft(results, criteria.minSqft, criteria.maxSqft);
+    console.log('[FILTER PIPELINE] After sqft:', results.length, `(removed ${before - results.length})`);
+  }
+  
+  // Step 4: Lot Size
+  if (criteria.minLotAcres || criteria.maxLotAcres) {
+    const before = results.length;
+    results = filterByLotSize(results, criteria.minLotAcres, criteria.maxLotAcres);
+    console.log('[FILTER PIPELINE] After lot size:', results.length, `(removed ${before - results.length})`);
+  }
+  
+  // Step 5: Beds/Baths
+  if (criteria.minBeds || criteria.minBaths) {
+    const before = results.length;
+    results = filterByBedsBaths(results, criteria.minBeds, criteria.minBaths);
+    console.log('[FILTER PIPELINE] After beds/baths:', results.length, `(removed ${before - results.length})`);
+  }
+  
+  console.log('[FILTER PIPELINE] === FINAL RESULT:', results.length, '===');
+  return results;
+}
+```
+
+---
+
+## Task 2: Test with BROAD Criteria First
+
+Run this search (NO sqft/lot filters) and verify results appear:
+```json
+{
+  "subdivision": "steiner ranch",
+  "zipCode": "78732",
+  "statuses": ["Active"],
+  "closeDateDays": 365
+}
+```
+
+Expected: ~48 Active Steiner Ranch properties should appear in UI.
+
+Then GRADUALLY add filters back:
+1. Add propertyType: "Single Family Residence" → log count
+2. Add minSqft: 5400, maxSqft: 6400 → log count
+3. Add minLotAcres: 0.5, maxLotAcres: 1.5 → log count
+
+This will identify WHICH filter reduces results to 0.
+
+---
+
+## Task 3: Log Steiner Ranch Property Details
+
+Show me the sqft and lot sizes of the 48 Steiner Ranch properties:
+```javascript
+// After subdivision filter, before other filters
+console.log('[STEINER RANCH DATA SAMPLE]', 
+  steinerRanchResults.slice(0, 20).map(l => ({
+    address: l.address?.streetNumber + ' ' + l.address?.streetName,
+    subdivision: l.address?.neighborhood,
+    sqft: l.details?.sqft || l.sqft || l.livingArea || 'N/A',
+    lotAcres: l.details?.lotAcres || l.lotSizeAcres || l.lotSize || 'N/A',
+    propertyType: l.propertyType || l.details?.propertyType || 'N/A'
+  }))
+);
+```
+
+---
+
+## Task 4: Add Debug Panel to UI (Dev Mode Only)
+
+Add a collapsible debug panel at the bottom of /cmas/new that shows:
+```jsx
+{process.env.NODE_ENV === 'development' && (
+  <div className="debug-panel" style={{background: '#f0f0f0', padding: '10px', margin: '10px'}}>
+    <h4>Debug Info</h4>
+    <pre>{JSON.stringify({
+      searchCriteria: criteria,
+      apiResultCount: apiResults?.length,
+      afterSubdivisionFilter: afterSubdivision?.length,
+      afterSqftFilter: afterSqft?.length,
+      afterLotFilter: afterLot?.length,
+      finalResultCount: finalResults?.length,
+      sampleResults: finalResults?.slice(0, 3).map(r => ({
+        address: r.address?.streetName,
+        subdivision: r.address?.neighborhood,
+        sqft: r.sqft,
+        lot: r.lotSizeAcres
+      }))
+    }, null, 2)}</pre>
+  </div>
+)}
+```
+
+---
+
+## Task 5: Check Frontend-Backend Data Flow
+
+Verify the API response is reaching the frontend:
+```javascript
+// In the frontend component that calls the search API
+const handleSearch = async () => {
+  console.log('[FRONTEND] Sending search with criteria:', criteria);
+  
+  const response = await fetch('/api/cma/search', {
+    method: 'POST',
+    body: JSON.stringify(criteria)
+  });
+  
+  const data = await response.json();
+  
+  console.log('[FRONTEND] Received response:', {
+    status: response.status,
+    count: data.count,
+    listingsLength: data.listings?.length,
+    firstListing: data.listings?.[0]
+  });
+  
+  setResults(data.listings);
+};
+```
+
+---
+
+## Required Output
+
+After implementing the above, provide:
+
+1. **Filter pipeline log** showing count at each step for this search:
+```json
+{
+  "subdivision": "steiner ranch",
+  "zipCode": "78732",
+  "propertyType": "Single Family Residence",
+  "minSqft": 5400,
+  "maxSqft": 6400,
+  "minLotAcres": 0.5,
+  "maxLotAcres": 1.5,
+  "statuses": ["Active", "Active Under Contract", "Closed"],
+  "closeDateDays": 365
+}
+```
+
+2. **Sample of Steiner Ranch properties** showing their sqft and lot sizes
+
+3. **Confirmation** that removing sqft/lot filters shows results in UI
+
+---
+
+## Hypothesis
+
+I suspect this is happening:
+94 properties (ZIP 78732, Active)
+↓ subdivision filter
+48 properties (Steiner Ranch) ← Your logs stop here
+↓ sqft filter (5400-6400)
+2-5 properties
+↓ lot filter (0.5-1.5 acres)
+0 properties ← Final result
+
+The 5400-6400 sqft range is extremely narrow for luxury homes. Most Steiner Ranch homes are probably outside this range.
+
+Prove or disprove this hypothesis with the filter pipeline logging.
+
+Quick Test You Can Do Right Now
+Before sending to Replit, test this yourself on the live site:
+Test 1: Remove ALL optional filters
+
+Subdivision: steiner ranch
+Zip: 78732
+Status: ✅ Active only
+Leave BLANK: Min/Max Sqft, Min/Max Lot, Beds, Baths, Property Type
+Close Date: 365 days
+
+If you see results → the narrow criteria (sqft 5400-6400, lot 0.5-1.5) is the issue, not the code
+Test 2: If Test 1 shows 0
+Then there's a real bug in how results reach the UI, and Replit needs to debug the frontend-backend connection.
