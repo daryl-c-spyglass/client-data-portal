@@ -1,0 +1,333 @@
+# UX Enhancement: Add Status Filter Tabs to Search Results
+
+## Current State
+- Search results show 48 total (all statuses combined)
+- View toggle exists (Grid/List/Table icons)
+- No way to filter results by status without re-searching
+
+## Requested Feature
+Add status filter tabs/pills next to the view toggle so users can:
+1. See ALL results (default)
+2. Filter to Active only
+3. Filter to Active Under Contract only
+4. Filter to Closed only
+
+This filters the ALREADY FETCHED results (client-side), not a new API call.
+
+---
+
+## Task 1: Create Status Filter Component
+```jsx
+// StatusFilterTabs.tsx
+interface StatusFilterTabsProps {
+  counts: {
+    all: number;
+    active: number;
+    underContract: number;
+    closed: number;
+  };
+  activeFilter: string;
+  onFilterChange: (filter: string) => void;
+}
+
+export function StatusFilterTabs({ counts, activeFilter, onFilterChange }: StatusFilterTabsProps) {
+  const filters = [
+    { key: 'all', label: 'All', count: counts.all },
+    { key: 'active', label: 'Active', count: counts.active, color: 'green' },
+    { key: 'underContract', label: 'Under Contract', count: counts.underContract, color: 'orange' },
+    { key: 'closed', label: 'Closed', count: counts.closed, color: 'gray' },
+  ];
+
+  return (
+    <div className="flex items-center gap-1 bg-gray-100 rounded-lg p-1">
+      {filters.map(filter => (
+        <button
+          key={filter.key}
+          onClick={() => onFilterChange(filter.key)}
+          className={`
+            px-3 py-1.5 rounded-md text-sm font-medium transition-all
+            ${activeFilter === filter.key 
+              ? 'bg-white shadow-sm text-gray-900' 
+              : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
+            }
+          `}
+        >
+          {filter.label}
+          <span className={`
+            ml-1.5 px-1.5 py-0.5 rounded-full text-xs
+            ${activeFilter === filter.key 
+              ? 'bg-orange-100 text-orange-700' 
+              : 'bg-gray-200 text-gray-600'
+            }
+          `}>
+            {filter.count}
+          </span>
+        </button>
+      ))}
+    </div>
+  );
+}
+```
+
+---
+
+## Task 2: Alternative Design - Colored Pills
+```jsx
+// StatusFilterPills.tsx (Alternative design with status colors)
+export function StatusFilterPills({ counts, activeFilter, onFilterChange }) {
+  return (
+    <div className="flex items-center gap-2">
+      {/* All */}
+      <button
+        onClick={() => onFilterChange('all')}
+        className={`
+          px-3 py-1 rounded-full text-sm font-medium border
+          ${activeFilter === 'all' 
+            ? 'bg-gray-900 text-white border-gray-900' 
+            : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+          }
+        `}
+      >
+        All ({counts.all})
+      </button>
+      
+      {/* Active - Green */}
+      <button
+        onClick={() => onFilterChange('active')}
+        className={`
+          px-3 py-1 rounded-full text-sm font-medium border
+          ${activeFilter === 'active' 
+            ? 'bg-green-500 text-white border-green-500' 
+            : 'bg-white text-green-700 border-green-300 hover:bg-green-50'
+          }
+        `}
+      >
+        Active ({counts.active})
+      </button>
+      
+      {/* Under Contract - Orange */}
+      <button
+        onClick={() => onFilterChange('underContract')}
+        className={`
+          px-3 py-1 rounded-full text-sm font-medium border
+          ${activeFilter === 'underContract' 
+            ? 'bg-orange-500 text-white border-orange-500' 
+            : 'bg-white text-orange-700 border-orange-300 hover:bg-orange-50'
+          }
+        `}
+      >
+        Under Contract ({counts.underContract})
+      </button>
+      
+      {/* Closed - Gray */}
+      <button
+        onClick={() => onFilterChange('closed')}
+        className={`
+          px-3 py-1 rounded-full text-sm font-medium border
+          ${activeFilter === 'closed' 
+            ? 'bg-gray-500 text-white border-gray-500' 
+            : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+          }
+        `}
+      >
+        Closed ({counts.closed})
+      </button>
+    </div>
+  );
+}
+```
+
+---
+
+## Task 3: Integrate into Search Results Header
+
+Update the Search Results section:
+```jsx
+// SearchResults.tsx
+export function SearchResults({ listings }) {
+  const [statusFilter, setStatusFilter] = useState('all');
+  const [viewMode, setViewMode] = useState('list');
+  const [sortBy, setSortBy] = useState('relevant');
+  
+  // Calculate counts by status
+  const counts = useMemo(() => ({
+    all: listings.length,
+    active: listings.filter(l => l.status === 'Active' || l.standardStatus === 'Active').length,
+    underContract: listings.filter(l => 
+      l.status === 'Active Under Contract' || 
+      l.standardStatus === 'Active Under Contract' ||
+      l.status === 'Pending'
+    ).length,
+    closed: listings.filter(l => 
+      l.status === 'Closed' || 
+      l.standardStatus === 'Closed' ||
+      l.lastStatus === 'Sld'
+    ).length,
+  }), [listings]);
+  
+  // Filter listings by selected status
+  const filteredListings = useMemo(() => {
+    if (statusFilter === 'all') return listings;
+    
+    return listings.filter(listing => {
+      const status = listing.status || listing.standardStatus;
+      
+      switch (statusFilter) {
+        case 'active':
+          return status === 'Active';
+        case 'underContract':
+          return status === 'Active Under Contract' || status === 'Pending';
+        case 'closed':
+          return status === 'Closed' || listing.lastStatus === 'Sld';
+        default:
+          return true;
+      }
+    });
+  }, [listings, statusFilter]);
+  
+  // Apply sorting to filtered listings
+  const sortedListings = useMemo(() => {
+    return sortListings(filteredListings, sortBy);
+  }, [filteredListings, sortBy]);
+
+  return (
+    <div className="border rounded-lg bg-white">
+      {/* Header Row */}
+      <div className="p-4 border-b">
+        <div className="flex items-center justify-between flex-wrap gap-4">
+          {/* Left: Title */}
+          <h3 className="text-lg font-semibold">
+            Search Results ({filteredListings.length} found)
+          </h3>
+          
+          {/* Right: Controls */}
+          <div className="flex items-center gap-4">
+            {/* Status Filter Tabs */}
+            <StatusFilterTabs 
+              counts={counts}
+              activeFilter={statusFilter}
+              onFilterChange={setStatusFilter}
+            />
+            
+            {/* Sort Dropdown */}
+            <select 
+              value={sortBy}
+              onChange={(e) => setSortBy(e.target.value)}
+              className="border rounded-lg px-3 py-1.5 text-sm"
+            >
+              <option value="relevant">Relevant</option>
+              <option value="price-high">Price: High to Low</option>
+              <option value="price-low">Price: Low to High</option>
+              <option value="newest">Newest First</option>
+              <option value="sqft-high">Sq Ft: High to Low</option>
+            </select>
+            
+            {/* View Toggle */}
+            <ViewToggle 
+              currentView={viewMode}
+              onViewChange={setViewMode}
+            />
+          </div>
+        </div>
+      </div>
+      
+      {/* Results */}
+      <div className="p-4">
+        {viewMode === 'grid' && <GridView listings={sortedListings} />}
+        {viewMode === 'list' && <ListView listings={sortedListings} />}
+        {viewMode === 'table' && <TableView listings={sortedListings} />}
+      </div>
+    </div>
+  );
+}
+```
+
+---
+
+## Task 4: Visual Layout (Header Structure)
+┌─────────────────────────────────────────────────────────────────────────────┐
+│  Search Results (48 found)                                                  │
+│                                                                             │
+│  ┌─────────────────────────────────────┐  ┌──────────┐  ┌───┬───┬───┐      │
+│  │ All(48) │ Active(18) │ UC(13) │ Closed(17) │  │ Relevant ▼│  │ ▦ │ ☰ │ ▤ │      │
+│  └─────────────────────────────────────┘  └──────────┘  └───┴───┴───┘      │
+│         Status Filter Tabs                   Sort        View Toggle        │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+---
+
+## Task 5: Mobile Responsive Layout
+
+On smaller screens, stack the controls:
+```jsx
+<div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+  {/* Title */}
+  <h3 className="text-lg font-semibold">
+    Search Results ({filteredListings.length} found)
+  </h3>
+  
+  {/* Controls - wrap on mobile */}
+  <div className="flex flex-wrap items-center gap-2 sm:gap-4">
+    {/* Status filters scroll horizontally on mobile */}
+    <div className="overflow-x-auto w-full sm:w-auto">
+      <StatusFilterTabs {...props} />
+    </div>
+    
+    <div className="flex items-center gap-2">
+      <select className="border rounded px-2 py-1 text-sm">...</select>
+      <ViewToggle {...props} />
+    </div>
+  </div>
+</div>
+```
+
+---
+
+## Task 6: Update Count Display When Filtered
+
+When a status filter is active, show context:
+```jsx
+<h3 className="text-lg font-semibold">
+  Search Results 
+  {statusFilter === 'all' ? (
+    <span> ({counts.all} found)</span>
+  ) : (
+    <span>
+      ({filteredListings.length} {statusFilter === 'active' ? 'Active' : 
+        statusFilter === 'underContract' ? 'Under Contract' : 'Closed'})
+      <span className="text-gray-400 text-sm ml-1">
+        of {counts.all} total
+      </span>
+    </span>
+  )}
+</h3>
+```
+
+---
+
+## Acceptance Criteria
+
+- [ ] Status filter tabs appear next to sort/view controls
+- [ ] "All" tab shows total count (48)
+- [ ] "Active" tab shows active count (18)
+- [ ] "Under Contract" tab shows UC count (13)
+- [ ] "Closed" tab shows closed count (17)
+- [ ] Clicking a tab filters results instantly (no API call)
+- [ ] Counts update correctly when filters change
+- [ ] Selected tab is visually highlighted
+- [ ] Sort and view toggles work with filtered results
+- [ ] Mobile responsive (tabs scroll or wrap)
+
+---
+
+## Visual Reference
+
+The status filter should look similar to this pattern:
+[ All (48) ] [ Active (18) ] [ Under Contract (13) ] [ Closed (17) ]
+↑
+Selected (highlighted)
+
+Use colors matching the existing status badges:
+- Active: Green
+- Under Contract: Orange  
+- Closed: Gray

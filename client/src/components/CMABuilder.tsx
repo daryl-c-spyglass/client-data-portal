@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -11,7 +11,8 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { X, Plus, TrendingUp, Search, Loader2, AlertCircle, Home, MousePointerClick, RotateCcw, ChevronLeft, ChevronRight, Info, Map, ListFilter, Sparkles, LayoutGrid, List, Table2 } from "lucide-react";
+import { X, Plus, TrendingUp, Search, Loader2, AlertCircle, Home, MousePointerClick, RotateCcw, ChevronLeft, ChevronRight, Info, Map, ListFilter, Sparkles, LayoutGrid, List, Table2, Filter } from "lucide-react";
+import { StatusFilterTabs } from "@/components/StatusFilterTabs";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { PolygonMapSearch } from "@/components/PolygonMapSearch";
@@ -328,6 +329,9 @@ export function CMABuilder({ onCreateCMA, initialData }: CMABuilderProps) {
     }
   };
   
+  // Status filter for client-side filtering of already-fetched results
+  const [statusDisplayFilter, setStatusDisplayFilter] = useState<string>('all');
+  
   // Autoplay carousel effect - advance every 3 seconds when dialog is open
   useEffect(() => {
     if (!selectedProperty) return;
@@ -366,6 +370,7 @@ export function CMABuilder({ onCreateCMA, initialData }: CMABuilderProps) {
     setSearchMaxYearBuilt("");
     setSearchSoldDays("");
     setSearchPropertyType("");
+    setStatusDisplayFilter('all');
   };
   
   const clearFilters = () => {
@@ -396,6 +401,7 @@ export function CMABuilder({ onCreateCMA, initialData }: CMABuilderProps) {
     setSearchSoldDays("");
     setSearchPropertyType("");
     setSearchEnabled(false);
+    setStatusDisplayFilter('all');
   };
 
   const buildSearchQuery = () => {
@@ -466,6 +472,16 @@ export function CMABuilder({ onCreateCMA, initialData }: CMABuilderProps) {
   const searchResults = searchResponse?.properties || [];
   const totalResults = searchResponse?.count || 0;
   const schoolFilterWarning = searchResponse?.schoolFilterWarning;
+  
+  // Reset status filter when search results change (new search performed)
+  const prevSearchResultsRef = useRef<Property[]>([]);
+  useEffect(() => {
+    // Only reset if the results have actually changed (new search)
+    if (searchResults !== prevSearchResultsRef.current && searchResults.length > 0) {
+      setStatusDisplayFilter('all');
+      prevSearchResultsRef.current = searchResults;
+    }
+  }, [searchResults]);
 
   const handleSearch = () => {
     const missingFields: string[] = [];
@@ -606,12 +622,56 @@ export function CMABuilder({ onCreateCMA, initialData }: CMABuilderProps) {
     setCurrentBoundary(null);
   };
 
-  // Get the active results based on search mode and visual match
-  const activeSearchResults = visualMatchEnabled && visualMatchResults.length > 0 
+  // Get the base results based on search mode and visual match
+  const baseSearchResults = visualMatchEnabled && visualMatchResults.length > 0 
     ? visualMatchResults 
     : searchMode === 'map' 
       ? mapSearchResults 
       : searchResults;
+  
+  // Calculate status counts for the filter tabs (client-side)
+  const statusCounts = useMemo(() => {
+    const counts = {
+      all: baseSearchResults.length,
+      active: 0,
+      underContract: 0,
+      closed: 0,
+    };
+    
+    baseSearchResults.forEach((listing) => {
+      const status = listing.standardStatus;
+      if (status === 'Active') {
+        counts.active++;
+      } else if (status === 'Active Under Contract' || status === 'Pending') {
+        counts.underContract++;
+      } else if (status === 'Closed') {
+        counts.closed++;
+      }
+    });
+    
+    return counts;
+  }, [baseSearchResults]);
+  
+  // Filter results by selected status (client-side filtering of already-fetched data)
+  const activeSearchResults = useMemo(() => {
+    if (statusDisplayFilter === 'all') return baseSearchResults;
+    
+    return baseSearchResults.filter((listing) => {
+      const status = listing.standardStatus;
+      
+      switch (statusDisplayFilter) {
+        case 'active':
+          return status === 'Active';
+        case 'underContract':
+          return status === 'Active Under Contract' || status === 'Pending';
+        case 'closed':
+          return status === 'Closed';
+        default:
+          return true;
+      }
+    });
+  }, [baseSearchResults, statusDisplayFilter]);
+  
   const activeResultCount = visualMatchEnabled && visualMatchResults.length > 0
     ? visualMatchResults.length
     : searchMode === 'map' 
@@ -1867,51 +1927,75 @@ export function CMABuilder({ onCreateCMA, initialData }: CMABuilderProps) {
 
       <Card>
         <CardHeader>
-          <div className="flex items-center justify-between flex-wrap gap-2">
-            <CardTitle className="flex items-center gap-2">
-              Search Results {activeResultCount > 0 && `(${activeResultCount.toLocaleString()} found)`}
-              {searchMode === 'map' && mapSearchResults.length > 0 && (
-                <Badge variant="outline" className="ml-2">
-                  <Map className="w-3 h-3 mr-1" />
-                  Map Search
-                </Badge>
+          <div className="flex flex-col gap-3">
+            <div className="flex items-center justify-between flex-wrap gap-2">
+              <CardTitle className="flex items-center gap-2">
+                Search Results 
+                {statusDisplayFilter === 'all' ? (
+                  activeResultCount > 0 && ` (${activeResultCount.toLocaleString()} found)`
+                ) : (
+                  <>
+                    {` (${activeSearchResults.length} `}
+                    {statusDisplayFilter === 'active' ? 'Active' : 
+                      statusDisplayFilter === 'underContract' ? 'Under Contract' : 'Closed'}
+                    {`)  `}
+                    <span className="text-muted-foreground font-normal text-sm">
+                      of {statusCounts.all} total
+                    </span>
+                  </>
+                )}
+                {searchMode === 'map' && mapSearchResults.length > 0 && (
+                  <Badge variant="outline" className="ml-2">
+                    <Map className="w-3 h-3 mr-1" />
+                    Map Search
+                  </Badge>
+                )}
+              </CardTitle>
+              
+              {/* View Toggle */}
+              {baseSearchResults.length > 0 && (
+                <div className="flex items-center gap-1" data-testid="view-toggle">
+                  <Button
+                    size="icon"
+                    variant={viewMode === 'grid' ? 'default' : 'ghost'}
+                    className="toggle-elevate"
+                    onClick={() => handleViewModeChange('grid')}
+                    data-testid="button-view-grid"
+                    title="Grid View"
+                  >
+                    <LayoutGrid className="w-4 h-4" />
+                  </Button>
+                  <Button
+                    size="icon"
+                    variant={viewMode === 'list' ? 'default' : 'ghost'}
+                    className="toggle-elevate"
+                    onClick={() => handleViewModeChange('list')}
+                    data-testid="button-view-list"
+                    title="List View"
+                  >
+                    <List className="w-4 h-4" />
+                  </Button>
+                  <Button
+                    size="icon"
+                    variant={viewMode === 'table' ? 'default' : 'ghost'}
+                    className="toggle-elevate"
+                    onClick={() => handleViewModeChange('table')}
+                    data-testid="button-view-table"
+                    title="Table View"
+                  >
+                    <Table2 className="w-4 h-4" />
+                  </Button>
+                </div>
               )}
-            </CardTitle>
+            </div>
             
-            {/* View Toggle */}
-            {activeSearchResults.length > 0 && (
-              <div className="flex items-center gap-1" data-testid="view-toggle">
-                <Button
-                  size="icon"
-                  variant={viewMode === 'grid' ? 'default' : 'ghost'}
-                  className="toggle-elevate"
-                  onClick={() => handleViewModeChange('grid')}
-                  data-testid="button-view-grid"
-                  title="Grid View"
-                >
-                  <LayoutGrid className="w-4 h-4" />
-                </Button>
-                <Button
-                  size="icon"
-                  variant={viewMode === 'list' ? 'default' : 'ghost'}
-                  className="toggle-elevate"
-                  onClick={() => handleViewModeChange('list')}
-                  data-testid="button-view-list"
-                  title="List View"
-                >
-                  <List className="w-4 h-4" />
-                </Button>
-                <Button
-                  size="icon"
-                  variant={viewMode === 'table' ? 'default' : 'ghost'}
-                  className="toggle-elevate"
-                  onClick={() => handleViewModeChange('table')}
-                  data-testid="button-view-table"
-                  title="Table View"
-                >
-                  <Table2 className="w-4 h-4" />
-                </Button>
-              </div>
+            {/* Status Filter Tabs - only show when there are results */}
+            {baseSearchResults.length > 0 && (
+              <StatusFilterTabs
+                counts={statusCounts}
+                activeFilter={statusDisplayFilter}
+                onFilterChange={setStatusDisplayFilter}
+              />
             )}
           </div>
         </CardHeader>
