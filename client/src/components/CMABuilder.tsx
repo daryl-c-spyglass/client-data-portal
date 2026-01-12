@@ -453,12 +453,7 @@ export function CMABuilder({ onCreateCMA, initialData }: CMABuilderProps) {
     if (!searchPropertyType || searchPropertyType === 'any') {
       missingFields.push('Property Type');
     }
-    if (!searchMinSqft) {
-      missingFields.push('Min Sq Ft');
-    }
-    if (!searchMaxSqft) {
-      missingFields.push('Max Sq Ft');
-    }
+    // Sqft fields are now optional - users can leave blank for broader results
     
     if (missingFields.length > 0) {
       toast({
@@ -975,20 +970,20 @@ export function CMABuilder({ onCreateCMA, initialData }: CMABuilderProps) {
                   </div>
                 )}
                 <div className="space-y-2">
-                  <Label>Min Sq Ft <span className="text-destructive">*</span></Label>
+                  <Label>Min Sq Ft</Label>
                   <Input
                     type="number"
-                    placeholder="e.g., 1500"
+                    placeholder="e.g., 2000"
                     value={searchMinSqft}
                     onChange={(e) => setSearchMinSqft(e.target.value)}
                     data-testid="input-min-sqft"
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label>Max Sq Ft <span className="text-destructive">*</span></Label>
+                  <Label>Max Sq Ft</Label>
                   <Input
                     type="number"
-                    placeholder="e.g., 3000"
+                    placeholder="e.g., 5000"
                     value={searchMaxSqft}
                     onChange={(e) => setSearchMaxSqft(e.target.value)}
                     data-testid="input-max-sqft"
@@ -1258,20 +1253,20 @@ export function CMABuilder({ onCreateCMA, initialData }: CMABuilderProps) {
                     </div>
                   )}
                   <div className="space-y-2">
-                    <Label>Min Sq Ft <span className="text-destructive">*</span></Label>
+                    <Label>Min Sq Ft</Label>
                     <Input
                       type="number"
-                      placeholder="e.g., 1500"
+                      placeholder="e.g., 2000"
                       value={searchMinSqft}
                       onChange={(e) => setSearchMinSqft(e.target.value)}
                       data-testid="input-map-min-sqft"
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label>Max Sq Ft <span className="text-destructive">*</span></Label>
+                    <Label>Max Sq Ft</Label>
                     <Input
                       type="number"
-                      placeholder="e.g., 3000"
+                      placeholder="e.g., 5000"
                       value={searchMaxSqft}
                       onChange={(e) => setSearchMaxSqft(e.target.value)}
                       data-testid="input-map-max-sqft"

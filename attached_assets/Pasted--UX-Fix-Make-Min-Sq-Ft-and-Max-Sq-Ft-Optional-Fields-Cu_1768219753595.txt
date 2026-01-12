@@ -1,0 +1,189 @@
+# UX Fix: Make Min Sq Ft and Max Sq Ft Optional Fields
+
+## Current Problem
+
+The Min Sq Ft and Max Sq Ft fields are marked as required (*) but should be optional. Users should be able to:
+1. Leave them blank → No sqft filtering applied
+2. Enter values → Filter by the entered range
+
+## Required Changes
+
+### Task 1: Remove Required Validation from Sqft Fields
+
+In the CMA form component (likely `CMABuilder.tsx` or similar):
+```jsx
+// BEFORE - Required fields
+<Input
+  label="Min Sq Ft *"
+  name="minSqft"
+  required={true}
+  ...
+/>
+
+// AFTER - Optional fields
+<Input
+  label="Min Sq Ft"
+  name="minSqft"
+  required={false}
+  placeholder="e.g., 2000"
+  ...
+/>
+```
+
+Remove the asterisk (*) from both labels:
+- "Min Sq Ft *" → "Min Sq Ft"
+- "Max Sq Ft *" → "Max Sq Ft"
+
+### Task 2: Update Form Validation
+
+Remove sqft from required field validation:
+```javascript
+// BEFORE
+const requiredFields = ['propertyType', 'minSqft', 'maxSqft'];
+
+// AFTER
+const requiredFields = ['propertyType']; // Only property type required
+```
+
+### Task 3: Update Filter Logic to Handle Empty Sqft
+```javascript
+function filterBySqft(listings, minSqft, maxSqft) {
+  // If no sqft criteria provided, return all listings (no filtering)
+  if (!minSqft && !maxSqft) {
+    console.log('[SQFT FILTER] No sqft criteria - skipping filter');
+    return listings;
+  }
+  
+  return listings.filter(listing => {
+    const sqft = listing.sqft || listing.details?.sqft || listing.livingArea;
+    
+    // If listing has no sqft data, include it when filtering is partial
+    if (!sqft && sqft !== 0) {
+      // Include listings with missing sqft data (don't exclude them)
+      return true;
+    }
+    
+    // Apply min filter if provided
+    if (minSqft && sqft < minSqft) {
+      return false;
+    }
+    
+    // Apply max filter if provided
+    if (maxSqft && sqft > maxSqft) {
+      return false;
+    }
+    
+    return true;
+  });
+}
+```
+
+### Task 4: Update API Query Builder
+```javascript
+function buildRepliersQuery(criteria) {
+  const params = {
+    type: 'Sale',
+    zip: criteria.zipCode,
+    // ... other params
+  };
+  
+  // Only add sqft params if values provided
+  if (criteria.minSqft) {
+    params.minSqft = criteria.minSqft;
+  }
+  if (criteria.maxSqft) {
+    params.maxSqft = criteria.maxSqft;
+  }
+  
+  return params;
+}
+```
+
+### Task 5: Also Make Lot Size Optional
+
+Apply the same logic to Min Lot (Acres) and Max Lot (Acres):
+```javascript
+function filterByLotSize(listings, minLotAcres, maxLotAcres) {
+  // If no lot criteria provided, return all listings
+  if (!minLotAcres && !maxLotAcres) {
+    console.log('[LOT FILTER] No lot criteria - skipping filter');
+    return listings;
+  }
+  
+  return listings.filter(listing => {
+    const lotAcres = listing.lotSizeAcres || listing.details?.lotAcres || listing.lotSize;
+    
+    // Include listings with missing lot data
+    if (!lotAcres && lotAcres !== 0) {
+      return true;
+    }
+    
+    if (minLotAcres && lotAcres < minLotAcres) {
+      return false;
+    }
+    
+    if (maxLotAcres && lotAcres > maxLotAcres) {
+      return false;
+    }
+    
+    return true;
+  });
+}
+```
+
+---
+
+## Updated Field Requirements
+
+| Field | Required | Notes |
+|-------|----------|-------|
+| Property Type | Yes (*) | Keep required |
+| Min Sq Ft | No | Optional - if blank, no min filter |
+| Max Sq Ft | No | Optional - if blank, no max filter |
+| Min Lot (Acres) | No | Optional - if blank, no min filter |
+| Max Lot (Acres) | No | Optional - if blank, no max filter |
+| Close Date | Yes (*) | Keep required for Closed status |
+| Status | Yes (*) | At least one must be selected |
+
+---
+
+## UI Changes
+
+1. Remove asterisk (*) from:
+   - Min Sq Ft
+   - Max Sq Ft
+   - Min Lot (Acres)
+   - Max Lot (Acres)
+
+2. Add placeholder text to guide users:
+   - Min Sq Ft: "e.g., 2000"
+   - Max Sq Ft: "e.g., 5000"
+   - Min Lot: "e.g., 0.25"
+   - Max Lot: "e.g., 1.0"
+
+3. Update help text under Search Properties:
+   "Find comparable properties from the Repliers database. Leave Sq Ft and Lot fields blank for broader results."
+
+---
+
+## Acceptance Criteria
+
+- [ ] Min Sq Ft and Max Sq Ft fields are NOT required
+- [ ] Asterisks removed from sqft and lot field labels
+- [ ] Blank sqft fields = no sqft filtering (returns all sqft ranges)
+- [ ] Blank lot fields = no lot filtering (returns all lot sizes)
+- [ ] Entering values still filters correctly
+- [ ] Form submits successfully with blank sqft/lot fields
+
+---
+
+## Test Case
+
+Search with:
+- Subdivision: Steiner Ranch
+- Zip: 78732 (correct zip for Steiner Ranch)
+- Status: Active
+- Sqft: BLANK (both fields)
+- Lot: BLANK (both fields)
+
+Expected: ~36+ Steiner Ranch properties (based on Replit's earlier test)
