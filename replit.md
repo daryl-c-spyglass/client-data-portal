@@ -31,6 +31,7 @@ The UI incorporates Spyglass Realty branding with an orange primary color scheme
 
 ### Technical Implementations
 - **Data Sourcing**: Primary property data from Repliers API (active, pending, closed listings) and MLS Grid API.
+- **Repliers Subdivision Data**: IMPORTANT - Repliers API stores MLS SubdivisionName data in the `address.neighborhood` field. All other subdivision fields (address.subdivision, raw.SubdivisionName) are undefined. This is a Repliers data contract limitation, not a code choice. Subdivision filtering is applied locally with partial matching since the API only supports exact match.
 - **Repliers Inventory Sync**: Scheduled daily refresh at 12 AM Central (CST/CDT) with manual trigger support via `/api/admin/repliers/sync`. Status endpoint at `/api/admin/repliers/sync/status`.
 - **Location Data**: Neighborhood information derived from boundary polygon resolution.
 - **Caching**: In-memory caches for frequently accessed external API data (e.g., FUB, ReZen).

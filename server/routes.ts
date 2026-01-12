@@ -471,7 +471,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.log(`     - Beds: ${bedsMin || 'any'} - ${bedsMax || 'any'}`);
       console.log(`     - Baths: ${bathsMin || 'any'}+`);
       console.log(`     - Sqft: ${minSqft || 'any'} - ${maxSqft || 'any'}`);
+      console.log(`     - Lot Acres: ${minLotAcres || 'any'} - ${maxLotAcres || 'any'}`);
       if (soldDays) console.log(`     - Sold in last: ${soldDays} days`);
+      console.log(`   =============================================================`);
+      
+      // CMA COMPLIANCE LOGGING
+      // IMPORTANT: Repliers API stores MLS subdivision/tract data in address.neighborhood field
+      // There is NO address.subdivision or raw.SubdivisionName field available in Repliers API
+      // This is a Repliers data mapping decision - we must use address.neighborhood to get subdivision data
+      console.log(`📋 [CMA Compliance] ==========================================`);
+      console.log(`   subdivisionSource: Repliers address.neighborhood (NOTE: Repliers maps MLS SubdivisionName to this field - no raw.SubdivisionName available)`);
+      console.log(`   rentalExcluded: type=sale enforced for Closed status`);
+      console.log(`   statusCodes: ${statusList.join(', ')}`);
+      console.log(`   closeDateAppliedTo: ${statusList.includes('closed') ? 'Closed only' : 'N/A'}`);
+      console.log(`   apiLevelFiltering: ${subdivision ? 'local (API does exact match only)' : 'API-level'}`);
+      console.log(`   lotAcresFilter: ${(minLotAcres || maxLotAcres) ? 'includes null lot data' : 'none'}`);
       console.log(`   =============================================================\n`);
 
       // Normalize results to consistent format
@@ -1109,18 +1123,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const applyFilters = (results: any[], skipSchoolFilters: boolean = false): any[] => {
         let filtered = results;
         
+        // CRITICAL: Include properties WITHOUT lot size data (null lotSizeAcres)
+        // This ensures properties with missing lot data are not excluded from search
         if (minLotAcres) {
           const minAcres = parseFloat(minLotAcres);
           filtered = filtered.filter((p: any) => {
             const acres = p.lotSizeAcres || (p.lotSizeSquareFeet ? p.lotSizeSquareFeet / 43560 : null);
-            return acres !== null && acres >= minAcres;
+            return acres === null || acres >= minAcres;
           });
         }
         if (maxLotAcres) {
           const maxAcres = parseFloat(maxLotAcres);
           filtered = filtered.filter((p: any) => {
             const acres = p.lotSizeAcres || (p.lotSizeSquareFeet ? p.lotSizeSquareFeet / 43560 : null);
-            return acres !== null && acres <= maxAcres;
+            return acres === null || acres <= maxAcres;
           });
         }
         if (minYearBuilt) {
