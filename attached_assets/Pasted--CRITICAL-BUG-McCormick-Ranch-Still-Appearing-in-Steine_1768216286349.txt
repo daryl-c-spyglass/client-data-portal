@@ -1,0 +1,94 @@
+# CRITICAL BUG: McCormick Ranch Still Appearing in Steiner Ranch Search
+
+## Screenshot Evidence
+The search results show 2 properties:
+1. 13612 Flat Top Ranch RD - Steiner Ranch Ph 02 Sec 05 ✅
+2. 908 Cypress Grove DR - McCormick Ranch On Lake Austin ❌ WRONG
+
+McCormick Ranch is NOT Steiner Ranch. The subdivision filter is BROKEN.
+
+---
+
+## The Bug
+
+You said Active/Under Contract uses "local subdivision filtering" but it's NOT filtering out McCormick Ranch.
+
+Debug this NOW:
+```javascript
+// Add this logging BEFORE returning results
+console.log('[SUBDIVISION FILTER DEBUG]', {
+  searchTerm: criteria.subdivision,
+  resultsBeforeFilter: allResults.length,
+  resultsAfterFilter: filteredResults.length,
+  rejected: allResults
+    .filter(r => !filteredResults.includes(r))
+    .map(r => ({
+      address: r.address?.streetName,
+      neighborhood: r.address?.neighborhood,
+      matchesFilter: r.address?.neighborhood?.toLowerCase().includes('steiner ranch')
+    })),
+  kept: filteredResults.map(r => ({
+    address: r.address?.streetName,
+    neighborhood: r.address?.neighborhood
+  }))
+});
+```
+
+---
+
+## Questions to Answer
+
+1. Is local subdivision filtering actually being applied to Active results?
+2. What is the neighborhood value for 908 Cypress Grove DR?
+3. Why does "McCormick Ranch On Lake Austin" pass a "steiner ranch" filter?
+
+---
+
+## Required Fix
+
+The subdivision filter for Active listings must:
+1. Check if `address.neighborhood` contains the search term (case-insensitive)
+2. EXCLUDE any listing where neighborhood does NOT contain "steiner ranch"
+3. Log every rejected listing with reason
+```javascript
+function filterBySubdivision(listings, subdivisionSearch) {
+  if (!subdivisionSearch) return listings;
+  
+  const searchLower = subdivisionSearch.toLowerCase();
+  
+  return listings.filter(listing => {
+    const neighborhood = listing.address?.neighborhood?.toLowerCase() || '';
+    const matches = neighborhood.includes(searchLower);
+    
+    if (!matches) {
+      console.log('[SUBDIVISION REJECTED]', {
+        address: listing.address?.streetName,
+        neighborhood: listing.address?.neighborhood,
+        searchTerm: subdivisionSearch,
+        reason: 'neighborhood does not contain search term'
+      });
+    }
+    
+    return matches;
+  });
+}
+```
+
+---
+
+## Acceptance Criteria
+
+Run this search:
+- Subdivision: "steiner ranch"
+- Zip: 78732
+- Status: Active
+
+**MUST NOT** return any listing where `address.neighborhood` does not contain "steiner ranch"
+
+908 Cypress Grove DR (McCormick Ranch) must NOT appear.
+
+---
+
+## DO NOT respond with explanations. Fix the bug and show me:
+1. The debug logs proving McCormick Ranch is now rejected
+2. Updated screenshot with ONLY Steiner Ranch properties

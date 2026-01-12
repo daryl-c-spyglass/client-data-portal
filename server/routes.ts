@@ -1217,13 +1217,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
         if (subdivision) {
           const subdivisionLower = subdivision.toLowerCase().trim();
-          const searchTerms = subdivisionLower.split(/\s+/); // Split "Barton Hills" into ["barton", "hills"]
           const beforeCount = filtered.length;
+          const rejected: any[] = [];
           
           // Log the search query for debugging
           console.log(`🔍 [Subdivision Filter] ===================================`);
           console.log(`   Search term: "${subdivision}"`);
-          console.log(`   Search words: ${JSON.stringify(searchTerms)}`);
           console.log(`   Properties to filter: ${beforeCount}`);
           
           // Log sample of subdivision values for debugging
@@ -1231,7 +1230,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             const sampleProps = filtered.slice(0, 5);
             console.log(`   Sample subdivision values in ${beforeCount} results:`);
             sampleProps.forEach((p: any) => {
-              console.log(`     - "${p.address}": subdiv="${p.subdivision || 'NULL'}", subdivName="${p.subdivisionName || 'NULL'}"`);
+              console.log(`     - "${p.address}": subdiv="${p.subdivision || 'NULL'}"`);
             });
           } else {
             console.log(`   ⚠️ NO PROPERTIES TO FILTER - check if Repliers returned results`);
@@ -1240,33 +1239,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
           filtered = filtered.filter((p: any) => {
             const propSubdiv = (p.subdivision || '').toLowerCase().trim();
             const propSubdivName = (p.subdivisionName || '').toLowerCase().trim();
-            // CRITICAL: Also check street address - MLS data sometimes has subdivision name in street
-            const propAddress = (p.address || p.unparsedAddress || '').toLowerCase().trim();
             
-            // Combine all subdivision-like fields for matching
-            const allSubdivFields = `${propSubdiv} ${propSubdivName}`;
+            // STRICT SUBDIVISION MATCHING - Only check subdivision/subdivisionName fields
+            // DO NOT check address string - this caused McCormick Ranch to appear in Steiner Ranch searches
             
             // Matching logic (ordered by specificity):
             // 1. Exact match (case-insensitive)
             const exactMatch = propSubdiv === subdivisionLower || propSubdivName === subdivisionLower;
             
-            // 2. Property subdivision STARTS WITH search term (e.g., "Steiner Ranch" matches "Steiner Ranch Sec 4")
-            const startsWithMatch = propSubdiv.startsWith(subdivisionLower) || propSubdivName.startsWith(subdivisionLower);
+            // 2. Property subdivision CONTAINS search term (e.g., "Steiner Ranch Ph 02 Sec 05" contains "steiner ranch")
+            const containsMatch = propSubdiv.includes(subdivisionLower) || propSubdivName.includes(subdivisionLower);
             
-            // 3. Search term STARTS WITH property subdivision (e.g., searching "Steiner Ranch Sec 4" matches "Steiner Ranch")
-            const searchStartsWithProp = (propSubdiv.length > 3 && subdivisionLower.startsWith(propSubdiv)) || 
-                                         (propSubdivName.length > 3 && subdivisionLower.startsWith(propSubdivName));
+            // 3. Search term CONTAINS property subdivision (for short subdivision names)
+            // Only if property subdivision is at least 5 chars to avoid false positives
+            const searchContainsProp = (propSubdiv.length >= 5 && subdivisionLower.includes(propSubdiv)) || 
+                                       (propSubdivName.length >= 5 && subdivisionLower.includes(propSubdivName));
             
-            // 4. All search term words appear in the subdivision (e.g., "Steiner Ranch" matches "River Dance Steiner Ranch")
-            const allWordsMatch = searchTerms.every(term => allSubdivFields.includes(term));
+            const isMatch = exactMatch || containsMatch || searchContainsProp;
             
-            // 5. Substring match - full search term appears in subdivision (e.g., "Steiner Ranch" in "River Dance, Steiner Ranch")
-            const substringMatch = allSubdivFields.includes(subdivisionLower);
-            
-            // 6. Address matching: Check if street name contains the subdivision search term
-            const addressContainsSubdiv = propAddress.includes(subdivisionLower);
-            
-            const isMatch = exactMatch || startsWithMatch || searchStartsWithProp || allWordsMatch || substringMatch || addressContainsSubdiv;
+            // Log rejections for debugging
+            if (!isMatch) {
+              rejected.push({
+                address: p.address,
+                subdivision: propSubdiv || propSubdivName || 'N/A',
+                reason: 'subdivision does not contain search term'
+              });
+            }
             
             return isMatch;
           });
@@ -1274,17 +1272,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
           // Log subdivision filtering results
           console.log(`   Result: "${subdivision}" kept ${filtered.length} of ${beforeCount} properties`);
           
-          // Log sample of matched/unmatched for debugging
-          if (beforeCount > 0 && filtered.length === 0) {
-            console.log(`   ⚠️ ZERO MATCHES after subdivision filter!`);
-            console.log(`   Showing sample of what was rejected:`);
-            const rejectedSample = results.slice(0, 5);
-            rejectedSample.forEach((p: any) => {
-              console.log(`     ✗ ${p.address} - subdiv="${p.subdivision || 'N/A'}"`);
+          // Log all rejected properties
+          if (rejected.length > 0) {
+            console.log(`   ❌ REJECTED (${rejected.length} properties):`);
+            rejected.slice(0, 10).forEach((r: any) => {
+              console.log(`     ✗ ${r.address} - subdiv="${r.subdivision}" - ${r.reason}`);
             });
-          } else if (filtered.length > 0) {
-            console.log(`   Sample matched properties:`);
-            filtered.slice(0, 3).forEach((p: any) => {
+            if (rejected.length > 10) {
+              console.log(`     ... and ${rejected.length - 10} more rejected`);
+            }
+          }
+          
+          // Log matched properties
+          if (filtered.length > 0) {
+            console.log(`   ✅ MATCHED (${filtered.length} properties):`);
+            filtered.slice(0, 5).forEach((p: any) => {
               console.log(`     ✓ ${p.address} - subdiv="${p.subdivision || 'N/A'}"`);
             });
           }
