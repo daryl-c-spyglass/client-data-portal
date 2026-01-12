@@ -445,11 +445,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Parse statuses - support both single status and comma-separated list
       let statusList: string[] = [];
       if (statuses) {
-        statusList = statuses.split(',').map(s => s.trim().toLowerCase());
+        statusList = statuses.split(',').map(s => s.trim().toLowerCase()).filter(s => s.length > 0);
       } else if (status) {
         statusList = [status.toLowerCase()];
-      } else {
-        statusList = ['active'];
+      }
+      
+      // DEFENSIVE: If no valid statuses provided, return 400 error to surface frontend issues
+      if (statusList.length === 0) {
+        console.log(`❌ [CMA Search] No statuses provided - returning 400 error`);
+        return res.status(400).json({ 
+          error: 'Missing required parameter: statuses',
+          message: 'At least one status (active, under_contract, closed) must be specified',
+        });
       }
       
       // COMPREHENSIVE CMA SEARCH LOGGING
@@ -700,12 +707,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
         
         if (listings.length > 0 && listings.length <= 20) {
-          console.log(`   Listings returned:`);
+          console.log(`   Listings returned (showing NORMALIZED subdivision values):`);
           listings.forEach((l: any, i: number) => {
             const addr = l.address || {};
-            const neighborhood = addr.neighborhood || 'N/A';
-            const subdivision = l.subdivision || l.raw?.subdivision || l.raw?.SubdivisionName || 'N/A';
-            console.log(`     ${i+1}. ${addr.streetNumber} ${addr.streetName} - neighborhood="${neighborhood}", subdivision="${subdivision}", sqft=${l.details?.sqft || l.livingArea || 'N/A'}`);
+            // Show normalized subdivision using same logic as mapping function
+            const rawSub = l.raw?.SubdivisionName || l.raw?.Subdivision;
+            const structured = l.subdivisionName || l.subdivision || l.details?.subdivision;
+            const nbhd = addr.neighborhood || l.neighborhood;
+            const normalizedSubdiv = (rawSub && rawSub !== 'N/A' && rawSub.trim()) ? rawSub :
+                                     (structured && structured !== 'N/A' && structured.trim()) ? structured :
+                                     (nbhd && nbhd !== 'N/A' && nbhd.trim()) ? nbhd : 'N/A';
+            console.log(`     ${i+1}. ${addr.streetNumber} ${addr.streetName} - subdivision="${normalizedSubdiv}", sqft=${l.details?.sqft || l.livingArea || 'N/A'}`);
           });
         } else if (listings.length > 20) {
           console.log(`   (Too many listings to show details)`);
@@ -1200,20 +1212,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
             const startsWithMatch = propSubdiv.startsWith(subdivisionLower) || propSubdivName.startsWith(subdivisionLower);
             
             // 3. Search term STARTS WITH property subdivision (e.g., searching "Steiner Ranch Sec 4" matches "Steiner Ranch")
-            const searchStartsWithProp = subdivisionLower.startsWith(propSubdiv) || subdivisionLower.startsWith(propSubdivName);
+            const searchStartsWithProp = (propSubdiv.length > 3 && subdivisionLower.startsWith(propSubdiv)) || 
+                                         (propSubdivName.length > 3 && subdivisionLower.startsWith(propSubdivName));
             
-            // 4. All search term words appear in the subdivision (e.g., "Steiner Ranch" matches "Steiner Ranch Section 2")
+            // 4. All search term words appear in the subdivision (e.g., "Steiner Ranch" matches "River Dance Steiner Ranch")
             const allWordsMatch = searchTerms.every(term => allSubdivFields.includes(term));
             
-            // 5. Contains match for single-word searches or if all terms are found
-            const containsMatch = searchTerms.length === 1 
-              ? allSubdivFields.includes(subdivisionLower)
-              : allWordsMatch;
+            // 5. Substring match - full search term appears in subdivision (e.g., "Steiner Ranch" in "River Dance, Steiner Ranch")
+            const substringMatch = allSubdivFields.includes(subdivisionLower);
             
             // 6. Address matching: Check if street name contains the subdivision search term
             const addressContainsSubdiv = propAddress.includes(subdivisionLower);
             
-            const isMatch = exactMatch || startsWithMatch || searchStartsWithProp || containsMatch || addressContainsSubdiv;
+            const isMatch = exactMatch || startsWithMatch || searchStartsWithProp || allWordsMatch || substringMatch || addressContainsSubdiv;
             
             return isMatch;
           });
