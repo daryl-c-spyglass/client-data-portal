@@ -1532,17 +1532,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.log(`\n📊 [MULTI-STATUS DEBUG] =====================================`);
       console.log(`   Statuses requested: ${statusList.join(', ')}`);
       console.log(`   Combined results before dedupe: ${allResults.length}`);
-      
-      // Count per status before dedupe
-      const statusCounts: Record<string, number> = {};
-      allResults.forEach(r => {
-        const s = (r as any).standardStatus || r.status || 'Unknown';
-        statusCounts[s] = (statusCounts[s] || 0) + 1;
-      });
-      console.log(`   Per-status breakdown (before dedupe):`);
-      Object.entries(statusCounts).forEach(([s, count]) => {
-        console.log(`     - ${s}: ${count}`);
-      });
 
       // Remove duplicates (by id)
       const uniqueResults = Array.from(new Map(allResults.map(r => [r.id, r])).values());
@@ -1566,23 +1555,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
         console.log(`   Property type filter: removed ${nonRentalResults.length - propertyTypeFiltered.length} listings`);
       }
       
+      // Count per status AFTER dedupe and filtering (accurate counts for UI)
+      const statusCounts: Record<string, number> = {};
+      propertyTypeFiltered.forEach(r => {
+        const s = (r as any).standardStatus || r.status || 'Unknown';
+        statusCounts[s] = (statusCounts[s] || 0) + 1;
+      });
+      console.log(`   Per-status breakdown (after dedupe/filter):`);
+      Object.entries(statusCounts).forEach(([s, count]) => {
+        console.log(`     - ${s}: ${count}`);
+      });
+      
       // CRITICAL FIX: For multi-status searches, scale the limit by number of statuses
       // This ensures that searching with 3 statuses returns 3x the per-status limit
       // rather than applying the single-status limit to the merged result set
-      const effectiveLimit = parsedLimit * Math.max(statusList.length, 1);
+      // Cap at 200 to prevent excessive results
+      const effectiveLimit = Math.min(parsedLimit * Math.max(statusList.length, 1), 200);
       const finalResults = propertyTypeFiltered.slice(0, effectiveLimit);
       
-      // Validate: total should equal sum of parts (minus duplicates)
-      const expectedSum = Object.values(statusCounts).reduce((a, b) => a + b, 0);
-      if (finalResults.length < expectedSum - duplicatesRemoved && finalResults.length < propertyTypeFiltered.length) {
-        console.log(`   ⚠️ WARNING: Final results (${finalResults.length}) less than expected (${expectedSum - duplicatesRemoved})`);
-      }
+      // Capture total before slice for accurate UI display
+      const totalBeforeSlice = propertyTypeFiltered.length;
+      
+      console.log(`   Total before limit: ${totalBeforeSlice}`);
+      console.log(`   Effective limit: ${effectiveLimit} (requested: ${parsedLimit} x ${statusList.length} statuses)`);
       console.log(`   =============================================================\n`);
 
       // FINAL RESULT SUMMARY
       console.log(`\n📦 [CMA Search Complete] ====================================`);
       console.log(`   Statuses: ${statusList.join(', ')}`);
-      console.log(`   Final results: ${finalResults.length} (limit: ${effectiveLimit})`);
+      console.log(`   Final results: ${finalResults.length} of ${totalBeforeSlice} available`);
       if (subdivision) console.log(`   Subdivision filter: "${subdivision}"`);
       if (postalCode) console.log(`   ZIP filter: "${postalCode}"`);
       if (finalResults.length === 0) {
@@ -1593,10 +1594,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json({
         properties: finalResults,
         count: finalResults.length,
-        totalCount: propertyTypeFiltered.length, // True count before limit
+        totalCount: totalBeforeSlice, // True count before limit
         statuses: statusList,
         schoolFilterWarning: schoolFilterWarning,
-        statusBreakdown: statusCounts, // Per-status counts for UI display
+        statusBreakdown: statusCounts, // Per-status counts (post-dedupe, pre-slice)
       });
     } catch (error) {
       console.error('Unified search error:', error);
