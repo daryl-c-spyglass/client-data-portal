@@ -16,6 +16,9 @@ import { startRepliersScheduledSync, registerRepliersSyncRoutes, triggerRepliers
 
 const app = express();
 
+// Trust proxy - required for secure cookies behind Replit's reverse proxy
+app.set('trust proxy', 1);
+
 // Serve static files from public folder (logos, widget JS, etc.)
 app.use(express.static(path.join(process.cwd(), 'public')));
 
@@ -57,6 +60,8 @@ app.use(
     saveUninitialized: false,
     cookie: {
       secure: process.env.NODE_ENV === "production",
+      httpOnly: true,
+      sameSite: "lax",
       maxAge: 1000 * 60 * 60 * 24 * 7,
     },
   })
