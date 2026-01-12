@@ -1,0 +1,129 @@
+ARITY TEST STILL FAILING
+Issue 1: Wrong Result Count
+
+MLS Ground Truth: 3 results
+Portal Result: 2 results
+Status: ❌ FAIL
+
+Issue 2: Wrong Subdivision in Results (CRITICAL BUG)
+Looking at Image 2, the search results show:
+#PropertySubdivisionStatus113612 Flat Top Ranch RDSteiner Ranch Ph 02 Sec 05Active2908 Cypress Grove DRMcCormick Ranch On Lake AustinActive
+"McCormick Ranch On Lake Austin" is NOT Steiner Ranch!
+The subdivision filter is broken — it's returning properties from completely different subdivisions.
+Issue 3: Only Active Results Showing
+Both results show Active badges. Where are the Closed listings?
+The search criteria has all three statuses checked (Active, Active Under Contract, Closed) with 0-150 days close date, yet only Active listings appear.
+Issue 4: "365 Days" Workaround is Invalid
+Replit's response says:
+
+"PARITY TEST PASSES with 6 results! ... With 365 days, we get 6 Steiner Ranch properties."
+
+This is not acceptable. The original MLS search used 0-150 days and returned 3 results. The portal must match the same criteria, not expand the date range to get more results.
+
+Follow-Up Replit Prompt
+# CMA PARITY TEST STILL FAILING - Critical Issues
+
+## Screenshots Show These Problems:
+
+### Problem 1: Wrong Subdivision in Results
+The search for "Steiner Ranch" returned:
+- 13612 Flat Top Ranch RD - Steiner Ranch Ph 02 Sec 05 ✅
+- 908 Cypress Grove DR - McCormick Ranch On Lake Austin ❌
+
+McCormick Ranch is NOT Steiner Ranch. The subdivision filter is broken.
+
+**Task:** Fix the subdivision filter. When user enters "steiner ranch", results must ONLY include properties where subdivision contains "steiner ranch" (case-insensitive).
+
+Debug this immediately:
+```typescript
+console.log('[SUBDIVISION BUG] Search term:', searchCriteria.subdivision);
+console.log('[SUBDIVISION BUG] Results:', results.map(r => ({
+  address: r.address,
+  subdivision: r.subdivision,
+  matchesFilter: r.subdivision?.toLowerCase().includes('steiner ranch')
+})));
+```
+
+### Problem 2: Only Active Results - No Closed
+The screenshot shows 2 results, both with "Active" badges.
+
+Status checkboxes selected: Active ✅, Active Under Contract ✅, Closed ✅
+Close Date: 0-150 days
+
+Where are the Closed listings?
+
+**Task:** Debug why Closed listings are not appearing:
+```typescript
+console.log('[STATUS DEBUG] Requested statuses:', params.statuses);
+console.log('[STATUS DEBUG] Results by status:', {
+  active: results.filter(r => r.status === 'Active').length,
+  underContract: results.filter(r => r.status === 'Active Under Contract').length,
+  closed: results.filter(r => r.status === 'Closed').length
+});
+```
+
+### Problem 3: Count Mismatch (2 vs 3)
+- MLS: 3 results with 0-150 days
+- Portal: 2 results with 0-150 days
+- Gap: 1 missing listing
+
+Do NOT change to 365 days. The original 150-day criteria must work.
+
+**Task:** Identify the missing listing. Query MLS or check logs to find which property is being filtered out and why.
+
+### Problem 4: Subdivision Filter Not Applied at API Level
+If subdivision is not passed to Repliers API, the local filter may be failing silently.
+
+**Task:** Verify subdivision is passed to API:
+```typescript
+console.log('[API PARAMS] Repliers query:', {
+  subdivision: params.subdivision,
+  search: params.search,
+  searchFields: params.searchFields
+});
+```
+
+If subdivision is not in API params, that's why McCormick Ranch appeared - it matched other criteria (sqft, lot, zip) but not subdivision.
+
+---
+
+## Required Fixes
+
+1. **Fix subdivision filter** - Must exclude McCormick Ranch from Steiner Ranch search
+2. **Debug Closed listings** - Why are they not appearing?
+3. **Verify API-level filtering** - Is subdivision passed to Repliers?
+4. **Match original criteria** - 0-150 days, not 365 days
+
+---
+
+## Acceptance Criteria (Updated)
+
+Run this exact test:
+```json
+{
+  "subdivision": "steiner ranch",
+  "propertyType": "Single Family Residence",
+  "minSqft": 5400,
+  "maxSqft": 6400,
+  "minLotAcres": 0.5,
+  "maxLotAcres": 1.5,
+  "statuses": ["Active", "Active Under Contract", "Closed"],
+  "closeDateDays": 150,
+  "zipCode": "78732"
+}
+```
+
+**Must pass ALL:**
+- [ ] All results have subdivision containing "steiner ranch"
+- [ ] Results include Closed listings (not just Active)
+- [ ] Count ≥3 (matching MLS)
+- [ ] No McCormick Ranch or other non-Steiner subdivisions
+
+---
+
+## DO NOT mark complete until:
+1. McCormick Ranch is NOT in results
+2. Closed listings appear
+3. Count matches MLS (≥3 with 150 days)
+
+Bottom Line: The fix is broken. The subdivision filter is not working (McCormick Ranch shouldn't appear), Closed listings are missing, and changing to 365 days is not a valid solution. Send this follow-up to Replit immediately.
