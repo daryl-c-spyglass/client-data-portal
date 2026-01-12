@@ -1,0 +1,365 @@
+# UX Enhancement: Add View Toggle for Search Results
+
+## Current State
+- Search results display in a 2-column grid (card layout)
+- Sorting dropdown exists with: Relevant, Price, Newest, Oldest, Sq Ft, Lot Size
+
+## Requested Feature
+Add a view toggle next to the sorting dropdown with 3 options:
+1. **Grid View** (current default) - 2-column card layout
+2. **List View** - Single column, horizontal cards with more details
+3. **Table View** - Spreadsheet-style rows with sortable columns
+
+---
+
+## Task 1: Add View Toggle Component
+
+Create a toggle button group next to the sort dropdown:
+```jsx
+// ViewToggle.tsx
+import { Grid, List, Table } from 'lucide-react'; // or your icon library
+
+type ViewMode = 'grid' | 'list' | 'table';
+
+interface ViewToggleProps {
+  currentView: ViewMode;
+  onViewChange: (view: ViewMode) => void;
+}
+
+export function ViewToggle({ currentView, onViewChange }: ViewToggleProps) {
+  return (
+    <div className="flex items-center border rounded-lg overflow-hidden">
+      <button
+        onClick={() => onViewChange('grid')}
+        className={`p-2 ${currentView === 'grid' ? 'bg-orange-500 text-white' : 'bg-white text-gray-600 hover:bg-gray-100'}`}
+        title="Grid View"
+      >
+        <Grid size={18} />
+      </button>
+      <button
+        onClick={() => onViewChange('list')}
+        className={`p-2 border-l ${currentView === 'list' ? 'bg-orange-500 text-white' : 'bg-white text-gray-600 hover:bg-gray-100'}`}
+        title="List View"
+      >
+        <List size={18} />
+      </button>
+      <button
+        onClick={() => onViewChange('table')}
+        className={`p-2 border-l ${currentView === 'table' ? 'bg-orange-500 text-white' : 'bg-white text-gray-600 hover:bg-gray-100'}`}
+        title="Table View"
+      >
+        <Table size={18} />
+      </button>
+    </div>
+  );
+}
+```
+
+---
+
+## Task 2: Update Search Results Header
+
+Place the view toggle next to the existing sort dropdown:
+```jsx
+// SearchResults header area
+<div className="flex items-center justify-between mb-4">
+  <h3 className="text-lg font-semibold">
+    Search Results ({results.length} found)
+  </h3>
+  
+  <div className="flex items-center gap-3">
+    {/* Existing Sort Dropdown */}
+    <select 
+      value={sortBy} 
+      onChange={(e) => setSortBy(e.target.value)}
+      className="border rounded-lg px-3 py-2"
+    >
+      <option value="relevant">Relevant</option>
+      <option value="price-low">Price: Low to High</option>
+      <option value="price-high">Price: High to Low</option>
+      <option value="newest">Newest First</option>
+      <option value="oldest">Oldest First</option>
+      <option value="sqft-high">Sq Ft: High to Low</option>
+      <option value="sqft-low">Sq Ft: Low to High</option>
+      <option value="lot-high">Lot Size: High to Low</option>
+      <option value="lot-low">Lot Size: Low to High</option>
+    </select>
+    
+    {/* NEW: View Toggle */}
+    <ViewToggle 
+      currentView={viewMode} 
+      onViewChange={setViewMode} 
+    />
+  </div>
+</div>
+```
+
+---
+
+## Task 3: Create Grid View Component (Current Layout)
+```jsx
+// GridView.tsx
+export function GridView({ listings, onSetSubject, onAddComp }) {
+  return (
+    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      {listings.map(listing => (
+        <PropertyCard 
+          key={listing.mlsNumber}
+          listing={listing}
+          onSetSubject={onSetSubject}
+          onAddComp={onAddComp}
+        />
+      ))}
+    </div>
+  );
+}
+```
+
+---
+
+## Task 4: Create List View Component
+
+Single column with horizontal cards showing more details:
+```jsx
+// ListView.tsx
+export function ListView({ listings, onSetSubject, onAddComp }) {
+  return (
+    <div className="flex flex-col gap-3">
+      {listings.map(listing => (
+        <div 
+          key={listing.mlsNumber}
+          className="flex border rounded-lg overflow-hidden bg-white shadow-sm hover:shadow-md transition-shadow"
+        >
+          {/* Image */}
+          <div className="w-48 h-36 flex-shrink-0">
+            <img 
+              src={listing.photos?.[0] || '/placeholder.jpg'} 
+              alt={listing.address?.streetName}
+              className="w-full h-full object-cover"
+            />
+          </div>
+          
+          {/* Details */}
+          <div className="flex-1 p-4">
+            <div className="flex justify-between items-start">
+              <div>
+                <h4 className="font-semibold text-lg">
+                  {listing.address?.streetNumber} {listing.address?.streetName}
+                </h4>
+                <p className="text-sm text-gray-500">{listing.subdivision}</p>
+              </div>
+              <StatusBadge status={listing.status} />
+            </div>
+            
+            <div className="mt-2 flex items-center gap-6">
+              <span className="text-xl font-bold text-orange-500">
+                ${listing.listPrice?.toLocaleString()}
+              </span>
+              <span className="text-sm text-gray-600">
+                ${listing.pricePerSqft}/sqft
+              </span>
+            </div>
+            
+            <div className="mt-2 flex items-center gap-4 text-sm text-gray-600">
+              <span>{listing.beds} beds</span>
+              <span>{listing.baths} baths</span>
+              <span>{listing.sqft?.toLocaleString()} sqft</span>
+              <span>Built {listing.yearBuilt}</span>
+              <span>{listing.dom} DOM</span>
+            </div>
+            
+            {listing.status === 'Closed' && (
+              <div className="mt-1 text-sm text-gray-500">
+                Closed: {listing.closeDate} • Close: ${listing.closePrice?.toLocaleString()}
+              </div>
+            )}
+          </div>
+          
+          {/* Actions */}
+          <div className="flex flex-col justify-center gap-2 p-4 border-l">
+            <button 
+              onClick={() => onSetSubject(listing)}
+              className="px-4 py-2 border rounded-lg hover:bg-gray-50"
+            >
+              Set as Subject
+            </button>
+            <button 
+              onClick={() => onAddComp(listing)}
+              className="px-4 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600"
+            >
+              + Add
+            </button>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+```
+
+---
+
+## Task 5: Create Table View Component
+
+Spreadsheet-style with sortable columns:
+```jsx
+// TableView.tsx
+export function TableView({ listings, onSetSubject, onAddComp, sortBy, onSort }) {
+  const columns = [
+    { key: 'address', label: 'Address', sortable: true },
+    { key: 'subdivision', label: 'Subdivision', sortable: true },
+    { key: 'status', label: 'Status', sortable: true },
+    { key: 'listPrice', label: 'Price', sortable: true },
+    { key: 'beds', label: 'Beds', sortable: true },
+    { key: 'baths', label: 'Baths', sortable: true },
+    { key: 'sqft', label: 'Sq Ft', sortable: true },
+    { key: 'pricePerSqft', label: '$/Sqft', sortable: true },
+    { key: 'yearBuilt', label: 'Year', sortable: true },
+    { key: 'dom', label: 'DOM', sortable: true },
+    { key: 'actions', label: 'Actions', sortable: false },
+  ];
+
+  return (
+    <div className="overflow-x-auto border rounded-lg">
+      <table className="w-full text-sm">
+        <thead className="bg-gray-50">
+          <tr>
+            {columns.map(col => (
+              <th 
+                key={col.key}
+                onClick={() => col.sortable && onSort(col.key)}
+                className={`px-4 py-3 text-left font-medium text-gray-700 ${col.sortable ? 'cursor-pointer hover:bg-gray-100' : ''}`}
+              >
+                {col.label}
+                {col.sortable && sortBy === col.key && (
+                  <span className="ml-1">↓</span>
+                )}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody className="divide-y">
+          {listings.map(listing => (
+            <tr key={listing.mlsNumber} className="hover:bg-gray-50">
+              <td className="px-4 py-3">
+                <div className="flex items-center gap-2">
+                  <img 
+                    src={listing.photos?.[0] || '/placeholder.jpg'} 
+                    alt=""
+                    className="w-12 h-10 object-cover rounded"
+                  />
+                  <span className="font-medium">
+                    {listing.address?.streetNumber} {listing.address?.streetName}
+                  </span>
+                </div>
+              </td>
+              <td className="px-4 py-3 text-gray-600">{listing.subdivision}</td>
+              <td className="px-4 py-3">
+                <StatusBadge status={listing.status} size="sm" />
+              </td>
+              <td className="px-4 py-3 font-semibold text-orange-500">
+                ${listing.listPrice?.toLocaleString()}
+              </td>
+              <td className="px-4 py-3">{listing.beds}</td>
+              <td className="px-4 py-3">{listing.baths}</td>
+              <td className="px-4 py-3">{listing.sqft?.toLocaleString()}</td>
+              <td className="px-4 py-3">${listing.pricePerSqft}</td>
+              <td className="px-4 py-3">{listing.yearBuilt}</td>
+              <td className="px-4 py-3">{listing.dom}</td>
+              <td className="px-4 py-3">
+                <div className="flex gap-2">
+                  <button 
+                    onClick={() => onSetSubject(listing)}
+                    className="text-xs px-2 py-1 border rounded hover:bg-gray-100"
+                  >
+                    Subject
+                  </button>
+                  <button 
+                    onClick={() => onAddComp(listing)}
+                    className="text-xs px-2 py-1 bg-orange-500 text-white rounded hover:bg-orange-600"
+                  >
+                    + Add
+                  </button>
+                </div>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+```
+
+---
+
+## Task 6: Integrate Views in Search Results
+```jsx
+// SearchResults.tsx
+const [viewMode, setViewMode] = useState<'grid' | 'list' | 'table'>('grid');
+
+return (
+  <div>
+    {/* Header with Sort + View Toggle */}
+    <div className="flex items-center justify-between mb-4">
+      <h3>Search Results ({results.length} found)</h3>
+      <div className="flex items-center gap-3">
+        <SortDropdown value={sortBy} onChange={setSortBy} />
+        <ViewToggle currentView={viewMode} onViewChange={setViewMode} />
+      </div>
+    </div>
+    
+    {/* Conditional View Rendering */}
+    {viewMode === 'grid' && (
+      <GridView listings={sortedResults} onSetSubject={onSetSubject} onAddComp={onAddComp} />
+    )}
+    {viewMode === 'list' && (
+      <ListView listings={sortedResults} onSetSubject={onSetSubject} onAddComp={onAddComp} />
+    )}
+    {viewMode === 'table' && (
+      <TableView listings={sortedResults} onSetSubject={onSetSubject} onAddComp={onAddComp} sortBy={sortBy} onSort={setSortBy} />
+    )}
+  </div>
+);
+```
+
+---
+
+## Task 7: Persist View Preference
+
+Save user's preferred view mode to localStorage:
+```javascript
+// On mount
+useEffect(() => {
+  const savedView = localStorage.getItem('cma-view-mode');
+  if (savedView) setViewMode(savedView as ViewMode);
+}, []);
+
+// On change
+const handleViewChange = (view: ViewMode) => {
+  setViewMode(view);
+  localStorage.setItem('cma-view-mode', view);
+};
+```
+
+---
+
+## Acceptance Criteria
+
+- [ ] View toggle appears next to sort dropdown
+- [ ] Grid view shows 2-column card layout (current design)
+- [ ] List view shows single-column horizontal cards
+- [ ] Table view shows spreadsheet-style rows
+- [ ] All views show same data with Set as Subject / Add buttons
+- [ ] View preference persists on page refresh
+- [ ] Sorting works in all view modes
+- [ ] Responsive on mobile (grid → 1 column, table → horizontal scroll)
+
+---
+
+## Visual Reference
+
+The toggle should look similar to Image 2 in your screenshots:
+- 3 icon buttons grouped together
+- Active state highlighted in orange
+- Positioned next to the sort dropdown

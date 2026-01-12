@@ -11,7 +11,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { X, Plus, TrendingUp, Search, Loader2, AlertCircle, Home, MousePointerClick, RotateCcw, ChevronLeft, ChevronRight, Info, Map, ListFilter, Sparkles } from "lucide-react";
+import { X, Plus, TrendingUp, Search, Loader2, AlertCircle, Home, MousePointerClick, RotateCcw, ChevronLeft, ChevronRight, Info, Map, ListFilter, Sparkles, LayoutGrid, List, Table2 } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { PolygonMapSearch } from "@/components/PolygonMapSearch";
@@ -303,6 +303,19 @@ export function CMABuilder({ onCreateCMA, initialData }: CMABuilderProps) {
   // Property detail dialog state
   const [selectedProperty, setSelectedProperty] = useState<Property | null>(null);
   const [currentPhotoIndex, setCurrentPhotoIndex] = useState(0);
+  
+  // View mode state - persisted to localStorage
+  type ViewMode = 'grid' | 'list' | 'table';
+  const [viewMode, setViewMode] = useState<ViewMode>(() => {
+    const saved = localStorage.getItem('cma-view-mode');
+    return (saved as ViewMode) || 'grid';
+  });
+  
+  // Persist view mode to localStorage
+  const handleViewModeChange = (mode: ViewMode) => {
+    setViewMode(mode);
+    localStorage.setItem('cma-view-mode', mode);
+  };
   
   // Autoplay carousel effect - advance every 3 seconds when dialog is open
   useEffect(() => {
@@ -1843,15 +1856,53 @@ export function CMABuilder({ onCreateCMA, initialData }: CMABuilderProps) {
 
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            Search Results {activeResultCount > 0 && `(${activeResultCount.toLocaleString()} found)`}
-            {searchMode === 'map' && mapSearchResults.length > 0 && (
-              <Badge variant="outline" className="ml-2">
-                <Map className="w-3 h-3 mr-1" />
-                Map Search
-              </Badge>
+          <div className="flex items-center justify-between flex-wrap gap-2">
+            <CardTitle className="flex items-center gap-2">
+              Search Results {activeResultCount > 0 && `(${activeResultCount.toLocaleString()} found)`}
+              {searchMode === 'map' && mapSearchResults.length > 0 && (
+                <Badge variant="outline" className="ml-2">
+                  <Map className="w-3 h-3 mr-1" />
+                  Map Search
+                </Badge>
+              )}
+            </CardTitle>
+            
+            {/* View Toggle */}
+            {activeSearchResults.length > 0 && (
+              <div className="flex items-center border rounded-lg overflow-hidden" data-testid="view-toggle">
+                <Button
+                  size="sm"
+                  variant={viewMode === 'grid' ? 'default' : 'ghost'}
+                  className="rounded-none px-3 h-8"
+                  onClick={() => handleViewModeChange('grid')}
+                  data-testid="button-view-grid"
+                  title="Grid View"
+                >
+                  <LayoutGrid className="w-4 h-4" />
+                </Button>
+                <Button
+                  size="sm"
+                  variant={viewMode === 'list' ? 'default' : 'ghost'}
+                  className="rounded-none px-3 h-8 border-l"
+                  onClick={() => handleViewModeChange('list')}
+                  data-testid="button-view-list"
+                  title="List View"
+                >
+                  <List className="w-4 h-4" />
+                </Button>
+                <Button
+                  size="sm"
+                  variant={viewMode === 'table' ? 'default' : 'ghost'}
+                  className="rounded-none px-3 h-8 border-l"
+                  onClick={() => handleViewModeChange('table')}
+                  data-testid="button-view-table"
+                  title="Table View"
+                >
+                  <Table2 className="w-4 h-4" />
+                </Button>
+              </div>
             )}
-          </CardTitle>
+          </div>
         </CardHeader>
         <CardContent>
           {/* School filter warning */}
@@ -1877,179 +1928,434 @@ export function CMABuilder({ onCreateCMA, initialData }: CMABuilderProps) {
               </p>
             </div>
           ) : activeSearchResults.length > 0 ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {activeSearchResults.map((property) => {
-                // Photos are returned directly from Repliers API in property.photos
-                const photos = (property as any).photos as string[] | undefined;
-                const primaryPhoto = photos?.[0];
-                const pricePerSqft = property.livingArea 
-                  ? (property.standardStatus === 'Closed' && property.closePrice 
-                      ? Number(property.closePrice) 
-                      : Number(property.listPrice || 0)) / Number(property.livingArea)
-                  : null;
-                
-                // Format listing date
-                const listingDate = property.listingContractDate 
-                  ? new Date(property.listingContractDate).toLocaleDateString()
-                  : null;
-                
-                // Get status badge styling
-                const getStatusBadge = () => {
-                  if (property.standardStatus === 'Closed') {
-                    return <Badge variant="secondary" className="flex-shrink-0">Closed</Badge>;
-                  } else if (property.standardStatus === 'Active') {
-                    return <Badge variant="default" className="flex-shrink-0 bg-green-600 hover:bg-green-600">Active</Badge>;
-                  } else if (property.standardStatus === 'Active Under Contract') {
-                    return <Badge variant="default" className="flex-shrink-0 bg-amber-500 hover:bg-amber-500">Active Under Contract</Badge>;
-                  }
-                  return <Badge variant="secondary" className="flex-shrink-0">{property.standardStatus}</Badge>;
-                };
-                
-                // Get match tier from visual search results
-                const matchTier = (property as any).matchTier as string | undefined;
-                
-                return (
-                  <Card 
-                    key={property.id} 
-                    className="overflow-hidden cursor-pointer hover-elevate relative"
-                    onClick={() => {
-                      setSelectedProperty(property);
-                      setCurrentPhotoIndex(0);
-                    }}
-                    data-testid={`card-property-${property.id}`}
-                  >
-                    {/* Visual Match Tier Badge */}
-                    {matchTier && visualMatchEnabled && (
-                      <div className="absolute top-2 left-2 z-10">
-                        <Badge 
-                          className={cn(
-                            "text-xs",
-                            matchTier === 'High' && "bg-emerald-500 text-white hover:bg-emerald-500",
-                            matchTier === 'Medium' && "bg-amber-500 text-white hover:bg-amber-500",
-                            matchTier === 'Low' && "bg-gray-500 text-white hover:bg-gray-500"
+            <>
+              {/* GRID VIEW */}
+              {viewMode === 'grid' && (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {activeSearchResults.map((property) => {
+                    const photos = (property as any).photos as string[] | undefined;
+                    const primaryPhoto = photos?.[0];
+                    const pricePerSqft = property.livingArea 
+                      ? (property.standardStatus === 'Closed' && property.closePrice 
+                          ? Number(property.closePrice) 
+                          : Number(property.listPrice || 0)) / Number(property.livingArea)
+                      : null;
+                    const listingDate = property.listingContractDate 
+                      ? new Date(property.listingContractDate).toLocaleDateString()
+                      : null;
+                    const getStatusBadge = () => {
+                      if (property.standardStatus === 'Closed') {
+                        return <Badge variant="secondary" className="flex-shrink-0">Closed</Badge>;
+                      } else if (property.standardStatus === 'Active') {
+                        return <Badge variant="default" className="flex-shrink-0 bg-green-600 hover:bg-green-600">Active</Badge>;
+                      } else if (property.standardStatus === 'Active Under Contract') {
+                        return <Badge variant="default" className="flex-shrink-0 bg-amber-500 hover:bg-amber-500">Active Under Contract</Badge>;
+                      }
+                      return <Badge variant="secondary" className="flex-shrink-0">{property.standardStatus}</Badge>;
+                    };
+                    const matchTier = (property as any).matchTier as string | undefined;
+                    
+                    return (
+                      <Card 
+                        key={property.id} 
+                        className="overflow-hidden cursor-pointer hover-elevate relative"
+                        onClick={() => {
+                          setSelectedProperty(property);
+                          setCurrentPhotoIndex(0);
+                        }}
+                        data-testid={`card-property-${property.id}`}
+                      >
+                        {matchTier && visualMatchEnabled && (
+                          <div className="absolute top-2 left-2 z-10">
+                            <Badge 
+                              className={cn(
+                                "text-xs",
+                                matchTier === 'High' && "bg-emerald-500 text-white hover:bg-emerald-500",
+                                matchTier === 'Medium' && "bg-amber-500 text-white hover:bg-amber-500",
+                                matchTier === 'Low' && "bg-gray-500 text-white hover:bg-gray-500"
+                              )}
+                            >
+                              <Sparkles className="w-3 h-3 mr-1" />
+                              {matchTier} Match
+                            </Badge>
+                          </div>
+                        )}
+                        <div className="flex">
+                          {primaryPhoto ? (
+                            <div className="w-32 h-32 flex-shrink-0">
+                              <img 
+                                src={primaryPhoto} 
+                                alt={property.unparsedAddress || 'Property'}
+                                className="w-full h-full object-cover"
+                              />
+                            </div>
+                          ) : (
+                            <div className="w-32 h-32 flex-shrink-0 bg-muted flex flex-col items-center justify-center p-2">
+                              <Home className="w-6 h-6 text-muted-foreground/50 mb-1" />
+                              <span className="text-[10px] text-muted-foreground text-center leading-tight">No photos available</span>
+                            </div>
                           )}
-                        >
-                          <Sparkles className="w-3 h-3 mr-1" />
-                          {matchTier} Match
-                        </Badge>
-                      </div>
-                    )}
-                    <div className="flex">
-                      {primaryPhoto ? (
-                        <div className="w-32 h-32 flex-shrink-0">
-                          <img 
-                            src={primaryPhoto} 
-                            alt={property.unparsedAddress || 'Property'}
-                            className="w-full h-full object-cover"
-                          />
+                          <CardContent className="flex-1 p-3 space-y-2">
+                            <div className="flex items-start justify-between gap-2">
+                              <div className="flex-1 min-w-0">
+                                <p className="font-semibold text-sm line-clamp-1" data-testid={`text-address-${property.id}`}>
+                                  {property.unparsedAddress}
+                                </p>
+                                {property.subdivision && (
+                                  <p className="text-xs text-muted-foreground line-clamp-1">
+                                    {property.subdivision}
+                                  </p>
+                                )}
+                              </div>
+                              {getStatusBadge()}
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <span className="font-bold text-lg text-primary">{getPriceDisplay(property)}</span>
+                              {pricePerSqft && (
+                                <span className="text-xs text-muted-foreground">${pricePerSqft.toFixed(0)}/sqft</span>
+                              )}
+                            </div>
+                            <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-muted-foreground">
+                              <span>{property.bedroomsTotal || 0} beds</span>
+                              <span>{property.bathroomsFull || property.bathroomsTotalInteger || 0}F/{property.bathroomsHalf || 0}H baths</span>
+                              {property.livingArea && (
+                                <span>{Number(property.livingArea).toLocaleString()} sqft</span>
+                              )}
+                              {property.yearBuilt && <span>Built {property.yearBuilt}</span>}
+                            </div>
+                            <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-muted-foreground">
+                              {property.garageParkingSpaces !== null && property.garageParkingSpaces !== undefined && property.garageParkingSpaces > 0 && (
+                                <span>{property.garageParkingSpaces} garage</span>
+                              )}
+                              {property.lotSizeAcres && Number(property.lotSizeAcres) > 0 && (
+                                <span>{Number(property.lotSizeAcres).toFixed(2)} acres</span>
+                              )}
+                              {property.storiesTotal && Number(property.storiesTotal) > 0 && (
+                                <span>{property.storiesTotal} story</span>
+                              )}
+                              {property.daysOnMarket !== null && property.daysOnMarket !== undefined && (
+                                <span>{property.daysOnMarket} DOM</span>
+                              )}
+                            </div>
+                            <div className="flex flex-wrap gap-x-2 gap-y-1 text-xs text-muted-foreground">
+                              {listingDate && <span>Listed: {listingDate}</span>}
+                              {property.standardStatus === 'Closed' && property.closeDate && (
+                                <span>Closed: {new Date(property.closeDate).toLocaleDateString()}</span>
+                              )}
+                              {property.standardStatus === 'Closed' && property.closePrice && (
+                                <span className="font-medium text-foreground">
+                                  Close: ${Number(property.closePrice).toLocaleString()}
+                                </span>
+                              )}
+                            </div>
+                            <div className="flex gap-2 pt-1" onClick={(e) => e.stopPropagation()}>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="flex-1"
+                                onClick={() => handleSetSubject(property)}
+                                disabled={subjectProperty?.id === property.id}
+                                data-testid={`button-set-subject-${property.id}`}
+                              >
+                                Set as Subject
+                              </Button>
+                              {comparables.some(p => p.id === property.id) ? (
+                                <Button
+                                  size="sm"
+                                  variant="destructive"
+                                  className="flex-1"
+                                  onClick={() => handleRemoveComparable(property.id)}
+                                  data-testid={`button-remove-comparable-${property.id}`}
+                                >
+                                  <X className="w-3 h-3 mr-1" />
+                                  Remove
+                                </Button>
+                              ) : (
+                                <Button
+                                  size="sm"
+                                  className="flex-1"
+                                  onClick={() => handleAddComparable(property)}
+                                  disabled={comparables.length >= 15}
+                                  data-testid={`button-add-comparable-${property.id}`}
+                                >
+                                  <Plus className="w-3 h-3 mr-1" />
+                                  Add
+                                </Button>
+                              )}
+                            </div>
+                          </CardContent>
                         </div>
-                      ) : (
-                        <div className="w-32 h-32 flex-shrink-0 bg-muted flex flex-col items-center justify-center p-2">
-                          <Home className="w-6 h-6 text-muted-foreground/50 mb-1" />
-                          <span className="text-[10px] text-muted-foreground text-center leading-tight">No photos available</span>
-                        </div>
-                      )}
-                      <CardContent className="flex-1 p-3 space-y-2">
-                        <div className="flex items-start justify-between gap-2">
-                          <div className="flex-1 min-w-0">
-                            <p className="font-semibold text-sm line-clamp-1" data-testid={`text-address-${property.id}`}>
-                              {property.unparsedAddress}
-                            </p>
-                            {property.subdivision && (
-                              <p className="text-xs text-muted-foreground line-clamp-1">
-                                {property.subdivision}
-                              </p>
+                      </Card>
+                    );
+                  })}
+                </div>
+              )}
+              
+              {/* LIST VIEW */}
+              {viewMode === 'list' && (
+                <div className="flex flex-col gap-3">
+                  {activeSearchResults.map((property) => {
+                    const photos = (property as any).photos as string[] | undefined;
+                    const primaryPhoto = photos?.[0];
+                    const pricePerSqft = property.livingArea 
+                      ? (property.standardStatus === 'Closed' && property.closePrice 
+                          ? Number(property.closePrice) 
+                          : Number(property.listPrice || 0)) / Number(property.livingArea)
+                      : null;
+                    const getStatusBadge = () => {
+                      if (property.standardStatus === 'Closed') {
+                        return <Badge variant="secondary" className="flex-shrink-0">Closed</Badge>;
+                      } else if (property.standardStatus === 'Active') {
+                        return <Badge variant="default" className="flex-shrink-0 bg-green-600 hover:bg-green-600">Active</Badge>;
+                      } else if (property.standardStatus === 'Active Under Contract') {
+                        return <Badge variant="default" className="flex-shrink-0 bg-amber-500 hover:bg-amber-500">Active Under Contract</Badge>;
+                      }
+                      return <Badge variant="secondary" className="flex-shrink-0">{property.standardStatus}</Badge>;
+                    };
+                    
+                    return (
+                      <Card 
+                        key={property.id}
+                        className="overflow-hidden cursor-pointer hover-elevate"
+                        onClick={() => {
+                          setSelectedProperty(property);
+                          setCurrentPhotoIndex(0);
+                        }}
+                        data-testid={`list-property-${property.id}`}
+                      >
+                        <div className="flex flex-col md:flex-row">
+                          {primaryPhoto ? (
+                            <div className="w-full md:w-48 h-36 flex-shrink-0">
+                              <img 
+                                src={primaryPhoto} 
+                                alt={property.unparsedAddress || 'Property'}
+                                className="w-full h-full object-cover"
+                              />
+                            </div>
+                          ) : (
+                            <div className="w-full md:w-48 h-36 flex-shrink-0 bg-muted flex flex-col items-center justify-center">
+                              <Home className="w-8 h-8 text-muted-foreground/50 mb-1" />
+                              <span className="text-xs text-muted-foreground">No photo</span>
+                            </div>
+                          )}
+                          <div className="flex-1 p-4">
+                            <div className="flex justify-between items-start gap-2 mb-2">
+                              <div>
+                                <h4 className="font-semibold text-base" data-testid={`text-list-address-${property.id}`}>
+                                  {property.unparsedAddress}
+                                </h4>
+                                {property.subdivision && (
+                                  <p className="text-sm text-muted-foreground">{property.subdivision}</p>
+                                )}
+                              </div>
+                              {getStatusBadge()}
+                            </div>
+                            <div className="flex items-center gap-4 mb-2">
+                              <span className="text-xl font-bold text-primary">{getPriceDisplay(property)}</span>
+                              {pricePerSqft && (
+                                <span className="text-sm text-muted-foreground">${pricePerSqft.toFixed(0)}/sqft</span>
+                              )}
+                            </div>
+                            <div className="flex flex-wrap items-center gap-4 text-sm text-muted-foreground mb-2">
+                              <span>{property.bedroomsTotal || 0} beds</span>
+                              <span>{property.bathroomsFull || property.bathroomsTotalInteger || 0}F/{property.bathroomsHalf || 0}H baths</span>
+                              {property.livingArea && (
+                                <span>{Number(property.livingArea).toLocaleString()} sqft</span>
+                              )}
+                              {property.yearBuilt && <span>Built {property.yearBuilt}</span>}
+                              {property.daysOnMarket !== null && property.daysOnMarket !== undefined && (
+                                <span>{property.daysOnMarket} DOM</span>
+                              )}
+                              {property.lotSizeAcres && Number(property.lotSizeAcres) > 0 && (
+                                <span>{Number(property.lotSizeAcres).toFixed(2)} acres</span>
+                              )}
+                            </div>
+                            {property.standardStatus === 'Closed' && (
+                              <div className="text-sm text-muted-foreground mb-2">
+                                {property.closeDate && (
+                                  <span>Closed: {new Date(property.closeDate).toLocaleDateString()}</span>
+                                )}
+                                {property.closePrice && (
+                                  <span className="ml-2 font-medium text-foreground">
+                                    Close: ${Number(property.closePrice).toLocaleString()}
+                                  </span>
+                                )}
+                              </div>
                             )}
                           </div>
-                          {getStatusBadge()}
+                          <div className="flex md:flex-col justify-center gap-2 p-4 border-t md:border-t-0 md:border-l" onClick={(e) => e.stopPropagation()}>
+                            <Button 
+                              size="sm"
+                              variant="outline"
+                              onClick={() => handleSetSubject(property)}
+                              disabled={subjectProperty?.id === property.id}
+                              data-testid={`button-list-subject-${property.id}`}
+                            >
+                              Set as Subject
+                            </Button>
+                            {comparables.some(p => p.id === property.id) ? (
+                              <Button
+                                size="sm"
+                                variant="destructive"
+                                onClick={() => handleRemoveComparable(property.id)}
+                                data-testid={`button-list-remove-${property.id}`}
+                              >
+                                <X className="w-3 h-3 mr-1" />
+                                Remove
+                              </Button>
+                            ) : (
+                              <Button
+                                size="sm"
+                                onClick={() => handleAddComparable(property)}
+                                disabled={comparables.length >= 15}
+                                data-testid={`button-list-add-${property.id}`}
+                              >
+                                <Plus className="w-3 h-3 mr-1" />
+                                Add
+                              </Button>
+                            )}
+                          </div>
                         </div>
+                      </Card>
+                    );
+                  })}
+                </div>
+              )}
+              
+              {/* TABLE VIEW */}
+              {viewMode === 'table' && (
+                <div className="overflow-x-auto border rounded-lg">
+                  <table className="w-full text-sm">
+                    <thead className="bg-muted/50">
+                      <tr>
+                        <th className="px-3 py-3 text-left font-medium text-muted-foreground">Address</th>
+                        <th className="px-3 py-3 text-left font-medium text-muted-foreground">Status</th>
+                        <th className="px-3 py-3 text-left font-medium text-muted-foreground">Price</th>
+                        <th className="px-3 py-3 text-left font-medium text-muted-foreground">Beds</th>
+                        <th className="px-3 py-3 text-left font-medium text-muted-foreground">Baths</th>
+                        <th className="px-3 py-3 text-left font-medium text-muted-foreground">Sq Ft</th>
+                        <th className="px-3 py-3 text-left font-medium text-muted-foreground">$/Sqft</th>
+                        <th className="px-3 py-3 text-left font-medium text-muted-foreground">Year</th>
+                        <th className="px-3 py-3 text-left font-medium text-muted-foreground">DOM</th>
+                        <th className="px-3 py-3 text-left font-medium text-muted-foreground">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y">
+                      {activeSearchResults.map((property) => {
+                        const photos = (property as any).photos as string[] | undefined;
+                        const primaryPhoto = photos?.[0];
+                        const pricePerSqft = property.livingArea 
+                          ? (property.standardStatus === 'Closed' && property.closePrice 
+                              ? Number(property.closePrice) 
+                              : Number(property.listPrice || 0)) / Number(property.livingArea)
+                          : null;
+                        const getStatusBadge = () => {
+                          if (property.standardStatus === 'Closed') {
+                            return <Badge variant="secondary" className="text-xs">Closed</Badge>;
+                          } else if (property.standardStatus === 'Active') {
+                            return <Badge variant="default" className="text-xs bg-green-600 hover:bg-green-600">Active</Badge>;
+                          } else if (property.standardStatus === 'Active Under Contract') {
+                            return <Badge variant="default" className="text-xs bg-amber-500 hover:bg-amber-500">AUC</Badge>;
+                          }
+                          return <Badge variant="secondary" className="text-xs">{property.standardStatus}</Badge>;
+                        };
                         
-                        <div className="flex items-center gap-2">
-                          <span className="font-bold text-lg text-primary">{getPriceDisplay(property)}</span>
-                          {pricePerSqft && (
-                            <span className="text-xs text-muted-foreground">${pricePerSqft.toFixed(0)}/sqft</span>
-                          )}
-                        </div>
-                        
-                        <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-muted-foreground">
-                          <span>{property.bedroomsTotal || 0} beds</span>
-                          <span>{property.bathroomsFull || property.bathroomsTotalInteger || 0}F/{property.bathroomsHalf || 0}H baths</span>
-                          {property.livingArea && (
-                            <span>{Number(property.livingArea).toLocaleString()} sqft</span>
-                          )}
-                          {property.yearBuilt && <span>Built {property.yearBuilt}</span>}
-                        </div>
-                        
-                        {/* Additional details row */}
-                        <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-muted-foreground">
-                          {property.garageParkingSpaces !== null && property.garageParkingSpaces !== undefined && property.garageParkingSpaces > 0 && (
-                            <span>{property.garageParkingSpaces} garage</span>
-                          )}
-                          {property.lotSizeAcres && Number(property.lotSizeAcres) > 0 && (
-                            <span>{Number(property.lotSizeAcres).toFixed(2)} acres</span>
-                          )}
-                          {property.storiesTotal && Number(property.storiesTotal) > 0 && (
-                            <span>{property.storiesTotal} story</span>
-                          )}
-                          {property.daysOnMarket !== null && property.daysOnMarket !== undefined && (
-                            <span>{property.daysOnMarket} DOM</span>
-                          )}
-                        </div>
-                        
-                        {/* Date and close price display based on status */}
-                        <div className="flex flex-wrap gap-x-2 gap-y-1 text-xs text-muted-foreground">
-                          {listingDate && <span>Listed: {listingDate}</span>}
-                          {property.standardStatus === 'Closed' && property.closeDate && (
-                            <span>Closed: {new Date(property.closeDate).toLocaleDateString()}</span>
-                          )}
-                          {property.standardStatus === 'Closed' && property.closePrice && (
-                            <span className="font-medium text-foreground">
-                              Close: ${Number(property.closePrice).toLocaleString()}
-                            </span>
-                          )}
-                        </div>
-                        
-                        <div className="flex gap-2 pt-1" onClick={(e) => e.stopPropagation()}>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            className="flex-1"
-                            onClick={() => handleSetSubject(property)}
-                            disabled={subjectProperty?.id === property.id}
-                            data-testid={`button-set-subject-${property.id}`}
+                        return (
+                          <tr 
+                            key={property.id} 
+                            className="hover:bg-muted/30 cursor-pointer"
+                            onClick={() => {
+                              setSelectedProperty(property);
+                              setCurrentPhotoIndex(0);
+                            }}
+                            data-testid={`row-property-${property.id}`}
                           >
-                            Set as Subject
-                          </Button>
-                          {comparables.some(p => p.id === property.id) ? (
-                            <Button
-                              size="sm"
-                              variant="destructive"
-                              className="flex-1"
-                              onClick={() => handleRemoveComparable(property.id)}
-                              data-testid={`button-remove-comparable-${property.id}`}
-                            >
-                              <X className="w-3 h-3 mr-1" />
-                              Remove
-                            </Button>
-                          ) : (
-                            <Button
-                              size="sm"
-                              className="flex-1"
-                              onClick={() => handleAddComparable(property)}
-                              disabled={comparables.length >= 15}
-                              data-testid={`button-add-comparable-${property.id}`}
-                            >
-                              <Plus className="w-3 h-3 mr-1" />
-                              Add
-                            </Button>
-                          )}
-                        </div>
-                      </CardContent>
-                    </div>
-                  </Card>
-                );
-              })}
-            </div>
+                            <td className="px-3 py-3">
+                              <div className="flex items-center gap-2">
+                                {primaryPhoto ? (
+                                  <img 
+                                    src={primaryPhoto} 
+                                    alt=""
+                                    className="w-10 h-8 object-cover rounded flex-shrink-0"
+                                  />
+                                ) : (
+                                  <div className="w-10 h-8 bg-muted rounded flex items-center justify-center flex-shrink-0">
+                                    <Home className="w-4 h-4 text-muted-foreground/50" />
+                                  </div>
+                                )}
+                                <div className="min-w-0">
+                                  <span className="font-medium block truncate max-w-[180px]" data-testid={`text-table-address-${property.id}`}>
+                                    {property.unparsedAddress}
+                                  </span>
+                                  {property.subdivision && (
+                                    <span className="text-xs text-muted-foreground block truncate max-w-[180px]">
+                                      {property.subdivision}
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+                            </td>
+                            <td className="px-3 py-3">{getStatusBadge()}</td>
+                            <td className="px-3 py-3 font-semibold text-primary whitespace-nowrap">
+                              {getPriceDisplay(property)}
+                            </td>
+                            <td className="px-3 py-3">{property.bedroomsTotal || '-'}</td>
+                            <td className="px-3 py-3">
+                              {property.bathroomsFull || property.bathroomsTotalInteger || 0}F/{property.bathroomsHalf || 0}H
+                            </td>
+                            <td className="px-3 py-3 whitespace-nowrap">
+                              {property.livingArea ? Number(property.livingArea).toLocaleString() : '-'}
+                            </td>
+                            <td className="px-3 py-3 whitespace-nowrap">
+                              {pricePerSqft ? `$${pricePerSqft.toFixed(0)}` : '-'}
+                            </td>
+                            <td className="px-3 py-3">{property.yearBuilt || '-'}</td>
+                            <td className="px-3 py-3">
+                              {property.daysOnMarket !== null && property.daysOnMarket !== undefined ? property.daysOnMarket : '-'}
+                            </td>
+                            <td className="px-3 py-3" onClick={(e) => e.stopPropagation()}>
+                              <div className="flex gap-1">
+                                <Button 
+                                  size="sm"
+                                  variant="outline"
+                                  className="text-xs px-2 py-1 h-7"
+                                  onClick={() => handleSetSubject(property)}
+                                  disabled={subjectProperty?.id === property.id}
+                                  data-testid={`button-table-subject-${property.id}`}
+                                >
+                                  Subject
+                                </Button>
+                                {comparables.some(p => p.id === property.id) ? (
+                                  <Button
+                                    size="sm"
+                                    variant="destructive"
+                                    className="text-xs px-2 py-1 h-7"
+                                    onClick={() => handleRemoveComparable(property.id)}
+                                    data-testid={`button-table-remove-${property.id}`}
+                                  >
+                                    <X className="w-3 h-3" />
+                                  </Button>
+                                ) : (
+                                  <Button
+                                    size="sm"
+                                    className="text-xs px-2 py-1 h-7"
+                                    onClick={() => handleAddComparable(property)}
+                                    disabled={comparables.length >= 15}
+                                    data-testid={`button-table-add-${property.id}`}
+                                  >
+                                    <Plus className="w-3 h-3" />
+                                  </Button>
+                                )}
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </>
           ) : (searchEnabled || (searchMode === 'map' && mapSearchResults.length === 0)) ? (
             <div className="text-center py-12 text-muted-foreground">
               {searchMode === 'map' ? (
