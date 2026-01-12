@@ -411,9 +411,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Routes to Repliers for active listings, HomeReview for closed/sold
   app.get("/api/search", async (req, res) => {
     try {
-      // Debug: Log incoming query parameters
-      console.log(`🔎 [Search API] Raw query params: ${JSON.stringify(req.query)}`);
-      
       const {
         status,
         statuses, // Comma-separated list of statuses (active,under_contract,closed)
@@ -454,6 +451,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
       } else {
         statusList = ['active'];
       }
+      
+      // COMPREHENSIVE CMA SEARCH LOGGING
+      console.log(`\n🔎 [CMA Search Request] =====================================`);
+      console.log(`   Statuses requested: ${statusList.join(', ')}`);
+      console.log(`   Location filters:`);
+      console.log(`     - ZIP Code: ${postalCode || 'none'}`);
+      console.log(`     - Subdivision: ${subdivision || 'none'}`);
+      console.log(`     - City: ${city || 'none'}`);
+      console.log(`   Property filters:`);
+      console.log(`     - Price: ${minPrice || 'any'} - ${maxPrice || 'any'}`);
+      console.log(`     - Beds: ${bedsMin || 'any'} - ${bedsMax || 'any'}`);
+      console.log(`     - Baths: ${bathsMin || 'any'}+`);
+      console.log(`     - Sqft: ${minSqft || 'any'} - ${maxSqft || 'any'}`);
+      if (soldDays) console.log(`     - Sold in last: ${soldDays} days`);
+      console.log(`   =============================================================\n`);
 
       // Normalize results to consistent format
       interface NormalizedProperty {
@@ -1155,58 +1167,75 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const beforeCount = filtered.length;
           
           // Log the search query for debugging
-          console.log(`🔍 [Subdivision Filter] Searching for: "${subdivision}"`);
+          console.log(`🔍 [Subdivision Filter] ===================================`);
+          console.log(`   Search term: "${subdivision}"`);
+          console.log(`   Search words: ${JSON.stringify(searchTerms)}`);
+          console.log(`   Properties to filter: ${beforeCount}`);
           
           // Log sample of subdivision values for debugging
-          const sampleProps = filtered.slice(0, 10);
-          console.log(`   Sample subdivision values in results:`);
-          sampleProps.forEach((p: any) => {
-            console.log(`     - "${p.address}": subdiv="${p.subdivision || 'NULL'}", subdivName="${p.subdivisionName || 'NULL'}", neighborhood="${p.neighborhood || 'NULL'}"`);
-          });
+          if (beforeCount > 0) {
+            const sampleProps = filtered.slice(0, 5);
+            console.log(`   Sample subdivision values in ${beforeCount} results:`);
+            sampleProps.forEach((p: any) => {
+              console.log(`     - "${p.address}": subdiv="${p.subdivision || 'NULL'}", subdivName="${p.subdivisionName || 'NULL'}"`);
+            });
+          } else {
+            console.log(`   ⚠️ NO PROPERTIES TO FILTER - check if Repliers returned results`);
+          }
           
           filtered = filtered.filter((p: any) => {
             const propSubdiv = (p.subdivision || '').toLowerCase().trim();
             const propSubdivName = (p.subdivisionName || '').toLowerCase().trim();
-            // CRITICAL: Also check neighborhood field - Repliers stores subdivision info there for Active listings
-            const propNeighborhood = (p.neighborhood || '').toLowerCase().trim();
-            // CRITICAL: Also check street address - MLS data sometimes has subdivision name in street (e.g., "904 OAKLANDS Dr")
+            // CRITICAL: Also check street address - MLS data sometimes has subdivision name in street
             const propAddress = (p.address || p.unparsedAddress || '').toLowerCase().trim();
             
-            // Stricter matching logic:
+            // Combine all subdivision-like fields for matching
+            const allSubdivFields = `${propSubdiv} ${propSubdivName}`;
+            
+            // Matching logic (ordered by specificity):
             // 1. Exact match (case-insensitive)
-            // 2. Property subdivision STARTS WITH search term (e.g., "Barton Hills" matches "Barton Hills West")
-            // 3. All search term words appear in the subdivision (e.g., "Barton Hills" matches "Barton Hills Section 2")
-            // 4. Street address contains the search term (e.g., "904 Oaklands Dr" matches "oaklands")
+            const exactMatch = propSubdiv === subdivisionLower || propSubdivName === subdivisionLower;
             
-            const exactMatch = propSubdiv === subdivisionLower || propSubdivName === subdivisionLower || propNeighborhood === subdivisionLower;
-            const startsWithMatch = propSubdiv.startsWith(subdivisionLower) || propSubdivName.startsWith(subdivisionLower) || propNeighborhood.startsWith(subdivisionLower);
-            const allWordsMatch = searchTerms.every(term => 
-              propSubdiv.includes(term) || propSubdivName.includes(term) || propNeighborhood.includes(term)
-            );
+            // 2. Property subdivision STARTS WITH search term (e.g., "Steiner Ranch" matches "Steiner Ranch Sec 4")
+            const startsWithMatch = propSubdiv.startsWith(subdivisionLower) || propSubdivName.startsWith(subdivisionLower);
             
-            // Reject partial matches that don't contain ALL search terms
-            // This prevents "Barton Creek" from matching "Barton Hills"
-            const hasAllTerms = searchTerms.length > 1 
-              ? searchTerms.every(term => propSubdiv.includes(term) || propSubdivName.includes(term) || propNeighborhood.includes(term))
-              : propSubdiv.includes(subdivisionLower) || propSubdivName.includes(subdivisionLower) || propNeighborhood.includes(subdivisionLower);
+            // 3. Search term STARTS WITH property subdivision (e.g., searching "Steiner Ranch Sec 4" matches "Steiner Ranch")
+            const searchStartsWithProp = subdivisionLower.startsWith(propSubdiv) || subdivisionLower.startsWith(propSubdivName);
             
-            // Address matching: Check if street name contains the subdivision search term
-            // This catches cases like "904 Oaklands Dr" when searching for "oaklands"
+            // 4. All search term words appear in the subdivision (e.g., "Steiner Ranch" matches "Steiner Ranch Section 2")
+            const allWordsMatch = searchTerms.every(term => allSubdivFields.includes(term));
+            
+            // 5. Contains match for single-word searches or if all terms are found
+            const containsMatch = searchTerms.length === 1 
+              ? allSubdivFields.includes(subdivisionLower)
+              : allWordsMatch;
+            
+            // 6. Address matching: Check if street name contains the subdivision search term
             const addressContainsSubdiv = propAddress.includes(subdivisionLower);
             
-            return exactMatch || startsWithMatch || (allWordsMatch && hasAllTerms) || addressContainsSubdiv;
+            const isMatch = exactMatch || startsWithMatch || searchStartsWithProp || containsMatch || addressContainsSubdiv;
+            
+            return isMatch;
           });
           
           // Log subdivision filtering results
-          console.log(`   - Subdivision filter: "${subdivision}" kept ${filtered.length} of ${beforeCount} properties`);
+          console.log(`   Result: "${subdivision}" kept ${filtered.length} of ${beforeCount} properties`);
           
-          // Log sample of filtered and rejected results for debugging
-          if (beforeCount > 0) {
-            console.log(`   - Sample kept properties:`);
+          // Log sample of matched/unmatched for debugging
+          if (beforeCount > 0 && filtered.length === 0) {
+            console.log(`   ⚠️ ZERO MATCHES after subdivision filter!`);
+            console.log(`   Showing sample of what was rejected:`);
+            const rejectedSample = results.slice(0, 5);
+            rejectedSample.forEach((p: any) => {
+              console.log(`     ✗ ${p.address} - subdiv="${p.subdivision || 'N/A'}"`);
+            });
+          } else if (filtered.length > 0) {
+            console.log(`   Sample matched properties:`);
             filtered.slice(0, 3).forEach((p: any) => {
-              console.log(`     ✓ ${p.address} - Subdivision: "${p.subdivision || 'N/A'}", Neighborhood: "${p.neighborhood || 'N/A'}"`);
+              console.log(`     ✓ ${p.address} - subdiv="${p.subdivision || 'N/A'}"`);
             });
           }
+          console.log(`   ================================================`);
         }
         // CRITICAL: Include properties WITHOUT sqft data (null/undefined livingArea)
         // This ensures properties like 2400 Rockingham Cir (no sqft in Repliers) are not excluded
@@ -1365,6 +1394,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Wait for all fetches to complete
       const resultsArrays = await Promise.all(fetchPromises);
       
+      // Log per-status fetch results
+      console.log(`\n📊 [Fetch Results by Status] ================================`);
+      for (const { results, expectedStatus, fromRepliers } of resultsArrays) {
+        const source = fromRepliers ? 'Repliers API' : 'Database';
+        console.log(`   ${expectedStatus}: ${results.length} results from ${source}`);
+        if (results.length === 0) {
+          console.log(`      ⚠️ ZERO RESULTS for ${expectedStatus} - check Repliers API response`);
+        }
+      }
+      console.log(`   =============================================================\n`);
+      
       // Combine and apply filters WITH strict status matching
       // This ensures that when we query for 'Active', we only return truly Active listings
       // (not 'Active Under Contract' which should be mapped to 'Under Contract')
@@ -1399,7 +1439,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         if (skipSchoolFilters) {
           console.log(`🏫 [Skip Local Filter] Repliers already filtered by school, skipping local school filter`);
         }
-        allResults = allResults.concat(applyFilters(statusFilteredResults, skipSchoolFilters));
+        
+        const beforeFilters = statusFilteredResults.length;
+        const afterFilters = applyFilters(statusFilteredResults, skipSchoolFilters);
+        if (afterFilters.length < beforeFilters && subdivision) {
+          console.log(`🔍 [${expectedStatus}] After local filters: ${afterFilters.length} of ${beforeFilters} (subdivision filter applied)`);
+        }
+        allResults = allResults.concat(afterFilters);
       }
 
       // Remove duplicates (by id)
@@ -1425,7 +1471,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Apply limit after all filtering
       const finalResults = propertyTypeFiltered.slice(0, parsedLimit);
 
-      console.log(`📦 Multi-status search returned ${finalResults.length} listings from ${statusList.join(', ')}`);
+      // FINAL RESULT SUMMARY
+      console.log(`\n📦 [CMA Search Complete] ====================================`);
+      console.log(`   Statuses: ${statusList.join(', ')}`);
+      console.log(`   Final results: ${finalResults.length}`);
+      if (subdivision) console.log(`   Subdivision filter: "${subdivision}"`);
+      if (postalCode) console.log(`   ZIP filter: "${postalCode}"`);
+      if (finalResults.length === 0) {
+        console.log(`   ⚠️ ZERO FINAL RESULTS - review filters above for issues`);
+      }
+      console.log(`   =============================================================\n`);
 
       res.json({
         properties: finalResults,

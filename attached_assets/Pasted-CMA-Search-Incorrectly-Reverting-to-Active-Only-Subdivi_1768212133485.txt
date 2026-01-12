@@ -1,0 +1,271 @@
+CMA Search Incorrectly Reverting to “Active Only” + Subdivision / Zip Filters Ignored
+Scope
+
+Fix CMA comparable search logic so it matches MLS (ACTRIS) results and never silently reverts to showing only the subject property or only Active listings when valid filters are applied.
+
+This issue directly impacts:
+
+CMA credibility
+
+Agent trust
+
+Pricing accuracy
+
+Data source: Repliers
+MLS: ACTRIS
+Leases / rentals: MUST remain excluded globally
+
+❗ Problem Summary (Observed Behavior)
+
+Using CMA Search:
+
+Subject property:
+13612 Flat Top Ranch Rd, Austin, TX 78732 (Active)
+
+Filters applied:
+
+Subdivision: Steiner Ranch
+
+Status: Active + Under Contract + Closed
+
+Sq Ft: 5400–6400
+
+Close Date: 0–150 days
+
+Result in Client Data Portal:
+
+❌ Only the subject Active listing appears
+
+❌ Removing subdivision and using Zip Code 78732 returns 0 results
+
+Same criteria in ACTRIS MLS:
+
+✅ 3 matching listings returned
+
+Pattern:
+
+System reverts back to Active-only behavior when:
+
+subdivision filter is used
+
+or subdivision returns no partial matches
+
+or zip code is used alone
+
+This behavior has regressed and must be eliminated.
+
+Root Cause Hypothesis (Must Validate)
+
+One or more of the following is happening:
+
+Subdivision filter logic
+
+Using an unsafe or partial string match
+
+Falling back to subjectProperty.subdivision when no results are returned
+
+Treating “no subdivision matches” as an error → defaulting to Active subject listing
+
+Status filter override
+
+CMA search pipeline is overwriting status filters when subdivision or zip filters fail
+
+Resulting in implicit status=Active only
+
+Silent fallback (NOT ALLOWED)
+
+Empty result set triggers fallback instead of returning empty state + explanation
+
+🚫 Non-Negotiable Rules (Must Enforce)
+
+NO silent fallbacks
+
+NO automatic reversion to Active
+
+NO subject-property-only default
+
+NO fuzzy inference of subdivision
+
+NO merging subdivision with neighborhood
+
+If filters produce zero results:
+➡️ Return 0 results with an explicit UI message
+➡️ Never change filters implicitly
+
+🔧 Required Engineering Tasks
+1. Audit CMA Search Query Builder
+
+Locate the CMA search request construction (likely shared with Buyer Search).
+
+Files/modules to inspect (examples):
+
+cmaSearch.service.ts
+
+repliersQueryBuilder.ts
+
+useCmaSearch.ts
+
+any middleware applying defaults
+
+Verify:
+
+Status filter is passed explicitly as:
+
+status IN [Active, UnderContract, Closed]
+
+
+No conditional logic that resets status when:
+
+subdivision yields no matches
+
+zip code is present without subdivision
+
+2. Fix Subdivision Filtering Logic (Critical)
+
+Subdivision rules (DO NOT VIOLATE):
+
+Subdivision comes only from MLS listing field
+
+Must be treated as an exact normalized comparison
+
+No inference, no neighborhood logic, no fallback
+
+Implement:
+function normalizeSubdivision(value: string): string {
+  return value.trim().toLowerCase();
+}
+
+if (filters.subdivision) {
+  query.subdivision = normalizeSubdivision(filters.subdivision);
+}
+
+Explicitly REMOVE:
+
+.includes()
+
+fuzzy matching
+
+“trained” or heuristic subdivision logic
+
+fallback to subject property subdivision
+
+If Repliers returns 0 listings:
+➡️ Return empty array
+➡️ Do NOT modify query
+
+3. Zip Code Search Must Stand Alone
+
+If user supplies:
+
+zipCode = 78732
+
+
+Then:
+
+Query must execute
+
+Must NOT require subdivision
+
+Must NOT revert to subject listing
+
+Validate that:
+
+Zip is mapped to the correct Repliers field
+
+Zip is not being ignored when subdivision is empty
+
+4. Enforce Status Logic Across CMA (Single Source of Truth)
+
+Ensure every CMA result set obeys:
+
+totalProperties = active + underContract + soldClosed
+
+
+No section (cards, tables, charts, PDFs) may:
+
+Recalculate independently
+
+Drop statuses silently
+
+Default to Active
+
+5. Add Mandatory Debug Logging (Temporary)
+
+Before executing the Repliers request, log:
+
+console.log("CMA Search Filters:", {
+  city,
+  subdivision,
+  zipCode,
+  statuses,
+  minSqFt,
+  maxSqFt,
+  closeDateRange
+});
+
+console.log("CMA Repliers Query:", JSON.stringify(query, null, 2));
+
+
+After response:
+
+console.log("CMA Results Count:", results.length);
+console.log("CMA Status Breakdown:", {
+  active,
+  underContract,
+  closed
+});
+
+
+These logs are REQUIRED for validation and may be removed only after sign-off.
+
+✅ Acceptance Criteria (Blocking)
+
+This ticket CANNOT be closed until all are true:
+
+Using Steiner Ranch + Sq Ft + 0–150 days returns the same listings as ACTRIS MLS
+
+Using Zip Code 78732 only returns valid comps
+
+Removing subdivision does not revert to Active-only
+
+Zero-result searches:
+
+Show empty state
+
+Preserve filters
+
+Do NOT auto-add subject listing
+
+Status counts are consistent across:
+
+CMA results
+
+Charts
+
+PDFs
+
+🧪 Validation Tests (Required)
+
+✅ Steiner Ranch + Closed only → matches MLS
+
+✅ Steiner Ranch + All statuses → matches MLS
+
+✅ Zip only (78732) → non-zero results
+
+✅ Invalid subdivision → 0 results + warning
+
+❌ No case where Active-only appears unless user explicitly selects it
+
+📦 Required Deliverables
+
+Code changes committed
+
+Screenshot of CMA results vs MLS results
+
+Console logs showing correct query + counts
+
+Confirmation that silent fallback logic is removed
+
+🚨 Severity
+
+High – Client-facing credibility issue
