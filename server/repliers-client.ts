@@ -40,6 +40,9 @@ interface ListingsSearchParams {
   search?: string;  // Free-text search (address, MLS#, keywords)
   searchFields?: string;  // Comma-separated fields to search in (e.g., address.streetName,address.streetNumber)
   fuzzySearch?: boolean;  // Enable typo tolerance
+  // Date range filters
+  minSoldDate?: string;  // Minimum sold date in YYYY-MM-DD format for Closed listings
+  maxSoldDate?: string;  // Maximum sold date in YYYY-MM-DD format
   // Raw MLS field filters - use contains: prefix for partial matching
   rawElementarySchool?: string;  // Filters using raw.ElementarySchool=contains:{value}
   rawMiddleSchool?: string;      // Filters using raw.MiddleOrJuniorSchool=contains:{value}
@@ -425,6 +428,10 @@ class RepliersClient {
     if (params.search) queryParams.append('search', params.search);
     if (params.searchFields) queryParams.append('searchFields', params.searchFields);
     if (params.fuzzySearch) queryParams.append('fuzzySearch', 'true');
+    
+    // Date range filters for sold/closed listings
+    if (params.minSoldDate) queryParams.append('minSoldDate', params.minSoldDate);
+    if (params.maxSoldDate) queryParams.append('maxSoldDate', params.maxSoldDate);
     
     // Raw MLS field filters - use contains: prefix for partial matching per Repliers API
     // Reference: https://api.repliers.io/listings?raw.ElementarySchool=contains:{input}

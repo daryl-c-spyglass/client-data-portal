@@ -284,7 +284,7 @@ export function CMABuilder({ onCreateCMA, initialData }: CMABuilderProps) {
   const [searchStories, setSearchStories] = useState(sc.stories || "");
   const [searchMinYearBuilt, setSearchMinYearBuilt] = useState(sc.minYearBuilt || "");
   const [searchMaxYearBuilt, setSearchMaxYearBuilt] = useState(sc.maxYearBuilt || "");
-  const [searchSoldDays, setSearchSoldDays] = useState(sc.soldDays || "");
+  const [searchSoldDays, setSearchSoldDays] = useState(sc.soldDays || "365");
   const [searchPropertyType, setSearchPropertyType] = useState(sc.propertyType || "");
   
   // Search mode state
@@ -965,14 +965,11 @@ export function CMABuilder({ onCreateCMA, initialData }: CMABuilderProps) {
                         <SelectValue placeholder="Select..." />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="30">0-30 days</SelectItem>
-                        <SelectItem value="60">0-60 days</SelectItem>
                         <SelectItem value="90">0-90 days</SelectItem>
-                        <SelectItem value="120">0-120 days</SelectItem>
                         <SelectItem value="150">0-150 days</SelectItem>
                         <SelectItem value="180">0-180 days</SelectItem>
-                        <SelectItem value="200">0-200 days</SelectItem>
-                        <SelectItem value="365">0-365 days</SelectItem>
+                        <SelectItem value="365">0-365 days (default)</SelectItem>
+                        <SelectItem value="730">0-730 days (2 years)</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
@@ -1251,14 +1248,11 @@ export function CMABuilder({ onCreateCMA, initialData }: CMABuilderProps) {
                           <SelectValue placeholder="Select..." />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="30">0-30 days</SelectItem>
-                          <SelectItem value="60">0-60 days</SelectItem>
                           <SelectItem value="90">0-90 days</SelectItem>
-                          <SelectItem value="120">0-120 days</SelectItem>
                           <SelectItem value="150">0-150 days</SelectItem>
                           <SelectItem value="180">0-180 days</SelectItem>
-                          <SelectItem value="200">0-200 days</SelectItem>
-                          <SelectItem value="365">0-365 days</SelectItem>
+                          <SelectItem value="365">0-365 days (default)</SelectItem>
+                          <SelectItem value="730">0-730 days (2 years)</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>

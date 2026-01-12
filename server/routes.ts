@@ -476,16 +476,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.log(`   =============================================================`);
       
       // CMA COMPLIANCE LOGGING
-      // IMPORTANT: Repliers API stores MLS subdivision/tract data in address.neighborhood field
-      // There is NO address.subdivision or raw.SubdivisionName field available in Repliers API
-      // This is a Repliers data mapping decision - we must use address.neighborhood to get subdivision data
+      // TWO-QUERY STRATEGY: Two logical filter paths (not literal request count due to Repliers single-standardStatus constraint)
+      // Path 1 (Active/UC): Local subdivision filtering + multi-page fetch to preserve listings with missing/divergent neighborhood data
+      // Path 2 (Closed): API-level subdivision (search+searchFields) + minSoldDate for efficient date filtering
       console.log(`📋 [CMA Compliance] ==========================================`);
-      console.log(`   subdivisionSource: Repliers address.neighborhood (NOTE: Repliers maps MLS SubdivisionName to this field - no raw.SubdivisionName available)`);
+      console.log(`   subdivisionFilter: ${subdivision ? `Closed=API-level, Active/UC=local` : 'none'}`);
+      console.log(`   dateFilter: ${soldDays && statusList.includes('closed') ? `API-level (minSoldDate for Closed)` : 'none'}`);
       console.log(`   rentalExcluded: type=sale enforced for Closed status`);
       console.log(`   statusCodes: ${statusList.join(', ')}`);
-      console.log(`   closeDateAppliedTo: ${statusList.includes('closed') ? 'Closed only' : 'N/A'}`);
-      console.log(`   apiLevelFiltering: ${subdivision ? 'local (API does exact match only)' : 'API-level'}`);
-      console.log(`   lotAcresFilter: ${(minLotAcres || maxLotAcres) ? 'includes null lot data' : 'none'}`);
+      console.log(`   lotAcresFilter: ${(minLotAcres || maxLotAcres) ? 'local (includes null lot data)' : 'none'}`);
       console.log(`   =============================================================\n`);
 
       // Normalize results to consistent format
@@ -523,21 +522,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
 
         const needsServerSideFiltering = minLotAcres || maxLotAcres || stories || minYearBuilt || maxYearBuilt;
-        // CRITICAL: When subdivision filter is needed, DON'T pass it to API (API does exact match)
-        // Instead, fetch more results and filter locally for partial matches like "Barton Hills Sec 03A"
-        const needsLocalSubdivisionFilter = !!subdivision;
         // School filters also require larger fetch since they're applied server-side
         const needsSchoolFilter = !!elementarySchools || !!middleSchools || !!highSchools || !!schoolDistrict;
-        const effectiveLimit = (needsLocalSubdivisionFilter || needsServerSideFiltering || needsSchoolFilter) ? 200 : parsedLimit;
+        // Subdivision filtering: API-level for Closed (via minSoldDate-supported search), local for Active/UC
+        // This ensures Active/UC listings with missing/divergent neighborhood data aren't lost
+        const hasSubdivisionFilter = !!subdivision;
+        const useApiSubdivisionFilter = hasSubdivisionFilter && repliersStatus === 'Closed';
+        const needsLocalSubdivisionFilter = hasSubdivisionFilter && repliersStatus !== 'Closed';
+        const effectiveLimit = (needsServerSideFiltering || needsSchoolFilter || hasSubdivisionFilter) ? 200 : parsedLimit;
         
         // Build search params - add type=Sale for Closed to exclude leased rentals
-        // DO NOT pass subdivision to API - it does exact match which misses "Barton Hills Sec 03A" etc.
-        // We'll filter locally with partial/contains matching
+        // NEW: Use search + searchFields=address.neighborhood for API-level subdivision filtering
         const searchParams: any = {
           standardStatus: repliersStatus,  // RESO-compliant: Active, Pending, Closed
           postalCode: postalCode,
           city: city,
-          // REMOVED: subdivision - API does exact match, we need partial match locally
           minPrice: minPrice ? parseInt(minPrice, 10) : undefined,
           maxPrice: maxPrice ? parseInt(maxPrice, 10) : undefined,
           minBeds: bedsMin ? parseInt(bedsMin, 10) : undefined,
@@ -547,13 +546,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
           maxSqft: maxSqft ? parseInt(maxSqft, 10) : undefined,
           resultsPerPage: effectiveLimit,
           // Raw school filters - use contains: prefix for partial matching via Repliers API
-          // Reference: https://api.repliers.io/listings?raw.ElementarySchool=contains:{input}
-          // Note: Repliers API handles one value per raw.* parameter, so we take the first school name
-          // if multiple are provided (comma-separated). The UI is designed for single school input.
           rawElementarySchool: elementarySchools?.split(',')[0]?.trim() || undefined,
           rawMiddleSchool: middleSchools?.split(',')[0]?.trim() || undefined,
           rawHighSchool: highSchools?.split(',')[0]?.trim() || undefined,
         };
+        
+        // API-level subdivision filtering ONLY for Closed queries
+        // For Active/Under Contract, use local filtering to avoid missing listings with divergent neighborhood data
+        if (useApiSubdivisionFilter && subdivision) {
+          searchParams.search = subdivision.trim();
+          searchParams.searchFields = 'address.neighborhood';
+          console.log(`🔎 [API Subdivision - Closed] Using search="${subdivision}" with searchFields=address.neighborhood`);
+        } else if (needsLocalSubdivisionFilter) {
+          console.log(`🔎 [Local Subdivision - Active/UC] Will apply local filter for "${subdivision}"`);
+        }
+        
+        // For Closed status, add minSoldDate for date filtering
+        // Use YYYY-MM-DD format as per Repliers API
+        if (repliersStatus === 'Closed' && soldDays) {
+          const daysAgo = parseInt(soldDays, 10);
+          const cutoffDate = new Date();
+          cutoffDate.setDate(cutoffDate.getDate() - daysAgo);
+          searchParams.minSoldDate = cutoffDate.toISOString().split('T')[0]; // YYYY-MM-DD
+          console.log(`📅 [API Date Filter] minSoldDate=${searchParams.minSoldDate} (${daysAgo} days ago)`);
+        }
         
         // CRITICAL: For Closed status, add type=sale to exclude leased rentals
         // standardStatus=Closed returns BOTH sold sales AND leased rentals
@@ -566,6 +582,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
           searchParams.type = type;
         }
         
+        // GUARD: Block operator=OR which would break AND logic and return unrelated listings
+        if ((searchParams as any).operator === 'OR') {
+          console.error(`❌ [CMA] BLOCKED: operator=OR would break AND logic`);
+          throw new Error('operator=OR is forbidden in CMA queries');
+        }
+        
         // COMPREHENSIVE DIAGNOSTIC LOGGING
         // Remove undefined values for cleaner logging
         const cleanParams = Object.fromEntries(
@@ -574,9 +596,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         console.log(`\n📊 [CMA Search Diagnostic] ===================================`);
         console.log(`   Status requested: ${repliersStatus}`);
         console.log(`   Repliers API params: ${JSON.stringify(cleanParams, null, 2)}`);
-        if (subdivision) {
-          console.log(`   NOTE: Subdivision filter applied LOCALLY (API does exact match only)`);
-          console.log(`   Local subdivision filter: "${subdivision}"`);
+        if (useApiSubdivisionFilter && subdivision) {
+          console.log(`   ✅ Subdivision filter: API-level (search="${subdivision}" + searchFields=address.neighborhood)`);
+        } else if (needsLocalSubdivisionFilter && subdivision) {
+          console.log(`   🔄 Subdivision filter: Local filtering for "${subdivision}" (Active/UC uses local to preserve results)`);
+        }
+        if (repliersStatus === 'Closed' && soldDays) {
+          console.log(`   ✅ Date filter applied at API level: minSoldDate=${searchParams.minSoldDate}`);
         }
         if (elementarySchools) {
           console.log(`   🏫 Elementary School filter: raw.ElementarySchool=contains:${elementarySchools.trim()}`);
@@ -589,10 +615,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
         console.log(`   =============================================================\n`);
         
-        // PAGINATION: When subdivision/school filtering is active, fetch multiple pages to find enough matches
+        // PAGINATION: When local subdivision/school filtering is active, fetch multiple pages to find enough matches
         // Repliers API caps at 100 results per page, so filtered listings may be on page 2+
         let allListings: any[] = [];
-        const MAX_PAGES = (needsLocalSubdivisionFilter || needsSchoolFilter) ? 5 : 1; // Fetch up to 5 pages when filtering
+        const MAX_PAGES = (needsLocalSubdivisionFilter || needsSchoolFilter) ? 5 : 1; // Fetch up to 5 pages when local filtering
         const TARGET_MATCHES = 20; // Stop early if we find enough matches
         let currentPage = 1;
         let totalCount = 0;
@@ -612,7 +638,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           
           // Early exit if we have enough potential matches or exhausted results
           if (!needsLocalSubdivisionFilter) {
-            break; // Only one page needed if no subdivision filter
+            break; // Only one page needed if no local subdivision filter
           }
           
           // Check if we might have enough subdivision matches

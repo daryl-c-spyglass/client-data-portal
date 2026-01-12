@@ -1,0 +1,156 @@
+# FINAL FIX: Implement ChatGPT's Two-Query Strategy + Date Range Update
+
+## Context
+ChatGPT analyzed Repliers API docs and identified the correct implementation pattern. Replit confirmed the subdivision filter works but 150-day window has no matching data.
+
+## DECISION: Implement Option A — 365 days default for CMA
+
+---
+
+## Task 1: Implement Two-Query Strategy (per ChatGPT)
+
+Replace the single query with two separate Repliers API calls:
+
+### Query A — Active + Active Under Contract
+```javascript
+const activeQuery = {
+  type: 'Sale',
+  standardStatus: ['Active', 'Active Under Contract'],
+  zip: criteria.zipCode,
+  minSqft: criteria.minSqft,
+  maxSqft: criteria.maxSqft,
+  minLotAcres: criteria.minLotAcres,
+  maxLotAcres: criteria.maxLotAcres,
+  search: criteria.subdivision,
+  searchFields: 'address.neighborhood'
+};
+```
+
+### Query B — Closed (Sold) with date window
+```javascript
+const closedQuery = {
+  type: 'Sale',
+  status: 'U',
+  lastStatus: 'Sld',
+  minSoldDate: calculateDateFromDays(criteria.closeDateDays), // YYYY-MM-DD format
+  zip: criteria.zipCode,
+  minSqft: criteria.minSqft,
+  maxSqft: criteria.maxSqft,
+  minLotAcres: criteria.minLotAcres,
+  maxLotAcres: criteria.maxLotAcres,
+  search: criteria.subdivision,
+  searchFields: 'address.neighborhood'
+};
+```
+
+### Merge Results
+```javascript
+async function searchCMA(criteria) {
+  const [activeResults, closedResults] = await Promise.all([
+    repliersClient.get('/listings', { params: activeQuery }),
+    repliersClient.get('/listings', { params: closedQuery })
+  ]);
+  
+  // Merge and dedupe by mlsNumber
+  const allListings = [...activeResults.data.listings, ...closedResults.data.listings];
+  const deduped = dedupeByMlsNumber(allListings);
+  
+  console.log('[CMA Search] Active/UC results:', activeResults.data.count);
+  console.log('[CMA Search] Closed results:', closedResults.data.count);
+  console.log('[CMA Search] Merged total:', deduped.length);
+  
+  return deduped;
+}
+```
+
+---
+
+## Task 2: Change Default Close Date to 365 Days
+
+Update the default from 150 to 365 days for CMA searches:
+```javascript
+// In CMA search defaults
+const DEFAULT_CLOSE_DATE_DAYS = 365; // Changed from 150
+```
+
+Also update the UI dropdown options:
+- 90 days
+- 150 days
+- 180 days
+- 365 days (default)
+- 730 days (2 years)
+
+---
+
+## Task 3: Use Correct Repliers Parameters
+
+Per ChatGPT's Repliers API analysis:
+
+| Our Parameter | Repliers Parameter | Notes |
+|---------------|-------------------|-------|
+| subdivision | `search` + `searchFields=address.neighborhood` | Field-restricted search |
+| closeDateDays | `minSoldDate` (YYYY-MM-DD format) | NOT soldDateFrom |
+| statuses Active/UC | `standardStatus` | Array format |
+| statuses Closed | `status=U` + `lastStatus=Sld` | Separate query |
+| rental exclusion | `type=Sale` | On both queries |
+
+---
+
+## Task 4: Add Guard Against operator=OR
+
+ChatGPT warned that `operator=OR` can cause unrelated listings to appear:
+```javascript
+// Before sending any Repliers request
+if (params.operator === 'OR') {
+  console.error('[CMA] BLOCKED: operator=OR would break AND logic');
+  throw new Error('operator=OR is forbidden in CMA queries');
+}
+```
+
+---
+
+## Task 5: Validation Logging
+
+Log both outbound requests and results:
+```javascript
+console.log('[CMA Query A] Active/UC request:', JSON.stringify(activeQuery));
+console.log('[CMA Query B] Closed request:', JSON.stringify(closedQuery));
+console.log('[CMA Results] Sample neighborhoods:', 
+  deduped.slice(0, 5).map(l => l.address?.neighborhood)
+);
+```
+
+---
+
+## Acceptance Criteria
+
+- [ ] Two separate Repliers queries (Active/UC + Closed)
+- [ ] Default close date changed to 365 days
+- [ ] `search` + `searchFields=address.neighborhood` used for subdivision
+- [ ] `minSoldDate` used for sold date filtering (YYYY-MM-DD format)
+- [ ] `type=Sale` on both queries
+- [ ] No `operator=OR` allowed
+- [ ] Merged results deduped by mlsNumber
+- [ ] Logging shows both query URLs and result counts
+
+---
+
+## Test Case
+
+After implementation, run:
+```json
+{
+  "subdivision": "steiner ranch",
+  "propertyType": "Single Family Residence",
+  "minSqft": 5400,
+  "maxSqft": 6400,
+  "minLotAcres": 0.5,
+  "maxLotAcres": 1.5,
+  "statuses": ["Active", "Active Under Contract", "Closed"],
+  "closeDateDays": 365,
+  "zipCode": "78732"
+}
+```
+
+Expected: ≥6 results (as Replit confirmed with 365 days)
+All results must have address.neighborhood containing "steiner ranch"
