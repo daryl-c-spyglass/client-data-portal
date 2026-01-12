@@ -307,14 +307,25 @@ export function CMABuilder({ onCreateCMA, initialData }: CMABuilderProps) {
   // View mode state - persisted to localStorage
   type ViewMode = 'grid' | 'list' | 'table';
   const [viewMode, setViewMode] = useState<ViewMode>(() => {
-    const saved = localStorage.getItem('cma-view-mode');
-    return (saved as ViewMode) || 'grid';
+    try {
+      const saved = typeof window !== 'undefined' ? localStorage.getItem('cma-view-mode') : null;
+      if (saved === 'grid' || saved === 'list' || saved === 'table') {
+        return saved;
+      }
+    } catch {
+      // localStorage may not be available
+    }
+    return 'grid';
   });
   
   // Persist view mode to localStorage
   const handleViewModeChange = (mode: ViewMode) => {
     setViewMode(mode);
-    localStorage.setItem('cma-view-mode', mode);
+    try {
+      localStorage.setItem('cma-view-mode', mode);
+    } catch {
+      // localStorage may not be available
+    }
   };
   
   // Autoplay carousel effect - advance every 3 seconds when dialog is open
@@ -1869,11 +1880,11 @@ export function CMABuilder({ onCreateCMA, initialData }: CMABuilderProps) {
             
             {/* View Toggle */}
             {activeSearchResults.length > 0 && (
-              <div className="flex items-center border rounded-lg overflow-hidden" data-testid="view-toggle">
+              <div className="flex items-center gap-1" data-testid="view-toggle">
                 <Button
-                  size="sm"
+                  size="icon"
                   variant={viewMode === 'grid' ? 'default' : 'ghost'}
-                  className="rounded-none px-3 h-8"
+                  className="toggle-elevate"
                   onClick={() => handleViewModeChange('grid')}
                   data-testid="button-view-grid"
                   title="Grid View"
@@ -1881,9 +1892,9 @@ export function CMABuilder({ onCreateCMA, initialData }: CMABuilderProps) {
                   <LayoutGrid className="w-4 h-4" />
                 </Button>
                 <Button
-                  size="sm"
+                  size="icon"
                   variant={viewMode === 'list' ? 'default' : 'ghost'}
-                  className="rounded-none px-3 h-8 border-l"
+                  className="toggle-elevate"
                   onClick={() => handleViewModeChange('list')}
                   data-testid="button-view-list"
                   title="List View"
@@ -1891,9 +1902,9 @@ export function CMABuilder({ onCreateCMA, initialData }: CMABuilderProps) {
                   <List className="w-4 h-4" />
                 </Button>
                 <Button
-                  size="sm"
+                  size="icon"
                   variant={viewMode === 'table' ? 'default' : 'ghost'}
-                  className="rounded-none px-3 h-8 border-l"
+                  className="toggle-elevate"
                   onClick={() => handleViewModeChange('table')}
                   data-testid="button-view-table"
                   title="Table View"
