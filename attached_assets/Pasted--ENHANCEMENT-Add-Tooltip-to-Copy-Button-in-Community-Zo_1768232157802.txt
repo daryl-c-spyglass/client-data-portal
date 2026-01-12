@@ -1,0 +1,309 @@
+### ENHANCEMENT - Add Tooltip to Copy Button in Community Zones
+
+**Reference Screenshot:** Shows Community Zones card with Copy button
+
+**Goal:** Add hover tooltip to "Copy" button explaining that it copies the polygon coordinates (lat/long).
+
+---
+
+## Implementation
+
+### Option 1: Simple HTML Title Attribute (Quick Fix)
+```jsx
+<button 
+  className="action-btn copy-btn"
+  onClick={(e) => { 
+    e.stopPropagation(); 
+    handleCopyCoordinates(); 
+  }}
+  title="Copy polygon coordinates (lat/long) to clipboard"
+>
+  <span className="btn-icon">📋</span>
+  Copy
+</button>
+```
+
+---
+
+### Option 2: Custom Styled Tooltip (Better UX)
+```jsx
+const ZoneCard = ({ zone, onDelete }) => {
+  const [showCopyTooltip, setShowCopyTooltip] = useState(false);
+  const [copySuccess, setCopySuccess] = useState(false);
+
+  const handleCopyCoordinates = async () => {
+    try {
+      // Format coordinates for copying
+      const coordsString = JSON.stringify(zone.coordinates, null, 2);
+      await navigator.clipboard.writeText(coordsString);
+      
+      // Show success feedback
+      setCopySuccess(true);
+      setTimeout(() => setCopySuccess(false), 2000);
+      
+    } catch (error) {
+      console.error('Failed to copy:', error);
+    }
+  };
+
+  return (
+    <div className="zone-card">
+      {/* ... other card content ... */}
+      
+      <div className="zone-actions">
+        <button className="action-btn collapse-btn">
+          <span className="btn-icon">▲</span>
+          Collapse
+        </button>
+        
+        <button className="action-btn view-map-btn">
+          <span className="btn-icon">🗺️</span>
+          View on Map
+        </button>
+        
+        {/* Copy Button with Tooltip */}
+        <div 
+          className="tooltip-wrapper"
+          onMouseEnter={() => setShowCopyTooltip(true)}
+          onMouseLeave={() => setShowCopyTooltip(false)}
+        >
+          <button 
+            className="action-btn copy-btn"
+            onClick={(e) => { 
+              e.stopPropagation(); 
+              handleCopyCoordinates(); 
+            }}
+          >
+            <span className="btn-icon">📋</span>
+            {copySuccess ? 'Copied!' : 'Copy'}
+          </button>
+          
+          {/* Tooltip */}
+          {showCopyTooltip && !copySuccess && (
+            <div className="tooltip">
+              Copy polygon coordinates (lat/long) to clipboard
+              <div className="tooltip-arrow"></div>
+            </div>
+          )}
+          
+          {/* Success Tooltip */}
+          {copySuccess && (
+            <div className="tooltip success">
+              Coordinates copied!
+              <div className="tooltip-arrow"></div>
+            </div>
+          )}
+        </div>
+        
+        <button className="action-btn delete-btn">
+          <span className="btn-icon">🗑️</span>
+        </button>
+      </div>
+    </div>
+  );
+};
+```
+
+---
+
+### CSS for Custom Tooltip
+```css
+/* Tooltip Wrapper */
+.tooltip-wrapper {
+  position: relative;
+  display: inline-block;
+}
+
+/* Tooltip Box */
+.tooltip {
+  position: absolute;
+  bottom: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  margin-bottom: 8px;
+  padding: 8px 12px;
+  background: #333;
+  color: white;
+  font-size: 12px;
+  font-weight: 400;
+  white-space: nowrap;
+  border-radius: 6px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+  z-index: 1000;
+  animation: tooltipFadeIn 0.2s ease;
+}
+
+/* Success Tooltip */
+.tooltip.success {
+  background: #2e7d32;
+}
+
+/* Tooltip Arrow */
+.tooltip-arrow {
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  border: 6px solid transparent;
+  border-top-color: #333;
+}
+
+.tooltip.success .tooltip-arrow {
+  border-top-color: #2e7d32;
+}
+
+/* Fade In Animation */
+@keyframes tooltipFadeIn {
+  from {
+    opacity: 0;
+    transform: translateX(-50%) translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+}
+
+/* Action Buttons Row */
+.zone-actions {
+  display: flex;
+  gap: 8px;
+  padding: 12px 16px;
+  border-top: 1px solid #eee;
+}
+
+.action-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 12px;
+  background: white;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.action-btn:hover {
+  background: #f5f5f5;
+  border-color: #ccc;
+}
+
+.action-btn .btn-icon {
+  font-size: 14px;
+}
+
+/* Copy Button Specific */
+.copy-btn:hover {
+  background: #e3f2fd;
+  border-color: #90caf9;
+  color: #1976d2;
+}
+
+/* Delete Button */
+.delete-btn {
+  margin-left: auto;
+}
+
+.delete-btn:hover {
+  background: #ffebee;
+  border-color: #ef9a9a;
+  color: #c62828;
+}
+
+/* Dark Mode */
+.dark .tooltip {
+  background: #555;
+}
+
+.dark .tooltip-arrow {
+  border-top-color: #555;
+}
+
+.dark .action-btn {
+  background: #3d3d3d;
+  border-color: #555;
+  color: #fff;
+}
+
+.dark .action-btn:hover {
+  background: #4d4d4d;
+}
+```
+
+---
+
+### Option 3: CSS-Only Tooltip (No JavaScript)
+```jsx
+<button 
+  className="action-btn copy-btn has-tooltip"
+  onClick={(e) => { 
+    e.stopPropagation(); 
+    handleCopyCoordinates(); 
+  }}
+  data-tooltip="Copy polygon coordinates (lat/long) to clipboard"
+>
+  <span className="btn-icon">📋</span>
+  Copy
+</button>
+```
+```css
+/* CSS-Only Tooltip */
+.has-tooltip {
+  position: relative;
+}
+
+.has-tooltip::before {
+  content: attr(data-tooltip);
+  position: absolute;
+  bottom: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  margin-bottom: 8px;
+  padding: 8px 12px;
+  background: #333;
+  color: white;
+  font-size: 12px;
+  font-weight: 400;
+  white-space: nowrap;
+  border-radius: 6px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.2s ease, visibility 0.2s ease;
+  z-index: 1000;
+}
+
+.has-tooltip::after {
+  content: '';
+  position: absolute;
+  bottom: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  margin-bottom: 2px;
+  border: 6px solid transparent;
+  border-top-color: #333;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.2s ease, visibility 0.2s ease;
+}
+
+.has-tooltip:hover::before,
+.has-tooltip:hover::after {
+  opacity: 1;
+  visibility: visible;
+}
+```
+
+---
+
+## Testing Checklist
+
+- [ ] Hover over Copy button shows tooltip
+- [ ] Tooltip text reads "Copy polygon coordinates (lat/long) to clipboard"
+- [ ] Tooltip appears above the button with arrow pointing down
+- [ ] Tooltip fades in smoothly
+- [ ] Clicking Copy changes text to "Copied!" temporarily
+- [ ] Works in dark mode
+- [ ] Tooltip doesn't get cut off by container edges
