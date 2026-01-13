@@ -1196,19 +1196,24 @@
 
     renderError() {
       const p = this.containerId;
-      const escapedP = this.escapeHtml(p);
       const resultsContainer = this.container.querySelector(`#${p}-results`);
-      resultsContainer.innerHTML = `
-        <div class="spyglass-no-results">
-          <p>Unable to load properties. Please try again.</p>
-          <button class="spyglass-btn-secondary" id="${escapedP}-retry-btn">Retry</button>
-        </div>
-      `;
-      // Attach retry handler
-      const retryBtn = resultsContainer.querySelector(`#${escapedP}-retry-btn`);
-      if (retryBtn) {
-        retryBtn.addEventListener('click', () => this.search());
-      }
+      resultsContainer.innerHTML = '';
+      
+      const noResultsDiv = document.createElement('div');
+      noResultsDiv.className = 'spyglass-no-results';
+      
+      const messagePara = document.createElement('p');
+      messagePara.textContent = 'Unable to load properties. Please try again.';
+      noResultsDiv.appendChild(messagePara);
+      
+      const retryBtn = document.createElement('button');
+      retryBtn.className = 'spyglass-btn-secondary';
+      retryBtn.id = `${p}-retry-btn`;
+      retryBtn.textContent = 'Retry';
+      retryBtn.addEventListener('click', () => this.search());
+      noResultsDiv.appendChild(retryBtn);
+      
+      resultsContainer.appendChild(noResultsDiv);
     }
 
     renderResults() {
