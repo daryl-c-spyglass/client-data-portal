@@ -1619,7 +1619,7 @@
                 <img src="${widget.escapeHtml(this.property.primaryPhoto) || 'https://placehold.co/200x120/e0e0e0/666?text=No+Photo'}" alt="${widget.escapeHtml(this.property.streetAddress)}" onerror="this.src='https://placehold.co/200x120/e0e0e0/666?text=No+Photo'">
                 <div class="spyglass-info-window-price">$${widget.formatNumber(this.property.listPrice)}</div>
                 <div class="spyglass-info-window-address">${widget.escapeHtml(this.property.streetAddress) || ''}</div>
-                <button class="spyglass-info-window-btn" onclick="document.getElementById('${widget.containerId}').__spyglassWidget.openPropertyDetail(${propJson})">View Details</button>
+                <button class="spyglass-info-window-btn" onclick="document.getElementById('${widget.escapeHtml(widget.containerId)}').__spyglassWidget.openPropertyDetail(${propJson})">View Details</button>
               </div>
             `;
             widget.infoWindow.setContent(infoContent);
