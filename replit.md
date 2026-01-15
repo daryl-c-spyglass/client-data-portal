@@ -53,7 +53,7 @@ The UI incorporates Spyglass Realty branding with an orange primary color scheme
 - **Seller Updates**: Automated market update emails for sellers with SendGrid integration. Supports configurable frequency (weekly, bimonthly, quarterly), test emails, active/pause toggle, and send history tracking. Cron job runs daily at 9 AM Central to send due emails.
 - **Settings Page**: Management for agent profile (headshot, bio, title, cover letter, social links), data sync, display preferences, embed codes, and lead capture.
 - **Admin Panel**: Master admin controls for company branding (logo, colors), custom report pages, and user role management. Access restricted to admin users.
-- **CMA Presentation Builder**: Professional CMA report creation with agent profiles, customizable sections, and company branding. Database tables: agent_profiles, company_settings, custom_report_pages, cma_report_configs.
+- **CMA Presentation Builder**: Professional CMA report creation with agent profiles, customizable sections (16 sections in 3 categories), and company branding. Features include section toggles with ordering, cover letter customization, layout options (landscape/portrait), live preview, and agent footer toggle. Access via /cmas/:id/presentation. Database tables: agent_profiles, company_settings, custom_report_pages, cma_report_configs.
 - **Market Insights**: Year-over-Year price comparisons and neighborhood-level market statistics.
 - **Property Detail Page**: Enhanced property details with neighborhood reviews and boundary maps.
 - **Search Enhancements**: Autocomplete for cities, zip codes, subdivisions, and elementary schools.
