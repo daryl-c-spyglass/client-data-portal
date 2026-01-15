@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
-import { ArrowLeft, Share2, Link as LinkIcon, Copy, Check, Trash2, ExternalLink, Printer, Loader2, Mail } from "lucide-react";
+import { ArrowLeft, Share2, Link as LinkIcon, Copy, Check, Trash2, ExternalLink, Printer, Loader2, Mail, LayoutGrid } from "lucide-react";
 import { SiFacebook, SiX, SiInstagram, SiTiktok } from "react-icons/si";
 import { Link } from "wouter";
 import { CMAReport } from "@/components/CMAReport";
@@ -555,6 +555,14 @@ Best regards`;
           <Button variant="outline" onClick={handlePrint} data-testid="button-print-header">
             <Printer className="w-4 h-4 mr-2" />
             Print
+          </Button>
+          <Button 
+            variant="outline" 
+            onClick={() => setLocation(`/cmas/${id}/presentation`)}
+            data-testid="button-presentation-builder"
+          >
+            <LayoutGrid className="w-4 h-4 mr-2" />
+            Presentation
           </Button>
           <Dialog open={shareDialogOpen} onOpenChange={setShareDialogOpen}>
             <DialogTrigger asChild>

@@ -17,6 +17,7 @@ import CMAs from "@/pages/CMAs";
 import CMANew from "@/pages/CMANew";
 import PropertyDetailPage from "@/pages/PropertyDetailPage";
 import CMADetailPage from "@/pages/CMADetailPage";
+import CMAPresentationBuilder from "@/pages/CMAPresentationBuilder";
 import SellerUpdates from "@/pages/SellerUpdates";
 import SellerUpdateNew from "@/pages/SellerUpdateNew";
 import SellerUpdatePreview from "@/pages/SellerUpdatePreview";
@@ -102,6 +103,7 @@ function Router() {
       <Route path="/cmas" component={CMAs} />
       <Route path="/cmas/new" component={CMANew} />
       <Route path="/cmas/:id" component={CMADetailPage} />
+      <Route path="/cmas/:id/presentation" component={CMAPresentationBuilder} />
       <Route path="/seller-updates" component={SellerUpdates} />
       <Route path="/seller-updates/new" component={SellerUpdateNew} />
       <Route path="/seller-updates/:id/preview" component={SellerUpdatePreview} />
