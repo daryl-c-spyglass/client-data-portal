@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useRoute, useLocation, Link } from "wouter";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -45,7 +45,21 @@ import {
   Check,
   ChevronDown,
   ChevronUp,
+  TrendingUp,
+  TrendingDown,
+  Minus,
 } from "lucide-react";
+import {
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+  Cell,
+  ReferenceLine,
+} from "recharts";
 import { 
   CMA_REPORT_SECTIONS, 
   type CmaSectionId,
@@ -92,6 +106,92 @@ const PHOTO_LAYOUT_OPTIONS = [
   { value: "first_dozen", label: "First 12 Photos" },
   { value: "all", label: "All Photos" },
 ];
+
+interface PropertyData {
+  id?: string;
+  listingId?: string;
+  address?: string;
+  streetAddress?: string;
+  city?: string;
+  listPrice?: number | string | null;
+  closePrice?: number | string | null;
+  livingArea?: number | string | null;
+  bedroomsTotal?: number | string | null;
+  bathroomsTotal?: number | string | null;
+  yearBuilt?: number | string | null;
+  daysOnMarket?: number | string | null;
+  standardStatus?: string;
+  closeDate?: string;
+}
+
+interface PropertyStatistics {
+  avgPrice: number;
+  medianPrice: number;
+  avgPricePerSqft: number;
+  medianPricePerSqft: number;
+  avgLivingArea: number;
+  avgBedrooms: number;
+  avgBathrooms: number;
+  priceRange: { min: number; max: number };
+  sqftRange: { min: number; max: number };
+  propertyCount: number;
+}
+
+function calculateStatistics(properties: PropertyData[]): PropertyStatistics {
+  const validProperties = properties.filter(p => {
+    const price = Number(p.listPrice || p.closePrice);
+    return price > 0;
+  });
+
+  const prices = validProperties.map(p => Number(p.listPrice || p.closePrice));
+  const sqftValues = validProperties
+    .filter(p => Number(p.livingArea) > 0)
+    .map(p => Number(p.livingArea));
+  const pricesPerSqft = validProperties
+    .filter(p => Number(p.listPrice || p.closePrice) > 0 && Number(p.livingArea) > 0)
+    .map(p => Number(p.listPrice || p.closePrice) / Number(p.livingArea));
+  const bedrooms = validProperties
+    .filter(p => Number(p.bedroomsTotal) > 0)
+    .map(p => Number(p.bedroomsTotal));
+  const bathrooms = validProperties
+    .filter(p => Number(p.bathroomsTotal) > 0)
+    .map(p => Number(p.bathroomsTotal));
+
+  const avg = (arr: number[]) => arr.length ? arr.reduce((a, b) => a + b, 0) / arr.length : 0;
+  const median = (arr: number[]) => {
+    if (!arr.length) return 0;
+    const sorted = [...arr].sort((a, b) => a - b);
+    const mid = Math.floor(sorted.length / 2);
+    return sorted.length % 2 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
+  };
+
+  return {
+    avgPrice: avg(prices),
+    medianPrice: median(prices),
+    avgPricePerSqft: avg(pricesPerSqft),
+    medianPricePerSqft: median(pricesPerSqft),
+    avgLivingArea: avg(sqftValues),
+    avgBedrooms: avg(bedrooms),
+    avgBathrooms: avg(bathrooms),
+    priceRange: { min: Math.min(...prices) || 0, max: Math.max(...prices) || 0 },
+    sqftRange: { min: Math.min(...sqftValues) || 0, max: Math.max(...sqftValues) || 0 },
+    propertyCount: validProperties.length,
+  };
+}
+
+function formatCurrency(value: number): string {
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: "USD",
+    maximumFractionDigits: 0,
+  }).format(value);
+}
+
+function formatNumber(value: number, decimals = 0): string {
+  return new Intl.NumberFormat("en-US", {
+    maximumFractionDigits: decimals,
+  }).format(value);
+}
 
 export default function CMAPresentationBuilder() {
   const [, params] = useRoute("/cmas/:id/presentation");
@@ -168,6 +268,37 @@ export default function CMAPresentationBuilder() {
   const { data: currentUser } = useQuery<AuthUser>({
     queryKey: ["/api/auth/me"],
   });
+
+  // Calculate statistics from CMA properties
+  const { statistics, pricePerSqftData } = useMemo(() => {
+    const properties = (cma?.propertiesData || []) as PropertyData[];
+    const stats = calculateStatistics(properties);
+    
+    // Prepare chart data for price per sqft visualization
+    const subjectId = cma?.subjectPropertyId;
+    const chartData = properties
+      .filter(p => Number(p.listPrice || p.closePrice) > 0 && Number(p.livingArea) > 0)
+      .map(p => {
+        const price = Number(p.listPrice || p.closePrice);
+        const sqft = Number(p.livingArea);
+        const pricePerSqft = price / sqft;
+        const address = p.streetAddress || p.address || "Property";
+        const shortAddress = address.length > 20 ? address.substring(0, 18) + "..." : address;
+        // Check both id and listingId for subject property match
+        const isSubject = subjectId ? (p.id === subjectId || p.listingId === subjectId) : false;
+        return {
+          name: shortAddress,
+          fullAddress: address,
+          pricePerSqft: Math.round(pricePerSqft),
+          price,
+          sqft,
+          isSubject,
+        };
+      })
+      .sort((a, b) => a.pricePerSqft - b.pricePerSqft);
+
+    return { statistics: stats, pricePerSqftData: chartData };
+  }, [cma?.propertiesData, cma?.subjectPropertyId]);
 
   useEffect(() => {
     if (reportConfig) {
@@ -709,11 +840,33 @@ export default function CMAPresentationBuilder() {
 
                   {includedSections.includes("summary_comparables") && (
                     <PreviewSection title="Summary of Comparable Properties" icon={Table}>
-                      <div className="h-24 bg-muted rounded-md flex items-center justify-center">
-                        <span className="text-muted-foreground text-sm">
-                          Comparison table with key metrics
-                        </span>
-                      </div>
+                      {statistics.propertyCount > 0 ? (
+                        <div className="space-y-3">
+                          <div className="grid grid-cols-3 gap-2 text-xs">
+                            <div className="p-2 bg-muted rounded-md text-center">
+                              <div className="text-muted-foreground mb-1">Avg Price</div>
+                              <div className="font-semibold">{formatCurrency(statistics.avgPrice)}</div>
+                            </div>
+                            <div className="p-2 bg-muted rounded-md text-center">
+                              <div className="text-muted-foreground mb-1">Avg $/SqFt</div>
+                              <div className="font-semibold">${formatNumber(statistics.avgPricePerSqft)}</div>
+                            </div>
+                            <div className="p-2 bg-muted rounded-md text-center">
+                              <div className="text-muted-foreground mb-1">Properties</div>
+                              <div className="font-semibold">{statistics.propertyCount}</div>
+                            </div>
+                          </div>
+                          <div className="text-xs text-muted-foreground text-center">
+                            Price range: {formatCurrency(statistics.priceRange.min)} - {formatCurrency(statistics.priceRange.max)}
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="h-20 bg-muted rounded-md flex items-center justify-center">
+                          <span className="text-muted-foreground text-sm">
+                            No comparable properties in this CMA
+                          </span>
+                        </div>
+                      )}
                     </PreviewSection>
                   )}
 
@@ -739,31 +892,125 @@ export default function CMAPresentationBuilder() {
 
                   {includedSections.includes("online_valuation") && (
                     <PreviewSection title="Online Valuation Analysis" icon={BarChart3}>
-                      <div className="h-24 bg-muted rounded-md flex items-center justify-center">
-                        <span className="text-muted-foreground text-sm">
-                          Zestimate and online valuation comparison
-                        </span>
+                      <div className="space-y-3">
+                        <div className="p-3 bg-muted/50 rounded-md border border-dashed">
+                          <div className="flex items-center gap-2 mb-2">
+                            <TrendingUp className="w-4 h-4 text-primary" />
+                            <span className="text-sm font-medium">Online Valuations vs. Actual Sale Prices</span>
+                          </div>
+                          <p className="text-xs text-muted-foreground">
+                            This section compares automated valuation models (Zestimate, Redfin Estimate) 
+                            against actual closed sale prices to demonstrate accuracy variance.
+                          </p>
+                          <div className="mt-3 pt-3 border-t border-dashed">
+                            <p className="text-xs text-muted-foreground italic">
+                              Note: Online valuation data requires Zillow API integration. Contact your administrator to enable this feature.
+                            </p>
+                          </div>
+                        </div>
                       </div>
                     </PreviewSection>
                   )}
 
                   {includedSections.includes("price_per_sqft") && (
                     <PreviewSection title="Average Price Per Sq. Ft." icon={BarChart3}>
-                      <div className="h-24 bg-muted rounded-md flex items-center justify-center">
-                        <span className="text-muted-foreground text-sm">
-                          Price per square foot analysis chart
-                        </span>
+                      <div className="space-y-3">
+                        {pricePerSqftData.length > 0 ? (
+                          <>
+                            <div className="h-40">
+                              <ResponsiveContainer width="100%" height="100%">
+                                <BarChart data={pricePerSqftData} margin={{ top: 5, right: 5, left: 5, bottom: 5 }}>
+                                  <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                                  <XAxis 
+                                    dataKey="name" 
+                                    tick={{ fontSize: 9 }} 
+                                    angle={-45} 
+                                    textAnchor="end" 
+                                    height={50}
+                                    interval={0}
+                                  />
+                                  <YAxis 
+                                    tick={{ fontSize: 10 }} 
+                                    tickFormatter={(value) => `$${value}`}
+                                    width={50}
+                                  />
+                                  <Tooltip 
+                                    formatter={(value: number) => [`$${value}/sqft`, "Price/SqFt"]}
+                                    labelFormatter={(label) => pricePerSqftData.find(d => d.name === label)?.fullAddress || label}
+                                  />
+                                  <ReferenceLine 
+                                    y={statistics.avgPricePerSqft} 
+                                    stroke="hsl(var(--primary))" 
+                                    strokeDasharray="5 5"
+                                    label={{ value: `Avg: $${Math.round(statistics.avgPricePerSqft)}`, fontSize: 10, fill: 'hsl(var(--primary))' }}
+                                  />
+                                  <Bar dataKey="pricePerSqft" radius={[2, 2, 0, 0]}>
+                                    {pricePerSqftData.map((entry, index) => (
+                                      <Cell 
+                                        key={`cell-${index}`}
+                                        fill={entry.isSubject ? "hsl(var(--primary))" : "hsl(var(--muted-foreground) / 0.3)"}
+                                      />
+                                    ))}
+                                  </Bar>
+                                </BarChart>
+                              </ResponsiveContainer>
+                            </div>
+                            <div className="flex items-center justify-center gap-4 text-xs">
+                              <div className="flex items-center gap-1">
+                                <div className="w-3 h-3 rounded-sm bg-primary" />
+                                <span>Subject Property</span>
+                              </div>
+                              <div className="flex items-center gap-1">
+                                <div className="w-3 h-3 rounded-sm bg-muted-foreground/30" />
+                                <span>Comparables</span>
+                              </div>
+                            </div>
+                          </>
+                        ) : (
+                          <div className="h-24 bg-muted rounded-md flex items-center justify-center">
+                            <span className="text-muted-foreground text-sm">
+                              No property data available for chart
+                            </span>
+                          </div>
+                        )}
                       </div>
                     </PreviewSection>
                   )}
 
                   {includedSections.includes("comparable_stats") && (
                     <PreviewSection title="Comparable Property Statistics" icon={Table}>
-                      <div className="h-24 bg-muted rounded-md flex items-center justify-center">
-                        <span className="text-muted-foreground text-sm">
-                          Statistical summary of comparables
-                        </span>
-                      </div>
+                      {statistics.propertyCount > 0 ? (
+                        <div className="space-y-3">
+                          <div className="grid grid-cols-2 gap-2 text-xs">
+                            <StatCard 
+                              label="Average Price" 
+                              value={formatCurrency(statistics.avgPrice)}
+                              subValue={`Median: ${formatCurrency(statistics.medianPrice)}`}
+                            />
+                            <StatCard 
+                              label="Avg Price/SqFt" 
+                              value={`$${formatNumber(statistics.avgPricePerSqft)}`}
+                              subValue={`Median: $${formatNumber(statistics.medianPricePerSqft)}`}
+                            />
+                            <StatCard 
+                              label="Avg Living Area" 
+                              value={`${formatNumber(statistics.avgLivingArea)} sqft`}
+                              subValue={`Range: ${formatNumber(statistics.sqftRange.min)} - ${formatNumber(statistics.sqftRange.max)}`}
+                            />
+                            <StatCard 
+                              label="Avg Bed/Bath" 
+                              value={`${statistics.avgBedrooms.toFixed(1)} / ${statistics.avgBathrooms.toFixed(1)}`}
+                              subValue={`${statistics.propertyCount} properties analyzed`}
+                            />
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="h-20 bg-muted rounded-md flex items-center justify-center">
+                          <span className="text-muted-foreground text-sm">
+                            No comparable properties in this CMA
+                          </span>
+                        </div>
+                      )}
                     </PreviewSection>
                   )}
 
@@ -813,6 +1060,26 @@ function PreviewSection({
         <span className="font-medium text-sm">{title}</span>
       </div>
       <div>{children}</div>
+    </div>
+  );
+}
+
+function StatCard({
+  label,
+  value,
+  subValue,
+}: {
+  label: string;
+  value: string;
+  subValue?: string;
+}) {
+  return (
+    <div className="p-2 bg-muted rounded-md">
+      <div className="text-muted-foreground text-xs mb-0.5">{label}</div>
+      <div className="font-semibold text-sm">{value}</div>
+      {subValue && (
+        <div className="text-muted-foreground text-xs mt-0.5">{subValue}</div>
+      )}
     </div>
   );
 }
