@@ -22,6 +22,9 @@ import {
   type AreaUnit,
   type DateFormatType,
 } from "@/lib/formatters";
+import { Textarea } from "@/components/ui/textarea";
+import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
+import { Label } from "@/components/ui/label";
 import { 
   Settings as SettingsIcon, 
   User, 
@@ -36,8 +39,14 @@ import {
   Copy,
   Check,
   ExternalLink,
-  RotateCcw
+  RotateCcw,
+  Camera,
+  Briefcase,
+  FileText,
+  Globe,
+  Loader2
 } from "lucide-react";
+import { SiFacebook, SiInstagram, SiLinkedin, SiX } from "react-icons/si";
 
 const leadGateSchema = z.object({
   enabled: z.boolean(),
@@ -67,6 +76,38 @@ interface DisplayPreferencesData {
   updatedAt: string;
 }
 
+interface AgentProfile {
+  id?: string;
+  userId?: string;
+  title?: string;
+  headshotUrl?: string;
+  bio?: string;
+  defaultCoverLetter?: string;
+  facebookUrl?: string;
+  instagramUrl?: string;
+  linkedinUrl?: string;
+  twitterUrl?: string;
+  websiteUrl?: string;
+  zillowProfileUrl?: string;
+  realSatisfiedId?: string;
+  ratedAgentId?: string;
+}
+
+interface UserData {
+  id: string;
+  email: string;
+  firstName?: string;
+  lastName?: string;
+  phone?: string;
+  company?: string;
+  picture?: string;
+}
+
+interface AgentProfileResponse {
+  profile: AgentProfile | null;
+  user: UserData | null;
+}
+
 export default function Settings() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -74,6 +115,109 @@ export default function Settings() {
   const [copied, setCopied] = useState(false);
   const [embedWidth, setEmbedWidth] = useState("600");
   const [embedHeight, setEmbedHeight] = useState("800");
+
+  // Agent profile state
+  const [profileForm, setProfileForm] = useState({
+    firstName: '',
+    lastName: '',
+    email: '',
+    phone: '',
+    company: '',
+    title: '',
+    headshotUrl: '',
+    bio: '',
+    defaultCoverLetter: '',
+    websiteUrl: '',
+    facebookUrl: '',
+    instagramUrl: '',
+    linkedinUrl: '',
+    twitterUrl: '',
+  });
+  const [originalProfile, setOriginalProfile] = useState(profileForm);
+  const [hasProfileChanges, setHasProfileChanges] = useState(false);
+
+  // Fetch agent profile
+  const { data: agentProfileData, isLoading: isLoadingProfile } = useQuery<AgentProfileResponse>({
+    queryKey: ["/api/agent/profile"],
+    enabled: activeTab === "profile",
+  });
+
+  // Populate profile form when data is fetched
+  useEffect(() => {
+    if (agentProfileData) {
+      const form = {
+        firstName: agentProfileData.user?.firstName || '',
+        lastName: agentProfileData.user?.lastName || '',
+        email: agentProfileData.user?.email || '',
+        phone: agentProfileData.user?.phone || '',
+        company: agentProfileData.user?.company || '',
+        title: agentProfileData.profile?.title || '',
+        headshotUrl: agentProfileData.profile?.headshotUrl || agentProfileData.user?.picture || '',
+        bio: agentProfileData.profile?.bio || '',
+        defaultCoverLetter: agentProfileData.profile?.defaultCoverLetter || '',
+        websiteUrl: agentProfileData.profile?.websiteUrl || '',
+        facebookUrl: agentProfileData.profile?.facebookUrl || '',
+        instagramUrl: agentProfileData.profile?.instagramUrl || '',
+        linkedinUrl: agentProfileData.profile?.linkedinUrl || '',
+        twitterUrl: agentProfileData.profile?.twitterUrl || '',
+      };
+      setProfileForm(form);
+      setOriginalProfile(form);
+      setHasProfileChanges(false);
+    }
+  }, [agentProfileData]);
+
+  // Track profile changes
+  useEffect(() => {
+    const changed = JSON.stringify(profileForm) !== JSON.stringify(originalProfile);
+    setHasProfileChanges(changed);
+  }, [profileForm, originalProfile]);
+
+  // Save profile mutation
+  const saveProfileMutation = useMutation({
+    mutationFn: async () => {
+      const response = await apiRequest("/api/agent/profile", "PUT", {
+        profile: {
+          title: profileForm.title,
+          headshotUrl: profileForm.headshotUrl,
+          bio: profileForm.bio,
+          defaultCoverLetter: profileForm.defaultCoverLetter,
+          websiteUrl: profileForm.websiteUrl,
+          facebookUrl: profileForm.facebookUrl,
+          instagramUrl: profileForm.instagramUrl,
+          linkedinUrl: profileForm.linkedinUrl,
+          twitterUrl: profileForm.twitterUrl,
+        },
+        user: {
+          firstName: profileForm.firstName,
+          lastName: profileForm.lastName,
+          phone: profileForm.phone,
+          company: profileForm.company,
+        }
+      });
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || "Failed to save profile");
+      }
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/agent/profile"] });
+      setOriginalProfile(profileForm);
+      setHasProfileChanges(false);
+      toast({
+        title: "Profile saved",
+        description: "Your profile has been updated successfully.",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
   
   // Display preferences state
   const [displayPrefs, setDisplayPrefs] = useState<{
@@ -373,61 +517,247 @@ export default function Settings() {
 
         {/* Profile Tab */}
         <TabsContent value="profile" className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <User className="w-5 h-5" />
-                Profile Information
-              </CardTitle>
-              <CardDescription>
-                Your personal and business information displayed on reports
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid gap-4 md:grid-cols-2">
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">Full Name</label>
-                  <Input placeholder="John Smith" data-testid="input-name" />
-                </div>
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">Email</label>
-                  <Input placeholder="john@example.com" type="email" data-testid="input-email" />
-                </div>
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">Phone</label>
-                  <Input placeholder="(512) 555-0123" data-testid="input-phone" />
-                </div>
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">License Number</label>
-                  <Input placeholder="TX-12345" data-testid="input-license" />
-                </div>
-              </div>
-              <div className="pt-4">
-                <Button data-testid="button-save-profile">Save Profile</Button>
-              </div>
-            </CardContent>
-          </Card>
+          {isLoadingProfile ? (
+            <div className="flex items-center justify-center py-12">
+              <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
+            </div>
+          ) : (
+            <>
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <User className="w-5 h-5" />
+                    Profile Information
+                  </CardTitle>
+                  <CardDescription>
+                    Your personal information displayed on CMA reports
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-6">
+                  <div className="flex items-start gap-6">
+                    <div className="flex flex-col items-center gap-2">
+                      <Avatar className="w-24 h-24">
+                        <AvatarImage src={profileForm.headshotUrl} alt="Profile" />
+                        <AvatarFallback className="text-2xl">
+                          {profileForm.firstName?.[0]}{profileForm.lastName?.[0]}
+                        </AvatarFallback>
+                      </Avatar>
+                      <Label className="text-xs text-muted-foreground">Headshot</Label>
+                    </div>
+                    <div className="flex-1 space-y-2">
+                      <Label htmlFor="headshotUrl">Headshot URL</Label>
+                      <Input 
+                        id="headshotUrl"
+                        placeholder="https://example.com/your-photo.jpg" 
+                        value={profileForm.headshotUrl}
+                        onChange={(e) => setProfileForm(prev => ({ ...prev, headshotUrl: e.target.value }))}
+                        data-testid="input-headshot-url" 
+                      />
+                      <p className="text-xs text-muted-foreground">Paste a URL to your professional headshot photo</p>
+                    </div>
+                  </div>
 
-          <Card>
-            <CardHeader>
-              <CardTitle>Brokerage Information</CardTitle>
-              <CardDescription>
-                Your brokerage details for MLS compliance
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid gap-4 md:grid-cols-2">
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">Brokerage Name</label>
-                  <Input placeholder="Spyglass Realty" data-testid="input-brokerage" />
-                </div>
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">Brokerage Address</label>
-                  <Input placeholder="123 Main St, Austin TX" data-testid="input-brokerage-address" />
-                </div>
+                  <div className="grid gap-4 md:grid-cols-2">
+                    <div className="space-y-2">
+                      <Label htmlFor="firstName">First Name</Label>
+                      <Input 
+                        id="firstName"
+                        placeholder="John" 
+                        value={profileForm.firstName}
+                        onChange={(e) => setProfileForm(prev => ({ ...prev, firstName: e.target.value }))}
+                        data-testid="input-first-name" 
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="lastName">Last Name</Label>
+                      <Input 
+                        id="lastName"
+                        placeholder="Smith" 
+                        value={profileForm.lastName}
+                        onChange={(e) => setProfileForm(prev => ({ ...prev, lastName: e.target.value }))}
+                        data-testid="input-last-name" 
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="email">Email</Label>
+                      <Input 
+                        id="email"
+                        placeholder="john@example.com" 
+                        type="email" 
+                        value={profileForm.email}
+                        disabled
+                        className="bg-muted"
+                        data-testid="input-email" 
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="phone">Phone</Label>
+                      <Input 
+                        id="phone"
+                        placeholder="(512) 555-0123" 
+                        value={profileForm.phone}
+                        onChange={(e) => setProfileForm(prev => ({ ...prev, phone: e.target.value }))}
+                        data-testid="input-phone" 
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="title">Title</Label>
+                      <Input 
+                        id="title"
+                        placeholder="Broker/Owner, Realtor, Agent" 
+                        value={profileForm.title}
+                        onChange={(e) => setProfileForm(prev => ({ ...prev, title: e.target.value }))}
+                        data-testid="input-title" 
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="company">Company</Label>
+                      <Input 
+                        id="company"
+                        placeholder="Spyglass Realty" 
+                        value={profileForm.company}
+                        onChange={(e) => setProfileForm(prev => ({ ...prev, company: e.target.value }))}
+                        data-testid="input-company" 
+                      />
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <FileText className="w-5 h-5" />
+                    Bio & Cover Letter
+                  </CardTitle>
+                  <CardDescription>
+                    Your biography and default cover letter for CMA reports
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="bio">Agent Bio / Resume</Label>
+                    <Textarea 
+                      id="bio"
+                      placeholder="Tell clients about your experience, expertise, and what makes you the right agent for them..."
+                      value={profileForm.bio}
+                      onChange={(e) => setProfileForm(prev => ({ ...prev, bio: e.target.value }))}
+                      className="min-h-[120px]"
+                      data-testid="textarea-bio"
+                    />
+                    <p className="text-xs text-muted-foreground">This will appear on the Agent Resume page in your CMA reports</p>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="coverLetter">Default Cover Letter</Label>
+                    <Textarea 
+                      id="coverLetter"
+                      placeholder="Dear [Client Name],
+
+Thank you for the opportunity to prepare this Comparative Market Analysis for your property. This report will help you understand the current market conditions and determine the best listing price for your home..."
+                      value={profileForm.defaultCoverLetter}
+                      onChange={(e) => setProfileForm(prev => ({ ...prev, defaultCoverLetter: e.target.value }))}
+                      className="min-h-[150px]"
+                      data-testid="textarea-cover-letter"
+                    />
+                    <p className="text-xs text-muted-foreground">This will be used as the default cover letter in your CMA presentations (can be customized per CMA)</p>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Globe className="w-5 h-5" />
+                    Social & Web Links
+                  </CardTitle>
+                  <CardDescription>
+                    Your website and social media links for reports
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="grid gap-4 md:grid-cols-2">
+                    <div className="space-y-2">
+                      <Label htmlFor="websiteUrl" className="flex items-center gap-2">
+                        <Globe className="w-4 h-4" /> Website
+                      </Label>
+                      <Input 
+                        id="websiteUrl"
+                        placeholder="https://yourwebsite.com" 
+                        value={profileForm.websiteUrl}
+                        onChange={(e) => setProfileForm(prev => ({ ...prev, websiteUrl: e.target.value }))}
+                        data-testid="input-website" 
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="facebookUrl" className="flex items-center gap-2">
+                        <SiFacebook className="w-4 h-4" /> Facebook
+                      </Label>
+                      <Input 
+                        id="facebookUrl"
+                        placeholder="https://facebook.com/yourpage" 
+                        value={profileForm.facebookUrl}
+                        onChange={(e) => setProfileForm(prev => ({ ...prev, facebookUrl: e.target.value }))}
+                        data-testid="input-facebook" 
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="instagramUrl" className="flex items-center gap-2">
+                        <SiInstagram className="w-4 h-4" /> Instagram
+                      </Label>
+                      <Input 
+                        id="instagramUrl"
+                        placeholder="https://instagram.com/yourprofile" 
+                        value={profileForm.instagramUrl}
+                        onChange={(e) => setProfileForm(prev => ({ ...prev, instagramUrl: e.target.value }))}
+                        data-testid="input-instagram" 
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="linkedinUrl" className="flex items-center gap-2">
+                        <SiLinkedin className="w-4 h-4" /> LinkedIn
+                      </Label>
+                      <Input 
+                        id="linkedinUrl"
+                        placeholder="https://linkedin.com/in/yourprofile" 
+                        value={profileForm.linkedinUrl}
+                        onChange={(e) => setProfileForm(prev => ({ ...prev, linkedinUrl: e.target.value }))}
+                        data-testid="input-linkedin" 
+                      />
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <div className="flex justify-end gap-3">
+                <Button 
+                  variant="outline" 
+                  onClick={() => {
+                    setProfileForm(originalProfile);
+                    setHasProfileChanges(false);
+                  }}
+                  disabled={!hasProfileChanges}
+                  data-testid="button-reset-profile"
+                >
+                  <RotateCcw className="w-4 h-4 mr-2" />
+                  Reset Changes
+                </Button>
+                <Button 
+                  onClick={() => saveProfileMutation.mutate()}
+                  disabled={!hasProfileChanges || saveProfileMutation.isPending}
+                  data-testid="button-save-profile"
+                >
+                  {saveProfileMutation.isPending ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      Saving...
+                    </>
+                  ) : (
+                    'Save Profile'
+                  )}
+                </Button>
               </div>
-            </CardContent>
-          </Card>
+            </>
+          )}
         </TabsContent>
 
         {/* Data & Sync Tab */}

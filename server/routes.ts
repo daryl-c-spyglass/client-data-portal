@@ -7086,6 +7086,282 @@ OUTPUT JSON:
     });
   });
 
+  // ==========================================
+  // CMA PRESENTATION BUILDER ROUTES
+  // ==========================================
+
+  // Agent Profile Routes
+  app.get("/api/agent/profile", requireAuth, async (req, res) => {
+    try {
+      const userId = (req.user as any)?.id;
+      if (!userId) {
+        return res.status(401).json({ error: "Unauthorized" });
+      }
+      
+      const profile = await storage.getAgentProfile(userId);
+      const user = await storage.getUser(userId);
+      
+      res.json({
+        profile: profile || null,
+        user: user ? {
+          id: user.id,
+          email: user.email,
+          firstName: user.firstName,
+          lastName: user.lastName,
+          phone: user.phone,
+          company: user.company,
+          picture: user.picture,
+        } : null,
+      });
+    } catch (error: any) {
+      console.error("[Agent Profile] Error fetching profile:", error.message);
+      res.status(500).json({ error: "Failed to fetch agent profile" });
+    }
+  });
+
+  app.put("/api/agent/profile", requireAuth, async (req, res) => {
+    try {
+      const userId = (req.user as any)?.id;
+      if (!userId) {
+        return res.status(401).json({ error: "Unauthorized" });
+      }
+      
+      const { updateAgentProfileSchema, updateUserSchema } = await import("@shared/schema");
+      const profileData = updateAgentProfileSchema.partial().safeParse(req.body.profile || {});
+      
+      if (!profileData.success) {
+        return res.status(400).json({ error: "Invalid profile data", details: profileData.error.issues });
+      }
+      
+      // Update agent profile
+      const updatedProfile = await storage.updateAgentProfile(userId, profileData.data);
+      
+      // Update user basic info if provided
+      if (req.body.user) {
+        const userData = {
+          firstName: req.body.user.firstName,
+          lastName: req.body.user.lastName,
+          phone: req.body.user.phone,
+          company: req.body.user.company,
+        };
+        await storage.updateUser(userId, userData);
+      }
+      
+      res.json({ success: true, profile: updatedProfile });
+    } catch (error: any) {
+      console.error("[Agent Profile] Error updating profile:", error.message);
+      res.status(500).json({ error: "Failed to update agent profile" });
+    }
+  });
+
+  // Company Settings Routes (Admin only)
+  app.get("/api/admin/company-settings", requireAuth, async (req, res) => {
+    try {
+      const settings = await storage.getCompanySettings();
+      res.json(settings || {
+        companyName: "Spyglass Realty",
+        primaryColor: "#F97316",
+        secondaryColor: "#1E3A5F",
+        accentColor: "#FFFFFF",
+      });
+    } catch (error: any) {
+      console.error("[Company Settings] Error fetching:", error.message);
+      res.status(500).json({ error: "Failed to fetch company settings" });
+    }
+  });
+
+  app.put("/api/admin/company-settings", requireAuth, requireRole("admin"), async (req, res) => {
+    try {
+      const { updateCompanySettingsSchema } = await import("@shared/schema");
+      const parsed = updateCompanySettingsSchema.safeParse(req.body);
+      
+      if (!parsed.success) {
+        return res.status(400).json({ error: "Invalid settings data", details: parsed.error.issues });
+      }
+      
+      const updatedSettings = await storage.updateCompanySettings(parsed.data);
+      res.json({ success: true, settings: updatedSettings });
+    } catch (error: any) {
+      console.error("[Company Settings] Error updating:", error.message);
+      res.status(500).json({ error: "Failed to update company settings" });
+    }
+  });
+
+  // Custom Report Pages Routes (Admin only)
+  app.get("/api/admin/custom-pages", requireAuth, async (req, res) => {
+    try {
+      const pages = await storage.getCustomReportPages();
+      res.json(pages);
+    } catch (error: any) {
+      console.error("[Custom Pages] Error fetching:", error.message);
+      res.status(500).json({ error: "Failed to fetch custom pages" });
+    }
+  });
+
+  app.post("/api/admin/custom-pages", requireAuth, requireRole("admin"), async (req, res) => {
+    try {
+      const { insertCustomReportPageSchema } = await import("@shared/schema");
+      const parsed = insertCustomReportPageSchema.safeParse(req.body);
+      
+      if (!parsed.success) {
+        return res.status(400).json({ error: "Invalid page data", details: parsed.error.issues });
+      }
+      
+      const newPage = await storage.createCustomReportPage(parsed.data);
+      res.json({ success: true, page: newPage });
+    } catch (error: any) {
+      console.error("[Custom Pages] Error creating:", error.message);
+      res.status(500).json({ error: "Failed to create custom page" });
+    }
+  });
+
+  app.put("/api/admin/custom-pages/:id", requireAuth, requireRole("admin"), async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { updateCustomReportPageSchema } = await import("@shared/schema");
+      const parsed = updateCustomReportPageSchema.safeParse(req.body);
+      
+      if (!parsed.success) {
+        return res.status(400).json({ error: "Invalid page data", details: parsed.error.issues });
+      }
+      
+      const updatedPage = await storage.updateCustomReportPage(id, parsed.data);
+      if (!updatedPage) {
+        return res.status(404).json({ error: "Custom page not found" });
+      }
+      
+      res.json({ success: true, page: updatedPage });
+    } catch (error: any) {
+      console.error("[Custom Pages] Error updating:", error.message);
+      res.status(500).json({ error: "Failed to update custom page" });
+    }
+  });
+
+  app.delete("/api/admin/custom-pages/:id", requireAuth, requireRole("admin"), async (req, res) => {
+    try {
+      const { id } = req.params;
+      const deleted = await storage.deleteCustomReportPage(id);
+      
+      if (!deleted) {
+        return res.status(404).json({ error: "Custom page not found" });
+      }
+      
+      res.json({ success: true });
+    } catch (error: any) {
+      console.error("[Custom Pages] Error deleting:", error.message);
+      res.status(500).json({ error: "Failed to delete custom page" });
+    }
+  });
+
+  // CMA Report Config Routes
+  app.get("/api/cmas/:id/report-config", requireAuth, async (req, res) => {
+    try {
+      const { id } = req.params;
+      const config = await storage.getCmaReportConfig(id);
+      
+      // Import report sections for defaults
+      const { CMA_REPORT_SECTIONS } = await import("@shared/schema");
+      const defaultSections = CMA_REPORT_SECTIONS.filter(s => s.defaultEnabled).map(s => s.id);
+      const defaultOrder = CMA_REPORT_SECTIONS.map(s => s.id);
+      
+      res.json(config || {
+        cmaId: id,
+        includedSections: defaultSections,
+        sectionOrder: defaultOrder,
+        layout: "two_photos",
+        template: "default",
+        theme: "spyglass",
+        photoLayout: "first_dozen",
+        includeAgentFooter: true,
+      });
+    } catch (error: any) {
+      console.error("[CMA Report Config] Error fetching:", error.message);
+      res.status(500).json({ error: "Failed to fetch report config" });
+    }
+  });
+
+  app.put("/api/cmas/:id/report-config", requireAuth, async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { updateCmaReportConfigSchema } = await import("@shared/schema");
+      const parsed = updateCmaReportConfigSchema.safeParse(req.body);
+      
+      if (!parsed.success) {
+        return res.status(400).json({ error: "Invalid config data", details: parsed.error.issues });
+      }
+      
+      const updatedConfig = await storage.updateCmaReportConfig(id, parsed.data);
+      res.json({ success: true, config: updatedConfig });
+    } catch (error: any) {
+      console.error("[CMA Report Config] Error updating:", error.message);
+      res.status(500).json({ error: "Failed to update report config" });
+    }
+  });
+
+  // Get all users (Admin only)
+  app.get("/api/admin/users", requireAuth, requireRole("admin"), async (req, res) => {
+    try {
+      // Get all users - we'll need to add this to storage interface
+      const result = await import("@shared/schema").then(async (schema) => {
+        // Direct query since we don't have getAllUsers in interface
+        const { drizzle } = await import("drizzle-orm/neon-serverless");
+        const { Pool } = await import("@neondatabase/serverless");
+        const pool = new Pool({ connectionString: process.env.DATABASE_URL });
+        const db = drizzle(pool);
+        const users = await db.select().from(schema.users);
+        return users.map(u => ({
+          id: u.id,
+          email: u.email,
+          firstName: u.firstName,
+          lastName: u.lastName,
+          role: u.role,
+          phone: u.phone,
+          company: u.company,
+          picture: u.picture,
+          createdAt: u.createdAt,
+          lastLoginAt: u.lastLoginAt,
+        }));
+      });
+      
+      res.json(result);
+    } catch (error: any) {
+      console.error("[Admin Users] Error fetching:", error.message);
+      res.status(500).json({ error: "Failed to fetch users" });
+    }
+  });
+
+  app.put("/api/admin/users/:id", requireAuth, requireRole("admin"), async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { role } = req.body;
+      
+      if (role && !["admin", "agent"].includes(role)) {
+        return res.status(400).json({ error: "Invalid role. Must be 'admin' or 'agent'" });
+      }
+      
+      const updatedUser = await storage.updateUser(id, { role });
+      if (!updatedUser) {
+        return res.status(404).json({ error: "User not found" });
+      }
+      
+      res.json({ success: true, user: updatedUser });
+    } catch (error: any) {
+      console.error("[Admin Users] Error updating:", error.message);
+      res.status(500).json({ error: "Failed to update user" });
+    }
+  });
+
+  // Get CMA report sections (available sections for presentation builder)
+  app.get("/api/cma/report-sections", async (req, res) => {
+    try {
+      const { CMA_REPORT_SECTIONS } = await import("@shared/schema");
+      res.json(CMA_REPORT_SECTIONS);
+    } catch (error: any) {
+      console.error("[Report Sections] Error:", error.message);
+      res.status(500).json({ error: "Failed to fetch report sections" });
+    }
+  });
+
   const httpServer = createServer(app);
 
   return httpServer;

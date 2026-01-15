@@ -1,5 +1,6 @@
-import { Home, Search, FileText, Users, Settings, BarChart3, Mail, Filter, Calendar, UserCircle, MessageCircle } from "lucide-react";
+import { Home, Search, FileText, Users, Settings, BarChart3, Mail, Filter, Calendar, UserCircle, MessageCircle, Shield } from "lucide-react";
 import { Link, useLocation } from "wouter";
+import { useQuery } from "@tanstack/react-query";
 import {
   Sidebar,
   SidebarContent,
@@ -15,6 +16,12 @@ import {
 import { Button } from "@/components/ui/button";
 import { useChat } from "@/contexts/ChatContext";
 import spyglassLogo from "@assets/Large_Logo_1765233192587.jpeg";
+
+interface UserData {
+  id: string;
+  email: string;
+  role?: string;
+}
 
 const menuItems = [
   {
@@ -67,6 +74,13 @@ const menuItems = [
   },
 ];
 
+const adminItem = {
+  title: "Admin",
+  url: "/admin",
+  icon: Shield,
+  testId: "link-admin",
+};
+
 const calendarItems = [
   {
     title: "Calendar",
@@ -86,6 +100,12 @@ const calendarItems = [
 export function AppSidebar() {
   const [location] = useLocation();
   const { openChat } = useChat();
+
+  const { data: user } = useQuery<UserData>({
+    queryKey: ["/api/auth/me"],
+  });
+
+  const isAdmin = user?.role === "admin";
 
   return (
     <Sidebar>
@@ -117,6 +137,19 @@ export function AppSidebar() {
                   </SidebarMenuButton>
                 </SidebarMenuItem>
               ))}
+              {isAdmin && (
+                <SidebarMenuItem key={adminItem.title}>
+                  <SidebarMenuButton 
+                    asChild
+                    className={location === adminItem.url ? "bg-sidebar-accent" : ""}
+                  >
+                    <Link href={adminItem.url} data-testid={adminItem.testId}>
+                      <adminItem.icon className="w-4 h-4" />
+                      <span>{adminItem.title}</span>
+                    </Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              )}
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>

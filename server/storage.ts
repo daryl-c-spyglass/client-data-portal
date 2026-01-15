@@ -23,6 +23,17 @@ import {
   type InsertUser,
   type WpFavorite,
   type InsertWpFavorite,
+  type AgentProfile,
+  type InsertAgentProfile,
+  type UpdateAgentProfile,
+  type CompanySettings,
+  type UpdateCompanySettings,
+  type CustomReportPage,
+  type InsertCustomReportPage,
+  type UpdateCustomReportPage,
+  type CmaReportConfig,
+  type InsertCmaReportConfig,
+  type UpdateCmaReportConfig,
   properties,
   media,
   savedSearches,
@@ -32,7 +43,11 @@ import {
   leadGateSettings,
   displayPreferences,
   users,
-  wpFavorites
+  wpFavorites,
+  agentProfiles,
+  companySettings,
+  customReportPages,
+  cmaReportConfigs
 } from "@shared/schema";
 import { randomUUID } from "crypto";
 import { drizzle } from "drizzle-orm/neon-serverless";
@@ -148,6 +163,27 @@ export interface IStorage {
   createWpFavorite(favorite: InsertWpFavorite): Promise<WpFavorite>;
   deleteWpFavorite(wpUserId: string, propertyId: string): Promise<boolean>;
   getWpFavorite(wpUserId: string, propertyId: string): Promise<WpFavorite | undefined>;
+  
+  // Agent Profile operations
+  getAgentProfile(userId: string): Promise<AgentProfile | undefined>;
+  createAgentProfile(profile: InsertAgentProfile): Promise<AgentProfile>;
+  updateAgentProfile(userId: string, profile: UpdateAgentProfile): Promise<AgentProfile | undefined>;
+  
+  // Company Settings operations
+  getCompanySettings(): Promise<CompanySettings | undefined>;
+  updateCompanySettings(settings: UpdateCompanySettings): Promise<CompanySettings>;
+  
+  // Custom Report Pages operations
+  getCustomReportPages(): Promise<CustomReportPage[]>;
+  getCustomReportPage(id: string): Promise<CustomReportPage | undefined>;
+  createCustomReportPage(page: InsertCustomReportPage): Promise<CustomReportPage>;
+  updateCustomReportPage(id: string, page: UpdateCustomReportPage): Promise<CustomReportPage | undefined>;
+  deleteCustomReportPage(id: string): Promise<boolean>;
+  
+  // CMA Report Config operations
+  getCmaReportConfig(cmaId: string): Promise<CmaReportConfig | undefined>;
+  createCmaReportConfig(config: InsertCmaReportConfig): Promise<CmaReportConfig>;
+  updateCmaReportConfig(cmaId: string, config: UpdateCmaReportConfig): Promise<CmaReportConfig | undefined>;
 }
 
 export class MemStorage implements IStorage {
@@ -948,6 +984,53 @@ export class MemStorage implements IStorage {
     return Array.from(this.wpFavoritesMap.values()).find(
       f => f.wpUserId === wpUserId && f.propertyId === propertyId
     );
+  }
+
+  // Agent Profile operations (stub for MemStorage)
+  async getAgentProfile(_userId: string): Promise<AgentProfile | undefined> {
+    return undefined;
+  }
+  async createAgentProfile(_profile: InsertAgentProfile): Promise<AgentProfile> {
+    throw new Error('MemStorage: createAgentProfile not implemented');
+  }
+  async updateAgentProfile(_userId: string, _profile: UpdateAgentProfile): Promise<AgentProfile | undefined> {
+    return undefined;
+  }
+
+  // Company Settings operations (stub for MemStorage)
+  async getCompanySettings(): Promise<CompanySettings | undefined> {
+    return undefined;
+  }
+  async updateCompanySettings(_settings: UpdateCompanySettings): Promise<CompanySettings> {
+    throw new Error('MemStorage: updateCompanySettings not implemented');
+  }
+
+  // Custom Report Pages operations (stub for MemStorage)
+  async getCustomReportPages(): Promise<CustomReportPage[]> {
+    return [];
+  }
+  async getCustomReportPage(_id: string): Promise<CustomReportPage | undefined> {
+    return undefined;
+  }
+  async createCustomReportPage(_page: InsertCustomReportPage): Promise<CustomReportPage> {
+    throw new Error('MemStorage: createCustomReportPage not implemented');
+  }
+  async updateCustomReportPage(_id: string, _page: UpdateCustomReportPage): Promise<CustomReportPage | undefined> {
+    return undefined;
+  }
+  async deleteCustomReportPage(_id: string): Promise<boolean> {
+    return false;
+  }
+
+  // CMA Report Config operations (stub for MemStorage)
+  async getCmaReportConfig(_cmaId: string): Promise<CmaReportConfig | undefined> {
+    return undefined;
+  }
+  async createCmaReportConfig(_config: InsertCmaReportConfig): Promise<CmaReportConfig> {
+    throw new Error('MemStorage: createCmaReportConfig not implemented');
+  }
+  async updateCmaReportConfig(_cmaId: string, _config: UpdateCmaReportConfig): Promise<CmaReportConfig | undefined> {
+    return undefined;
   }
 }
 
@@ -1778,6 +1861,110 @@ export class DbStorage implements IStorage {
     const result = await this.db.select().from(wpFavorites).where(
       and(eq(wpFavorites.wpUserId, wpUserId), eq(wpFavorites.propertyId, propertyId))
     ).limit(1);
+    return result[0];
+  }
+
+  // Agent Profile operations
+  async getAgentProfile(userId: string): Promise<AgentProfile | undefined> {
+    const result = await this.db.select().from(agentProfiles).where(eq(agentProfiles.userId, userId)).limit(1);
+    return result[0];
+  }
+
+  async createAgentProfile(profile: InsertAgentProfile): Promise<AgentProfile> {
+    const result = await this.db.insert(agentProfiles).values(profile).returning();
+    return result[0];
+  }
+
+  async updateAgentProfile(userId: string, profile: UpdateAgentProfile): Promise<AgentProfile | undefined> {
+    const existing = await this.getAgentProfile(userId);
+    if (!existing) {
+      // Create new profile if doesn't exist
+      const result = await this.db.insert(agentProfiles).values({ userId, ...profile }).returning();
+      return result[0];
+    }
+    const result = await this.db.update(agentProfiles)
+      .set({ ...profile, updatedAt: new Date() })
+      .where(eq(agentProfiles.userId, userId))
+      .returning();
+    return result[0];
+  }
+
+  // Company Settings operations
+  async getCompanySettings(): Promise<CompanySettings | undefined> {
+    const result = await this.db.select().from(companySettings).limit(1);
+    return result[0];
+  }
+
+  async updateCompanySettings(settings: UpdateCompanySettings): Promise<CompanySettings> {
+    const existing = await this.getCompanySettings();
+    if (!existing) {
+      // Create default settings if none exist
+      const result = await this.db.insert(companySettings).values(settings).returning();
+      return result[0];
+    }
+    const result = await this.db.update(companySettings)
+      .set({ ...settings, updatedAt: new Date() })
+      .where(eq(companySettings.id, existing.id))
+      .returning();
+    return result[0];
+  }
+
+  // Custom Report Pages operations
+  async getCustomReportPages(): Promise<CustomReportPage[]> {
+    const result = await this.db.select().from(customReportPages)
+      .orderBy(customReportPages.displayOrder);
+    return result;
+  }
+
+  async getCustomReportPage(id: string): Promise<CustomReportPage | undefined> {
+    const result = await this.db.select().from(customReportPages)
+      .where(eq(customReportPages.id, id))
+      .limit(1);
+    return result[0];
+  }
+
+  async createCustomReportPage(page: InsertCustomReportPage): Promise<CustomReportPage> {
+    const result = await this.db.insert(customReportPages).values(page).returning();
+    return result[0];
+  }
+
+  async updateCustomReportPage(id: string, page: UpdateCustomReportPage): Promise<CustomReportPage | undefined> {
+    const result = await this.db.update(customReportPages)
+      .set({ ...page, updatedAt: new Date() })
+      .where(eq(customReportPages.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async deleteCustomReportPage(id: string): Promise<boolean> {
+    const result = await this.db.delete(customReportPages).where(eq(customReportPages.id, id));
+    return result.rowCount! > 0;
+  }
+
+  // CMA Report Config operations
+  async getCmaReportConfig(cmaId: string): Promise<CmaReportConfig | undefined> {
+    const result = await this.db.select().from(cmaReportConfigs)
+      .where(eq(cmaReportConfigs.cmaId, cmaId))
+      .limit(1);
+    return result[0];
+  }
+
+  async createCmaReportConfig(config: InsertCmaReportConfig): Promise<CmaReportConfig> {
+    const result = await this.db.insert(cmaReportConfigs).values(config).returning();
+    return result[0];
+  }
+
+  async updateCmaReportConfig(cmaId: string, config: UpdateCmaReportConfig): Promise<CmaReportConfig | undefined> {
+    const existing = await this.getCmaReportConfig(cmaId);
+    if (!existing) {
+      // Create new config if doesn't exist
+      const result = await this.db.insert(cmaReportConfigs).values({ cmaId, ...config }).returning();
+      return result[0];
+    }
+    const result = await this.db.update(cmaReportConfigs)
+      .set({ ...config, updatedAt: new Date() })
+      .where(eq(cmaReportConfigs.cmaId, cmaId))
+      .returning();
     return result[0];
   }
 }

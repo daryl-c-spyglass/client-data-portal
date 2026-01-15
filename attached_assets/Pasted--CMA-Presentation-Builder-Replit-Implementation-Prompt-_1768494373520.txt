@@ -1,0 +1,360 @@
+# CMA Presentation Builder - Replit Implementation Prompt
+
+## Project Context
+
+We have an existing Spyglass Realty MLS Grid IDX Platform built in Replit that replicates CloudCMA's CMA data collection and property search functionality. The app currently allows agents to:
+- Search properties from the Repliers database (30,000+ active listings)
+- Create CMAs with subject properties and comparable listings
+- View property details, maps, and organize listings by status (Active, Under Contract, Sold)
+
+**What we need now:** A presentation builder that transforms CMA data into polished, client-ready PDF reports—replicating CloudCMA's "Customize Report" functionality.
+
+---
+
+## Feature Requirements
+
+### 1. Presentation Builder Interface
+
+Create a "Customize Report" view accessible from each CMA that includes:
+
+#### Left Sidebar - Section Toggle Panel
+A collapsible sidebar with toggleable sections. Each section has:
+- A `+` icon to add/remove from report
+- An "Edit" link for sections with editable content
+- Drag-and-drop reordering capability
+
+**Sections to include (in order):**
+
+**Introduction**
+- [ ] Cover Page (use uploaded cover image or default Spyglass template)
+- [ ] Cover Letter (rich text editor)
+- [ ] Agent Resume (rich text editor)
+- [ ] Our Company (rich text editor or PDF embed)
+- [ ] What is a CMA? (static educational page with Spyglass branding)
+- [ ] Contact Me (auto-populated from agent profile)
+
+**Listings**
+- [ ] Map of All Listings (interactive map showing all comps)
+- [ ] Summary of Comparable Properties (table overview)
+- [ ] Listings Chapter Header
+- [ ] Property Details (individual property pages)
+- [ ] Property Photos (configurable: first dozen on one page or all)
+- [ ] Adjustments (if applicable)
+
+**Analysis**
+- [ ] Analysis Chapter Header
+- [ ] Online Valuation Analysis (Zestimate comparison table)
+- [ ] Average Price Per Sq. Ft. (scatter plot visualization)
+- [ ] Comparable Property Statistics
+
+**Custom Pages** (admin-managed)
+- [ ] Spyglass Resources and Links
+- [ ] Any additional PDF pages uploaded by Master Admin
+
+#### Top Bar - Theme/Layout Controls
+- **Theme Selector:** "Spyglass Realty" theme (orange/navy color scheme matching existing branding)
+- **Layout Selector:** Options like "Two photos", "Single photo", "No photos"
+- **Template Selector:** "Default Template" or custom templates
+
+#### Right Panel - Live Preview
+- Real-time preview of the report as sections are toggled
+- Page-by-page navigation
+- "Preview" button for full-screen modal preview
+
+---
+
+### 2. Master Admin Panel
+
+Create a `/admin` route accessible only to users with `role: 'admin'`:
+
+#### Company Settings
+- Upload company logo (used on all reports)
+- Set company name, address, phone, website
+- Upload company description (rich text)
+- Set default theme colors (primary, secondary, accent)
+
+#### Default Report Content
+- Upload/edit "What is a CMA?" page content
+- Upload/edit "Our Company" page content  
+- Upload static PDF pages to include in reports (e.g., "Spyglass Resources and Links")
+- Manage cover page templates/images
+
+#### User Management
+- View all registered agents
+- Assign roles (admin, agent)
+- Enable/disable agent accounts
+
+---
+
+### 3. Agent Settings Panel
+
+Each agent needs a `/settings` page to manage their profile:
+
+#### Profile Information
+- First Name, Last Name
+- Email
+- Phone Number
+- Title/Role (e.g., "Broker/Owner", "Realtor")
+
+#### Branding Assets
+- Upload headshot photo (displayed on reports)
+- Upload personal logo (optional, if different from company)
+
+#### Report Defaults
+- Default cover letter text (rich text editor with merge fields)
+- Agent resume/bio (rich text editor)
+- Default sections to include in new CMAs
+
+#### Integrations (if applicable)
+- Zillow profile URL (for Zestimate integration)
+- RealSatisfied ID
+- RatedAgent ID
+
+---
+
+### 4. Data Visualizations for Reports
+
+#### Online Valuation Analysis Page
+Display a comparison table showing:
+| ADDRESS | SOLD DATE | SOLD PRICE | ZESTIMATE | DIFFERENCE |
+|---------|-----------|------------|-----------|------------|
+
+- Group by status: Sold, Active Under Contract, Active
+- Show variance percentage and dollar amount
+- Header showing overall Zestimate accuracy (e.g., "10.3% | $102,000")
+- Footer disclaimer about Zestimate methodology
+
+#### Average Price Per Sq. Ft. Page
+- Large headline showing average $/sqft (e.g., "$605 Sqft.")
+- Scatter plot with:
+  - X-axis: Square feet
+  - Y-axis: Price
+  - Color-coded dots by status (green=active, red=sold, yellow=pending)
+  - Numbered labels corresponding to property list
+  - Trendline based on sold listings only
+- Summary table below chart:
+| # | ADDRESS | STATUS | SOLD PRICE | SQ. FT. | $/SQ.FT |
+|---|---------|--------|------------|---------|---------|
+
+---
+
+### 5. PDF Generation
+
+Use a library like `@react-pdf/renderer`, `puppeteer`, or `jspdf` to generate professional PDFs:
+
+#### Requirements:
+- Consistent Spyglass Realty branding on every page
+- Page numbers
+- Agent photo and contact info in footer (configurable)
+- High-resolution property photos
+- Proper page breaks (no orphaned headers/content)
+- Downloadable as PDF
+- Option to generate shareable link (hosted PDF or web view)
+
+---
+
+### 6. Database Schema Additions
+
+```sql
+-- Agent profiles
+CREATE TABLE agent_profiles (
+  id UUID PRIMARY KEY,
+  user_id UUID REFERENCES users(id),
+  first_name VARCHAR(100),
+  last_name VARCHAR(100),
+  email VARCHAR(255),
+  phone VARCHAR(20),
+  title VARCHAR(100),
+  headshot_url TEXT,
+  bio TEXT,
+  default_cover_letter TEXT,
+  created_at TIMESTAMP DEFAULT NOW(),
+  updated_at TIMESTAMP DEFAULT NOW()
+);
+
+-- Company settings (single row for now)
+CREATE TABLE company_settings (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  company_name VARCHAR(255),
+  logo_url TEXT,
+  address TEXT,
+  phone VARCHAR(20),
+  website VARCHAR(255),
+  description TEXT,
+  what_is_cma_content TEXT,
+  our_company_content TEXT,
+  primary_color VARCHAR(7) DEFAULT '#F97316',
+  secondary_color VARCHAR(7) DEFAULT '#1E3A5F',
+  created_at TIMESTAMP DEFAULT NOW(),
+  updated_at TIMESTAMP DEFAULT NOW()
+);
+
+-- Custom PDF pages (admin uploads)
+CREATE TABLE custom_report_pages (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  title VARCHAR(255),
+  pdf_url TEXT,
+  display_order INT,
+  is_active BOOLEAN DEFAULT true,
+  created_at TIMESTAMP DEFAULT NOW()
+);
+
+-- CMA report configurations (per CMA)
+CREATE TABLE cma_report_configs (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  cma_id UUID REFERENCES cmas(id),
+  included_sections JSONB, -- array of section IDs/names
+  section_order JSONB, -- ordered array for custom ordering
+  cover_letter_override TEXT,
+  layout VARCHAR(50) DEFAULT 'two_photos',
+  template VARCHAR(50) DEFAULT 'default',
+  created_at TIMESTAMP DEFAULT NOW(),
+  updated_at TIMESTAMP DEFAULT NOW()
+);
+```
+
+---
+
+### 7. UI/UX Specifications
+
+#### Color Palette (Spyglass Realty)
+- Primary Orange: `#F97316`
+- Navy Blue: `#1E3A5F`
+- White: `#FFFFFF`
+- Light Gray: `#F3F4F6`
+- Text Gray: `#374151`
+
+#### Typography
+- Headers: Bold, uppercase for section titles (matching CloudCMA style)
+- Body: Clean sans-serif (Inter, Open Sans, or system fonts)
+
+#### Component Styling
+- Match existing app styling (orange buttons, clean cards)
+- Smooth animations for section toggles
+- Responsive design for tablet use during listing presentations
+
+---
+
+### 8. User Flows
+
+#### Flow 1: Agent Creates Report
+1. Agent completes CMA with subject property and comps
+2. Clicks "Customize Report" button
+3. Presentation builder opens with default sections enabled
+4. Agent toggles sections on/off, reorders as needed
+5. Agent clicks preview to review
+6. Agent downloads PDF or copies shareable link
+7. Agent presents to client
+
+#### Flow 2: Admin Configures Defaults
+1. Admin logs in and navigates to `/admin`
+2. Uploads company logo and information
+3. Uploads "Our Company" PDF or enters rich text
+4. Uploads any custom pages (resources, links, etc.)
+5. Saves changes - all agents now see updated defaults
+
+#### Flow 3: New Agent Onboarding
+1. New agent registers or is added by admin
+2. Agent navigates to Settings
+3. Uploads headshot
+4. Enters bio and contact information
+5. Customizes default cover letter
+6. Agent is now ready to generate branded reports
+
+---
+
+### 9. API Endpoints Needed
+
+```
+GET    /api/cma/:id/report-config     - Get report configuration for CMA
+PUT    /api/cma/:id/report-config     - Update report configuration
+POST   /api/cma/:id/generate-pdf      - Generate and return PDF
+GET    /api/cma/:id/preview           - Get preview data for report
+
+GET    /api/agent/profile             - Get current agent's profile
+PUT    /api/agent/profile             - Update agent profile
+POST   /api/agent/upload-headshot     - Upload headshot image
+
+GET    /api/admin/company-settings    - Get company settings
+PUT    /api/admin/company-settings    - Update company settings
+GET    /api/admin/custom-pages        - List custom PDF pages
+POST   /api/admin/custom-pages        - Upload new custom page
+DELETE /api/admin/custom-pages/:id    - Remove custom page
+GET    /api/admin/users               - List all users (admin only)
+PUT    /api/admin/users/:id           - Update user role/status
+```
+
+---
+
+### 10. Technical Implementation Notes
+
+#### PDF Generation Approach
+Recommend using **Puppeteer** or **Playwright** with a React template:
+1. Build report as a React page with print-optimized CSS
+2. Navigate headless browser to report URL
+3. Generate PDF with `page.pdf()`
+4. Store in cloud storage (Supabase, S3, etc.) or return directly
+
+#### Image Handling
+- Compress headshots on upload (max 500KB, square crop)
+- Property photos should be lazy-loaded in preview
+- Use CDN for fast loading in PDF generation
+
+#### Performance
+- Cache generated PDFs for repeat downloads
+- Lazy load preview sections
+- Use optimistic UI updates when toggling sections
+
+---
+
+### 11. Out of Scope (Do NOT Include)
+
+- Testimonials section (Zillow reviews, RealSatisfied, RatedAgent, Reach150, Testimonial Tree)
+- Buyer Tour feature
+- Flyer feature  
+- Homebeat feature
+- Presentation slide deck (just PDF reports)
+
+---
+
+## Reference Screenshots
+
+The following CloudCMA screenshots are provided as visual reference:
+1. CMA Reports list view
+2. Organize Listings with map view
+3. Customize panel with section toggles
+4. Cover page preview ("Home Selling System")
+5. Cover letter preview
+6. Agent Resume editor
+7. "What is a CMA?" page
+8. Online Valuation Analysis page
+9. Active listings Zestimate comparison
+10. Zestimate disclaimer
+11. Average Price Per Sq. Ft. chart
+12. Property comparison table
+13. Custom Pages section
+
+---
+
+## Success Criteria
+
+The feature is complete when:
+1. ✅ Agents can customize which sections appear in their CMA reports
+2. ✅ Agents can edit cover letters and preview changes in real-time
+3. ✅ PDF generation produces professional, branded reports
+4. ✅ Master Admin can configure company-wide settings and upload custom pages
+5. ✅ Each agent has their own profile with headshot and contact info
+6. ✅ Reports automatically include agent branding (photo, name, contact) in footer
+7. ✅ Online Valuation Analysis and Price/Sq.Ft. charts render correctly in PDF
+8. ✅ Reports match Spyglass Realty branding (orange/navy theme)
+
+---
+
+## Priority Order for Implementation
+
+1. **Phase 1:** Agent Settings page (headshot, bio, contact info)
+2. **Phase 2:** Master Admin panel (company settings, custom pages)
+3. **Phase 3:** Presentation Builder UI (section toggles, preview)
+4. **Phase 4:** Data visualizations (Zestimate table, $/sqft chart)
+5. **Phase 5:** PDF generation and download
+6. **Phase 6:** Polish and testing

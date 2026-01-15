@@ -783,3 +783,180 @@ export function filterOutRentalProperties<T extends {
 }>(properties: T[]): T[] {
   return properties.filter(p => !isLikelyRentalProperty(p));
 }
+
+// ==========================================
+// CMA PRESENTATION BUILDER SCHEMA
+// ==========================================
+
+// Agent Profiles - Extended profile info for CMA reports
+export const agentProfiles = pgTable("agent_profiles", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: 'cascade' }).unique(),
+  title: text("title"), // e.g., "Broker/Owner", "Realtor"
+  headshotUrl: text("headshot_url"),
+  bio: text("bio"),
+  defaultCoverLetter: text("default_cover_letter"),
+  // Social links
+  facebookUrl: text("facebook_url"),
+  instagramUrl: text("instagram_url"),
+  linkedinUrl: text("linkedin_url"),
+  twitterUrl: text("twitter_url"),
+  websiteUrl: text("website_url"),
+  // External integrations
+  zillowProfileUrl: text("zillow_profile_url"),
+  realSatisfiedId: text("real_satisfied_id"),
+  ratedAgentId: text("rated_agent_id"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+export const insertAgentProfileSchema = createInsertSchema(agentProfiles).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export const updateAgentProfileSchema = z.object({
+  title: z.string().optional(),
+  headshotUrl: z.string().url().optional().or(z.literal('')),
+  bio: z.string().optional(),
+  defaultCoverLetter: z.string().optional(),
+  facebookUrl: z.string().url().optional().or(z.literal('')),
+  instagramUrl: z.string().url().optional().or(z.literal('')),
+  linkedinUrl: z.string().url().optional().or(z.literal('')),
+  twitterUrl: z.string().url().optional().or(z.literal('')),
+  websiteUrl: z.string().url().optional().or(z.literal('')),
+  zillowProfileUrl: z.string().url().optional().or(z.literal('')),
+  realSatisfiedId: z.string().optional(),
+  ratedAgentId: z.string().optional(),
+});
+export type InsertAgentProfile = z.infer<typeof insertAgentProfileSchema>;
+export type UpdateAgentProfile = z.infer<typeof updateAgentProfileSchema>;
+export type AgentProfile = typeof agentProfiles.$inferSelect;
+
+// Company Settings - Global company branding for reports
+export const companySettings = pgTable("company_settings", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  companyName: text("company_name").default("Spyglass Realty"),
+  logoUrl: text("logo_url"),
+  address: text("address"),
+  phone: text("phone"),
+  website: text("website"),
+  description: text("description"),
+  whatIsCmaContent: text("what_is_cma_content"),
+  ourCompanyContent: text("our_company_content"),
+  primaryColor: varchar("primary_color", { length: 7 }).default("#F97316"),
+  secondaryColor: varchar("secondary_color", { length: 7 }).default("#1E3A5F"),
+  accentColor: varchar("accent_color", { length: 7 }).default("#FFFFFF"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+export const insertCompanySettingsSchema = createInsertSchema(companySettings).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export const updateCompanySettingsSchema = z.object({
+  companyName: z.string().optional(),
+  logoUrl: z.string().url().optional().or(z.literal('')),
+  address: z.string().optional(),
+  phone: z.string().optional(),
+  website: z.string().url().optional().or(z.literal('')),
+  description: z.string().optional(),
+  whatIsCmaContent: z.string().optional(),
+  ourCompanyContent: z.string().optional(),
+  primaryColor: z.string().regex(/^#[0-9A-Fa-f]{6}$/).optional(),
+  secondaryColor: z.string().regex(/^#[0-9A-Fa-f]{6}$/).optional(),
+  accentColor: z.string().regex(/^#[0-9A-Fa-f]{6}$/).optional(),
+});
+export type InsertCompanySettings = z.infer<typeof insertCompanySettingsSchema>;
+export type UpdateCompanySettings = z.infer<typeof updateCompanySettingsSchema>;
+export type CompanySettings = typeof companySettings.$inferSelect;
+
+// Custom Report Pages - Admin-uploaded pages for CMA reports
+export const customReportPages = pgTable("custom_report_pages", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  title: text("title").notNull(),
+  content: text("content"), // HTML/Markdown content
+  pdfUrl: text("pdf_url"), // URL to uploaded PDF
+  displayOrder: integer("display_order").default(0),
+  isActive: boolean("is_active").notNull().default(true),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+export const insertCustomReportPageSchema = createInsertSchema(customReportPages).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export const updateCustomReportPageSchema = z.object({
+  title: z.string().optional(),
+  content: z.string().optional(),
+  pdfUrl: z.string().url().optional().or(z.literal('')),
+  displayOrder: z.number().int().optional(),
+  isActive: z.boolean().optional(),
+});
+export type InsertCustomReportPage = z.infer<typeof insertCustomReportPageSchema>;
+export type UpdateCustomReportPage = z.infer<typeof updateCustomReportPageSchema>;
+export type CustomReportPage = typeof customReportPages.$inferSelect;
+
+// CMA Report Sections - Available sections for the presentation builder
+export const CMA_REPORT_SECTIONS = [
+  // Introduction
+  { id: 'cover_page', name: 'Cover Page', category: 'introduction', defaultEnabled: true },
+  { id: 'cover_letter', name: 'Cover Letter', category: 'introduction', defaultEnabled: true, editable: true },
+  { id: 'agent_resume', name: 'Agent Resume', category: 'introduction', defaultEnabled: false, editable: true },
+  { id: 'our_company', name: 'Our Company', category: 'introduction', defaultEnabled: false },
+  { id: 'what_is_cma', name: 'What is a CMA?', category: 'introduction', defaultEnabled: false },
+  { id: 'contact_me', name: 'Contact Me', category: 'introduction', defaultEnabled: true },
+  // Listings
+  { id: 'map_all_listings', name: 'Map of All Listings', category: 'listings', defaultEnabled: true },
+  { id: 'summary_comparables', name: 'Summary of Comparable Properties', category: 'listings', defaultEnabled: true },
+  { id: 'listings_header', name: 'Listings Chapter Header', category: 'listings', defaultEnabled: false },
+  { id: 'property_details', name: 'Property Details', category: 'listings', defaultEnabled: true },
+  { id: 'property_photos', name: 'Property Photos', category: 'listings', defaultEnabled: true },
+  { id: 'adjustments', name: 'Adjustments', category: 'listings', defaultEnabled: false },
+  // Analysis
+  { id: 'analysis_header', name: 'Analysis Chapter Header', category: 'analysis', defaultEnabled: false },
+  { id: 'online_valuation', name: 'Online Valuation Analysis', category: 'analysis', defaultEnabled: false },
+  { id: 'price_per_sqft', name: 'Average Price Per Sq. Ft.', category: 'analysis', defaultEnabled: true },
+  { id: 'comparable_stats', name: 'Comparable Property Statistics', category: 'analysis', defaultEnabled: true },
+] as const;
+
+export type CmaSectionId = typeof CMA_REPORT_SECTIONS[number]['id'];
+
+// CMA Report Configs - Per-CMA presentation configuration
+export const cmaReportConfigs = pgTable("cma_report_configs", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  cmaId: varchar("cma_id").notNull().references(() => cmas.id, { onDelete: 'cascade' }).unique(),
+  includedSections: json("included_sections").$type<string[]>(), // Array of section IDs
+  sectionOrder: json("section_order").$type<string[]>(), // Ordered array for custom ordering
+  coverLetterOverride: text("cover_letter_override"),
+  layout: text("layout").default("two_photos"), // 'two_photos', 'single_photo', 'no_photos'
+  template: text("template").default("default"),
+  theme: text("theme").default("spyglass"), // Theme name
+  photoLayout: text("photo_layout").default("first_dozen"), // 'first_dozen', 'all'
+  includeAgentFooter: boolean("include_agent_footer").default(true),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+export const insertCmaReportConfigSchema = createInsertSchema(cmaReportConfigs).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export const updateCmaReportConfigSchema = z.object({
+  includedSections: z.array(z.string()).optional(),
+  sectionOrder: z.array(z.string()).optional(),
+  coverLetterOverride: z.string().optional(),
+  layout: z.enum(['two_photos', 'single_photo', 'no_photos']).optional(),
+  template: z.string().optional(),
+  theme: z.string().optional(),
+  photoLayout: z.enum(['first_dozen', 'all']).optional(),
+  includeAgentFooter: z.boolean().optional(),
+});
+export type InsertCmaReportConfig = z.infer<typeof insertCmaReportConfigSchema>;
+export type UpdateCmaReportConfig = z.infer<typeof updateCmaReportConfigSchema>;
+export type CmaReportConfig = typeof cmaReportConfigs.$inferSelect;

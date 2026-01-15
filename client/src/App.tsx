@@ -30,6 +30,7 @@ import SharedCMAView from "@/pages/SharedCMAView";
 import CalendarPage from "@/pages/CalendarPage";
 import LeadsPage from "@/pages/LeadsPage";
 import InventoryAudit from "@/pages/InventoryAudit";
+import AdminPage from "@/pages/AdminPage";
 import Login from "@/pages/Login";
 import { useEffect } from "react";
 
@@ -112,6 +113,7 @@ function Router() {
       <Route path="/calendar" component={CalendarPage} />
       <Route path="/leads" component={LeadsPage} />
       <Route path="/inventory-audit" component={InventoryAudit} />
+      <Route path="/admin" component={AdminPage} />
       <Route component={NotFound} />
     </Switch>
   );
