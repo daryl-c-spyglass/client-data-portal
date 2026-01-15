@@ -666,7 +666,7 @@ export function CMAPdfDocument({
               return (
                 <View 
                   key={index} 
-                  style={[styles.tableRow, isSubject && styles.tableRowHighlight]}
+                  style={isSubject ? [styles.tableRow, styles.tableRowHighlight] : styles.tableRow}
                 >
                   <Text style={{ ...styles.tableCell, flex: 2 }}>
                     {isSubject ? "★ " : ""}
@@ -718,11 +718,11 @@ export function CMAPdfDocument({
                 <Text style={styles.chartLabel}>{item.name}</Text>
                 <View style={styles.chartBarContainer}>
                   <View
-                    style={[
-                      styles.priceBar,
-                      item.isSubject && styles.priceBarSubject,
-                      { width: `${(item.pricePerSqft / maxPricePerSqft) * 70}%` },
-                    ]}
+                    style={
+                      item.isSubject 
+                        ? [styles.priceBar, styles.priceBarSubject, { width: `${(item.pricePerSqft / maxPricePerSqft) * 70}%` }]
+                        : [styles.priceBar, { width: `${(item.pricePerSqft / maxPricePerSqft) * 70}%` }]
+                    }
                   />
                   <Text style={styles.priceBarValue}>${item.pricePerSqft}</Text>
                 </View>
