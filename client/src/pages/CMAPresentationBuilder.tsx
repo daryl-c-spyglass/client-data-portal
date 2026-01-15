@@ -48,7 +48,10 @@ import {
   TrendingUp,
   TrendingDown,
   Minus,
+  Download,
 } from "lucide-react";
+import { pdf } from "@react-pdf/renderer";
+import { CMAPdfDocument } from "@/components/CMAPdfDocument";
 import {
   BarChart,
   Bar,
@@ -202,6 +205,7 @@ export default function CMAPresentationBuilder() {
 
   const [activeTab, setActiveTab] = useState("sections");
   const [hasChanges, setHasChanges] = useState(false);
+  const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
 
   const [includedSections, setIncludedSections] = useState<string[]>([]);
   const [sectionOrder, setSectionOrder] = useState<string[]>([]);
@@ -391,6 +395,52 @@ export default function CMAPresentationBuilder() {
     });
   };
 
+  const handleExportPdf = async () => {
+    if (!cma) return;
+    
+    setIsGeneratingPdf(true);
+    try {
+      const pdfDoc = (
+        <CMAPdfDocument
+          cma={{
+            ...cma,
+            propertiesData: cma.propertiesData || undefined,
+          }}
+          agentProfile={agentProfile}
+          companySettings={companySettings}
+          currentUser={currentUser}
+          includedSections={includedSections}
+          coverLetterOverride={coverLetterOverride}
+          includeAgentFooter={includeAgentFooter}
+        />
+      );
+      
+      const blob = await pdf(pdfDoc).toBlob();
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `CMA_Report_${cma.name?.replace(/\s+/g, "_") || "Report"}_${new Date().toISOString().split("T")[0]}.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+      
+      toast({
+        title: "PDF exported",
+        description: "Your CMA report has been downloaded.",
+      });
+    } catch (error) {
+      console.error("PDF generation error:", error);
+      toast({
+        title: "Export failed",
+        description: "Failed to generate PDF. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsGeneratingPdf(false);
+    }
+  };
+
   const isLoading = cmaLoading || configLoading || profileLoading || companyLoading;
   const hasError = cmaError || configError;
 
@@ -485,6 +535,19 @@ export default function CMAPresentationBuilder() {
               <Save className="w-4 h-4 mr-2" />
             )}
             Save Configuration
+          </Button>
+          <Button
+            onClick={handleExportPdf}
+            disabled={isGeneratingPdf || !cma}
+            variant="secondary"
+            data-testid="button-export-pdf"
+          >
+            {isGeneratingPdf ? (
+              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+            ) : (
+              <Download className="w-4 h-4 mr-2" />
+            )}
+            Export PDF
           </Button>
         </div>
       </div>
