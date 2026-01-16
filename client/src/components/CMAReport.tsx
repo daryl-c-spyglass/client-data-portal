@@ -1104,7 +1104,7 @@ export function CMAReport({
               return (
                 <MapboxMap
                   markers={mapMarkers}
-                  height="100%"
+                  height="600px"
                   showLegend={true}
                   onMarkerClick={(id) => {
                     const property = properties.find(p => p.id === id);
@@ -2802,11 +2802,11 @@ export function CMAReport({
                     const mapMarkers: MapMarker[] = propertiesWithCoords.map(p => propertyToMapMarker(p));
                     
                     return (
-                      <div className="h-[400px] rounded-lg overflow-hidden border">
+                      <div className="rounded-lg overflow-hidden border">
                         <MapboxMap
                           key={activeListingTab}
                           markers={mapMarkers}
-                          height="100%"
+                          height="400px"
                         />
                       </div>
                     );
@@ -3560,10 +3560,10 @@ export function CMAReport({
                     const mapMarkers: MapMarker[] = propertiesWithCoords.map(p => propertyToMapMarker(p));
                     
                     return (
-                      <div className="h-[300px] rounded-lg overflow-hidden border">
+                      <div className="rounded-lg overflow-hidden border">
                         <MapboxMap
                           markers={mapMarkers}
-                          height="100%"
+                          height="300px"
                         />
                       </div>
                     );
