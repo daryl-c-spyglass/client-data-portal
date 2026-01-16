@@ -1,0 +1,800 @@
+# CMA Presentation Builder - Bug Fixes & Improvements
+
+## Context
+Based on testing feedback, several issues need to be fixed in the Presentation Builder. This prompt consolidates all bugs and improvements into actionable tasks.
+
+**Important:** The Client Data Portal will use Mapbox for ALL map features throughout the application, not just the Presentation Builder.
+
+**CMA Data Source:** The Presentation Builder pulls data from the CMA created by the user. The comparables, statistics, and property data are already available from the CMA record (see `/api/cmas/:id` and `/api/cmas/:id/statistics`).
+
+---
+
+## CRITICAL FIX: Mapbox Token Configuration
+
+### Issue
+Map shows error: "Mapbox token not configured. Please configure VITE_MAPBOX_TOKEN"
+
+### Fix
+The environment variable `VITE_MAPBOX_TOKEN` is already set. Ensure the application reads it correctly:
+```typescript
+// Verify token is accessible
+const mapboxToken = import.meta.env.VITE_MAPBOX_TOKEN;
+
+if (!mapboxToken) {
+  console.error('[MAPBOX] Token not found in environment');
+}
+
+// In Mapbox component initialization
+mapboxgl.accessToken = import.meta.env.VITE_MAPBOX_TOKEN;
+```
+
+Check:
+1. Token exists in `.env` file as `VITE_MAPBOX_TOKEN=pk.xxx`
+2. Vite is exposing the variable (must start with `VITE_`)
+3. Component reads from `import.meta.env.VITE_MAPBOX_TOKEN`
+
+---
+
+## Section 1: Sections Tab Fixes
+
+### Issue
+Category buttons (Introduction, Listings, Analysis) may not be syncing properly to Live Preview.
+
+### Tasks
+
+1. **Verify toggle state syncs to preview:**
+```typescript
+// When a section is toggled, ensure it immediately reflects in preview
+const handleSectionToggle = (sectionId: string, enabled: boolean) => {
+  setConfig(prev => ({
+    ...prev,
+    includedSections: enabled 
+      ? [...prev.includedSections, sectionId]
+      : prev.includedSections.filter(id => id !== sectionId)
+  }));
+  
+  // Force preview refresh
+  setPreviewKey(prev => prev + 1);
+};
+```
+
+2. **Verify category expand/collapse works:**
+```typescript
+// Each category (Introduction, Listings, Analysis) should expand/collapse
+const [expandedCategories, setExpandedCategories] = useState({
+  introduction: true,
+  listings: true,
+  analysis: true
+});
+```
+
+3. **Add visual feedback when section is toggled:**
+- Show brief highlight animation on preview when section toggles
+- Update section count badge in real-time
+
+### Acceptance Criteria
+- [ ] Toggling any section immediately updates Live Preview
+- [ ] Category expand/collapse buttons work correctly
+- [ ] Section count (e.g., "5/6") updates when sections toggle
+
+---
+
+## Section 2: Content Tab Fixes
+
+### Issue 1: Limited Editability
+Currently only Title and Subtitle can be edited. All content fields should be editable.
+
+### Tasks
+
+1. **Make all content fields editable:**
+```typescript
+// Content tab should allow editing:
+interface ContentConfig {
+  // Cover Page
+  coverPage: {
+    title: string;           // ✅ Already works
+    subtitle: string;        // ✅ Already works
+    showDate: boolean;
+    showAgentPhoto: boolean;
+    background: 'plain' | 'gradient' | 'property';
+  };
+  
+  // Cover Letter
+  coverLetter: {
+    content: string;         // Editable text area
+    useAI: boolean;
+  };
+  
+  // Agent Resume
+  agentResume: {
+    name: string;            // Default from profile, but editable
+    title: string;           // Default from profile, but editable
+    bio: string;             // Default from profile, but editable
+    showPhoto: boolean;
+  };
+  
+  // Company Info
+  company: {
+    name: string;            // Default: "Spyglass Realty"
+    description: string;     // Editable
+  };
+  
+  // What is a CMA
+  whatIsCMA: {
+    content: string;         // Default text, but editable
+  };
+  
+  // Contact Me
+  contactMe: {
+    email: string;           // From profile
+    phone: string;           // From profile
+    showEmail: boolean;
+    showPhone: boolean;
+  };
+}
+```
+
+2. **Add edit controls for each section:**
+```jsx
+// Example: Agent Resume Editor
+<div className="space-y-4">
+  <h3 className="font-semibold">Agent Resume</h3>
+  <p className="text-sm text-gray-600">
+    Defaults loaded from your profile settings
+  </p>
+  
+  <div>
+    <label className="block text-sm font-medium mb-1">Name</label>
+    <input
+      type="text"
+      value={config.agentResume.name || agentProfile.name}
+      onChange={(e) => updateConfig('agentResume.name', e.target.value)}
+      placeholder={agentProfile.name}
+      className="w-full border rounded-lg px-3 py-2"
+    />
+  </div>
+  
+  <div>
+    <label className="block text-sm font-medium mb-1">Title</label>
+    <input
+      type="text"
+      value={config.agentResume.title || 'Real Estate Agent'}
+      onChange={(e) => updateConfig('agentResume.title', e.target.value)}
+      className="w-full border rounded-lg px-3 py-2"
+    />
+  </div>
+  
+  <div>
+    <label className="block text-sm font-medium mb-1">Bio</label>
+    <textarea
+      value={config.agentResume.bio || agentProfile.bio}
+      onChange={(e) => updateConfig('agentResume.bio', e.target.value)}
+      rows={4}
+      className="w-full border rounded-lg px-3 py-2"
+    />
+  </div>
+</div>
+```
+
+### Issue 2: Agent Photo/Name Not Loading from Profile
+The "circle D daryl - test this" shows the agent info is not properly pulling from Settings > Profile Information.
+
+### Fix
+```typescript
+// Fetch agent profile on component mount
+const { data: agentProfile } = useQuery({
+  queryKey: ['agent-profile'],
+  queryFn: () => fetch('/api/agent-profile').then(r => r.json())
+});
+
+// Use profile data as defaults
+const defaultAgentName = agentProfile?.name || user?.name || 'Agent Name';
+const defaultAgentPhoto = agentProfile?.headshot || user?.avatar || null;
+const defaultAgentTitle = agentProfile?.title || 'Real Estate Agent';
+const defaultAgentBio = agentProfile?.bio || '';
+```
+
+### Issue 3: Cover Letter AI Assistant Not Working
+AI generation fails. Should use OpenAI and base content on CMA data.
+
+### Fix
+```typescript
+// 1. Create OpenAI endpoint for cover letter generation
+// server/routes/ai.ts
+
+import OpenAI from 'openai';
+
+const openai = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY,
+});
+
+app.post('/api/ai/generate-cover-letter', async (req, res) => {
+  const { cmaId, tone } = req.body;
+  
+  // Fetch CMA data
+  const cma = await db.query.cmas.findFirst({
+    where: eq(cmas.id, cmaId)
+  });
+  
+  if (!cma) {
+    return res.status(404).json({ error: 'CMA not found' });
+  }
+  
+  // Calculate statistics
+  const properties = cma.propertiesData || [];
+  const stats = calculateStatisticsFromProperties(properties);
+  
+  // Build prompt
+  const prompt = `
+You are a professional real estate agent writing a cover letter for a Comparative Market Analysis (CMA) report.
+
+CMA Name: ${cma.name}
+
+Market Analysis Summary:
+- ${properties.length} comparable properties analyzed
+- Average Price: $${stats.price.average.toLocaleString()}
+- Median Price: $${stats.price.median.toLocaleString()}
+- Price Range: $${stats.price.range.min.toLocaleString()} - $${stats.price.range.max.toLocaleString()}
+- Average Price/SqFt: $${stats.pricePerSqFt.average}
+- Average Days on Market: ${stats.daysOnMarket.average} days
+- Average Living Area: ${stats.livingArea.average.toLocaleString()} sqft
+
+Write a ${tone || 'professional'} cover letter that:
+1. Introduces the CMA report professionally
+2. Summarizes the key market findings
+3. Provides context about current market conditions
+4. Explains how this analysis helps make informed decisions
+5. Offers to discuss the findings
+
+Keep it concise (2-3 paragraphs). Do not include placeholder brackets or instructions.
+  `.trim();
+
+  try {
+    const completion = await openai.chat.completions.create({
+      model: 'gpt-4',
+      messages: [{ role: 'user', content: prompt }],
+      max_tokens: 500,
+      temperature: 0.7
+    });
+    
+    const coverLetter = completion.choices[0].message.content;
+    res.json({ coverLetter });
+  } catch (error) {
+    console.error('[AI] Cover letter generation failed:', error);
+    res.status(500).json({ error: 'Failed to generate cover letter' });
+  }
+});
+
+// 2. Update frontend to call the endpoint
+const handleGenerateCoverLetter = async () => {
+  setIsGenerating(true);
+  try {
+    const response = await fetch('/api/ai/generate-cover-letter', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ 
+        cmaId: cma.id,
+        tone: selectedTone // 'professional' | 'friendly' | 'confident'
+      })
+    });
+    
+    const data = await response.json();
+    if (data.coverLetter) {
+      updateConfig('coverLetter.content', data.coverLetter);
+    }
+  } catch (error) {
+    toast.error('Failed to generate cover letter');
+  } finally {
+    setIsGenerating(false);
+  }
+};
+```
+
+### Acceptance Criteria
+- [ ] All content sections are editable
+- [ ] Agent name/photo loads from Settings > Profile Information
+- [ ] Cover Letter AI generates using OpenAI
+- [ ] AI uses actual CMA data (comparables, statistics)
+- [ ] Three tone options: Professional, Friendly, Confident
+
+---
+
+## Section 3: Listing Brochure Fixes
+
+### Issue 1: Duplicate "Listing Brochure" Text
+The heading "Listing Brochure" appears twice in the UI.
+
+### Fix
+Find and remove the duplicate heading:
+```jsx
+// WRONG - Has duplicate
+<div>
+  <h3>Listing Brochure</h3>
+  <p>Add a marketing flyer for the subject property</p>
+  
+  <h3>Listing Brochure</h3>  {/* REMOVE THIS DUPLICATE */}
+  <p>Add a marketing flyer for the subject property to include in your CMA presentation.</p>
+</div>
+
+// CORRECT - Single heading
+<div>
+  <h3 className="font-semibold">Listing Brochure</h3>
+  <p className="text-sm text-gray-600">
+    Add a marketing flyer for the subject property to include in your CMA presentation.
+  </p>
+</div>
+```
+
+### Issue 2: Brochure Image Missing/Broken in Preview
+The uploaded brochure image is not displaying in the Live Preview.
+
+### Fix
+```jsx
+// In Live Preview, ensure brochure image renders correctly
+{config.includedSections.includes('listing-brochure') && cma.brochure && (
+  <div className="border rounded-lg p-4">
+    <div className="flex items-center gap-2 text-sm text-gray-500 mb-2">
+      <ImageIcon size={14} />
+      <span>Listing Brochure</span>
+    </div>
+    
+    {cma.brochure.url ? (
+      <div className="aspect-[8.5/11] bg-gray-100 rounded overflow-hidden">
+        <img 
+          src={cma.brochure.url} 
+          alt="Listing Brochure"
+          className="w-full h-full object-contain"
+          onError={(e) => {
+            console.error('[BROCHURE] Image failed to load:', cma.brochure.url);
+            e.currentTarget.src = '/placeholder-brochure.png';
+          }}
+        />
+      </div>
+    ) : (
+      <div className="aspect-[8.5/11] bg-gray-50 rounded flex items-center justify-center text-gray-400 text-sm">
+        No brochure uploaded
+      </div>
+    )}
+  </div>
+)}
+```
+
+### Acceptance Criteria
+- [ ] "Listing Brochure" heading appears only once
+- [ ] Uploaded brochure displays in Live Preview
+- [ ] Fallback shown if image fails to load
+
+---
+
+## Section 4: Layout Tab Fixes
+
+### Issue 1: Property Photos Missing
+The photo selection feature doesn't show actual property photos.
+
+### Fix
+```typescript
+// Fetch photos from CMA propertiesData
+const getPropertyPhotos = (cmaData) => {
+  const allPhotos = [];
+  
+  cmaData.propertiesData?.forEach(property => {
+    const photos = property.photos || [];
+    photos.forEach((photoUrl, index) => {
+      allPhotos.push({
+        url: photoUrl,
+        propertyAddress: property.address?.streetAddress || property.address,
+        mlsNumber: property.mlsNumber || property.id,
+        index
+      });
+    });
+  });
+  
+  return allPhotos;
+};
+
+// In Layout tab
+const photos = getPropertyPhotos(cmaData);
+
+<div>
+  <label className="block text-sm font-medium mb-2">Photo Selection</label>
+  <select
+    value={config.photoLayout}
+    onChange={(e) => updateConfig('photoLayout', e.target.value)}
+    className="w-full border rounded-lg px-3 py-2"
+  >
+    <option value="first_dozen">First 12 Photos</option>
+    <option value="all">All Photos</option>
+    <option value="ai_suggested">AI Suggested (Best Quality)</option>
+    <option value="custom">Custom Selection</option>
+  </select>
+  
+  {config.photoLayout === 'custom' && (
+    <button
+      onClick={() => setPhotoModalOpen(true)}
+      className="mt-3 w-full flex items-center justify-center gap-2 px-4 py-3 border-2 border-dashed rounded-lg hover:border-orange-300"
+    >
+      <ImageIcon size={20} />
+      <span>Select Photos ({photos.length} available)</span>
+    </button>
+  )}
+</div>
+```
+
+### Issue 2: Map Settings Should Not Be in Layout Tab
+Map settings (Streets/Satellite/Dark) should be directly on the Map in Live Preview, not in Layout tab.
+
+### Fix
+1. **Remove Map Settings from Layout tab**
+2. **Add map controls directly to the Map component in Live Preview:**
+```jsx
+// MapOfAllListings.tsx (in Live Preview)
+export function MapOfAllListings({ properties, config, onConfigChange }) {
+  const [mapStyle, setMapStyle] = useState(config.mapStyle || 'streets');
+  
+  const handleStyleChange = (style: string) => {
+    setMapStyle(style);
+    onConfigChange({ ...config, mapStyle: style });
+  };
+  
+  return (
+    <div className="border rounded-lg p-4">
+      <div className="flex items-center justify-between mb-2">
+        <div className="flex items-center gap-2 text-sm text-gray-500">
+          <MapIcon size={14} />
+          <span>Map of All Listings</span>
+        </div>
+      </div>
+      
+      <div className="relative">
+        {/* Mapbox Map */}
+        <MapboxMap
+          properties={properties}
+          style={mapStyle}
+          showPolygon={config.showMapPolygon}
+        />
+        
+        {/* Style controls ON the map */}
+        <div className="absolute top-3 left-3 bg-white rounded-lg shadow-md p-1 flex gap-1">
+          {['streets', 'satellite', 'dark'].map(style => (
+            <button
+              key={style}
+              onClick={() => handleStyleChange(style)}
+              className={`
+                px-3 py-1.5 text-xs font-medium rounded capitalize
+                ${mapStyle === style 
+                  ? 'bg-orange-500 text-white' 
+                  : 'hover:bg-gray-100'
+                }
+              `}
+            >
+              {style}
+            </button>
+          ))}
+        </div>
+        
+        {/* Show Polygon toggle ON the map */}
+        <div className="absolute top-3 right-3 bg-white rounded-lg shadow-md px-3 py-2">
+          <label className="flex items-center gap-2 text-xs">
+            <input
+              type="checkbox"
+              checked={config.showMapPolygon}
+              onChange={(e) => onConfigChange({ 
+                ...config, 
+                showMapPolygon: e.target.checked 
+              })}
+            />
+            Show Area
+          </label>
+        </div>
+      </div>
+    </div>
+  );
+}
+```
+
+### Issue 3: Map Should Sync with CMA Creation Map
+The map in presentation should show the same properties/view as when the CMA was created.
+
+### Fix
+```typescript
+// The map should use the same properties from cmaData.propertiesData
+// Extract coordinates from properties
+const mapProperties = cmaData.propertiesData?.map(p => ({
+  mlsNumber: p.mlsNumber || p.id,
+  address: p.address?.streetAddress || p.address,
+  lat: p.coordinates?.latitude || p.latitude || p.address?.latitude,
+  lng: p.coordinates?.longitude || p.longitude || p.address?.longitude,
+  price: p.listPrice || p.closePrice || p.price,
+  status: p.standardStatus || p.status,
+  isSubject: p.mlsNumber === cmaData.subjectPropertyId
+})).filter(p => p.lat && p.lng);
+```
+
+### Acceptance Criteria
+- [ ] Property photos display in Layout tab
+- [ ] Photo selection modal shows actual photos with AI suggestion option
+- [ ] Map Settings removed from Layout tab
+- [ ] Map controls (Streets/Satellite/Dark) appear directly on the map
+- [ ] Show Polygon toggle appears on the map
+- [ ] Map displays same properties as CMA
+
+---
+
+## Section 5: Mapbox Integration (Application-Wide)
+
+### Requirement
+Client Data Portal will use Mapbox for ALL map features throughout the application.
+
+### Tasks
+
+1. **Replace all Google Maps / Leaflet with Mapbox:**
+   - CMA Builder map search
+   - CMA Detail map view
+   - Presentation Builder map
+   - Property search map (if exists)
+   - Any other maps in the application
+
+2. **Create reusable Mapbox component:**
+```typescript
+// components/shared/MapboxMap.tsx
+import { useEffect, useRef, useState } from 'react';
+import mapboxgl from 'mapbox-gl';
+import 'mapbox-gl/dist/mapbox-gl.css';
+
+interface MapboxMapProps {
+  properties?: PropertyMarker[];
+  center?: [number, number];
+  zoom?: number;
+  style?: 'streets' | 'satellite' | 'dark';
+  showControls?: boolean;
+  onStyleChange?: (style: string) => void;
+  showPolygon?: boolean;
+  interactive?: boolean;
+  onBoundsChange?: (bounds: mapboxgl.LngLatBounds) => void;
+  onPolygonDraw?: (coordinates: [number, number][]) => void;
+}
+
+const MAPBOX_STYLES = {
+  streets: 'mapbox://styles/mapbox/streets-v12',
+  satellite: 'mapbox://styles/mapbox/satellite-streets-v12',
+  dark: 'mapbox://styles/mapbox/dark-v11'
+};
+
+export function MapboxMap({ 
+  properties = [],
+  center = [-97.7431, 30.2672], // Austin default
+  zoom = 10,
+  style = 'streets',
+  showControls = true,
+  onStyleChange,
+  showPolygon = false,
+  interactive = true,
+  onBoundsChange,
+  onPolygonDraw
+}: MapboxMapProps) {
+  const mapContainer = useRef<HTMLDivElement>(null);
+  const map = useRef<mapboxgl.Map | null>(null);
+  
+  useEffect(() => {
+    if (!mapContainer.current) return;
+    
+    mapboxgl.accessToken = import.meta.env.VITE_MAPBOX_TOKEN;
+    
+    if (!mapboxgl.accessToken) {
+      console.error('[MAPBOX] Token not configured');
+      return;
+    }
+    
+    map.current = new mapboxgl.Map({
+      container: mapContainer.current,
+      style: MAPBOX_STYLES[style],
+      center,
+      zoom,
+      interactive
+    });
+    
+    if (showControls) {
+      map.current.addControl(new mapboxgl.NavigationControl(), 'top-right');
+    }
+    
+    return () => {
+      map.current?.remove();
+    };
+  }, []);
+  
+  // Update style when changed
+  useEffect(() => {
+    if (map.current) {
+      map.current.setStyle(MAPBOX_STYLES[style]);
+    }
+  }, [style]);
+  
+  // Add markers when properties change
+  useEffect(() => {
+    if (!map.current) return;
+    // Add markers logic...
+  }, [properties]);
+  
+  return (
+    <div ref={mapContainer} className="w-full h-full min-h-[300px]" />
+  );
+}
+```
+
+3. **Ensure dark mode syncs with map:**
+```typescript
+// When app dark mode changes, update map style
+const { isDarkMode } = useTheme();
+
+useEffect(() => {
+  if (isDarkMode && mapStyle !== 'satellite') {
+    setMapStyle('dark');
+  } else if (!isDarkMode && mapStyle === 'dark') {
+    setMapStyle('streets');
+  }
+}, [isDarkMode]);
+```
+
+### Mapbox Style URLs
+- Streets: `mapbox://styles/mapbox/streets-v12`
+- Satellite: `mapbox://styles/mapbox/satellite-streets-v12`
+- Dark: `mapbox://styles/mapbox/dark-v11`
+
+### Acceptance Criteria
+- [ ] All maps in application use Mapbox
+- [ ] `VITE_MAPBOX_TOKEN` is properly configured and read
+- [ ] Maps support Streets, Satellite, Dark styles
+- [ ] Dark mode preference syncs with map style
+- [ ] Reusable MapboxMap component created
+
+---
+
+## Section 6: Settings - Profile Photo Upload
+
+### Requirement
+In Settings > Profile Information, add ability to upload, delete, and position agent headshot photo.
+
+### Tasks
+```jsx
+// ProfileSettings.tsx
+export function ProfileSettings() {
+  const [headshot, setHeadshot] = useState(profile?.headshot || null);
+  const [photoPosition, setPhotoPosition] = useState(profile?.photoPosition || 'center');
+  
+  const handlePhotoUpload = async (file: File) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    
+    const response = await fetch('/api/agent-profile/headshot', {
+      method: 'POST',
+      body: formData
+    });
+    
+    const data = await response.json();
+    setHeadshot(data.url);
+  };
+  
+  const handlePhotoDelete = async () => {
+    await fetch('/api/agent-profile/headshot', { method: 'DELETE' });
+    setHeadshot(null);
+  };
+  
+  return (
+    <div className="space-y-6">
+      <h3 className="font-semibold">Profile Information</h3>
+      
+      {/* Headshot Upload */}
+      <div>
+        <label className="block text-sm font-medium mb-2">Profile Photo</label>
+        
+        {headshot ? (
+          <div className="flex items-start gap-4">
+            <div className="relative w-32 h-32 rounded-full overflow-hidden border-2">
+              <img 
+                src={headshot} 
+                alt="Profile"
+                className={`w-full h-full object-cover object-${photoPosition}`}
+              />
+            </div>
+            
+            <div className="space-y-2">
+              <button
+                onClick={() => document.getElementById('photo-upload')?.click()}
+                className="text-sm text-blue-500 hover:text-blue-600"
+              >
+                Change Photo
+              </button>
+              <button
+                onClick={handlePhotoDelete}
+                className="text-sm text-red-500 hover:text-red-600 block"
+              >
+                Remove Photo
+              </button>
+              
+              {/* Position selector */}
+              <div className="mt-3">
+                <label className="text-xs text-gray-500">Photo Position</label>
+                <select
+                  value={photoPosition}
+                  onChange={(e) => setPhotoPosition(e.target.value)}
+                  className="mt-1 w-full border rounded px-2 py-1 text-sm"
+                >
+                  <option value="center">Center</option>
+                  <option value="top">Top</option>
+                  <option value="bottom">Bottom</option>
+                </select>
+              </div>
+            </div>
+          </div>
+        ) : (
+          <div 
+            onClick={() => document.getElementById('photo-upload')?.click()}
+            className="w-32 h-32 rounded-full border-2 border-dashed flex items-center justify-center cursor-pointer hover:border-orange-300"
+          >
+            <div className="text-center">
+              <CameraIcon className="mx-auto text-gray-400" size={24} />
+              <span className="text-xs text-gray-500 mt-1">Upload Photo</span>
+            </div>
+          </div>
+        )}
+        
+        <input
+          id="photo-upload"
+          type="file"
+          accept="image/*"
+          onChange={(e) => e.target.files?.[0] && handlePhotoUpload(e.target.files[0])}
+          className="hidden"
+        />
+        
+        <p className="text-xs text-gray-500 mt-2">
+          Recommended: Square image, at least 200x200 pixels
+        </p>
+      </div>
+      
+      {/* Other profile fields... */}
+    </div>
+  );
+}
+```
+
+### Acceptance Criteria
+- [ ] Users can upload profile photo
+- [ ] Users can delete profile photo
+- [ ] Users can select photo position (center, top, bottom)
+- [ ] Photo displays in CMA presentations
+- [ ] Photo uploads stored properly
+
+---
+
+## Summary of All Fixes
+
+| Area | Issue | Priority |
+|------|-------|----------|
+| **Mapbox Token** | Not configured error | 🔴 Critical |
+| **Sections Tab** | Toggle sync to preview | 🟡 Medium |
+| **Content Tab** | Limited editability | 🟡 Medium |
+| **Content Tab** | Agent photo not from profile | 🟡 Medium |
+| **Content Tab** | AI Cover Letter not working | 🔴 High |
+| **Listing Brochure** | Duplicate heading | 🟢 Low |
+| **Listing Brochure** | Image not showing in preview | 🔴 High |
+| **Layout Tab** | Photos missing | 🔴 High |
+| **Layout Tab** | Map Settings wrong location | 🟡 Medium |
+| **Global** | All maps should use Mapbox | 🔴 High |
+| **Settings** | Profile photo upload | 🟡 Medium |
+
+---
+
+## Testing Checklist
+
+After fixes, test the following flow:
+
+1. [ ] Create a new CMA with comparables
+2. [ ] Go to Presentation Builder
+3. [ ] Toggle sections - verify preview updates
+4. [ ] Edit all content fields - verify they save
+5. [ ] Generate AI Cover Letter - verify it uses CMA data
+6. [ ] Upload Listing Brochure - verify it shows in preview
+7. [ ] Select photos in Layout tab - verify modal works
+8. [ ] Change map style - verify map updates
+9. [ ] Export PDF - verify all sections render correctly
+10. [ ] Upload profile photo in Settings - verify it appears in CMA

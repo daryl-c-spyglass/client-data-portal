@@ -216,13 +216,6 @@ export function ListingBrochureContent({
 
   return (
     <div className="space-y-4">
-      <div>
-        <h3 className="font-semibold text-lg">Listing Brochure</h3>
-        <p className="text-sm text-muted-foreground">
-          Add a marketing flyer for the subject property to include in your CMA presentation.
-        </p>
-      </div>
-
       {brochure ? (
         <Card>
           <CardContent className="p-4 space-y-4">

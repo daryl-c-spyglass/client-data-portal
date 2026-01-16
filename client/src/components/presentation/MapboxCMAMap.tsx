@@ -19,6 +19,7 @@ interface MapboxCMAMapProps {
   style?: 'streets' | 'satellite' | 'dark';
   showPolygon?: boolean;
   onStyleChange?: (style: 'streets' | 'satellite' | 'dark') => void;
+  onPolygonChange?: (show: boolean) => void;
   height?: string;
   interactive?: boolean;
 }
@@ -47,6 +48,7 @@ export function MapboxCMAMap({
   style = 'streets',
   showPolygon = true,
   onStyleChange,
+  onPolygonChange,
   height = '400px',
   interactive = true
 }: MapboxCMAMapProps) {
@@ -202,10 +204,26 @@ export function MapboxCMAMap({
               variant={style === s ? 'default' : 'ghost'}
               onClick={() => onStyleChange(s)}
               className="capitalize text-xs h-7"
+              data-testid={`button-map-style-${s}`}
             >
               {s}
             </Button>
           ))}
+        </div>
+      )}
+      
+      {onPolygonChange && (
+        <div className="absolute top-3 right-3 bg-background/90 backdrop-blur-sm rounded-lg shadow-md px-3 py-2">
+          <label className="flex items-center gap-2 text-xs cursor-pointer">
+            <input
+              type="checkbox"
+              checked={showPolygon}
+              onChange={(e) => onPolygonChange(e.target.checked)}
+              className="rounded border-muted-foreground"
+              data-testid="checkbox-show-polygon"
+            />
+            <span>Show Area</span>
+          </label>
         </div>
       )}
       

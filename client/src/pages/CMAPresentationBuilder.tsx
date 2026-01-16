@@ -1039,66 +1039,7 @@ export default function CMAPresentationBuilder() {
                 </CardContent>
               </Card>
 
-              <Card>
-                <CardHeader className="pb-3">
-                  <CardTitle className="text-lg">Map Settings</CardTitle>
-                  <CardDescription>
-                    Customize the Map of All Listings appearance
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="space-y-2">
-                    <Label>Map Style</Label>
-                    <div className="grid grid-cols-3 gap-2">
-                      {[
-                        { id: 'streets' as const, label: 'Streets' },
-                        { id: 'satellite' as const, label: 'Satellite' },
-                        { id: 'dark' as const, label: 'Dark' }
-                      ].map(style => (
-                        <button
-                          key={style.id}
-                          type="button"
-                          onClick={() => {
-                            setMapStyle(style.id);
-                            setHasChanges(true);
-                          }}
-                          className={`
-                            border rounded-lg p-3 text-center transition-all
-                            ${mapStyle === style.id 
-                              ? 'border-primary bg-primary/10' 
-                              : 'hover:border-muted-foreground/50'
-                            }
-                          `}
-                          data-testid={`button-map-style-${style.id}`}
-                        >
-                          <Map className="w-6 h-6 mx-auto mb-1 text-muted-foreground" />
-                          <span className="text-sm">{style.label}</span>
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                  
-                  <Separator />
-                  
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <Label className="text-sm font-medium">Show Search Area Polygon</Label>
-                      <p className="text-xs text-muted-foreground">
-                        Display a boundary around all properties on the map
-                      </p>
-                    </div>
-                    <Switch 
-                      checked={showMapPolygon}
-                      onCheckedChange={(v) => {
-                        setShowMapPolygon(v);
-                        setHasChanges(true);
-                      }}
-                      data-testid="switch-show-polygon"
-                    />
-                  </div>
-                </CardContent>
-              </Card>
-            </TabsContent>
+              </TabsContent>
           </Tabs>
         </div>
 
@@ -1290,6 +1231,14 @@ export default function CMAPresentationBuilder() {
                             style={mapStyle}
                             showPolygon={showMapPolygon}
                             height="192px"
+                            onStyleChange={(s) => {
+                              setMapStyle(s);
+                              setHasChanges(true);
+                            }}
+                            onPolygonChange={(v) => {
+                              setShowMapPolygon(v);
+                              setHasChanges(true);
+                            }}
                           />
                         </div>
                       ) : (
@@ -1676,6 +1625,14 @@ export default function CMAPresentationBuilder() {
                     style={mapStyle}
                     showPolygon={showMapPolygon}
                     height="256px"
+                    onStyleChange={(s) => {
+                      setMapStyle(s);
+                      setHasChanges(true);
+                    }}
+                    onPolygonChange={(v) => {
+                      setShowMapPolygon(v);
+                      setHasChanges(true);
+                    }}
                   />
                 </div>
               ) : (
