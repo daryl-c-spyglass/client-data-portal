@@ -6,8 +6,11 @@ This project is a professional real estate IDX (Internet Data Exchange) platform
 ## User Preferences
 Preferred communication style: Simple, everyday language.
 **Mapping Solution**: Mapbox is the standard mapping library for all features across the application. All interactive maps, property visualizations, and location-based features should use Mapbox GL JS. Requires VITE_MAPBOX_TOKEN secret.
-- **Reusable MapboxMap Component**: `client/src/components/shared/MapboxMap.tsx` - Standard component for property maps with markers, price labels, popups, auto-fit bounds, legend, polygon overlays, and static map URL generation for PDF export.
-- **Migration Status**: CMAReport.tsx, PropertyDetail.tsx, PropertyMapView.tsx, NeighborhoodReview.tsx fully migrated to Mapbox. Remaining files using Leaflet: MapLayersControl.tsx (flood zones/school districts), PolygonMapSearch.tsx (requires mapbox-gl-draw for drawing tools).
+- **Centralized Map Colors**: `client/src/lib/mapColors.ts` - Single source of truth for all map marker colors (Active=#22c55e, AUC=#f97316, Pending=#eab308, Closed=#6b7280, Subject=#ef4444) and Mapbox style URLs (streets, satellite, dark).
+- **Reusable MapboxMap Component**: `client/src/components/shared/MapboxMap.tsx` - Standard component for property maps with markers, price labels, popups, auto-fit bounds, legend, polygon overlays, and static map URL generation for PDF export. Supports theme synchronization via `syncWithTheme` and `currentTheme` props.
+- **Global Day/Night Mode**: ThemeContext (`client/src/contexts/ThemeContext.tsx`) provides application-wide theme state with localStorage persistence ('cdp-theme'). Maps automatically sync their visual style (streets for light mode, dark for dark mode) when `syncWithTheme={true}` is passed to MapboxMap.
+- **Polygon Persistence**: MapboxMap uses reusable `addPolygonToMap()` function called both on initial render and after theme-triggered style changes to ensure polygon overlays persist across theme toggles.
+- **Migration Status**: CMAReport.tsx, PropertyDetail.tsx, PropertyMapView.tsx, NeighborhoodReview.tsx fully migrated to Mapbox with theme sync. Remaining files using Leaflet: MapLayersControl.tsx (flood zones/school districts), PolygonMapSearch.tsx (requires mapbox-gl-draw for drawing tools).
 
 ## System Architecture
 
