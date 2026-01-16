@@ -1,0 +1,160 @@
+Add Streets/Satellite Toggle to CMA Map
+Task: Add map style toggle buttons (Streets/Satellite) to the CMA section's main map view, matching the style shown in the CMA Presentation Preview.
+
+Current State
+
+CMA map shows comparable homes with price bubbles
+Map has a Legend (Subject Property, Active, Under Contract, Closed, Pending)
+Map already syncs with app's day/dark mode theme
+Missing: Streets/Satellite toggle that exists in the Presentation Preview
+
+Required Changes
+1. Add Toggle Buttons to CMA Map
+Add a button group in the top-left area of the map (similar to Presentation Preview):
+tsx// Map style toggle component
+const MapStyleToggle = ({ mapStyle, onStyleChange }) => {
+  return (
+    <div className="absolute top-3 left-3 z-10 flex rounded-lg overflow-hidden shadow-md">
+      <button
+        onClick={() => onStyleChange('streets')}
+        className={`px-4 py-2 text-sm font-medium transition-colors ${
+          mapStyle === 'streets'
+            ? 'bg-primary text-white'
+            : 'bg-white text-gray-700 hover:bg-gray-100'
+        }`}
+      >
+        Streets
+      </button>
+      <button
+        onClick={() => onStyleChange('satellite')}
+        className={`px-4 py-2 text-sm font-medium transition-colors ${
+          mapStyle === 'satellite'
+            ? 'bg-primary text-white'
+            : 'bg-white text-gray-700 hover:bg-gray-100'
+        }`}
+      >
+        Satellite
+      </button>
+    </div>
+  );
+};
+2. Map Style Configuration
+tsx// Mapbox style URLs
+const MAP_STYLES = {
+  streets: {
+    light: 'mapbox://styles/mapbox/streets-v12',
+    dark: 'mapbox://styles/mapbox/dark-v11'
+  },
+  satellite: {
+    light: 'mapbox://styles/mapbox/satellite-streets-v12',
+    dark: 'mapbox://styles/mapbox/satellite-streets-v12' // Same for both themes
+  }
+};
+
+// In your CMA map component
+const [mapStyle, setMapStyle] = useState<'streets' | 'satellite'>('streets');
+const { theme } = useTheme(); // or however you detect dark mode
+
+// Get the appropriate style based on selection AND theme
+const currentMapStyle = MAP_STYLES[mapStyle][theme === 'dark' ? 'dark' : 'light'];
+3. Integration with Existing Map
+tsx// In the CMA map component (likely CMATab.tsx or similar)
+
+const CMAMap = ({ comparables, subjectProperty }) => {
+  const [mapStyle, setMapStyle] = useState<'streets' | 'satellite'>('streets');
+  const { theme } = useTheme();
+  
+  const getMapStyle = () => {
+    if (mapStyle === 'satellite') {
+      return 'mapbox://styles/mapbox/satellite-streets-v12';
+    }
+    // Streets mode - respect dark/light theme
+    return theme === 'dark' 
+      ? 'mapbox://styles/mapbox/dark-v11'
+      : 'mapbox://styles/mapbox/streets-v12';
+  };
+
+  return (
+    <div className="relative w-full h-[500px] rounded-lg overflow-hidden">
+      {/* Map Style Toggle */}
+      <MapStyleToggle 
+        mapStyle={mapStyle} 
+        onStyleChange={setMapStyle} 
+      />
+      
+      {/* Mapbox Map */}
+      <Map
+        mapboxAccessToken={MAPBOX_TOKEN}
+        mapStyle={getMapStyle()}
+        // ... other map props
+      >
+        {/* Markers, Legend, etc. */}
+      </Map>
+      
+      {/* Existing Legend component */}
+      <Legend />
+    </div>
+  );
+};
+4. Dark Mode Styling for Toggle Buttons
+tsx// Ensure toggle looks good in dark mode
+<div className="absolute top-3 left-3 z-10 flex rounded-lg overflow-hidden shadow-md">
+  <button
+    onClick={() => onStyleChange('streets')}
+    className={`px-4 py-2 text-sm font-medium transition-colors ${
+      mapStyle === 'streets'
+        ? 'bg-primary text-white'
+        : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700'
+    }`}
+  >
+    Streets
+  </button>
+  <button
+    onClick={() => onStyleChange('satellite')}
+    className={`px-4 py-2 text-sm font-medium transition-colors ${
+      mapStyle === 'satellite'
+        ? 'bg-primary text-white'
+        : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700'
+    }`}
+  >
+    Satellite
+  </button>
+</div>
+```
+
+---
+
+### Files to Modify
+- `client/src/components/CMATab.tsx` (or wherever CMA map is rendered)
+- Possibly create `client/src/components/MapStyleToggle.tsx` as reusable component
+
+---
+
+### Acceptance Criteria
+- [ ] Streets/Satellite toggle appears in top-left of CMA map
+- [ ] Toggle styling matches the Presentation Preview (rounded buttons, clear active state)
+- [ ] "Streets" is selected by default
+- [ ] Clicking "Satellite" switches to satellite imagery with street labels
+- [ ] **NO "Dark" button** - dark mode is handled automatically by theme
+- [ ] In dark mode + Streets: map uses dark style
+- [ ] In dark mode + Satellite: map stays satellite (no dark variant needed)
+- [ ] In light mode + Streets: map uses light streets style
+- [ ] Toggle buttons look good in both light and dark app themes
+- [ ] Legend remains visible and positioned correctly
+- [ ] Price bubbles and markers remain visible on both map styles
+
+---
+
+### Visual Reference
+
+**Button Layout:**
+```
+┌─────────┬───────────┐
+│ Streets │ Satellite │  ← Toggle in top-left of map
+└─────────┴───────────┘
+Positioning:
+
+Top-left corner of map
+Small margin from edges (12-16px)
+Above the legend
+z-index ensures it's above map tiles

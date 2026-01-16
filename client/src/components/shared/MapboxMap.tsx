@@ -155,6 +155,11 @@ export function MapboxMap({
   const mapboxToken = import.meta.env.VITE_MAPBOX_TOKEN;
   
   const effectiveStyle = useMemo((): MapStyleKey => {
+    // Satellite always stays satellite regardless of theme
+    if (style === 'satellite') {
+      return 'satellite';
+    }
+    // For streets mode, respect theme sync
     if (syncWithTheme && currentTheme) {
       return currentTheme === 'dark' ? 'dark' : 'streets';
     }

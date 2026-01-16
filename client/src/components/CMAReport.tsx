@@ -103,6 +103,9 @@ export function CMAReport({
   const [showUnderContractOnTimeline, setShowUnderContractOnTimeline] = useState(true);
   const [showSoldOnTimeline, setShowSoldOnTimeline] = useState(true);
   
+  // Map style toggle (Streets/Satellite)
+  const [mapStyle, setMapStyle] = useState<'streets' | 'satellite'>('streets');
+  
   // Pricing Strategy state
   const [showSubjectOnPricingChart, setShowSubjectOnPricingChart] = useState(true);
   const [selectedPricingProperty, setSelectedPricingProperty] = useState<Property | null>(null);
@@ -1086,7 +1089,34 @@ export function CMAReport({
 
         {/* Map Tab - CloudCMA Style Full-width Map */}
         <TabsContent value="map" className="space-y-0 mt-0 relative">
-          <div className="h-[600px] rounded-b-lg overflow-hidden">
+          <div className="h-[600px] rounded-b-lg overflow-hidden relative">
+            {/* Streets/Satellite Toggle */}
+            <div className="absolute top-3 left-3 z-10 flex rounded-lg overflow-hidden shadow-md">
+              <button
+                onClick={() => setMapStyle('streets')}
+                className={cn(
+                  "px-4 py-2 text-sm font-medium transition-colors",
+                  mapStyle === 'streets'
+                    ? "bg-primary text-white"
+                    : "bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700"
+                )}
+                data-testid="button-map-style-streets"
+              >
+                Streets
+              </button>
+              <button
+                onClick={() => setMapStyle('satellite')}
+                className={cn(
+                  "px-4 py-2 text-sm font-medium transition-colors",
+                  mapStyle === 'satellite'
+                    ? "bg-primary text-white"
+                    : "bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700"
+                )}
+                data-testid="button-map-style-satellite"
+              >
+                Satellite
+              </button>
+            </div>
             {(() => {
               const validProperties = properties.filter(
                 p => p.latitude && p.longitude && !excludedPropertyIds.has(p.id)
@@ -1109,6 +1139,7 @@ export function CMAReport({
                   markers={mapMarkers}
                   height="600px"
                   showLegend={true}
+                  style={mapStyle}
                   syncWithTheme={true}
                   currentTheme={theme}
                   onMarkerClick={(id) => {
