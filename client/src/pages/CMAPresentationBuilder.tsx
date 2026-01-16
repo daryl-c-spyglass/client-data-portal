@@ -825,11 +825,11 @@ export default function CMAPresentationBuilder() {
                       subjectProperty={subjectProperty ? {
                         address: subjectProperty.address,
                         streetAddress: subjectProperty.streetAddress,
-                        listPrice: subjectProperty.listPrice,
-                        bedroomsTotal: subjectProperty.bedroomsTotal,
-                        bathroomsTotal: subjectProperty.bathroomsTotal,
-                        livingArea: subjectProperty.livingArea,
-                        yearBuilt: subjectProperty.yearBuilt,
+                        listPrice: subjectProperty.listPrice ?? undefined,
+                        bedroomsTotal: subjectProperty.bedroomsTotal ?? undefined,
+                        bathroomsTotal: subjectProperty.bathroomsTotal ?? undefined,
+                        livingArea: subjectProperty.livingArea ?? undefined,
+                        yearBuilt: subjectProperty.yearBuilt ?? undefined,
                         publicRemarks: subjectProperty.publicRemarks,
                         photos: subjectProperty.photos,
                       } : undefined}
