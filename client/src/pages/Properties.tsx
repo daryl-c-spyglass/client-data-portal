@@ -579,7 +579,7 @@ export default function Properties() {
                 <Badge variant="outline" className="bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200 text-xs" data-testid="badge-inventory-uc">
                   AUC: {(inventory.countsByStatus['Active Under Contract'] || 0).toLocaleString()}
                 </Badge>
-                <Badge variant="outline" className="bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 text-xs" data-testid="badge-inventory-closed">
+                <Badge variant="outline" className="bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200 text-xs" data-testid="badge-inventory-closed">
                   Closed: {(inventory.countsByStatus['Closed'] || 0).toLocaleString()}
                 </Badge>
               </div>
@@ -710,7 +710,7 @@ export default function Properties() {
                   <Badge variant="outline" className="bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200" data-testid="badge-status-under-contract">
                     Active Under Contract: {searchResult.inventoryByStatus['Active Under Contract']}
                   </Badge>
-                  <Badge variant="outline" className="bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200" data-testid="badge-status-closed">
+                  <Badge variant="outline" className="bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200" data-testid="badge-status-closed">
                     Closed: {searchResult.inventoryByStatus['Closed']}
                   </Badge>
                 </div>
