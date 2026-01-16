@@ -178,9 +178,9 @@ export default function Settings() {
         throw new Error("Failed to get upload URL");
       }
 
-      const { signedUrl, objectPath } = await urlResponse.json();
+      const { uploadURL, objectPath } = await urlResponse.json();
 
-      const uploadResponse = await fetch(signedUrl, {
+      const uploadResponse = await fetch(uploadURL, {
         method: "PUT",
         body: file,
         headers: { "Content-Type": file.type },
