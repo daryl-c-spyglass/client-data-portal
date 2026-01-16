@@ -1,0 +1,175 @@
+Extend Live Preview Panel Height
+SCOPE
+Make the Live Preview panel on the CMA Presentation Builder taller so users can see more content without excessive scrolling. Keep the expand modal option as well.
+
+CURRENT STATE
+┌─────────────────────────────────────────────────────────────────────┐
+│  Report Sections          │  Live Preview            [9 sections]  │
+│                           │  ┌─────────────────────────────────┐   │
+│  ☐ Cover Page             │  │                                 │   │
+│  ☐ Listing Brochure       │  │  ~300-400px visible height      │   │
+│  ☐ Cover Letter           │  │  (too short, lots of scrolling) │   │
+│  ☐ Agent Resume           │  │                                 │   │
+│  ...                      │  └─────────────────────────────────┘   │
+│                           │                                        │
+│                           │        ↑ User wants this taller        │
+└─────────────────────────────────────────────────────────────────────┘
+
+TARGET STATE
+┌─────────────────────────────────────────────────────────────────────┐
+│  Report Sections          │  Live Preview            [⛶ Expand]    │
+│                           │  ┌─────────────────────────────────┐   │
+│  ☐ Cover Page             │  │                                 │   │
+│  ☐ Listing Brochure       │  │                                 │   │
+│  ☐ Cover Letter           │  │                                 │   │
+│  ☐ Agent Resume           │  │   ~600-800px visible height     │   │
+│  ☐ Our Company            │  │   (or calc(100vh - header))     │   │
+│  ☐ What is a CMA?         │  │                                 │   │
+│  ☐ Contact Me             │  │   User can see much more        │   │
+│  ...                      │  │   without scrolling             │   │
+│                           │  │                                 │   │
+│                           │  │                                 │   │
+│                           │  └─────────────────────────────────┘   │
+└─────────────────────────────────────────────────────────────────────┘
+
+TASKS
+Task 1: Make Live Preview panel use available viewport height
+tsx// In CMAPresentationBuilder.tsx (or wherever Live Preview is rendered)
+
+// CURRENT (likely):
+<div className="h-[400px] overflow-y-auto">
+  {/* Preview content */}
+</div>
+
+// UPDATED - Use viewport height minus header/padding:
+<div className="h-[calc(100vh-200px)] min-h-[500px] max-h-[800px] overflow-y-auto sticky top-4">
+  {/* Preview content */}
+</div>
+Task 2: Make preview panel sticky (scrolls with page)
+tsx// Make the preview panel sticky so it stays visible as user scrolls sections list
+
+<div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+  {/* Left side - Report Sections */}
+  <div className="space-y-4">
+    {/* Sections list - scrolls normally */}
+  </div>
+  
+  {/* Right side - Live Preview */}
+  <div className="lg:sticky lg:top-4 lg:self-start">
+    <div className="border rounded-lg bg-white dark:bg-gray-900 shadow-sm">
+      {/* Preview header */}
+      <div className="flex items-center justify-between p-3 border-b">
+        <div>
+          <h3 className="font-medium">Live Preview</h3>
+          <p className="text-xs text-muted-foreground">Preview how your CMA presentation will appear</p>
+        </div>
+        <div className="flex items-center gap-2">
+          <span className="text-sm text-muted-foreground">{enabledCount} sections</span>
+          <Button variant="ghost" size="icon" onClick={openFullPreviewModal}>
+            <Expand className="w-4 h-4" />
+          </Button>
+        </div>
+      </div>
+      
+      {/* Preview content - TALLER */}
+      <div className="h-[calc(100vh-220px)] min-h-[500px] overflow-y-auto p-4">
+        {/* Preview sections render here */}
+      </div>
+    </div>
+  </div>
+</div>
+Task 3: Add responsive height adjustments
+tsx// Different heights for different screen sizes
+
+<div className={cn(
+  "overflow-y-auto",
+  // Mobile: fixed reasonable height
+  "h-[400px]",
+  // Tablet: taller
+  "md:h-[500px]",
+  // Desktop: use viewport calculation
+  "lg:h-[calc(100vh-200px)] lg:min-h-[600px] lg:max-h-[900px]"
+)}>
+  {/* Preview content */}
+</div>
+Task 4: Ensure smooth scrolling inside preview
+tsx// Add smooth scrolling and subtle scroll indicator
+
+<div className="relative">
+  <div 
+    className="h-[calc(100vh-220px)] min-h-[500px] overflow-y-auto scroll-smooth"
+    style={{ scrollbarGutter: 'stable' }}
+  >
+    {/* Preview content */}
+  </div>
+  
+  {/* Optional: Scroll shadow indicators */}
+  <div className="absolute top-0 left-0 right-0 h-4 bg-gradient-to-b from-white to-transparent pointer-events-none" />
+  <div className="absolute bottom-0 left-0 right-0 h-4 bg-gradient-to-t from-white to-transparent pointer-events-none" />
+</div>
+Task 5: Keep expand button for full modal view
+tsx// The expand button (⛶) should still open full-screen modal for detailed review
+
+<Button 
+  variant="ghost" 
+  size="icon" 
+  onClick={openFullPreviewModal}
+  title="Expand to full screen"
+>
+  <Maximize2 className="w-4 h-4" />
+</Button>
+
+OPTIONAL ENHANCEMENT: Resizable Preview Panel
+tsx// Allow user to drag to resize preview height
+
+import { ResizablePanel, ResizablePanelGroup, ResizableHandle } from '@/components/ui/resizable';
+
+<ResizablePanelGroup direction="vertical">
+  <ResizablePanel defaultSize={70} minSize={40}>
+    {/* Preview content */}
+  </ResizablePanel>
+  <ResizableHandle withHandle />
+  <ResizablePanel defaultSize={30}>
+    {/* Could show zoom controls or additional info */}
+  </ResizablePanel>
+</ResizablePanelGroup>
+```
+
+---
+
+### FILES TO MODIFY
+```
+client/src/
+└── pages/
+    └── CMAPresentationBuilder.tsx    [MODIFY - preview panel height]
+```
+
+---
+
+### ACCEPTANCE CRITERIA
+
+- [ ] Live Preview panel is visibly taller (minimum 500px, ideally viewport-based)
+- [ ] Preview uses `calc(100vh - offset)` for dynamic height on desktop
+- [ ] Preview panel is sticky on desktop (stays visible while scrolling sections)
+- [ ] Smooth scrolling inside preview panel
+- [ ] Expand button still works to open full-screen modal
+- [ ] Mobile view has reasonable fixed height (doesn't break layout)
+- [ ] Dark mode styling maintained
+- [ ] No horizontal overflow issues
+
+---
+
+### VISUAL REFERENCE
+
+**Before:**
+```
+Preview height: ~350px
+Visible sections: ~2-3
+Scrolling required: Excessive
+```
+
+**After:**
+```
+Preview height: ~600-800px (or viewport-based)
+Visible sections: ~5-7
+Scrolling required: Minimal

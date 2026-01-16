@@ -1136,7 +1136,7 @@ export default function CMAPresentationBuilder() {
           </Tabs>
         </div>
 
-        <div className="space-y-6">
+        <div className="lg:sticky lg:top-4 lg:self-start space-y-6">
           <Card>
             <CardHeader className="pb-3">
               <div className="flex items-center justify-between gap-2">
@@ -1163,7 +1163,7 @@ export default function CMAPresentationBuilder() {
               </div>
             </CardHeader>
             <CardContent>
-              <ScrollArea className="h-[600px] border rounded-md">
+              <ScrollArea className="h-[500px] md:h-[600px] lg:h-[calc(100vh-200px)] lg:min-h-[600px] lg:max-h-[900px] border rounded-md scroll-smooth">
                 <div className={`p-4 space-y-4 transition-opacity duration-300 ${isPreviewUpdating ? "opacity-50" : "opacity-100"}`}>
                   {includedSections.includes("cover_page") && (
                     <PreviewSection title="Cover Page" icon={FileText} sectionId="cover_page" onClick={handlePreviewSectionClick}>
