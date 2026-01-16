@@ -52,6 +52,7 @@ import {
 } from "lucide-react";
 import { pdf } from "@react-pdf/renderer";
 import { CMAPdfDocument } from "@/components/CMAPdfDocument";
+import { ListingBrochureContent } from "@/components/ListingBrochureContent";
 import {
   BarChart,
   Bar,
@@ -70,6 +71,7 @@ import {
   type CompanySettings,
   type CmaReportConfig,
   type Cma,
+  type CmaBrochure,
 } from "@shared/schema";
 
 // Extended type to handle API response which may include defaults
@@ -218,6 +220,7 @@ export default function CMAPresentationBuilder() {
     listings: true,
     analysis: true,
   });
+  const [brochure, setBrochure] = useState<CmaBrochure | null>(null);
 
   const { data: cma, isLoading: cmaLoading, isError: cmaError } = useQuery<Cma | null>({
     queryKey: ["/api/cmas", cmaId],
@@ -321,6 +324,23 @@ export default function CMAPresentationBuilder() {
     }
   }, [reportConfig, configLoading, agentProfile]);
 
+  // Initialize brochure from CMA data
+  useEffect(() => {
+    if (cma?.brochure) {
+      setBrochure(cma.brochure);
+    }
+  }, [cma?.brochure]);
+
+  // Extract subject property from CMA data
+  const subjectProperty = useMemo(() => {
+    if (!cma?.propertiesData || !cma?.subjectPropertyId) return null;
+    const properties = cma.propertiesData as PropertyData[];
+    const subject = properties.find(
+      p => p.id === cma.subjectPropertyId || p.listingId === cma.subjectPropertyId
+    );
+    return subject || null;
+  }, [cma?.propertiesData, cma?.subjectPropertyId]);
+
   const saveMutation = useMutation({
     mutationFn: async () => {
       const configData = {
@@ -412,6 +432,7 @@ export default function CMAPresentationBuilder() {
           includedSections={includedSections}
           coverLetterOverride={coverLetterOverride}
           includeAgentFooter={includeAgentFooter}
+          brochure={brochure}
         />
       );
       
@@ -718,6 +739,38 @@ export default function CMAPresentationBuilder() {
                   </div>
                 </CardContent>
               </Card>
+
+              <Card>
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-lg">Listing Brochure</CardTitle>
+                  <CardDescription>
+                    Add a marketing flyer for the subject property
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  {cmaId && (
+                    <ListingBrochureContent
+                      cmaId={cmaId}
+                      brochure={brochure}
+                      subjectProperty={subjectProperty ? {
+                        address: subjectProperty.address,
+                        streetAddress: subjectProperty.streetAddress,
+                        listPrice: subjectProperty.listPrice,
+                        bedroomsTotal: subjectProperty.bedroomsTotal,
+                        bathroomsTotal: subjectProperty.bathroomsTotal,
+                        livingArea: subjectProperty.livingArea,
+                        yearBuilt: subjectProperty.yearBuilt,
+                        publicRemarks: subjectProperty.publicRemarks,
+                        photos: subjectProperty.photos,
+                      } : undefined}
+                      onBrochureChange={(newBrochure) => {
+                        setBrochure(newBrochure);
+                        queryClientInstance.invalidateQueries({ queryKey: ["/api/cmas", cmaId] });
+                      }}
+                    />
+                  )}
+                </CardContent>
+              </Card>
             </TabsContent>
 
             <TabsContent value="layout" className="space-y-4 mt-4">
@@ -816,6 +869,36 @@ export default function CMAPresentationBuilder() {
                           Prepared by {userName}
                         </div>
                       </div>
+                    </PreviewSection>
+                  )}
+
+                  {includedSections.includes("listing_brochure") && (
+                    <PreviewSection title="Listing Brochure" icon={ImageIcon}>
+                      {brochure ? (
+                        <div className="space-y-2">
+                          <div className="aspect-[8.5/11] bg-muted rounded-lg overflow-hidden border max-h-[200px]">
+                            {brochure.type === "pdf" ? (
+                              <div className="flex items-center justify-center h-full text-muted-foreground">
+                                <FileText className="h-8 w-8 mr-2" />
+                                <span className="text-sm">{brochure.filename}</span>
+                              </div>
+                            ) : (
+                              <img
+                                src={brochure.url.startsWith("http") ? brochure.url : `/${brochure.url}`}
+                                alt="Listing Brochure"
+                                className="w-full h-full object-contain"
+                              />
+                            )}
+                          </div>
+                          <p className="text-xs text-muted-foreground text-center">
+                            {brochure.generated ? "Auto-generated brochure" : "Uploaded brochure"}
+                          </p>
+                        </div>
+                      ) : (
+                        <p className="text-sm text-muted-foreground text-center">
+                          No brochure uploaded. Go to Content tab to add one.
+                        </p>
+                      )}
                     </PreviewSection>
                   )}
 

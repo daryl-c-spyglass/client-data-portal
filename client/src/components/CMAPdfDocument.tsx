@@ -328,6 +328,14 @@ interface PropertyData {
   daysOnMarket?: number | string;
 }
 
+interface CmaBrochure {
+  type: "pdf" | "image";
+  url: string;
+  filename: string;
+  generated: boolean;
+  uploadedAt: string;
+}
+
 interface CMAPdfDocumentProps {
   cma: {
     id: string;
@@ -356,6 +364,7 @@ interface CMAPdfDocumentProps {
   includedSections: string[];
   coverLetterOverride?: string;
   includeAgentFooter: boolean;
+  brochure?: CmaBrochure | null;
 }
 
 const formatCurrency = (value: number): string => {
@@ -434,6 +443,7 @@ export function CMAPdfDocument({
   includedSections,
   coverLetterOverride,
   includeAgentFooter,
+  brochure,
 }: CMAPdfDocumentProps) {
   const properties = (cma.propertiesData || []) as PropertyData[];
   const statistics = calculateStatistics(properties);
@@ -500,6 +510,21 @@ export function CMAPdfDocument({
           </View>
 
           <Text style={{ ...styles.headerDate, marginTop: 40 }}>{currentDate}</Text>
+        </Page>
+      )}
+
+      {includedSections.includes("listing_brochure") && brochure && brochure.type === "image" && (
+        <Page size="LETTER" style={styles.page}>
+          <View style={styles.header}>
+            <Text style={styles.headerTitle}>Property Brochure</Text>
+            <Text style={styles.headerDate}>{currentDate}</Text>
+          </View>
+          <View style={{ flex: 1, justifyContent: "center", alignItems: "center", padding: 20 }}>
+            <Image 
+              src={brochure.url.startsWith("http") ? brochure.url : `${window.location.origin}/${brochure.url}`}
+              style={{ maxWidth: "100%", maxHeight: "90%", objectFit: "contain" }}
+            />
+          </View>
         </Page>
       )}
 
