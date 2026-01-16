@@ -1037,18 +1037,17 @@ export function CMAPdfDocument({
             const propertyId = property.listingId || property.id || `prop-${propIndex}`;
             const selectedPhotos = customPhotoSelections?.[propertyId] || property.photos || property.images || [];
             const photosToShow = selectedPhotos
-              .slice(0, 4)
               .map(url => getAbsolutePhotoUrl(url))
               .filter(url => url.length > 0);
             
             if (photosToShow.length === 0) return null;
 
             return (
-              <View key={propIndex} style={{ marginBottom: 16 }} wrap={false}>
+              <View key={propIndex} style={{ marginBottom: 16 }} wrap>
                 <Text style={{ fontSize: 10, fontWeight: 600, color: PDF_COLORS.text, marginBottom: 6 }}>
                   {getPropertyAddress(property)}
                 </Text>
-                <View style={styles.photoGrid}>
+                <View style={[styles.photoGrid, { flexWrap: 'wrap' }]}>
                   {photosToShow.map((photoUrl, photoIndex) => (
                     <View key={photoIndex} style={styles.photoContainer}>
                       <Image src={photoUrl} style={styles.photo} />
