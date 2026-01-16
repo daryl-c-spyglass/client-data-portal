@@ -304,7 +304,13 @@ export default function CMAPresentationBuilder() {
       const response = await fetch("/api/agent/profile");
       if (response.status === 404) return null;
       if (!response.ok) throw new Error("Failed to fetch profile");
-      return response.json();
+      const data = await response.json();
+      // API returns { profile: {...}, user: {...} } - unwrap and merge
+      return data.profile ? {
+        ...data.profile,
+        // Include user picture as fallback for headshotUrl
+        headshotUrl: data.profile.headshotUrl || data.user?.picture || null,
+      } : null;
     },
   });
 

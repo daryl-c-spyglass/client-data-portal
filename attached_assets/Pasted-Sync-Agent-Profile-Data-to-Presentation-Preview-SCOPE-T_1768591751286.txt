@@ -1,0 +1,187 @@
+Sync Agent Profile Data to Presentation Preview
+SCOPE
+The Live Preview shows placeholder data for Agent Resume section instead of the user's actual profile data from Settings (photo, title, bio). Fix the data binding so profile information displays correctly.
+
+CURRENT STATE
+FieldSettingsLive PreviewStatusProfile PhotoUploadedGray circle with "D"Not syncedTitleCustom title set"Real Estate Agent"Not synced (generic)BioCustom bio written"Agent bio will appear here..."Not synced (placeholder)NameDaryl CamingaoDaryl CamingaoWorking
+
+DIAGNOSIS TASKS
+Task 1: Find where Agent Resume section renders in Preview
+bashgrep -ri "Agent Resume" --include="*.tsx" client/src/
+grep -ri "agent bio" --include="*.tsx" client/src/
+grep -ri "Real Estate Agent" --include="*.tsx" client/src/
+Task 2: Check how user profile data is fetched
+typescript// Find where user/agent profile is stored
+// Likely in: useAuth hook, user context, or fetched from /api/users/me
+
+console.log('[AgentResume] User data:', user);
+console.log('[AgentResume] Profile photo:', user?.profilePhoto || user?.avatar || user?.photoUrl);
+console.log('[AgentResume] Title:', user?.title || user?.jobTitle);
+console.log('[AgentResume] Bio:', user?.bio || user?.biography || user?.about);
+Task 3: Check user schema for correct field names
+bashgrep -ri "profilePhoto\|avatar\|photoUrl\|bio\|title" shared/schema.ts
+
+LIKELY FIXES
+Fix A: Preview not receiving user data
+typescript// In Presentation Preview parent component
+// Make sure user profile is passed to the Agent Resume section
+
+const { user } = useAuth(); // or useUser()
+
+<AgentResumeSection
+  name={user?.name || user?.fullName}
+  title={user?.title || user?.jobTitle || 'Real Estate Agent'}
+  bio={user?.bio || user?.biography}
+  photoUrl={user?.profilePhoto || user?.avatar || user?.photoUrl}
+  email={user?.email}
+  phone={user?.phone}
+/>
+Fix B: Agent Resume section using hardcoded placeholders
+typescript// BEFORE (hardcoded):
+const AgentResumeSection = ({ name }) => {
+  return (
+    <div>
+      <div className="w-12 h-12 rounded-full bg-gray-200 flex items-center justify-center">
+        {name?.charAt(0) || 'A'}
+      </div>
+      <h3>{name}</h3>
+      <p>Real Estate Agent</p>  {/* ❌ Hardcoded */}
+      <p>Agent bio will appear here...</p>  {/* ❌ Placeholder */}
+    </div>
+  );
+};
+
+// AFTER (using actual data):
+const AgentResumeSection = ({ name, title, bio, photoUrl, email, phone }) => {
+  return (
+    <div>
+      {/* Profile Photo */}
+      {photoUrl ? (
+        <img 
+          src={photoUrl} 
+          alt={name}
+          className="w-12 h-12 rounded-full object-cover"
+        />
+      ) : (
+        <div className="w-12 h-12 rounded-full bg-gray-200 flex items-center justify-center text-gray-500">
+          {name?.charAt(0) || 'A'}
+        </div>
+      )}
+      
+      {/* Name */}
+      <h3 className="font-semibold">{name}</h3>
+      
+      {/* Title */}
+      <p className="text-sm text-muted-foreground">
+        {title || 'Real Estate Agent'}
+      </p>
+      
+      {/* Bio */}
+      {bio ? (
+        <p className="text-sm mt-2">{bio}</p>
+      ) : (
+        <p className="text-sm text-gray-400 italic mt-2">
+          No bio added yet. Add one in Settings.
+        </p>
+      )}
+    </div>
+  );
+};
+Fix C: Fetch fresh user profile data
+typescript// If user context doesn't have all fields, fetch from API
+
+const { data: userProfile } = useQuery({
+  queryKey: ['user-profile'],
+  queryFn: () => fetch('/api/users/me').then(r => r.json()),
+});
+
+// Use userProfile for display
+const agentData = {
+  name: userProfile?.name || userProfile?.fullName,
+  title: userProfile?.title || userProfile?.jobTitle,
+  bio: userProfile?.bio || userProfile?.biography,
+  photoUrl: userProfile?.profilePhoto || userProfile?.avatar,
+  email: userProfile?.email,
+  phone: userProfile?.phone,
+};
+
+ALSO UPDATE PDF EXPORT
+typescript// In PDF Agent/Contact section, use same data source
+
+const AgentContactPdf = ({ agent }) => (
+  <View style={styles.agentCard}>
+    {agent.photoUrl && (
+      <Image src={agent.photoUrl} style={styles.agentPhoto} />
+    )}
+    <Text style={styles.agentName}>{agent.name}</Text>
+    <Text style={styles.agentTitle}>{agent.title || 'Real Estate Agent'}</Text>
+    {agent.bio && (
+      <Text style={styles.agentBio}>{agent.bio}</Text>
+    )}
+    <Text style={styles.agentContact}>{agent.email}</Text>
+    <Text style={styles.agentContact}>{agent.phone}</Text>
+  </View>
+);
+```
+
+---
+
+### FILES TO CHECK/MODIFY
+```
+client/src/
+├── hooks/
+│   └── useAuth.ts (or useUser.ts)      [CHECK - what fields are available]
+├── pages/
+│   └── CMAPresentationBuilder.tsx      [MODIFY - pass user data to preview]
+├── components/
+│   └── CMA/
+│       ├── PresentationPreview.tsx     [MODIFY - receive user data]
+│       └── sections/
+│           └── AgentResumeSection.tsx  [MODIFY - use actual data]
+└── components/
+    └── pdf/
+        └── ContactPage.tsx             [MODIFY - use actual data]
+
+server/
+└── routes/
+    └── users.ts                        [CHECK - GET /api/users/me returns all fields]
+
+shared/
+└── schema.ts                           [CHECK - user table has photo, title, bio fields]
+
+ACCEPTANCE CRITERIA
+
+ Profile photo from Settings displays in Live Preview (not gray circle)
+ Agent title from Settings displays (not generic "Real Estate Agent")
+ Agent bio from Settings displays (not placeholder text)
+ If no photo uploaded, show initials fallback (current behavior is fine)
+ If no bio set, show helpful message like "Add bio in Settings"
+ Same data appears in PDF export
+ Changes in Settings immediately reflect in Presentation Preview
+
+
+LOGGING
+typescriptconsole.log('[AgentResume] Rendering with data:', {
+  name: agent?.name,
+  hasPhoto: !!agent?.photoUrl,
+  photoUrl: agent?.photoUrl?.substring(0, 50),
+  title: agent?.title,
+  hasBio: !!agent?.bio,
+});
+```
+
+---
+
+### VALIDATION TEST
+```
+1. Go to Settings
+2. Upload a profile photo
+3. Set title to "Senior Real Estate Advisor"
+4. Add bio "10 years of experience in Austin real estate..."
+5. Save settings
+6. Go to CMA > Presentation Builder
+7. Check Live Preview > Agent Resume section
+8. Verify: Photo shows (not gray circle)
+9. Verify: Title shows "Senior Real Estate Advisor"
+10. Verify: Bio shows the custom text
+11. Export PDF and verify same data appears
