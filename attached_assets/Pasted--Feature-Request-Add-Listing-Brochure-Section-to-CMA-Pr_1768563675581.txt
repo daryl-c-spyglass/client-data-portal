@@ -1,0 +1,245 @@
+ Feature Request: Add Listing Brochure Section to CMA Presentation Builder
+
+## Context
+Ryan requested the ability to add a "Listing Brochure" to CMA reports, similar to CloudCMA. This allows agents to include their own listing's marketing flyer/brochure within the CMA presentation.
+
+## What is a Listing Brochure?
+A single-page (or multi-page) marketing flyer for the subject property that agents can include in their CMA presentation. This is useful when the agent is representing the seller and wants to showcase the property professionally.
+
+---
+
+## Task 1: Add "Listing Brochure" Section to Sections Tab
+
+Add a new toggleable section under "Introduction" or create a new "Marketing" category:
+```typescript
+// In presentation sections config
+{
+  category: 'Marketing',
+  sections: [
+    {
+      id: 'listing-brochure',
+      name: 'Listing Brochure',
+      description: 'Include a property marketing flyer',
+      enabled: false, // Off by default
+      order: 7, // After Contact Me
+      icon: 'FileImage'
+    }
+  ]
+}
+```
+
+---
+
+## Task 2: Add Brochure Upload/Selection UI
+
+In the Content tab, add a Listing Brochure section:
+```jsx
+// ListingBrochureContent.tsx
+export function ListingBrochureContent({ cmaId, brochure, onUpdate }) {
+  return (
+    <div className="space-y-4">
+      <h3 className="font-semibold">Listing Brochure</h3>
+      <p className="text-sm text-gray-600">
+        Add a marketing flyer for the subject property
+      </p>
+      
+      {/* Option 1: Upload PDF/Image */}
+      <div className="border-2 border-dashed rounded-lg p-6 text-center">
+        <input 
+          type="file" 
+          accept=".pdf,.png,.jpg,.jpeg"
+          onChange={handleFileUpload}
+          className="hidden"
+          id="brochure-upload"
+        />
+        <label htmlFor="brochure-upload" className="cursor-pointer">
+          <UploadIcon className="mx-auto h-12 w-12 text-gray-400" />
+          <p className="mt-2 text-sm text-gray-600">
+            Upload PDF or Image (max 10MB)
+          </p>
+          <p className="text-xs text-gray-400">
+            Recommended: 8.5" x 11" portrait
+          </p>
+        </label>
+      </div>
+      
+      {/* Option 2: Generate from Listing Data */}
+      <div className="border rounded-lg p-4">
+        <h4 className="font-medium mb-2">Or Generate Automatically</h4>
+        <p className="text-sm text-gray-600 mb-3">
+          Create a brochure using the subject property's MLS data and photos
+        </p>
+        <button 
+          onClick={handleGenerateBrochure}
+          className="px-4 py-2 bg-orange-500 text-white rounded-lg"
+        >
+          Generate Brochure
+        </button>
+      </div>
+      
+      {/* Preview */}
+      {brochure && (
+        <div className="border rounded-lg p-4">
+          <h4 className="font-medium mb-2">Current Brochure</h4>
+          <div className="aspect-[8.5/11] bg-gray-100 rounded overflow-hidden">
+            {brochure.type === 'pdf' ? (
+              <iframe src={brochure.url} className="w-full h-full" />
+            ) : (
+              <img src={brochure.url} className="w-full h-full object-contain" />
+            )}
+          </div>
+          <button 
+            onClick={handleRemoveBrochure}
+            className="mt-2 text-red-500 text-sm"
+          >
+            Remove Brochure
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+```
+
+---
+
+## Task 3: Auto-Generate Brochure Option
+
+Create a simple brochure template using subject property data:
+```jsx
+// generateListingBrochure.ts
+export async function generateListingBrochure(subjectProperty) {
+  const brochureData = {
+    address: subjectProperty.address,
+    price: subjectProperty.listPrice,
+    beds: subjectProperty.beds,
+    baths: subjectProperty.baths,
+    sqft: subjectProperty.sqft,
+    lotSize: subjectProperty.lotSize,
+    yearBuilt: subjectProperty.yearBuilt,
+    description: subjectProperty.description,
+    photos: subjectProperty.photos?.slice(0, 4), // Top 4 photos
+    features: subjectProperty.features,
+    agent: {
+      name: currentUser.name,
+      phone: currentUser.phone,
+      email: currentUser.email,
+      photo: currentUser.photo,
+      brokerage: 'Spyglass Realty'
+    }
+  };
+  
+  // Generate PDF using template
+  return await renderBrochureTemplate(brochureData);
+}
+```
+
+---
+
+## Task 4: Include Brochure in PDF Export
+
+When exporting to PDF, insert the brochure page(s) after the Cover Page or at user-specified position:
+```javascript
+// In PDF export logic
+async function exportCMAToPDF(cmaData, presentationConfig) {
+  const pages = [];
+  
+  // Cover Page
+  if (presentationConfig.sections.coverPage.enabled) {
+    pages.push(renderCoverPage(cmaData));
+  }
+  
+  // Listing Brochure (NEW)
+  if (presentationConfig.sections.listingBrochure.enabled && cmaData.brochure) {
+    if (cmaData.brochure.type === 'pdf') {
+      // Merge uploaded PDF pages
+      const brochurePages = await extractPDFPages(cmaData.brochure.url);
+      pages.push(...brochurePages);
+    } else {
+      // Insert image as full page
+      pages.push(renderImagePage(cmaData.brochure.url));
+    }
+  }
+  
+  // Cover Letter
+  if (presentationConfig.sections.coverLetter.enabled) {
+    pages.push(renderCoverLetter(cmaData));
+  }
+  
+  // ... rest of sections
+}
+```
+
+---
+
+## Task 5: Update Live Preview
+
+Add brochure preview in the Live Preview pane:
+```jsx
+{config.sections.listingBrochure?.enabled && (
+  <div className="border rounded-lg p-4 mb-4">
+    <div className="flex items-center gap-2 mb-2">
+      <FileImageIcon size={16} />
+      <span className="font-medium">Listing Brochure</span>
+    </div>
+    {cmaData.brochure ? (
+      <div className="aspect-[8.5/11] bg-gray-100 rounded overflow-hidden">
+        <img 
+          src={cmaData.brochure.thumbnail || cmaData.brochure.url} 
+          className="w-full h-full object-contain"
+        />
+      </div>
+    ) : (
+      <div className="aspect-[8.5/11] bg-gray-50 rounded flex items-center justify-center text-gray-400 text-sm">
+        No brochure uploaded
+      </div>
+    )}
+  </div>
+)}
+```
+
+---
+
+## Database Schema Update
+
+Add brochure field to CMA model:
+```sql
+ALTER TABLE cmas ADD COLUMN brochure JSONB;
+
+-- brochure structure:
+-- {
+--   "type": "pdf" | "image",
+--   "url": "https://...",
+--   "thumbnail": "https://...",
+--   "filename": "listing-brochure.pdf",
+--   "generated": false,
+--   "uploadedAt": "2026-01-16T..."
+-- }
+```
+
+---
+
+## Acceptance Criteria
+
+- [ ] "Listing Brochure" appears as toggleable section in Sections tab
+- [ ] Users can upload PDF or image files
+- [ ] Users can auto-generate a brochure from subject property data
+- [ ] Brochure appears in Live Preview when enabled
+- [ ] Brochure is included in exported PDF at correct position
+- [ ] Brochure can be removed/replaced
+- [ ] File size limit enforced (10MB)
+
+---
+
+## UI Location
+
+In the Sections tab, add under Introduction or as new "Marketing" category:
+📋 Introduction (6/6)
+├─ Cover Page ✓
+├─ Listing Brochure ← NEW
+├─ Cover Letter ✓
+├─ Agent Resume ✓
+├─ Our Company
+├─ What is a CMA?
+└─ Contact Me ✓
+

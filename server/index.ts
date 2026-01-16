@@ -13,6 +13,7 @@ import { createMLSGridClient } from "./mlsgrid-client";
 import { startMLSGridScheduledSync, triggerManualSync } from "./mlsgrid-sync";
 import { startEmailScheduler } from "./email-scheduler";
 import { startRepliersScheduledSync, registerRepliersSyncRoutes, triggerRepliersSync } from "./repliers-sync";
+import { registerObjectStorageRoutes } from "./replit_integrations/object_storage";
 
 const app = express();
 
@@ -128,6 +129,9 @@ app.use((req, res, next) => {
   
   // Register Repliers sync admin routes
   registerRepliersSyncRoutes(app);
+  
+  // Register object storage routes for file uploads
+  registerObjectStorageRoutes(app);
   
   const server = await registerRoutes(app);
   
