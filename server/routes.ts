@@ -6920,7 +6920,7 @@ OUTPUT JSON:
         return;
       }
 
-      const { tone = 'professional' } = req.body;
+      const { tone = 'professional', existingCoverLetter } = req.body;
       
       // Validate tone
       const validTones = ['professional', 'friendly', 'confident'];
@@ -6944,6 +6944,7 @@ OUTPUT JSON:
         title: agentProfile?.title || undefined,
         company: user.company || 'Spyglass Realty',
         bio: agentProfile?.bio || undefined,
+        existingCoverLetter: existingCoverLetter || undefined,
       };
 
       console.log('[AI] Generating default cover letter:', {
@@ -6951,6 +6952,8 @@ OUTPUT JSON:
         tone,
         hasName: !!agentName,
         hasBio: !!context.bio,
+        hasExisting: !!existingCoverLetter,
+        mode: existingCoverLetter ? 'enhance' : 'generate',
       });
 
       const coverLetter = await generateDefaultCoverLetter(context, tone as 'professional' | 'friendly' | 'confident');

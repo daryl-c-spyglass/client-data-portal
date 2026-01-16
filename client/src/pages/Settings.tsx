@@ -237,7 +237,10 @@ export default function Settings() {
       const response = await fetch('/api/ai/generate-default-cover-letter', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ tone: aiCoverLetterTone }),
+        body: JSON.stringify({ 
+          tone: aiCoverLetterTone,
+          existingCoverLetter: profileForm.defaultCoverLetter || undefined,
+        }),
       });
 
       if (!response.ok) {
@@ -866,7 +869,10 @@ export default function Settings() {
                       </div>
                       
                       <p className="text-xs text-muted-foreground mt-2">
-                        AI will create a cover letter template based on your profile information above.
+                        {profileForm.defaultCoverLetter && profileForm.defaultCoverLetter.trim().length > 20
+                          ? "AI will enhance and improve your existing cover letter with the selected tone."
+                          : "AI will create a cover letter template based on your profile information above."
+                        }
                       </p>
                       
                       {!(profileForm.firstName || profileForm.lastName) && (

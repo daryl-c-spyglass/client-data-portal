@@ -264,9 +264,42 @@ export interface DefaultCoverLetterContext {
   title?: string;
   company?: string;
   bio?: string;
+  existingCoverLetter?: string;
 }
 
 function buildDefaultCoverLetterPrompt(context: DefaultCoverLetterContext, tone: CoverLetterTone): string {
+  // If there's existing content, enhance it rather than generating from scratch
+  if (context.existingCoverLetter && context.existingCoverLetter.trim().length > 20) {
+    return `You are a professional editor helping a real estate agent improve their existing cover letter for Comparative Market Analysis (CMA) reports.
+
+Agent Information:
+- Name: ${context.agentName}
+- Title: ${context.title || 'Real Estate Agent'}
+- Company: ${context.company || 'our brokerage'}
+${context.bio ? `- About: ${context.bio}` : ''}
+
+Their EXISTING cover letter:
+"""
+${context.existingCoverLetter}
+"""
+
+Your task:
+1. ENHANCE and IMPROVE this existing cover letter while preserving the agent's voice and key messages
+2. Apply a ${tone} tone throughout
+3. Improve clarity, flow, and professional polish
+4. Keep any placeholders like [Client Name] intact
+5. Keep it concise (2-3 paragraphs, ~150-200 words)
+6. Do NOT add specific property details or market statistics
+
+Tone guidelines:
+- Professional: Formal, business-like, authoritative
+- Friendly: Warm, personable, approachable  
+- Confident: Bold, assertive, results-focused
+
+Return ONLY the improved cover letter text. No commentary or explanations.`;
+  }
+  
+  // Generate new cover letter from scratch
   return `You are writing a default cover letter TEMPLATE for a real estate agent to use in their Comparative Market Analysis (CMA) reports.
 
 Agent Information:
