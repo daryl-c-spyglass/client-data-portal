@@ -25,6 +25,9 @@ import {
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import type { Property, Media } from "@shared/schema";
+import type { PhotoGalleryData } from "@shared/types/photos";
+import { RoomTypeTabs } from "@/components/property/RoomTypeTabs";
+import { getPhotosByRoom } from "@/lib/photoNormalizer";
 
 
 interface DebugData {
@@ -52,6 +55,7 @@ interface PropertyDetailProps {
   onShare?: () => void;
   onScheduleViewing?: () => void;
   debugData?: DebugData | null;
+  photoInsights?: PhotoGalleryData;
 }
 
 export function PropertyDetail({ 
@@ -61,16 +65,38 @@ export function PropertyDetail({
   onSave,
   onShare,
   onScheduleViewing,
-  debugData
+  debugData,
+  photoInsights
 }: PropertyDetailProps) {
   const { theme } = useTheme();
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [saved, setSaved] = useState(false);
   const [linkCopied, setLinkCopied] = useState(false);
   const [debugOpen, setDebugOpen] = useState(false);
+  const [selectedRoomType, setSelectedRoomType] = useState<string>('all');
   const { toast } = useToast();
   const autoAdvanceRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const pauseTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Filter photos by room type if we have insights
+  const filteredPhotos = photoInsights?.hasClassifications && selectedRoomType !== 'all'
+    ? getPhotosByRoom(photoInsights.allPhotos, selectedRoomType)
+    : photoInsights?.allPhotos || [];
+
+  // Map filtered photos to media format for display (maintain media structure)
+  const displayMedia = selectedRoomType === 'all' || !photoInsights?.hasClassifications
+    ? media
+    : filteredPhotos.map((photo, index) => ({
+        id: `filtered-${index}`,
+        listingId: property.listingId || property.id,
+        mediaKey: `filtered-${index}`,
+        mediaURL: photo.url,
+        order: index,
+        mediaCategory: 'Photo' as const,
+        shortDescription: photo.roomType,
+        modificationTimestamp: new Date().toISOString(),
+        localPath: null,
+      }));
 
   // Check if we have valid coordinates
   const hasCoordinates = Boolean(
@@ -130,12 +156,12 @@ export function PropertyDetail({
     : null;
 
   const nextImage = () => {
-    setCurrentImageIndex((prev) => (prev + 1) % media.length);
+    setCurrentImageIndex((prev) => (prev + 1) % displayMedia.length);
     pauseAndResumeAutoAdvance();
   };
 
   const prevImage = () => {
-    setCurrentImageIndex((prev) => (prev - 1 + media.length) % media.length);
+    setCurrentImageIndex((prev) => (prev - 1 + displayMedia.length) % displayMedia.length);
     pauseAndResumeAutoAdvance();
   };
 
@@ -183,24 +209,42 @@ export function PropertyDetail({
     onShare?.();
   };
 
+  // Reset image index when filter changes
+  const handleRoomTypeChange = (roomType: string) => {
+    setSelectedRoomType(roomType);
+    setCurrentImageIndex(0);
+    pauseAndResumeAutoAdvance();
+  };
+
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
       {/* Left Column - Images & Description */}
       <div className="lg:col-span-2 space-y-6">
+        {/* Room Type Tabs */}
+        {photoInsights && (
+          <RoomTypeTabs
+            photos={photoInsights.allPhotos}
+            roomTypes={photoInsights.roomTypes}
+            hasClassifications={photoInsights.hasClassifications}
+            selectedRoomType={selectedRoomType}
+            onRoomTypeChange={handleRoomTypeChange}
+          />
+        )}
+
         {/* Image Gallery */}
         <div className="space-y-4">
           <div className="relative aspect-[16/9] bg-muted rounded-md overflow-hidden">
-            {media.length > 0 ? (
+            {displayMedia.length > 0 ? (
               <>
                 <img 
-                  src={media[currentImageIndex].mediaURL || media[currentImageIndex].localPath || undefined} 
+                  src={displayMedia[currentImageIndex]?.mediaURL || displayMedia[currentImageIndex]?.localPath || undefined} 
                   alt={property.unparsedAddress || ''} 
                   className="w-full h-full object-cover"
                   data-testid="img-property-main"
                 />
                 
                 {/* Full-width left/right click zones for navigation */}
-                {media.length > 1 && (
+                {displayMedia.length > 1 && (
                   <>
                     <button
                       type="button"
@@ -225,7 +269,7 @@ export function PropertyDetail({
 
                 {/* Image Counter - z-20 to stay above navigation zones */}
                 <div className="absolute bottom-4 right-4 bg-black/60 text-white px-3 py-1 rounded-md text-sm z-20 pointer-events-none">
-                  {currentImageIndex + 1} / {media.length}
+                  {currentImageIndex + 1} / {displayMedia.length}
                 </div>
               </>
             ) : (
@@ -236,9 +280,9 @@ export function PropertyDetail({
           </div>
 
           {/* Thumbnail Strip */}
-          {media.length > 1 && (
+          {displayMedia.length > 1 && (
             <div className="grid grid-cols-6 gap-2">
-              {media.slice(0, 6).map((m, idx) => (
+              {displayMedia.slice(0, 6).map((m, idx) => (
                 <button
                   key={m.id}
                   onClick={() => {

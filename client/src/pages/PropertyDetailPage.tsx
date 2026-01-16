@@ -9,6 +9,8 @@ import { useSelectedProperty } from "@/contexts/SelectedPropertyContext";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import type { Property, Media } from "@shared/schema";
+import { normalizePhotos } from "@/lib/photoNormalizer";
+import type { PhotoGalleryData } from "@shared/types/photos";
 
 export default function PropertyDetailPage() {
   const [, params] = useRoute("/properties/:id");
@@ -114,6 +116,21 @@ export default function PropertyDetailPage() {
     },
     enabled: import.meta.env.DEV && !!listingId,
     staleTime: 5 * 60 * 1000,
+  });
+
+  // Fetch photo insights with AI classifications
+  const { data: photoInsights } = useQuery<PhotoGalleryData>({
+    queryKey: ['/api/listings', listingId, 'photos'],
+    queryFn: async () => {
+      const response = await fetch(`/api/listings/${listingId}/photos`);
+      if (!response.ok) {
+        return { allPhotos: [], roomTypes: [], hasClassifications: false };
+      }
+      const data = await response.json();
+      return normalizePhotos(data);
+    },
+    enabled: !!listingId,
+    staleTime: 10 * 60 * 1000, // 10 minutes - insights rarely change
   });
 
   // Use context data if available, otherwise use fetched data
@@ -326,6 +343,7 @@ export default function PropertyDetailPage() {
         onShare={handleShare}
         onScheduleViewing={handleScheduleViewing}
         debugData={_debug}
+        photoInsights={photoInsights}
       />
     </div>
   );
