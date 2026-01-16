@@ -46,7 +46,8 @@ import {
   Globe,
   Loader2,
   Upload,
-  Trash2
+  Trash2,
+  Sparkles
 } from "lucide-react";
 import { SiFacebook, SiInstagram, SiLinkedin, SiX } from "react-icons/si";
 
@@ -139,6 +140,8 @@ export default function Settings() {
   const [hasProfileChanges, setHasProfileChanges] = useState(false);
   const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
   const photoInputRef = useRef<HTMLInputElement>(null);
+  const [aiCoverLetterTone, setAiCoverLetterTone] = useState<'professional' | 'friendly' | 'confident'>('professional');
+  const [isGeneratingCoverLetter, setIsGeneratingCoverLetter] = useState(false);
 
   const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -215,6 +218,51 @@ export default function Settings() {
 
   const handleDeletePhoto = () => {
     setProfileForm(prev => ({ ...prev, headshotUrl: '' }));
+  };
+
+  const handleGenerateCoverLetter = async () => {
+    const hasName = !!(profileForm.firstName || profileForm.lastName);
+    if (!hasName) {
+      toast({
+        title: "Profile Required",
+        description: "Please fill in your name above before generating.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsGeneratingCoverLetter(true);
+
+    try {
+      const response = await fetch('/api/ai/generate-default-cover-letter', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tone: aiCoverLetterTone }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to generate');
+      }
+
+      const data = await response.json();
+
+      if (data.coverLetter) {
+        setProfileForm(prev => ({ ...prev, defaultCoverLetter: data.coverLetter }));
+        toast({
+          title: "Cover Letter Generated",
+          description: "You can edit the generated text below.",
+        });
+      }
+    } catch (error) {
+      console.error('[Settings] AI generation failed:', error);
+      toast({
+        title: "Generation Failed",
+        description: "Could not generate cover letter. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsGeneratingCoverLetter(false);
+    }
   };
 
   // Fetch agent profile
@@ -768,8 +816,66 @@ export default function Settings() {
                     />
                     <p className="text-xs text-muted-foreground">This will appear on the Agent Resume page in your CMA reports</p>
                   </div>
-                  <div className="space-y-2">
+                  <div className="space-y-3">
                     <Label htmlFor="coverLetter">Default Cover Letter</Label>
+                    
+                    <div className="bg-purple-50 dark:bg-purple-950/30 border border-purple-200 dark:border-purple-800 rounded-lg p-4">
+                      <div className="flex items-center gap-2 mb-3">
+                        <Sparkles className="w-4 h-4 text-purple-600 dark:text-purple-400" />
+                        <span className="text-sm font-medium text-purple-700 dark:text-purple-300">AI Assistant</span>
+                      </div>
+                      
+                      <div className="flex flex-wrap items-center gap-3">
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm text-muted-foreground">Tone:</span>
+                          <Select 
+                            value={aiCoverLetterTone} 
+                            onValueChange={(v) => setAiCoverLetterTone(v as typeof aiCoverLetterTone)}
+                          >
+                            <SelectTrigger className="w-[140px] h-9" data-testid="select-ai-tone">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="professional">Professional</SelectItem>
+                              <SelectItem value="friendly">Friendly</SelectItem>
+                              <SelectItem value="confident">Confident</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        
+                        <Button
+                          type="button"
+                          onClick={handleGenerateCoverLetter}
+                          disabled={isGeneratingCoverLetter || !(profileForm.firstName || profileForm.lastName)}
+                          className="bg-purple-600 hover:bg-purple-700"
+                          size="sm"
+                          data-testid="button-generate-cover-letter"
+                        >
+                          {isGeneratingCoverLetter ? (
+                            <>
+                              <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                              Generating...
+                            </>
+                          ) : (
+                            <>
+                              <Sparkles className="w-4 h-4 mr-2" />
+                              Generate with AI
+                            </>
+                          )}
+                        </Button>
+                      </div>
+                      
+                      <p className="text-xs text-muted-foreground mt-2">
+                        AI will create a cover letter template based on your profile information above.
+                      </p>
+                      
+                      {!(profileForm.firstName || profileForm.lastName) && (
+                        <p className="text-xs text-amber-600 dark:text-amber-400 mt-1">
+                          Fill in your name above to enable AI generation.
+                        </p>
+                      )}
+                    </div>
+                    
                     <Textarea 
                       id="coverLetter"
                       placeholder="Dear [Client Name],

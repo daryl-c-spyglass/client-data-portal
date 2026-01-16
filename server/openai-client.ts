@@ -258,3 +258,68 @@ export async function generateCoverLetter(
     throw new Error(`Failed to generate cover letter: ${error.message}`);
   }
 }
+
+export interface DefaultCoverLetterContext {
+  agentName: string;
+  title?: string;
+  company?: string;
+  bio?: string;
+}
+
+function buildDefaultCoverLetterPrompt(context: DefaultCoverLetterContext, tone: CoverLetterTone): string {
+  return `You are writing a default cover letter TEMPLATE for a real estate agent to use in their Comparative Market Analysis (CMA) reports.
+
+Agent Information:
+- Name: ${context.agentName}
+- Title: ${context.title || 'Real Estate Agent'}
+- Company: ${context.company || 'our brokerage'}
+${context.bio ? `- About: ${context.bio}` : ''}
+
+Requirements:
+1. Write a ${tone} cover letter template
+2. Use [Client Name] as a placeholder for personalization
+3. The letter should:
+   - Thank the client for the opportunity
+   - Briefly introduce the agent and their expertise
+   - Explain the purpose of the CMA report
+   - Offer to discuss the findings
+4. Keep it concise (2-3 paragraphs, ~150-200 words)
+5. Do NOT include specific property details or market statistics (those vary per CMA)
+6. Make it a reusable template that works for any property
+
+Tone guidelines:
+- Professional: Formal, business-like, authoritative
+- Friendly: Warm, personable, approachable
+- Confident: Bold, assertive, results-focused
+
+Write only the cover letter content. No additional commentary.`;
+}
+
+export async function generateDefaultCoverLetter(
+  context: DefaultCoverLetterContext,
+  tone: CoverLetterTone = 'professional'
+): Promise<string> {
+  const prompt = buildDefaultCoverLetterPrompt(context, tone);
+
+  try {
+    const response = await openai.chat.completions.create({
+      model: "gpt-4o",
+      messages: [
+        { role: "user", content: prompt }
+      ],
+      max_tokens: 500,
+      temperature: 0.7,
+    });
+
+    const content = response.choices[0].message.content;
+    if (!content) {
+      throw new Error("Empty response from AI");
+    }
+
+    console.log("[AI] Generated default cover letter template");
+    return content.trim();
+  } catch (error: any) {
+    console.error("Default cover letter generation error:", error);
+    throw new Error(`Failed to generate default cover letter: ${error.message}`);
+  }
+}

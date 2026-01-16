@@ -6901,6 +6901,66 @@ OUTPUT JSON:
     }
   });
 
+  // AI Default Cover Letter Generation endpoint (for Settings page)
+  app.post("/api/ai/generate-default-cover-letter", async (req, res) => {
+    try {
+      const { generateDefaultCoverLetter, isOpenAIConfigured } = await import("./openai-client");
+      
+      if (!isOpenAIConfigured()) {
+        res.status(503).json({ 
+          error: "AI assistant is not configured. Please add your OpenAI API key.",
+          configured: false
+        });
+        return;
+      }
+
+      const userId = (req as any).userId;
+      if (!userId) {
+        res.status(401).json({ error: "Unauthorized" });
+        return;
+      }
+
+      const { tone = 'professional' } = req.body;
+      
+      // Validate tone
+      const validTones = ['professional', 'friendly', 'confident'];
+      if (!validTones.includes(tone)) {
+        res.status(400).json({ error: "Tone must be professional, friendly, or confident" });
+        return;
+      }
+
+      // Get agent profile data
+      const user = await storage.getUser(userId);
+      if (!user) {
+        res.status(404).json({ error: "User not found" });
+        return;
+      }
+
+      const agentProfile = await storage.getAgentProfile(userId);
+      
+      const agentName = `${user.firstName || ''} ${user.lastName || ''}`.trim() || 'Agent';
+      const context = {
+        agentName,
+        title: agentProfile?.title || undefined,
+        company: user.company || 'Spyglass Realty',
+        bio: agentProfile?.bio || undefined,
+      };
+
+      console.log('[AI] Generating default cover letter:', {
+        userId,
+        tone,
+        hasName: !!agentName,
+        hasBio: !!context.bio,
+      });
+
+      const coverLetter = await generateDefaultCoverLetter(context, tone as 'professional' | 'friendly' | 'confident');
+      res.json({ coverLetter });
+    } catch (error: any) {
+      console.error("[AI Default Cover Letter] Error:", error.message);
+      res.status(500).json({ error: "Failed to generate cover letter. Please try again." });
+    }
+  });
+
   // CMA Draft endpoint - creates a draft CMA from AI-collected criteria
   app.post("/api/cma/draft", async (req, res) => {
     try {

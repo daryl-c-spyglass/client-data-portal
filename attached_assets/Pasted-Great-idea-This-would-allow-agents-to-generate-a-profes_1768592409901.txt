@@ -1,0 +1,359 @@
+Great idea! This would allow agents to generate a professional default cover letter template using their profile information. Let me create the Replit prompt.
+
+🔧 REPLIT PROMPT: Add AI Cover Letter Generator to Settings Page
+SCOPE
+Add an optional AI-powered cover letter generation feature to the Settings page "Default Cover Letter" field. This generates a reusable template based on the agent's profile information (name, title, company, bio) using OpenAI.
+
+CURRENT STATE vs TARGET STATE
+CurrentTargetPlain textarea for Default Cover LetterTextarea + "Generate with AI" buttonManual entry onlyAI can auto-compose based on agent profileNo tone optionsTone selector (Professional, Friendly, Confident)
+
+UI MOCKUP
+Default Cover Letter
+┌─────────────────────────────────────────────────────────┐
+│  ┌─────────────────┐  ┌──────────────────────────────┐  │
+│  │ Tone: [Professional ▼] │  │ ✨ Generate with AI        │  │
+│  └─────────────────┘  └──────────────────────────────┘  │
+│                                                         │
+│  AI will create a cover letter template based on your   │
+│  profile information above.                             │
+└─────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────┐
+│ Dear [Client Name],                                     │
+│                                                         │
+│ Thank you for the opportunity to prepare this           │
+│ Comparative Market Analysis for your property...        │
+│                                                         │
+└─────────────────────────────────────────────────────────┘
+This will be used as the default cover letter in your CMA 
+presentations (can be customized per CMA)
+
+ENGINEERING TASKS
+Task 1: Create API endpoint for Settings cover letter generation
+typescript// server/routes/ai.ts (or similar)
+
+router.post('/api/ai/generate-default-cover-letter', async (req, res) => {
+  const { tone = 'professional' } = req.body;
+  const userId = req.userId; // From auth middleware
+  
+  // Get agent profile data
+  const user = await db.query.users.findFirst({
+    where: eq(users.id, userId),
+  });
+  
+  if (!user) {
+    return res.status(404).json({ error: 'User not found' });
+  }
+  
+  const agentName = `${user.firstName || ''} ${user.lastName || ''}`.trim() || 'Agent';
+  const agentTitle = user.title || 'Real Estate Agent';
+  const company = user.company || 'our brokerage';
+  const agentBio = user.agentBio || '';
+  
+  const prompt = `
+You are writing a default cover letter TEMPLATE for a real estate agent to use in their Comparative Market Analysis (CMA) reports.
+
+Agent Information:
+- Name: ${agentName}
+- Title: ${agentTitle}
+- Company: ${company}
+${agentBio ? `- About: ${agentBio}` : ''}
+
+Requirements:
+1. Write a ${tone} cover letter template
+2. Use [Client Name] as a placeholder for personalization
+3. The letter should:
+   - Thank the client for the opportunity
+   - Briefly introduce the agent and their expertise
+   - Explain the purpose of the CMA report
+   - Offer to discuss the findings
+4. Keep it concise (2-3 paragraphs, ~150-200 words)
+5. Do NOT include specific property details or market statistics (those vary per CMA)
+6. Make it a reusable template that works for any property
+
+Tone guidelines:
+- Professional: Formal, business-like, authoritative
+- Friendly: Warm, personable, approachable
+- Confident: Bold, assertive, results-focused
+
+Write only the cover letter content. No additional commentary.
+  `.trim();
+
+  try {
+    const completion = await openai.chat.completions.create({
+      model: 'gpt-4',
+      messages: [{ role: 'user', content: prompt }],
+      max_tokens: 500,
+      temperature: 0.7,
+    });
+    
+    const coverLetter = completion.choices[0].message.content;
+    
+    console.log('[AI] Generated default cover letter for user:', userId);
+    
+    res.json({ coverLetter });
+  } catch (error) {
+    console.error('[AI] Default cover letter generation failed:', error);
+    res.status(500).json({ error: 'Failed to generate cover letter' });
+  }
+});
+Task 2: Create AI Cover Letter component for Settings page
+typescript// client/src/components/settings/DefaultCoverLetterAI.tsx
+
+import { useState } from 'react';
+import { Sparkles, RefreshCw } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Textarea } from '@/components/ui/textarea';
+import { useToast } from '@/hooks/use-toast';
+
+interface DefaultCoverLetterAIProps {
+  value: string;
+  onChange: (value: string) => void;
+  agentProfile: {
+    firstName?: string;
+    lastName?: string;
+    title?: string;
+    company?: string;
+    agentBio?: string;
+  };
+}
+
+export function DefaultCoverLetterAI({ value, onChange, agentProfile }: DefaultCoverLetterAIProps) {
+  const [tone, setTone] = useState<'professional' | 'friendly' | 'confident'>('professional');
+  const [isGenerating, setIsGenerating] = useState(false);
+  const { toast } = useToast();
+  
+  // Check if we have minimum profile data for AI
+  const hasProfileData = !!(agentProfile?.firstName || agentProfile?.lastName);
+  
+  const handleGenerate = async () => {
+    if (!hasProfileData) {
+      toast({
+        title: 'Profile Required',
+        description: 'Please fill in your name above before generating.',
+        variant: 'destructive',
+      });
+      return;
+    }
+    
+    setIsGenerating(true);
+    
+    try {
+      const response = await fetch('/api/ai/generate-default-cover-letter', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tone }),
+      });
+      
+      if (!response.ok) {
+        throw new Error('Failed to generate');
+      }
+      
+      const data = await response.json();
+      
+      if (data.coverLetter) {
+        onChange(data.coverLetter);
+        toast({
+          title: 'Cover Letter Generated',
+          description: 'You can edit the generated text below.',
+        });
+      }
+    } catch (error) {
+      console.error('[Settings] AI generation failed:', error);
+      toast({
+        title: 'Generation Failed',
+        description: 'Could not generate cover letter. Please try again.',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+  
+  return (
+    <div className="space-y-3">
+      <label className="text-sm font-medium">Default Cover Letter</label>
+      
+      {/* AI Assistant Section */}
+      <div className="bg-purple-50 border border-purple-200 rounded-lg p-4">
+        <div className="flex items-center gap-2 mb-2">
+          <Sparkles className="w-4 h-4 text-purple-600" />
+          <span className="text-sm font-medium text-purple-700">AI Assistant</span>
+        </div>
+        
+        <div className="flex items-center gap-3">
+          {/* Tone Selector */}
+          <div className="flex items-center gap-2">
+            <span className="text-sm text-gray-600">Tone:</span>
+            <Select value={tone} onValueChange={(v) => setTone(v as typeof tone)}>
+              <SelectTrigger className="w-[140px] h-9">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="professional">Professional</SelectItem>
+                <SelectItem value="friendly">Friendly</SelectItem>
+                <SelectItem value="confident">Confident</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          
+          {/* Generate Button */}
+          <Button
+            onClick={handleGenerate}
+            disabled={isGenerating || !hasProfileData}
+            className="bg-purple-600 hover:bg-purple-700"
+            size="sm"
+          >
+            {isGenerating ? (
+              <>
+                <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                Generating...
+              </>
+            ) : (
+              <>
+                <Sparkles className="w-4 h-4 mr-2" />
+                Generate with AI
+              </>
+            )}
+          </Button>
+        </div>
+        
+        <p className="text-xs text-gray-500 mt-2">
+          AI will create a cover letter template based on your profile information above.
+        </p>
+        
+        {!hasProfileData && (
+          <p className="text-xs text-amber-600 mt-1">
+            Fill in your name above to enable AI generation.
+          </p>
+        )}
+      </div>
+      
+      {/* Textarea */}
+      <Textarea
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder="Dear [Client Name],
+
+Thank you for the opportunity to prepare this Comparative Market Analysis for your property. This report will help you understand the current market conditions and determine the best listing price for your home..."
+        rows={8}
+        className="font-serif"
+      />
+      
+      <p className="text-xs text-muted-foreground">
+        This will be used as the default cover letter in your CMA presentations (can be customized per CMA)
+      </p>
+    </div>
+  );
+}
+Task 3: Integrate into Settings page
+typescript// In Settings page component (e.g., client/src/pages/Settings.tsx)
+
+import { DefaultCoverLetterAI } from '@/components/settings/DefaultCoverLetterAI';
+
+// Inside the form/component:
+<DefaultCoverLetterAI
+  value={formData.defaultCoverLetter || ''}
+  onChange={(value) => setFormData(prev => ({ ...prev, defaultCoverLetter: value }))}
+  agentProfile={{
+    firstName: formData.firstName,
+    lastName: formData.lastName,
+    title: formData.title,
+    company: formData.company,
+    agentBio: formData.agentBio,
+  }}
+/>
+```
+
+---
+
+### FILES TO CREATE/MODIFY
+```
+server/
+└── routes/
+    └── ai.ts                           [MODIFY - add new endpoint]
+
+client/src/
+├── components/
+│   └── settings/
+│       └── DefaultCoverLetterAI.tsx    [CREATE - new component]
+└── pages/
+    └── Settings.tsx                    [MODIFY - integrate component]
+
+ACCEPTANCE CRITERIA
+
+ "Generate with AI" button appears in Settings > Default Cover Letter section
+ Tone selector with 3 options: Professional, Friendly, Confident
+ Button disabled if agent name is not filled in
+ Clicking generates a cover letter template using agent profile data
+ Generated text populates the textarea (user can edit)
+ Loading state shows spinner during generation
+ Error handling with toast notification if generation fails
+ Generated letter uses [Client Name] placeholder
+ Generated letter does NOT include specific property/market data (template only)
+
+
+LOGGING
+typescript// Server-side
+console.log('[AI] Generating default cover letter:', {
+  userId,
+  tone,
+  hasName: !!(user.firstName || user.lastName),
+  hasBio: !!user.agentBio,
+});
+
+console.log('[AI] Default cover letter generated successfully');
+
+// Client-side
+console.log('[Settings] AI cover letter generation requested:', { tone });
+console.log('[Settings] AI cover letter received, length:', data.coverLetter?.length);
+```
+
+---
+
+### VALIDATION TEST
+```
+1. Go to Settings
+2. Ensure First Name and Last Name are filled in
+3. Optionally fill in Title, Company, and Agent Bio
+4. Scroll to "Default Cover Letter" section
+5. Verify AI Assistant panel is visible with tone selector
+6. Select "Professional" tone
+7. Click "Generate with AI"
+8. Verify loading spinner appears
+9. Verify generated text appears in textarea
+10. Verify text includes [Client Name] placeholder
+11. Verify text mentions agent name/company if provided
+12. Try "Friendly" tone - verify different style
+13. Try "Confident" tone - verify different style
+14. Edit the generated text manually
+15. Save settings
+16. Go to CMA > Presentation Builder
+17. Leave Cover Letter blank
+18. Verify Preview shows the default cover letter from Settings
+```
+
+---
+
+### EXAMPLE AI OUTPUT (Professional tone)
+```
+Dear [Client Name],
+
+Thank you for the opportunity to prepare this Comparative Market Analysis 
+for your property. As a Broker/Owner and Realtor with Spyglass Realty, 
+I am committed to providing you with accurate, data-driven insights to 
+help you make informed decisions about your home's value.
+
+This report includes a comprehensive analysis of comparable properties 
+in your area, current market trends, and a recommended listing price 
+based on the most recent sales data. My goal is to ensure you have all 
+the information needed to position your property competitively in 
+today's market.
+
+I look forward to discussing these findings with you and answering any 
+questions you may have.
+
+Sincerely,
+John Smith
+Spyglass Realty
