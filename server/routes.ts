@@ -7694,6 +7694,47 @@ OUTPUT JSON:
     }
   });
 
+  // Save CMA adjustments
+  app.put("/api/cmas/:id/adjustments", requireAuth, async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { adjustments } = req.body;
+      
+      if (!adjustments || typeof adjustments !== 'object') {
+        return res.status(400).json({ error: "Invalid adjustments data" });
+      }
+      
+      const cma = await storage.getCma(id);
+      if (!cma) {
+        return res.status(404).json({ error: "CMA not found" });
+      }
+      
+      const updated = await storage.updateCma(id, { adjustments });
+      console.log("[Adjustments] Saved for CMA:", id);
+      res.json({ success: true, adjustments: updated?.adjustments });
+    } catch (error: any) {
+      console.error("[Adjustments] Error saving:", error.message);
+      res.status(500).json({ error: "Failed to save adjustments" });
+    }
+  });
+
+  // Get CMA adjustments
+  app.get("/api/cmas/:id/adjustments", async (req, res) => {
+    try {
+      const { id } = req.params;
+      
+      const cma = await storage.getCma(id);
+      if (!cma) {
+        return res.status(404).json({ error: "CMA not found" });
+      }
+      
+      res.json({ adjustments: cma.adjustments || null });
+    } catch (error: any) {
+      console.error("[Adjustments] Error fetching:", error.message);
+      res.status(500).json({ error: "Failed to fetch adjustments" });
+    }
+  });
+
   const httpServer = createServer(app);
 
   return httpServer;

@@ -1,0 +1,515 @@
+Confirmed: SCENARIO C — Feature needs to be built from scratch.
+This is a substantial but essential CMA feature. Here's the complete engineering prompt:
+
+🔧 REPLIT PROMPT: Build CMA Adjustments Feature (Full Implementation)
+SCOPE
+Implement the property value Adjustments feature for CMA — allowing agents to enter dollar adjustments when comparing the subject property to comparables, with display in the Presentation Preview and PDF export.
+
+OVERVIEW
+┌─────────────────────────────────────────────────────────────────────────┐
+│                        ADJUSTMENTS WORKFLOW                             │
+├─────────────────────────────────────────────────────────────────────────┤
+│                                                                         │
+│  1. AGENT ENTERS DATA         2. SYSTEM CALCULATES      3. DISPLAYS    │
+│  ┌─────────────────────┐      ┌─────────────────────┐   ┌────────────┐ │
+│  │ Default $/sqft: $50 │  →   │ Comp 1: +$5,000     │ → │ Preview    │ │
+│  │ Default $/bed: $10K │      │ Comp 2: -$7,500     │   │ PDF Export │ │
+│  │ + Manual overrides  │      │ Adjusted prices     │   │            │ │
+│  └─────────────────────┘      └─────────────────────┘   └────────────┘ │
+│                                                                         │
+└─────────────────────────────────────────────────────────────────────────┘
+
+PHASE 1: DATABASE SCHEMA
+Task 1.1: Add adjustments field to cmas table
+typescript// In shared/schema.ts - Add to cmas table
+
+// Add this column to the cmas table definition:
+adjustments: jsonb('adjustments').$type<CMAdjustmentsData>(),
+
+// Type definition:
+interface CMAdjustmentsData {
+  rates: {
+    sqftPerUnit: number;        // $/sqft difference (default: 50)
+    bedroomValue: number;       // $/bedroom (default: 10000)
+    bathroomValue: number;      // $/bathroom (default: 7500)
+    poolValue: number;          // Pool yes/no (default: 25000)
+    garagePerSpace: number;     // $/garage space (default: 5000)
+    yearBuiltPerYear: number;   // $/year newer/older (default: 1000)
+    lotSizePerSqft: number;     // $/lot sqft (default: 2)
+  };
+  compAdjustments: {
+    [compId: string]: {
+      // Manual overrides (null = use auto-calculated)
+      sqft: number | null;
+      bedrooms: number | null;
+      bathrooms: number | null;
+      pool: number | null;
+      garage: number | null;
+      yearBuilt: number | null;
+      lotSize: number | null;
+      custom: { name: string; value: number }[];
+    };
+  };
+  enabled: boolean;  // Whether to show in presentation
+}
+Task 1.2: Run database migration
+bashnpm run db:push
+# or
+npx drizzle-kit push
+
+PHASE 2: BACKEND API
+Task 2.1: Add adjustments to CMA fetch response
+typescript// In server/routes/cma.ts (or wherever CMA routes are)
+
+// Ensure adjustments field is returned when fetching CMA
+app.get('/api/cmas/:id', async (req, res) => {
+  const cma = await db.query.cmas.findFirst({
+    where: eq(cmas.id, req.params.id),
+    columns: {
+      id: true,
+      // ... existing fields
+      adjustments: true,  // ← Add this
+    }
+  });
+  res.json(cma);
+});
+Task 2.2: Add endpoint to save adjustments
+typescript// PUT /api/cmas/:id/adjustments
+app.put('/api/cmas/:id/adjustments', requireAuth, async (req, res) => {
+  const { id } = req.params;
+  const { adjustments } = req.body;
+  
+  // Validate adjustments structure
+  if (!adjustments || typeof adjustments !== 'object') {
+    return res.status(400).json({ error: 'Invalid adjustments data' });
+  }
+  
+  await db.update(cmas)
+    .set({ 
+      adjustments,
+      updatedAt: new Date()
+    })
+    .where(eq(cmas.id, id));
+  
+  console.log('[Adjustments] Saved for CMA:', id);
+  res.json({ success: true });
+});
+```
+
+---
+
+### PHASE 3: FRONTEND — ADJUSTMENTS ENTRY UI
+
+**Task 3.1: Create AdjustmentsSection component**
+```
+Location: client/src/components/CMA/AdjustmentsSection.tsx
+Purpose: Allow agent to configure adjustment rates and view calculated adjustments
+typescript// Component structure:
+
+interface AdjustmentsSectionProps {
+  cma: CMA;
+  subjectProperty: Property;
+  comparables: Property[];
+  onSave: (adjustments: CMAdjustmentsData) => void;
+}
+
+const AdjustmentsSection = ({ cma, subjectProperty, comparables, onSave }) => {
+  const [rates, setRates] = useState(cma.adjustments?.rates || DEFAULT_RATES);
+  const [overrides, setOverrides] = useState(cma.adjustments?.compAdjustments || {});
+  
+  // Auto-calculate adjustments based on rates
+  const calculatedAdjustments = useMemo(() => {
+    return comparables.map(comp => calculateAdjustments(subjectProperty, comp, rates, overrides[comp.mlsNumber]));
+  }, [subjectProperty, comparables, rates, overrides]);
+  
+  return (
+    <div className="space-y-6">
+      {/* Adjustment Rates Configuration */}
+      <RatesConfigCard rates={rates} onChange={setRates} />
+      
+      {/* Adjustments Table */}
+      <AdjustmentsTable
+        subject={subjectProperty}
+        comparables={comparables}
+        adjustments={calculatedAdjustments}
+        overrides={overrides}
+        onOverride={(compId, field, value) => {
+          setOverrides(prev => ({
+            ...prev,
+            [compId]: { ...prev[compId], [field]: value }
+          }));
+        }}
+      />
+      
+      {/* Save Button */}
+      <Button onClick={() => onSave({ rates, compAdjustments: overrides, enabled: true })}>
+        Save Adjustments
+      </Button>
+    </div>
+  );
+};
+```
+
+**Task 3.2: Create Adjustment Rates Configuration Card**
+```
+┌─────────────────────────────────────────────────────────────────┐
+│ Adjustment Rates                                    [Reset Defaults]
+├─────────────────────────────────────────────────────────────────┤
+│                                                                 │
+│  Square Footage    $ [  50  ] per sqft difference              │
+│  Bedroom           $ [10,000] per bedroom                       │
+│  Bathroom          $ [ 7,500] per bathroom                      │
+│  Pool              $ [25,000] if subject has / comp doesn't     │
+│  Garage Space      $ [ 5,000] per garage space                  │
+│  Year Built        $ [ 1,000] per year (newer = positive)       │
+│  Lot Size          $ [     2] per sqft difference               │
+│                                                                 │
+│  [+ Add Custom Adjustment]                                      │
+│                                                                 │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+**Task 3.3: Create Adjustments Comparison Table**
+```
+┌──────────────────────────────────────────────────────────────────────────────┐
+│ ADJUSTMENTS COMPARISON                                                       │
+├────────────────┬──────────┬─────────────┬─────────┬─────────────┬───────────┤
+│ Feature        │ Subject  │ 123 Oak St  │ Adj     │ 456 Pine    │ Adj       │
+├────────────────┼──────────┼─────────────┼─────────┼─────────────┼───────────┤
+│ Sale Price     │ —        │ $475,000    │ —       │ $485,000    │ —         │
+├────────────────┼──────────┼─────────────┼─────────┼─────────────┼───────────┤
+│ Square Feet    │ 2,500    │ 2,400       │ +$5,000 │ 2,650       │ -$7,500   │
+│ Bedrooms       │ 4        │ 4           │ $0      │ 3           │ +$10,000  │
+│ Bathrooms      │ 3        │ 2           │ +$7,500 │ 3           │ $0        │
+│ Pool           │ Yes      │ No          │+$25,000 │ Yes         │ $0        │
+│ Garage         │ 2        │ 2           │ $0      │ 3           │ -$5,000   │
+│ Year Built     │ 2020     │ 2018        │ +$2,000 │ 2021        │ -$1,000   │
+├────────────────┼──────────┼─────────────┼─────────┼─────────────┼───────────┤
+│ ADJUSTED PRICE │ —        │ $514,500    │         │ $481,500    │           │
+└────────────────┴──────────┴─────────────┴─────────┴─────────────┴───────────┘
+
+Legend: Green = Positive (comp inferior), Red = Negative (comp superior)
+Task 3.4: Adjustment Calculation Logic
+typescript// client/src/lib/adjustmentCalculations.ts
+
+export const DEFAULT_RATES: AdjustmentRates = {
+  sqftPerUnit: 50,
+  bedroomValue: 10000,
+  bathroomValue: 7500,
+  poolValue: 25000,
+  garagePerSpace: 5000,
+  yearBuiltPerYear: 1000,
+  lotSizePerSqft: 2,
+};
+
+export function calculateAdjustments(
+  subject: Property,
+  comp: Property,
+  rates: AdjustmentRates,
+  overrides?: CompOverrides
+): CompAdjustmentResult {
+  const adjustments: AdjustmentLine[] = [];
+  
+  // Square Footage: If subject is larger, comp needs + adjustment
+  const sqftDiff = (subject.sqft || 0) - (comp.sqft || 0);
+  const sqftAdj = overrides?.sqft ?? sqftDiff * rates.sqftPerUnit;
+  if (sqftAdj !== 0) {
+    adjustments.push({
+      feature: 'Square Feet',
+      subjectValue: subject.sqft,
+      compValue: comp.sqft,
+      adjustment: sqftAdj,
+    });
+  }
+  
+  // Bedrooms
+  const bedDiff = (subject.beds || 0) - (comp.beds || 0);
+  const bedAdj = overrides?.bedrooms ?? bedDiff * rates.bedroomValue;
+  if (bedAdj !== 0) {
+    adjustments.push({
+      feature: 'Bedrooms',
+      subjectValue: subject.beds,
+      compValue: comp.beds,
+      adjustment: bedAdj,
+    });
+  }
+  
+  // Bathrooms
+  const bathDiff = (subject.baths || 0) - (comp.baths || 0);
+  const bathAdj = overrides?.bathrooms ?? bathDiff * rates.bathroomValue;
+  if (bathAdj !== 0) {
+    adjustments.push({
+      feature: 'Bathrooms',
+      subjectValue: subject.baths,
+      compValue: comp.baths,
+      adjustment: bathAdj,
+    });
+  }
+  
+  // Pool (boolean comparison)
+  const subjectHasPool = hasPool(subject);
+  const compHasPool = hasPool(comp);
+  if (subjectHasPool !== compHasPool) {
+    const poolAdj = overrides?.pool ?? (subjectHasPool ? rates.poolValue : -rates.poolValue);
+    adjustments.push({
+      feature: 'Pool',
+      subjectValue: subjectHasPool ? 'Yes' : 'No',
+      compValue: compHasPool ? 'Yes' : 'No',
+      adjustment: poolAdj,
+    });
+  }
+  
+  // Garage
+  const garageDiff = (subject.garageSpaces || 0) - (comp.garageSpaces || 0);
+  const garageAdj = overrides?.garage ?? garageDiff * rates.garagePerSpace;
+  if (garageAdj !== 0) {
+    adjustments.push({
+      feature: 'Garage Spaces',
+      subjectValue: subject.garageSpaces,
+      compValue: comp.garageSpaces,
+      adjustment: garageAdj,
+    });
+  }
+  
+  // Year Built (newer subject = positive adjustment to comp)
+  const yearDiff = (subject.yearBuilt || 0) - (comp.yearBuilt || 0);
+  const yearAdj = overrides?.yearBuilt ?? yearDiff * rates.yearBuiltPerYear;
+  if (yearAdj !== 0) {
+    adjustments.push({
+      feature: 'Year Built',
+      subjectValue: subject.yearBuilt,
+      compValue: comp.yearBuilt,
+      adjustment: yearAdj,
+    });
+  }
+  
+  // Calculate totals
+  const totalAdjustment = adjustments.reduce((sum, a) => sum + a.adjustment, 0);
+  const salePrice = comp.soldPrice || comp.listPrice || 0;
+  const adjustedPrice = salePrice + totalAdjustment;
+  
+  return {
+    compId: comp.mlsNumber,
+    compAddress: comp.address,
+    salePrice,
+    adjustments,
+    totalAdjustment,
+    adjustedPrice,
+  };
+}
+
+PHASE 4: PRESENTATION PREVIEW & PDF
+Task 4.1: Replace placeholder in CMAPresentationBuilder.tsx
+typescript// Find lines 1388-1392 and 1855-1859 (placeholder locations)
+// Replace placeholder with actual AdjustmentsTable component
+
+// In the preview section rendering:
+{section.id === 'adjustments' && (
+  <AdjustmentsPreviewTable
+    subject={subjectProperty}
+    comparables={comparables}
+    adjustments={cma.adjustments}
+  />
+)}
+Task 4.2: Create AdjustmentsPreviewTable (read-only display)
+typescript// client/src/components/CMA/AdjustmentsPreviewTable.tsx
+
+const AdjustmentsPreviewTable = ({ subject, comparables, adjustments }) => {
+  if (!adjustments?.enabled || !comparables?.length) {
+    return (
+      <div className="text-center text-gray-500 py-8">
+        <p>No adjustments configured</p>
+        <p className="text-sm">Configure adjustments in the CMA editor</p>
+      </div>
+    );
+  }
+  
+  const rates = adjustments.rates || DEFAULT_RATES;
+  const results = comparables.map(comp => 
+    calculateAdjustments(subject, comp, rates, adjustments.compAdjustments?.[comp.mlsNumber])
+  );
+  
+  return (
+    <table className="w-full border-collapse text-sm">
+      <thead>
+        <tr className="bg-gray-100">
+          <th className="border p-2 text-left">Feature</th>
+          <th className="border p-2 text-center">Subject</th>
+          {results.map(r => (
+            <React.Fragment key={r.compId}>
+              <th className="border p-2 text-center">{r.compAddress}</th>
+              <th className="border p-2 text-center">Adj</th>
+            </React.Fragment>
+          ))}
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td className="border p-2 font-medium">Sale Price</td>
+          <td className="border p-2 text-center">—</td>
+          {results.map(r => (
+            <React.Fragment key={r.compId}>
+              <td className="border p-2 text-center">{formatCurrency(r.salePrice)}</td>
+              <td className="border p-2 text-center">—</td>
+            </React.Fragment>
+          ))}
+        </tr>
+        {/* Render each adjustment row */}
+        {getUniqueFeatures(results).map(feature => (
+          <tr key={feature}>
+            <td className="border p-2">{feature}</td>
+            <td className="border p-2 text-center">{getSubjectValue(subject, feature)}</td>
+            {results.map(r => {
+              const adj = r.adjustments.find(a => a.feature === feature);
+              return (
+                <React.Fragment key={r.compId}>
+                  <td className="border p-2 text-center">{adj?.compValue ?? '—'}</td>
+                  <td className={`border p-2 text-center font-medium ${
+                    adj?.adjustment > 0 ? 'text-green-600' : 
+                    adj?.adjustment < 0 ? 'text-red-600' : ''
+                  }`}>
+                    {adj ? formatAdjustment(adj.adjustment) : '—'}
+                  </td>
+                </React.Fragment>
+              );
+            })}
+          </tr>
+        ))}
+        {/* Adjusted Price Row */}
+        <tr className="bg-gray-50 font-bold">
+          <td className="border p-2">ADJUSTED PRICE</td>
+          <td className="border p-2 text-center">—</td>
+          {results.map(r => (
+            <React.Fragment key={r.compId}>
+              <td className="border p-2 text-center text-primary">
+                {formatCurrency(r.adjustedPrice)}
+              </td>
+              <td className="border p-2"></td>
+            </React.Fragment>
+          ))}
+        </tr>
+      </tbody>
+    </table>
+  );
+};
+Task 4.3: Add to PDF Export
+typescript// In the PDF document component (CMAPdfDocument.tsx or similar)
+
+{sections.adjustments?.enabled && adjustmentsData && (
+  <View style={styles.section}>
+    <Text style={styles.sectionTitle}>Property Value Adjustments</Text>
+    <AdjustmentsPdfTable
+      subject={subjectProperty}
+      comparables={comparables}
+      adjustments={adjustmentsData}
+    />
+  </View>
+)}
+
+PHASE 5: INTEGRATION
+Task 5.1: Add Adjustments tab/section to CMA Detail Page
+typescript// In CMADetailPage.tsx or CMATab.tsx
+// Add new tab or accordion section for Adjustments
+
+<Tabs>
+  <TabsList>
+    <TabsTrigger value="overview">Overview</TabsTrigger>
+    <TabsTrigger value="comparables">Comparables</TabsTrigger>
+    <TabsTrigger value="adjustments">Adjustments</TabsTrigger>  {/* ← NEW */}
+    <TabsTrigger value="presentation">Presentation</TabsTrigger>
+  </TabsList>
+  
+  <TabsContent value="adjustments">
+    <AdjustmentsSection
+      cma={cma}
+      subjectProperty={subjectProperty}
+      comparables={comparables}
+      onSave={handleSaveAdjustments}
+    />
+  </TabsContent>
+</Tabs>
+Task 5.2: Wire up save handler
+typescriptconst handleSaveAdjustments = async (adjustments: CMAdjustmentsData) => {
+  try {
+    await fetch(`/api/cmas/${cma.id}/adjustments`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ adjustments }),
+    });
+    toast.success('Adjustments saved');
+    refetchCMA();
+  } catch (error) {
+    toast.error('Failed to save adjustments');
+    console.error('[Adjustments] Save error:', error);
+  }
+};
+```
+
+---
+
+### FILES TO CREATE/MODIFY
+```
+shared/
+└── schema.ts                                    [MODIFY - add adjustments column]
+
+server/
+└── routes/
+    └── cma.ts                                   [MODIFY - add adjustments endpoint]
+
+client/src/
+├── lib/
+│   └── adjustmentCalculations.ts               [NEW - calculation logic]
+├── components/
+│   └── CMA/
+│       ├── AdjustmentsSection.tsx              [NEW - entry UI]
+│       ├── AdjustmentsTable.tsx                [NEW - editable table]
+│       ├── AdjustmentsPreviewTable.tsx         [NEW - read-only preview]
+│       ├── RatesConfigCard.tsx                 [NEW - rates configuration]
+│       └── index.ts                            [MODIFY - export new components]
+├── pages/
+│   ├── CMADetailPage.tsx                       [MODIFY - add Adjustments tab]
+│   └── CMAPresentationBuilder.tsx              [MODIFY - replace placeholder]
+└── components/
+    └── pdf/
+        └── AdjustmentsPdfTable.tsx             [NEW - PDF export table]
+
+ACCEPTANCE CRITERIA
+Database & API:
+
+ adjustments JSONB column added to cmas table
+ Migration runs successfully
+ PUT /api/cmas/:id/adjustments endpoint works
+ Adjustments data included in CMA fetch response
+
+Entry UI:
+
+ Adjustment rates card displays with editable defaults
+ Adjustments table shows subject vs all comparables
+ Auto-calculation works based on rates
+ Manual override per cell works
+ Save button persists adjustments to database
+ Toast confirms save success/failure
+
+Display:
+
+ Adjustments table renders in Presentation Preview
+ Positive adjustments shown in green
+ Negative adjustments shown in red
+ Adjusted prices calculated correctly
+ Empty state shows helpful message when no adjustments configured
+
+PDF Export:
+
+ Adjustments table included in PDF when section enabled
+ Colors render correctly in PDF
+ Table fits on page without overflow
+
+
+LOGGING
+typescriptconsole.log('[Adjustments] Rates updated:', rates);
+console.log('[Adjustments] Override applied:', { compId, field, value });
+console.log('[Adjustments] Calculated for comp:', { compId, totalAdjustment, adjustedPrice });
+console.log('[Adjustments] Saved to CMA:', cmaId);
+
+DEFAULT ADJUSTMENT RATES (Industry Standard)
+FeatureDefault ValueNotesSquare Footage$50/sqftVaries by marketBedroom$10,000Per bedroom differenceBathroom$7,500Per full bathPool$25,000Binary: has/doesn't haveGarage Space$5,000Per space differenceYear Built$1,000/yearNewer = positiveLot Size$2/sqftFor significant differences

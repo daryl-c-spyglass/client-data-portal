@@ -310,6 +310,36 @@ export interface CmaBrochure {
   uploadedAt: string;
 }
 
+// Adjustment rates for CMA property value comparisons
+export interface CmaAdjustmentRates {
+  sqftPerUnit: number;        // $/sqft difference (default: 50)
+  bedroomValue: number;       // $/bedroom (default: 10000)
+  bathroomValue: number;      // $/bathroom (default: 7500)
+  poolValue: number;          // Pool yes/no (default: 25000)
+  garagePerSpace: number;     // $/garage space (default: 5000)
+  yearBuiltPerYear: number;   // $/year newer/older (default: 1000)
+  lotSizePerSqft: number;     // $/lot sqft (default: 2)
+}
+
+// Per-comparable adjustment overrides (null = use auto-calculated)
+export interface CmaCompAdjustmentOverrides {
+  sqft: number | null;
+  bedrooms: number | null;
+  bathrooms: number | null;
+  pool: number | null;
+  garage: number | null;
+  yearBuilt: number | null;
+  lotSize: number | null;
+  custom: { name: string; value: number }[];
+}
+
+// Complete adjustments data structure
+export interface CmaAdjustmentsData {
+  rates: CmaAdjustmentRates;
+  compAdjustments: Record<string, CmaCompAdjustmentOverrides>;
+  enabled: boolean;
+}
+
 export const cmas = pgTable("cmas", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   userId: varchar("user_id").references(() => users.id), // Nullable for unauthenticated users
@@ -321,6 +351,7 @@ export const cmas = pgTable("cmas", {
   notes: text("notes"),
   publicLink: text("public_link").unique(),
   brochure: json("brochure").$type<CmaBrochure>(), // Listing brochure for CMA presentation
+  adjustments: json("adjustments").$type<CmaAdjustmentsData>(), // Property value adjustments for CMA comparisons
   expiresAt: timestamp("expires_at"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),

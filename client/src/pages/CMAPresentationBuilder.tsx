@@ -54,6 +54,7 @@ import {
 import { pdf } from "@react-pdf/renderer";
 import { CMAPdfDocument } from "@/components/CMAPdfDocument";
 import { ListingBrochureContent } from "@/components/ListingBrochureContent";
+import { AdjustmentsSection } from "@/components/AdjustmentsSection";
 import { ExpandedPreviewModal } from "@/components/ExpandedPreviewModal";
 import { MapboxCMAMap } from "@/components/presentation/MapboxCMAMap";
 import { CoverLetterEditor } from "@/components/presentation/CoverLetterEditor";
@@ -79,7 +80,16 @@ import {
   type CmaReportConfig,
   type Cma,
   type CmaBrochure,
+  type CmaAdjustmentsData,
 } from "@shared/schema";
+import {
+  calculateAdjustments,
+  formatAdjustment,
+  getUniqueFeatures,
+  DEFAULT_ADJUSTMENT_RATES,
+  type PropertyForAdjustment,
+  type CompAdjustmentResult,
+} from "@/lib/adjustmentCalculations";
 
 // Extended type to handle API response which may include defaults
 interface ReportConfigResponse {
@@ -253,6 +263,8 @@ export default function CMAPresentationBuilder() {
     analysis: true,
   });
   const [brochure, setBrochure] = useState<CmaBrochure | null>(null);
+  const [adjustments, setAdjustments] = useState<CmaAdjustmentsData | null>(null);
+  const [isSavingAdjustments, setIsSavingAdjustments] = useState(false);
   const [isPhotoModalOpen, setIsPhotoModalOpen] = useState(false);
   const [selectedPhotoProperty, setSelectedPhotoProperty] = useState<string | null>(null);
   const [customPhotoSelections, setCustomPhotoSelections] = useState<Record<string, string[]>>({});
@@ -408,6 +420,45 @@ export default function CMAPresentationBuilder() {
     }
   }, [cma?.brochure]);
 
+  // Initialize adjustments from CMA data
+  useEffect(() => {
+    if (cma?.adjustments) {
+      setAdjustments(cma.adjustments as CmaAdjustmentsData);
+    } else if (cma && !cma.adjustments) {
+      // Clear stale adjustments when switching to a CMA without saved adjustments
+      setAdjustments(null);
+    }
+  }, [cma?.adjustments, cma]);
+
+  // Handle saving adjustments
+  const handleSaveAdjustments = async (newAdjustments: CmaAdjustmentsData) => {
+    if (!cmaId) return;
+    setIsSavingAdjustments(true);
+    try {
+      const response = await fetch(`/api/cmas/${cmaId}/adjustments`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ adjustments: newAdjustments }),
+      });
+      if (!response.ok) throw new Error("Failed to save adjustments");
+      setAdjustments(newAdjustments);
+      toast({
+        title: "Adjustments saved",
+        description: "Your property value adjustments have been saved.",
+      });
+      queryClientInstance.invalidateQueries({ queryKey: ["/api/cmas", cmaId] });
+    } catch (error) {
+      console.error("[Adjustments] Save error:", error);
+      toast({
+        title: "Failed to save adjustments",
+        description: "Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSavingAdjustments(false);
+    }
+  };
+
   // Visual feedback when preview updates
   useEffect(() => {
     setIsPreviewUpdating(true);
@@ -432,6 +483,14 @@ export default function CMAPresentationBuilder() {
       p => p.id === cma.subjectPropertyId || p.listingId === cma.subjectPropertyId
     );
     return subject || null;
+  }, [cma?.propertiesData, cma?.subjectPropertyId]);
+
+  const comparables = useMemo(() => {
+    if (!cma?.propertiesData || !cma?.subjectPropertyId) return [];
+    const properties = cma.propertiesData as PropertyData[];
+    return properties.filter(
+      p => p.id !== cma.subjectPropertyId && p.listingId !== cma.subjectPropertyId
+    );
   }, [cma?.propertiesData, cma?.subjectPropertyId]);
 
   const saveMutation = useMutation({
@@ -956,6 +1015,27 @@ export default function CMAPresentationBuilder() {
                   )}
                 </CardContent>
               </Card>
+
+              <Card>
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-lg">Property Value Adjustments</CardTitle>
+                  <CardDescription>
+                    Configure adjustment rates to compare property values between subject and comparables
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  {cmaId && (
+                    <AdjustmentsSection
+                      cmaId={cmaId}
+                      adjustments={adjustments}
+                      subjectProperty={subjectProperty as PropertyForAdjustment | null}
+                      comparables={comparables.map(c => c as PropertyForAdjustment)}
+                      onSave={handleSaveAdjustments}
+                      isSaving={isSavingAdjustments}
+                    />
+                  )}
+                </CardContent>
+              </Card>
             </TabsContent>
 
             <TabsContent value="layout" className="space-y-4 mt-4">
@@ -1387,11 +1467,58 @@ export default function CMAPresentationBuilder() {
 
                   {includedSections.includes("adjustments") && (
                     <PreviewSection title="Adjustments" icon={Table} sectionId="adjustments" onClick={handlePreviewSectionClick}>
-                      <div className="h-24 bg-muted rounded-md flex items-center justify-center">
-                        <span className="text-muted-foreground text-sm">
-                          Property value adjustments comparison table
-                        </span>
-                      </div>
+                      {(() => {
+                        const rates = adjustments?.rates || DEFAULT_ADJUSTMENT_RATES;
+                        const results = subjectProperty && comparables.length > 0
+                          ? comparables.map((comp) => {
+                              const compId = (comp as PropertyForAdjustment).listingId || (comp as PropertyForAdjustment).id || '';
+                              const compOverrides = adjustments?.compAdjustments?.[compId];
+                              return calculateAdjustments(subjectProperty as PropertyForAdjustment, comp as PropertyForAdjustment, rates, compOverrides);
+                            })
+                          : [];
+                        
+                        if (results.length === 0) {
+                          return (
+                            <div className="h-24 bg-muted rounded-md flex items-center justify-center">
+                              <span className="text-muted-foreground text-sm">
+                                No comparable properties to show adjustments
+                              </span>
+                            </div>
+                          );
+                        }
+
+                        return (
+                          <div className="overflow-x-auto">
+                            <table className="w-full text-xs">
+                              <thead>
+                                <tr className="border-b">
+                                  <th className="text-left p-1.5 font-medium">Property</th>
+                                  <th className="text-right p-1.5 font-medium">Sale Price</th>
+                                  <th className="text-right p-1.5 font-medium">Adj. Total</th>
+                                  <th className="text-right p-1.5 font-medium">Adj. Price</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {results.slice(0, 3).map((result: CompAdjustmentResult) => (
+                                  <tr key={result.compId} className="border-b border-muted">
+                                    <td className="p-1.5 truncate max-w-[120px]">{result.compAddress}</td>
+                                    <td className="text-right p-1.5">${(result.salePrice / 1000).toFixed(0)}k</td>
+                                    <td className={`text-right p-1.5 ${result.totalAdjustment >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                                      {formatAdjustment(result.totalAdjustment)}
+                                    </td>
+                                    <td className="text-right p-1.5 font-medium">${(result.adjustedPrice / 1000).toFixed(0)}k</td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                            {results.length > 3 && (
+                              <p className="text-xs text-muted-foreground text-center mt-2">
+                                +{results.length - 3} more comparables
+                              </p>
+                            )}
+                          </div>
+                        );
+                      })()}
                     </PreviewSection>
                   )}
 
@@ -1854,11 +1981,99 @@ export default function CMAPresentationBuilder() {
 
           {includedSections.includes("adjustments") && (
             <PreviewSection title="Adjustments" icon={Table} sectionId="adjustments" onClick={handlePreviewSectionClick}>
-              <div className="h-24 bg-muted rounded-md flex items-center justify-center">
-                <span className="text-muted-foreground text-sm">
-                  Property value adjustments comparison table
-                </span>
-              </div>
+              {(() => {
+                const rates = adjustments?.rates || DEFAULT_ADJUSTMENT_RATES;
+                const results = subjectProperty && comparables.length > 0
+                  ? comparables.map((comp) => {
+                      const compId = (comp as PropertyForAdjustment).listingId || (comp as PropertyForAdjustment).id || '';
+                      const compOverrides = adjustments?.compAdjustments?.[compId];
+                      return calculateAdjustments(subjectProperty as PropertyForAdjustment, comp as PropertyForAdjustment, rates, compOverrides);
+                    })
+                  : [];
+                
+                if (results.length === 0) {
+                  return (
+                    <div className="h-24 bg-muted rounded-md flex items-center justify-center">
+                      <span className="text-muted-foreground text-sm">
+                        No comparable properties to show adjustments
+                      </span>
+                    </div>
+                  );
+                }
+
+                // Get all unique features across all results
+                const allFeatures = getUniqueFeatures(results);
+                // Show max 4 feature columns to keep table manageable
+                const displayFeatures = allFeatures.slice(0, 4);
+
+                // Helper to get adjustment value by feature name
+                const getAdjValue = (result: CompAdjustmentResult, feature: string): number => {
+                  const adj = result.adjustments.find(a => a.feature === feature);
+                  return adj?.adjustment || 0;
+                };
+
+                // Short labels for features
+                const getFeatureLabel = (feature: string): string => {
+                  const labels: Record<string, string> = {
+                    'Square Feet': 'Sq Ft',
+                    'Bedrooms': 'Beds',
+                    'Bathrooms': 'Baths',
+                    'Pool': 'Pool',
+                    'Garage Spaces': 'Garage',
+                    'Year Built': 'Year',
+                    'Lot Size': 'Lot',
+                  };
+                  return labels[feature] || feature;
+                };
+
+                return (
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="border-b">
+                          <th className="text-left p-2 font-medium">Property</th>
+                          <th className="text-right p-2 font-medium">Sale Price</th>
+                          {displayFeatures.map(feature => (
+                            <th key={feature} className="text-right p-2 font-medium">{getFeatureLabel(feature)}</th>
+                          ))}
+                          <th className="text-right p-2 font-medium">Total Adj</th>
+                          <th className="text-right p-2 font-medium">Adj. Price</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {results.slice(0, 5).map((result: CompAdjustmentResult) => (
+                          <tr key={result.compId} className="border-b border-muted">
+                            <td className="p-2 truncate max-w-[200px]">{result.compAddress}</td>
+                            <td className="text-right p-2">${(result.salePrice / 1000).toFixed(0)}k</td>
+                            {displayFeatures.map(feature => {
+                              const adjVal = getAdjValue(result, feature);
+                              return (
+                                <td key={feature} className={`text-right p-2 ${adjVal >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                                  {formatAdjustment(adjVal)}
+                                </td>
+                              );
+                            })}
+                            <td className={`text-right p-2 font-medium ${result.totalAdjustment >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                              {formatAdjustment(result.totalAdjustment)}
+                            </td>
+                            <td className="text-right p-2 font-bold">${(result.adjustedPrice / 1000).toFixed(0)}k</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                    {allFeatures.length > 4 && (
+                      <p className="text-xs text-muted-foreground text-center mt-2">
+                        +{allFeatures.length - 4} more adjustment types in full report
+                      </p>
+                    )}
+                    {results.length > 5 && (
+                      <p className="text-xs text-muted-foreground text-center mt-2">
+                        +{results.length - 5} more comparables in full report
+                      </p>
+                    )}
+                  </div>
+                );
+              })()}
             </PreviewSection>
           )}
 
