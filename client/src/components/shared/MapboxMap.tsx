@@ -1,6 +1,7 @@
 import { useRef, useEffect, useState, useCallback, useMemo } from 'react';
 import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
+import { MAP_MARKER_COLORS, MAP_STYLES, getMarkerColorFromStatus, MapStyleKey } from '@/lib/mapColors';
 
 export interface MapMarker {
   id: string;
@@ -27,35 +28,16 @@ interface MapboxMapProps {
   interactive?: boolean;
   onMarkerClick?: (markerId: string) => void;
   className?: string;
-  style?: 'streets' | 'satellite' | 'dark';
+  style?: MapStyleKey;
   polygon?: number[][][];
   showPolygon?: boolean;
   polygonColor?: string;
+  syncWithTheme?: boolean;
+  currentTheme?: 'light' | 'dark';
 }
 
-const STATUS_COLORS: Record<string, string> = {
-  'Active': '#22c55e',
-  'Active Under Contract': '#f97316',
-  'Pending': '#eab308',
-  'Closed': '#6b7280',
-  'Subject': '#ef4444',
-};
-
-const MAPBOX_STYLES = {
-  streets: 'mapbox://styles/mapbox/streets-v12',
-  satellite: 'mapbox://styles/mapbox/satellite-streets-v12',
-  dark: 'mapbox://styles/mapbox/dark-v11'
-} as const;
-
 function getStatusColor(status: string, isSubject?: boolean): string {
-  if (isSubject) return STATUS_COLORS['Subject'];
-  const statusLower = (status || '').toLowerCase();
-  if (statusLower === 'active') return STATUS_COLORS['Active'];
-  if (statusLower.includes('under contract') || statusLower.includes('pending') || statusLower.includes('contingent')) {
-    return STATUS_COLORS['Active Under Contract'];
-  }
-  if (statusLower === 'closed' || statusLower === 'sold') return STATUS_COLORS['Closed'];
-  return STATUS_COLORS['Closed'];
+  return getMarkerColorFromStatus(status, isSubject);
 }
 
 function formatPrice(price: number): string {
@@ -160,6 +142,8 @@ export function MapboxMap({
   polygon,
   showPolygon = false,
   polygonColor = '#f97316',
+  syncWithTheme = false,
+  currentTheme,
 }: MapboxMapProps) {
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<mapboxgl.Map | null>(null);
@@ -168,6 +152,13 @@ export function MapboxMap({
   const [mapError, setMapError] = useState<string | null>(null);
 
   const mapboxToken = import.meta.env.VITE_MAPBOX_TOKEN;
+  
+  const effectiveStyle = useMemo((): MapStyleKey => {
+    if (syncWithTheme && currentTheme) {
+      return currentTheme === 'dark' ? 'dark' : 'streets';
+    }
+    return style;
+  }, [syncWithTheme, currentTheme, style]);
 
   const calculatedCenter = useMemo((): [number, number] => {
     if (center) return center;
@@ -193,7 +184,7 @@ export function MapboxMap({
     try {
       map.current = new mapboxgl.Map({
         container: mapContainer.current,
-        style: MAPBOX_STYLES[style],
+        style: MAP_STYLES[effectiveStyle],
         center: calculatedCenter,
         zoom,
         interactive,
@@ -222,7 +213,12 @@ export function MapboxMap({
       map.current?.remove();
       map.current = null;
     };
-  }, [mapboxToken, style]);
+  }, [mapboxToken, effectiveStyle]);
+
+  useEffect(() => {
+    if (!map.current || !mapLoaded) return;
+    map.current.setStyle(MAP_STYLES[effectiveStyle]);
+  }, [effectiveStyle, mapLoaded]);
 
   useEffect(() => {
     if (!map.current || !mapLoaded) return;
@@ -340,19 +336,19 @@ export function MapboxMap({
       {showLegend && (
         <div className="absolute bottom-4 left-4 bg-background/95 backdrop-blur-sm rounded-lg shadow-md p-3 text-sm border" data-testid="map-legend">
           <div className="flex items-center gap-2 mb-1.5">
-            <span className="w-3 h-3 rounded-full" style={{ backgroundColor: STATUS_COLORS['Active'] }}></span>
+            <span className="w-3 h-3 rounded-full" style={{ backgroundColor: MAP_MARKER_COLORS.active }}></span>
             <span className="text-foreground">Active</span>
           </div>
           <div className="flex items-center gap-2 mb-1.5">
-            <span className="w-3 h-3 rounded-full" style={{ backgroundColor: STATUS_COLORS['Active Under Contract'] }}></span>
+            <span className="w-3 h-3 rounded-full" style={{ backgroundColor: MAP_MARKER_COLORS.underContract }}></span>
             <span className="text-foreground">Under Contract</span>
           </div>
           <div className="flex items-center gap-2 mb-1.5">
-            <span className="w-3 h-3 rounded-full" style={{ backgroundColor: STATUS_COLORS['Closed'] }}></span>
+            <span className="w-3 h-3 rounded-full" style={{ backgroundColor: MAP_MARKER_COLORS.closed }}></span>
             <span className="text-foreground">Closed</span>
           </div>
           <div className="flex items-center gap-2">
-            <span className="w-3 h-3 rounded-full" style={{ backgroundColor: STATUS_COLORS['Subject'] }}></span>
+            <span className="w-3 h-3 rounded-full" style={{ backgroundColor: MAP_MARKER_COLORS.subject }}></span>
             <span className="text-foreground">Subject</span>
           </div>
         </div>

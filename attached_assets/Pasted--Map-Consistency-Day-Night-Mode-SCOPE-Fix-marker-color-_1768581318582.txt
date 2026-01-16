@@ -1,0 +1,426 @@
+ Map Consistency + Day/Night Mode
+SCOPE
+
+Fix marker color inconsistencies across all maps
+Add Streets/Satellite/Dark toggle to CMA Detail Page map
+Implement global Day/Night mode for entire Client Data Portal
+Sync all maps with global theme preference
+Ensure all UI elements remain visible in night mode
+
+
+TASK 1: Define Consistent Marker Colors (Single Source of Truth)
+Create: client/src/lib/mapColors.ts
+typescript// Single source of truth for all map marker colors
+export const MAP_MARKER_COLORS = {
+  subject: '#ef4444',      // Red - Subject Property
+  active: '#22c55e',       // Green - Active
+  underContract: '#f97316', // Orange - Under Contract  
+  closed: '#6b7280',       // Gray - Closed/Sold
+} as const;
+
+export const MAP_MARKER_LABELS = {
+  subject: 'Subject Property',
+  active: 'Active',
+  underContract: 'Under Contract',
+  closed: 'Closed',
+} as const;
+
+// Helper to get color from MLS status
+export function getMarkerColorFromStatus(status: string, isSubject: boolean = false): string {
+  if (isSubject) return MAP_MARKER_COLORS.subject;
+  
+  const normalizedStatus = status?.toLowerCase().trim();
+  
+  switch (normalizedStatus) {
+    case 'active':
+      return MAP_MARKER_COLORS.active;
+    case 'active under contract':
+    case 'pending':
+    case 'under contract':
+      return MAP_MARKER_COLORS.underContract;
+    case 'closed':
+    case 'sold':
+      return MAP_MARKER_COLORS.closed;
+    default:
+      return MAP_MARKER_COLORS.active;
+  }
+}
+Update all map components to import colors from this file instead of defining them locally.
+
+TASK 2: Add Map Style Toggle to CMA Detail Page
+File: Find the CMA Detail Page map component
+Add the same Streets/Satellite/Dark toggle that exists in Presentation Builder:
+typescriptimport { useState } from 'react';
+
+type MapStyle = 'streets' | 'satellite' | 'dark';
+
+const MAP_STYLES: Record<MapStyle, string> = {
+  streets: 'mapbox://styles/mapbox/streets-v12',
+  satellite: 'mapbox://styles/mapbox/satellite-streets-v12',
+  dark: 'mapbox://styles/mapbox/dark-v11',
+};
+
+function CMAMap({ properties, subjectProperty }) {
+  const [mapStyle, setMapStyle] = useState<MapStyle>('streets');
+  
+  return (
+    <div className="relative">
+      {/* Style Toggle Buttons */}
+      <div className="absolute top-3 left-3 z-10 flex rounded-lg overflow-hidden shadow-md">
+        <button
+          onClick={() => setMapStyle('streets')}
+          className={`px-3 py-1.5 text-sm font-medium transition-colors ${
+            mapStyle === 'streets'
+              ? 'bg-orange-500 text-white'
+              : 'bg-white text-gray-700 hover:bg-gray-100'
+          }`}
+        >
+          Streets
+        </button>
+        <button
+          onClick={() => setMapStyle('satellite')}
+          className={`px-3 py-1.5 text-sm font-medium transition-colors ${
+            mapStyle === 'satellite'
+              ? 'bg-orange-500 text-white'
+              : 'bg-white text-gray-700 hover:bg-gray-100'
+          }`}
+        >
+          Satellite
+        </button>
+        <button
+          onClick={() => setMapStyle('dark')}
+          className={`px-3 py-1.5 text-sm font-medium transition-colors ${
+            mapStyle === 'dark'
+              ? 'bg-orange-500 text-white'
+              : 'bg-white text-gray-700 hover:bg-gray-100'
+          }`}
+        >
+          Dark
+        </button>
+      </div>
+      
+      {/* Map Component */}
+      <MapboxMap
+        style={MAP_STYLES[mapStyle]}
+        // ... other props
+      />
+    </div>
+  );
+}
+
+TASK 3: Implement Global Day/Night Mode
+3.1 Create Theme Context
+Create: client/src/contexts/ThemeContext.tsx
+typescriptimport React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+
+type Theme = 'light' | 'dark';
+
+interface ThemeContextType {
+  theme: Theme;
+  setTheme: (theme: Theme) => void;
+  toggleTheme: () => void;
+}
+
+const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
+
+export function ThemeProvider({ children }: { children: ReactNode }) {
+  const [theme, setTheme] = useState<Theme>(() => {
+    // Check localStorage first
+    const saved = localStorage.getItem('cdp-theme') as Theme;
+    if (saved) return saved;
+    
+    // Check system preference
+    if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
+      return 'dark';
+    }
+    return 'light';
+  });
+
+  useEffect(() => {
+    // Save to localStorage
+    localStorage.setItem('cdp-theme', theme);
+    
+    // Apply to document
+    if (theme === 'dark') {
+      document.documentElement.classList.add('dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+    }
+  }, [theme]);
+
+  const toggleTheme = () => {
+    setTheme(prev => prev === 'light' ? 'dark' : 'light');
+  };
+
+  return (
+    <ThemeContext.Provider value={{ theme, setTheme, toggleTheme }}>
+      {children}
+    </ThemeContext.Provider>
+  );
+}
+
+export function useTheme() {
+  const context = useContext(ThemeContext);
+  if (!context) {
+    throw new Error('useTheme must be used within a ThemeProvider');
+  }
+  return context;
+}
+3.2 Wrap App with ThemeProvider
+File: client/src/main.tsx or client/src/App.tsx
+typescriptimport { ThemeProvider } from './contexts/ThemeContext';
+
+function App() {
+  return (
+    <ThemeProvider>
+      {/* existing app content */}
+    </ThemeProvider>
+  );
+}
+3.3 Add Theme Toggle to Header/Sidebar
+File: client/src/components/AppSidebar.tsx or header component
+typescriptimport { useTheme } from '@/contexts/ThemeContext';
+import { Sun, Moon } from 'lucide-react';
+
+function ThemeToggle() {
+  const { theme, toggleTheme } = useTheme();
+  
+  return (
+    <button
+      onClick={toggleTheme}
+      className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+      title={theme === 'light' ? 'Switch to Dark Mode' : 'Switch to Light Mode'}
+    >
+      {theme === 'light' ? (
+        <Moon className="h-5 w-5 text-gray-600 dark:text-gray-300" />
+      ) : (
+        <Sun className="h-5 w-5 text-gray-600 dark:text-gray-300" />
+      )}
+    </button>
+  );
+}
+Add this toggle button to the header area (near the user profile icon is a good spot).
+
+TASK 4: Configure Tailwind for Dark Mode
+File: tailwind.config.js
+javascriptmodule.exports = {
+  darkMode: 'class', // Enable class-based dark mode
+  content: [
+    './client/src/**/*.{js,ts,jsx,tsx}',
+  ],
+  theme: {
+    extend: {
+      // Add any custom dark mode colors if needed
+    },
+  },
+  plugins: [],
+};
+
+TASK 5: Update All UI Components for Dark Mode
+Add dark mode classes to all major UI components. The pattern is:
+tsx// Example: Card component
+<div className="bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 border border-gray-200 dark:border-gray-700">
+  {/* content */}
+</div>
+
+// Example: Text
+<p className="text-gray-600 dark:text-gray-400">Description text</p>
+
+// Example: Input
+<input className="bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 border-gray-300 dark:border-gray-600" />
+
+// Example: Button (secondary)
+<button className="bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-600">
+  Button
+</button>
+Priority components to update:
+ComponentFile (likely location)App Layout / Shellclient/src/components/AppLayout.tsxSidebarclient/src/components/AppSidebar.tsxHeaderclient/src/components/Header.tsxCardsclient/src/components/ui/card.tsxTablesclient/src/components/ui/table.tsxModals/Dialogsclient/src/components/ui/dialog.tsxForms/Inputsclient/src/components/ui/input.tsxButtonsclient/src/components/ui/button.tsxDropdownsclient/src/components/ui/dropdown-menu.tsxCMA Pagesclient/src/pages/CMAs.tsx, CMADetailPage.tsxDashboardclient/src/pages/Dashboard.tsxAll other pagesCheck each page component
+
+TASK 6: Sync Maps with Global Theme
+Update MapboxMap component to respond to global theme:
+typescriptimport { useTheme } from '@/contexts/ThemeContext';
+
+function MapboxMap({ markers, allowStyleOverride = true, ...props }) {
+  const { theme } = useTheme();
+  const [localStyle, setLocalStyle] = useState<'streets' | 'satellite' | 'dark' | null>(null);
+  
+  // Determine which style to use
+  const getMapStyle = () => {
+    // If user manually selected a style, use that
+    if (localStyle) {
+      return MAP_STYLES[localStyle];
+    }
+    
+    // Otherwise, sync with global theme
+    return theme === 'dark' 
+      ? 'mapbox://styles/mapbox/dark-v11'
+      : 'mapbox://styles/mapbox/streets-v12';
+  };
+  
+  // When global theme changes, reset local style override (optional behavior)
+  useEffect(() => {
+    if (!allowStyleOverride) {
+      setLocalStyle(null);
+    }
+  }, [theme, allowStyleOverride]);
+  
+  return (
+    <div className="relative">
+      {allowStyleOverride && (
+        <MapStyleToggle 
+          currentStyle={localStyle || (theme === 'dark' ? 'dark' : 'streets')}
+          onStyleChange={setLocalStyle}
+        />
+      )}
+      
+      <Map style={getMapStyle()} ... />
+    </div>
+  );
+}
+
+TASK 7: Dark Mode Color Palette
+Create: client/src/styles/darkMode.css (or add to existing CSS)
+css/* Dark mode specific adjustments */
+:root {
+  --background: 255 255 255;
+  --foreground: 10 10 10;
+  --card: 255 255 255;
+  --card-foreground: 10 10 10;
+  --muted: 245 245 245;
+  --muted-foreground: 115 115 115;
+  --border: 229 229 229;
+  --input: 229 229 229;
+}
+
+.dark {
+  --background: 10 10 10;
+  --foreground: 250 250 250;
+  --card: 23 23 23;
+  --card-foreground: 250 250 250;
+  --muted: 38 38 38;
+  --muted-foreground: 163 163 163;
+  --border: 38 38 38;
+  --input: 38 38 38;
+}
+
+/* Ensure Spyglass orange accent works in both modes */
+.dark .text-primary {
+  color: #f97316; /* Orange accent */
+}
+
+/* Map legend adjustments for dark mode */
+.dark .map-legend {
+  background-color: rgba(23, 23, 23, 0.95);
+  border-color: #374151;
+}
+
+/* Ensure charts/graphs are visible in dark mode */
+.dark .recharts-text {
+  fill: #d1d5db;
+}
+
+.dark .recharts-cartesian-grid line {
+  stroke: #374151;
+}
+
+ACCEPTANCE CRITERIA
+Marker Colors:
+
+ All maps use same color scheme from mapColors.ts
+ Subject Property = Red (#ef4444)
+ Active = Green (#22c55e)
+ Under Contract = Orange (#f97316)
+ Closed = Gray (#6b7280)
+ Colors match between Presentation Builder and CMA Detail Page
+
+Map Style Toggle:
+
+ CMA Detail Page map has Streets/Satellite/Dark buttons
+ Toggle buttons match Presentation Builder styling
+ Style changes apply immediately
+
+Day/Night Mode:
+
+ Theme toggle button visible in header/sidebar
+ Toggle switches between light and dark mode
+ Theme preference saved to localStorage
+ Theme persists across page refreshes
+ System preference detected on first visit
+
+Dark Mode UI:
+
+ Sidebar readable in dark mode
+ All cards/panels have dark backgrounds
+ All text is readable (proper contrast)
+ Forms/inputs visible and usable
+ Tables readable with proper borders
+ Charts/graphs visible
+ Modals/dialogs styled correctly
+ Buttons have proper hover states
+ Orange accent color (#f97316) still prominent
+
+Map Theme Sync:
+
+ Maps default to dark style when portal is in night mode
+ Maps default to streets style when portal is in day mode
+ User can still manually override map style
+ Legend readable in both modes
+
+
+VALIDATION TESTS
+javascript// Test 1: Marker colors consistent
+const presentationMapColors = getPresentationMapMarkerColors();
+const cmaMapColors = getCMAMapMarkerColors();
+expect(presentationMapColors).toEqual(cmaMapColors);
+
+// Test 2: Theme toggle works
+toggleTheme();
+expect(document.documentElement.classList.contains('dark')).toBe(true);
+toggleTheme();
+expect(document.documentElement.classList.contains('dark')).toBe(false);
+
+// Test 3: Theme persists
+localStorage.setItem('cdp-theme', 'dark');
+reloadPage();
+expect(getCurrentTheme()).toBe('dark');
+
+// Test 4: Map syncs with theme
+setTheme('dark');
+expect(getMapStyle()).toBe('mapbox://styles/mapbox/dark-v11');
+
+LOGGING
+javascriptconsole.log('Theme changed:', { from: previousTheme, to: newTheme });
+console.log('Map style changed:', { style, source: 'user' | 'theme-sync' });
+console.log('Theme loaded from storage:', { theme });
+```
+
+---
+
+### FILES LIKELY IMPACTED
+```
+client/src/
+├── contexts/
+│   └── ThemeContext.tsx                    [NEW]
+├── lib/
+│   └── mapColors.ts                        [NEW]
+├── components/
+│   ├── AppSidebar.tsx                      [MODIFY - add theme toggle]
+│   ├── AppLayout.tsx                       [MODIFY - dark mode classes]
+│   ├── maps/
+│   │   └── MapboxMap.tsx                   [MODIFY - use mapColors, theme sync]
+│   └── ui/
+│       ├── card.tsx                        [MODIFY - dark mode]
+│       ├── button.tsx                      [MODIFY - dark mode]
+│       ├── input.tsx                       [MODIFY - dark mode]
+│       ├── table.tsx                       [MODIFY - dark mode]
+│       └── ... (all ui components)         [MODIFY - dark mode]
+├── pages/
+│   ├── CMADetailPage.tsx                   [MODIFY - add map style toggle]
+│   ├── CMAPresentationBuilder.tsx          [MODIFY - use mapColors]
+│   └── ... (all pages)                     [MODIFY - dark mode]
+├── styles/
+│   └── darkMode.css                        [NEW or MODIFY existing]
+├── main.tsx                                [MODIFY - wrap with ThemeProvider]
+└── App.tsx                                 [MODIFY - wrap with ThemeProvider]
+
+tailwind.config.js                          [MODIFY - enable darkMode: 'class']

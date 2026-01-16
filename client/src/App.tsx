@@ -7,9 +7,11 @@ import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/AppSidebar";
 import { ChatAssistant } from "@/components/ChatAssistant";
 import { UserMenu } from "@/components/UserMenu";
+import { ThemeToggle } from "@/components/ThemeToggle";
 import { LeadGateProvider } from "@/contexts/LeadGateContext";
 import { SelectedPropertyProvider } from "@/contexts/SelectedPropertyContext";
 import { ChatProvider } from "@/contexts/ChatContext";
+import { ThemeProvider } from "@/contexts/ThemeContext";
 import NotFound from "@/pages/not-found";
 import Dashboard from "@/pages/Dashboard";
 import Properties from "@/pages/Properties";
@@ -129,49 +131,52 @@ export default function App() {
 
   return (
     <QueryClientProvider client={queryClient}>
-      <TooltipProvider>
-        <ChatProvider>
-          <LeadGateProvider>
-            <SelectedPropertyProvider>
-              <Switch>
-                {/* Public routes without auth */}
-                <Route path="/login" component={Login} />
-                <Route path="/embed/seller-update" component={SellerUpdateEmbed} />
-                <Route path="/share/cma/:token" component={SharedCMAView} />
-                
-                {/* Protected routes with sidebar */}
-                <Route>
-                  <AuthGuard>
-                    <SidebarProvider style={style as React.CSSProperties}>
-                      <div className="flex h-screen w-full">
-                        <AppSidebar />
-                        <div className="flex flex-col flex-1 overflow-hidden">
-                          <header className="flex items-center justify-between p-4 border-b bg-background gap-4">
-                            <SidebarTrigger data-testid="button-sidebar-toggle" />
-                            <div className="flex items-center gap-4">
-                              <div className="text-sm text-muted-foreground hidden sm:block">
-                                MLS Grid IDX Platform
+      <ThemeProvider>
+        <TooltipProvider>
+          <ChatProvider>
+            <LeadGateProvider>
+              <SelectedPropertyProvider>
+                <Switch>
+                  {/* Public routes without auth */}
+                  <Route path="/login" component={Login} />
+                  <Route path="/embed/seller-update" component={SellerUpdateEmbed} />
+                  <Route path="/share/cma/:token" component={SharedCMAView} />
+                  
+                  {/* Protected routes with sidebar */}
+                  <Route>
+                    <AuthGuard>
+                      <SidebarProvider style={style as React.CSSProperties}>
+                        <div className="flex h-screen w-full">
+                          <AppSidebar />
+                          <div className="flex flex-col flex-1 overflow-hidden">
+                            <header className="flex items-center justify-between p-4 border-b bg-background gap-4">
+                              <SidebarTrigger data-testid="button-sidebar-toggle" />
+                              <div className="flex items-center gap-4">
+                                <div className="text-sm text-muted-foreground hidden sm:block">
+                                  MLS Grid IDX Platform
+                                </div>
+                                <ThemeToggle />
+                                <UserMenu />
                               </div>
-                              <UserMenu />
-                            </div>
-                          </header>
-                          <main className="flex-1 overflow-auto p-6">
-                            <div className="max-w-7xl mx-auto">
-                              <Router />
-                            </div>
-                          </main>
+                            </header>
+                            <main className="flex-1 overflow-auto p-6">
+                              <div className="max-w-7xl mx-auto">
+                                <Router />
+                              </div>
+                            </main>
+                          </div>
                         </div>
-                      </div>
-                    </SidebarProvider>
-                  </AuthGuard>
-                </Route>
-              </Switch>
-            </SelectedPropertyProvider>
-          </LeadGateProvider>
-          <ChatAssistant />
-          <Toaster />
-        </ChatProvider>
-      </TooltipProvider>
+                      </SidebarProvider>
+                    </AuthGuard>
+                  </Route>
+                </Switch>
+              </SelectedPropertyProvider>
+            </LeadGateProvider>
+            <ChatAssistant />
+            <Toaster />
+          </ChatProvider>
+        </TooltipProvider>
+      </ThemeProvider>
     </QueryClientProvider>
   );
 }
