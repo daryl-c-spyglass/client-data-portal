@@ -2,6 +2,7 @@ import { useRef, useEffect, useState, useCallback } from 'react';
 import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
 import { Button } from '@/components/ui/button';
+import { STATUS_COLORS, getStatusHexFromMLS, MAP_STYLES } from '@/lib/statusColors';
 
 interface PropertyLocation {
   id: string;
@@ -24,22 +25,8 @@ interface MapboxCMAMapProps {
   interactive?: boolean;
 }
 
-const MAPBOX_STYLES = {
-  streets: 'mapbox://styles/mapbox/streets-v11',
-  satellite: 'mapbox://styles/mapbox/satellite-streets-v11',
-  dark: 'mapbox://styles/mapbox/dark-v10'
-} as const;
-
-const STATUS_COLORS: Record<string, string> = {
-  'Active': '#22c55e',
-  'Active Under Contract': '#f97316',
-  'Pending': '#eab308',
-  'Closed': '#6b7280',
-  'Subject': '#ef4444'
-};
-
-function getStatusColor(status: string): string {
-  return STATUS_COLORS[status] || STATUS_COLORS['Closed'];
+function getStatusColor(status: string, isSubject?: boolean): string {
+  return getStatusHexFromMLS(status, isSubject);
 }
 
 export function MapboxCMAMap({ 
@@ -90,7 +77,7 @@ export function MapboxCMAMap({
     try {
       map.current = new mapboxgl.Map({
         container: mapContainer.current,
-        style: MAPBOX_STYLES[style],
+        style: MAP_STYLES[style],
         center: getCenterPoint(),
         zoom: 12,
         interactive
@@ -123,7 +110,7 @@ export function MapboxCMAMap({
 
   useEffect(() => {
     if (map.current && mapLoaded) {
-      map.current.setStyle(MAPBOX_STYLES[style]);
+      map.current.setStyle(MAP_STYLES[style]);
     }
   }, [style, mapLoaded]);
 
@@ -205,7 +192,7 @@ export function MapboxCMAMap({
       
       {onStyleChange && (
         <div className="absolute top-3 left-3 bg-background/90 backdrop-blur-sm rounded-lg shadow-md p-1 flex gap-1">
-          {(Object.keys(MAPBOX_STYLES) as Array<keyof typeof MAPBOX_STYLES>).map((s) => (
+          {(['streets', 'satellite', 'dark'] as const).map((s) => (
             <Button
               key={s}
               size="sm"
@@ -239,19 +226,19 @@ export function MapboxCMAMap({
         <div className="text-xs font-medium mb-2">Legend</div>
         <div className="space-y-1">
           <div className="flex items-center gap-2 text-xs">
-            <span className="w-3 h-3 rounded-full" style={{ backgroundColor: STATUS_COLORS.Subject }} />
+            <span className="w-3 h-3 rounded-full" style={{ backgroundColor: STATUS_COLORS.subject.hex }} />
             <span>Subject Property</span>
           </div>
           <div className="flex items-center gap-2 text-xs">
-            <span className="w-3 h-3 rounded-full" style={{ backgroundColor: STATUS_COLORS.Active }} />
+            <span className="w-3 h-3 rounded-full" style={{ backgroundColor: STATUS_COLORS.active.hex }} />
             <span>Active</span>
           </div>
           <div className="flex items-center gap-2 text-xs">
-            <span className="w-3 h-3 rounded-full" style={{ backgroundColor: STATUS_COLORS['Active Under Contract'] }} />
+            <span className="w-3 h-3 rounded-full" style={{ backgroundColor: STATUS_COLORS.underContract.hex }} />
             <span>Under Contract</span>
           </div>
           <div className="flex items-center gap-2 text-xs">
-            <span className="w-3 h-3 rounded-full" style={{ backgroundColor: STATUS_COLORS.Closed }} />
+            <span className="w-3 h-3 rounded-full" style={{ backgroundColor: STATUS_COLORS.closed.hex }} />
             <span>Closed</span>
           </div>
         </div>
@@ -265,7 +252,7 @@ function createMarkerElement(isSubject: boolean, status: string): HTMLElement {
   el.style.width = isSubject ? '24px' : '18px';
   el.style.height = isSubject ? '24px' : '18px';
   el.style.borderRadius = '50%';
-  el.style.backgroundColor = isSubject ? STATUS_COLORS.Subject : getStatusColor(status);
+  el.style.backgroundColor = getStatusColor(status, isSubject);
   el.style.border = '3px solid white';
   el.style.boxShadow = '0 2px 4px rgba(0,0,0,0.3)';
   el.style.cursor = 'pointer';
@@ -316,7 +303,7 @@ function addPolygonLayer(map: mapboxgl.Map, properties: PropertyLocation[]) {
     type: 'fill',
     source: 'property-polygon',
     paint: {
-      'fill-color': '#f97316',
+      'fill-color': STATUS_COLORS.underContract.hex,
       'fill-opacity': 0.1
     }
   });
@@ -326,7 +313,7 @@ function addPolygonLayer(map: mapboxgl.Map, properties: PropertyLocation[]) {
     type: 'line',
     source: 'property-polygon',
     paint: {
-      'line-color': '#f97316',
+      'line-color': STATUS_COLORS.underContract.hex,
       'line-width': 2,
       'line-dasharray': [2, 2]
     }
@@ -373,7 +360,8 @@ export function generateMapboxStaticMapUrl(
   const markers: string[] = [];
   
   if (subjectProperty?.lat && subjectProperty?.lng) {
-    markers.push(`pin-l-star+ef4444(${subjectProperty.lng},${subjectProperty.lat})`);
+    const subjectColor = STATUS_COLORS.subject.hex.replace('#', '');
+    markers.push(`pin-l-star+${subjectColor}(${subjectProperty.lng},${subjectProperty.lat})`);
   }
 
   validProps.forEach(p => {

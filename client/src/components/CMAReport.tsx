@@ -9,6 +9,7 @@ import { Save, Edit, FileText, Printer, Info, Home, Mail, ChevronLeft, ChevronRi
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
 import { MapboxMap, type MapMarker } from "@/components/shared/MapboxMap";
 import { useTheme } from "@/contexts/ThemeContext";
+import { STATUS_COLORS, getStatusHexFromMLS } from "@/lib/statusColors";
 
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
@@ -1687,7 +1688,7 @@ export function CMAReport({
                                 if (payload.isSubject) {
                                   return (
                                     <g>
-                                      <circle cx={cx} cy={cy} r={16} fill="#3b82f6" stroke="white" strokeWidth={2} />
+                                      <circle cx={cx} cy={cy} r={16} fill={STATUS_COLORS.subject.hex} stroke="white" strokeWidth={2} />
                                       <text x={cx} y={cy + 4} textAnchor="middle" fill="white" fontSize={12}>⌂</text>
                                     </g>
                                   );
@@ -3050,9 +3051,7 @@ export function CMAReport({
                 };
                 
                 const getStatusColor = (status: string) => {
-                  if (status === 'Active') return '#22c55e';
-                  if (status === 'Active Under Contract') return '#eab308';
-                  return '#ef4444';
+                  return getStatusHexFromMLS(status);
                 };
                 
                 return filteredTimelineData.length > 0 ? (

@@ -1,11 +1,18 @@
-// Single source of truth for all map marker colors
+// Re-export from statusColors for backwards compatibility
+// Use statusColors.ts as the single source of truth
+import { STATUS_COLORS, getStatusHexFromMLS, getStatusFromMLS, StatusKey } from './statusColors';
+
+// Single source of truth for all map marker colors (aligned with statusColors.ts)
 export const MAP_MARKER_COLORS = {
-  subject: '#ef4444',      // Red - Subject Property
-  active: '#22c55e',       // Green - Active
-  underContract: '#f97316', // Orange - Under Contract  
-  pending: '#eab308',      // Yellow - Pending
-  closed: '#6b7280',       // Gray - Closed/Sold
+  subject: STATUS_COLORS.subject.hex,      // Blue - Subject Property
+  active: STATUS_COLORS.active.hex,        // Green - Active
+  underContract: STATUS_COLORS.underContract.hex, // Orange - Under Contract  
+  pending: STATUS_COLORS.pending.hex,      // Gray - Pending
+  closed: STATUS_COLORS.closed.hex,        // Red - Closed/Sold
 } as const;
+
+export { STATUS_COLORS, getStatusHexFromMLS, getStatusFromMLS };
+export type { StatusKey };
 
 export const MAP_MARKER_LABELS = {
   subject: 'Subject Property',

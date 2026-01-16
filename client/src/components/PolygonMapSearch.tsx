@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Loader2, Trash2, MapPin, AlertCircle, Search, PenTool } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { MapLayersControl } from "./MapLayersControl";
+import { STATUS_COLORS } from "@/lib/statusColors";
 import "leaflet/dist/leaflet.css";
 import "leaflet-draw/dist/leaflet.draw.css";
 
@@ -48,8 +49,8 @@ function DrawControl({
           allowIntersection: false,
           showArea: false,
           shapeOptions: {
-            color: "#f97316",
-            fillColor: "#f97316",
+            color: STATUS_COLORS.underContract.hex,
+            fillColor: STATUS_COLORS.underContract.hex,
             fillOpacity: 0.2,
             weight: 2,
           },

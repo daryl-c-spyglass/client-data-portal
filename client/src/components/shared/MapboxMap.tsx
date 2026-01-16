@@ -1,7 +1,8 @@
 import { useRef, useEffect, useState, useCallback, useMemo } from 'react';
 import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
-import { MAP_MARKER_COLORS, MAP_STYLES, getMarkerColorFromStatus, MapStyleKey } from '@/lib/mapColors';
+import { STATUS_COLORS, getStatusHexFromMLS, MAP_STYLES, MapStyleKey } from '@/lib/statusColors';
+import { MapLegend } from '@/components/maps/MapLegend';
 
 export interface MapMarker {
   id: string;
@@ -37,7 +38,7 @@ interface MapboxMapProps {
 }
 
 function getStatusColor(status: string, isSubject?: boolean): string {
-  return getMarkerColorFromStatus(status, isSubject);
+  return getStatusHexFromMLS(status, isSubject);
 }
 
 function formatPrice(price: number): string {
@@ -141,7 +142,7 @@ export function MapboxMap({
   style = 'streets',
   polygon,
   showPolygon = false,
-  polygonColor = '#f97316',
+  polygonColor = STATUS_COLORS.underContract.hex,
   syncWithTheme = false,
   currentTheme,
 }: MapboxMapProps) {
@@ -364,24 +365,10 @@ export function MapboxMap({
       />
       
       {showLegend && (
-        <div className="absolute bottom-4 left-4 bg-background/95 backdrop-blur-sm rounded-lg shadow-md p-3 text-sm border" data-testid="map-legend">
-          <div className="flex items-center gap-2 mb-1.5">
-            <span className="w-3 h-3 rounded-full" style={{ backgroundColor: MAP_MARKER_COLORS.active }}></span>
-            <span className="text-foreground">Active</span>
-          </div>
-          <div className="flex items-center gap-2 mb-1.5">
-            <span className="w-3 h-3 rounded-full" style={{ backgroundColor: MAP_MARKER_COLORS.underContract }}></span>
-            <span className="text-foreground">Under Contract</span>
-          </div>
-          <div className="flex items-center gap-2 mb-1.5">
-            <span className="w-3 h-3 rounded-full" style={{ backgroundColor: MAP_MARKER_COLORS.closed }}></span>
-            <span className="text-foreground">Closed</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <span className="w-3 h-3 rounded-full" style={{ backgroundColor: MAP_MARKER_COLORS.subject }}></span>
-            <span className="text-foreground">Subject</span>
-          </div>
-        </div>
+        <MapLegend 
+          statuses={['subject', 'active', 'underContract', 'closed', 'pending']} 
+          className="absolute bottom-4 left-4"
+        />
       )}
     </div>
   );
