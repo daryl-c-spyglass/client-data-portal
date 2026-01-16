@@ -49,10 +49,12 @@ import {
   TrendingDown,
   Minus,
   Download,
+  Expand,
 } from "lucide-react";
 import { pdf } from "@react-pdf/renderer";
 import { CMAPdfDocument } from "@/components/CMAPdfDocument";
 import { ListingBrochureContent } from "@/components/ListingBrochureContent";
+import { ExpandedPreviewModal } from "@/components/ExpandedPreviewModal";
 import {
   BarChart,
   Bar,
@@ -208,6 +210,8 @@ export default function CMAPresentationBuilder() {
   const [activeTab, setActiveTab] = useState("sections");
   const [hasChanges, setHasChanges] = useState(false);
   const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
+  const [isPreviewModalOpen, setIsPreviewModalOpen] = useState(false);
+  const [isPreviewUpdating, setIsPreviewUpdating] = useState(false);
 
   const [includedSections, setIncludedSections] = useState<string[]>([]);
   const [sectionOrder, setSectionOrder] = useState<string[]>([]);
@@ -330,6 +334,22 @@ export default function CMAPresentationBuilder() {
       setBrochure(cma.brochure);
     }
   }, [cma?.brochure]);
+
+  // Visual feedback when preview updates
+  useEffect(() => {
+    setIsPreviewUpdating(true);
+    const timer = setTimeout(() => setIsPreviewUpdating(false), 300);
+    return () => clearTimeout(timer);
+  }, [includedSections, layout, photoLayout, includeAgentFooter, coverLetterOverride]);
+
+  // Handle section click from preview to jump to settings
+  const handlePreviewSectionClick = (sectionId: string) => {
+    setActiveTab("sections");
+    setTimeout(() => {
+      const element = document.getElementById(`section-${sectionId}`);
+      element?.scrollIntoView({ behavior: "smooth", block: "center" });
+    }, 100);
+  };
 
   // Extract subject property from CMA data
   const subjectProperty = useMemo(() => {
@@ -638,6 +658,7 @@ export default function CMAPresentationBuilder() {
                             return (
                               <div
                                 key={section.id}
+                                id={`section-${section.id}`}
                                 className={`flex items-center justify-between p-3 rounded-md border ${
                                   isEnabled ? "bg-card" : "bg-muted/50"
                                 }`}
@@ -839,21 +860,34 @@ export default function CMAPresentationBuilder() {
         <div className="space-y-6">
           <Card>
             <CardHeader className="pb-3">
-              <div className="flex items-center justify-between">
-                <CardTitle className="text-lg">Live Preview</CardTitle>
-                <Badge variant="outline">
-                  {includedSections.length} sections enabled
-                </Badge>
+              <div className="flex items-center justify-between gap-2">
+                <div>
+                  <CardTitle className="text-lg">Live Preview</CardTitle>
+                  <CardDescription>
+                    Preview how your CMA presentation will appear
+                  </CardDescription>
+                </div>
+                <div className="flex items-center gap-2 flex-shrink-0">
+                  <Badge variant="outline">
+                    {includedSections.length} sections
+                  </Badge>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => setIsPreviewModalOpen(true)}
+                    title="Expand preview"
+                    data-testid="button-expand-preview"
+                  >
+                    <Expand className="h-4 w-4" />
+                  </Button>
+                </div>
               </div>
-              <CardDescription>
-                Preview how your CMA presentation will appear
-              </CardDescription>
             </CardHeader>
             <CardContent>
               <ScrollArea className="h-[600px] border rounded-md">
-                <div className="p-4 space-y-4">
+                <div className={`p-4 space-y-4 transition-opacity duration-300 ${isPreviewUpdating ? "opacity-50" : "opacity-100"}`}>
                   {includedSections.includes("cover_page") && (
-                    <PreviewSection title="Cover Page" icon={FileText}>
+                    <PreviewSection title="Cover Page" icon={FileText} sectionId="cover_page" onClick={handlePreviewSectionClick}>
                       <div className="text-center space-y-4">
                         {companySettings?.logoUrl ? (
                           <img
@@ -878,7 +912,7 @@ export default function CMAPresentationBuilder() {
                   )}
 
                   {includedSections.includes("listing_brochure") && (
-                    <PreviewSection title="Listing Brochure" icon={ImageIcon}>
+                    <PreviewSection title="Listing Brochure" icon={ImageIcon} sectionId="listing_brochure" onClick={handlePreviewSectionClick}>
                       {brochure ? (
                         <div className="space-y-2">
                           <div className="aspect-[8.5/11] bg-muted rounded-lg overflow-hidden border max-h-[200px]">
@@ -908,7 +942,7 @@ export default function CMAPresentationBuilder() {
                   )}
 
                   {includedSections.includes("cover_letter") && (
-                    <PreviewSection title="Cover Letter" icon={FileText}>
+                    <PreviewSection title="Cover Letter" icon={FileText} sectionId="cover_letter" onClick={handlePreviewSectionClick}>
                       <p className="text-sm text-muted-foreground whitespace-pre-wrap">
                         {coverLetterOverride || agentProfile?.defaultCoverLetter || "Your personalized cover letter will appear here..."}
                       </p>
@@ -916,7 +950,7 @@ export default function CMAPresentationBuilder() {
                   )}
 
                   {includedSections.includes("agent_resume") && (
-                    <PreviewSection title="Agent Resume" icon={User}>
+                    <PreviewSection title="Agent Resume" icon={User} sectionId="agent_resume" onClick={handlePreviewSectionClick}>
                       <div className="flex items-start gap-4">
                         <Avatar className="h-16 w-16">
                           <AvatarImage src={agentProfile?.headshotUrl ?? undefined} />
@@ -936,7 +970,7 @@ export default function CMAPresentationBuilder() {
                   )}
 
                   {includedSections.includes("our_company") && (
-                    <PreviewSection title="Our Company" icon={Building2}>
+                    <PreviewSection title="Our Company" icon={Building2} sectionId="our_company" onClick={handlePreviewSectionClick}>
                       <div className="space-y-2">
                         <div className="font-semibold">
                           {companySettings?.companyName || "Spyglass Realty"}
@@ -949,7 +983,7 @@ export default function CMAPresentationBuilder() {
                   )}
 
                   {includedSections.includes("what_is_cma") && (
-                    <PreviewSection title="What is a CMA?" icon={FileText}>
+                    <PreviewSection title="What is a CMA?" icon={FileText} sectionId="what_is_cma" onClick={handlePreviewSectionClick}>
                       <p className="text-sm text-muted-foreground">
                         A Comparative Market Analysis (CMA) is a detailed report that helps determine the value of a property by comparing it to similar properties that have recently sold or are currently on the market in the same area.
                       </p>
@@ -957,7 +991,7 @@ export default function CMAPresentationBuilder() {
                   )}
 
                   {includedSections.includes("contact_me") && (
-                    <PreviewSection title="Contact Me" icon={Phone}>
+                    <PreviewSection title="Contact Me" icon={Phone} sectionId="contact_me" onClick={handlePreviewSectionClick}>
                       <div className="space-y-2">
                         <div className="flex items-center gap-2 text-sm">
                           <Mail className="w-4 h-4 text-muted-foreground" />
@@ -980,7 +1014,7 @@ export default function CMAPresentationBuilder() {
                   )}
 
                   {includedSections.includes("map_all_listings") && (
-                    <PreviewSection title="Map of All Listings" icon={Map}>
+                    <PreviewSection title="Map of All Listings" icon={Map} sectionId="map_all_listings" onClick={handlePreviewSectionClick}>
                       <div className="h-32 bg-muted rounded-md flex items-center justify-center">
                         <span className="text-muted-foreground text-sm">
                           Interactive map with {cma.propertiesData?.length || 0} properties
@@ -990,7 +1024,7 @@ export default function CMAPresentationBuilder() {
                   )}
 
                   {includedSections.includes("summary_comparables") && (
-                    <PreviewSection title="Summary of Comparable Properties" icon={Table}>
+                    <PreviewSection title="Summary of Comparable Properties" icon={Table} sectionId="summary_comparables" onClick={handlePreviewSectionClick}>
                       {statistics.propertyCount > 0 ? (
                         <div className="space-y-3">
                           <div className="grid grid-cols-3 gap-2 text-xs">
@@ -1022,7 +1056,7 @@ export default function CMAPresentationBuilder() {
                   )}
 
                   {includedSections.includes("property_details") && (
-                    <PreviewSection title="Property Details" icon={Home}>
+                    <PreviewSection title="Property Details" icon={Home} sectionId="property_details" onClick={handlePreviewSectionClick}>
                       <div className="h-24 bg-muted rounded-md flex items-center justify-center">
                         <span className="text-muted-foreground text-sm">
                           Detailed property information pages
@@ -1032,7 +1066,7 @@ export default function CMAPresentationBuilder() {
                   )}
 
                   {includedSections.includes("property_photos") && (
-                    <PreviewSection title="Property Photos" icon={ImageIcon}>
+                    <PreviewSection title="Property Photos" icon={ImageIcon} sectionId="property_photos" onClick={handlePreviewSectionClick}>
                       <div className="h-24 bg-muted rounded-md flex items-center justify-center">
                         <span className="text-muted-foreground text-sm">
                           Photo gallery ({photoLayout === "all" ? "All" : "First 12"} photos)
@@ -1042,7 +1076,7 @@ export default function CMAPresentationBuilder() {
                   )}
 
                   {includedSections.includes("online_valuation") && (
-                    <PreviewSection title="Online Valuation Analysis" icon={BarChart3}>
+                    <PreviewSection title="Online Valuation Analysis" icon={BarChart3} sectionId="online_valuation" onClick={handlePreviewSectionClick}>
                       <div className="space-y-3">
                         <div className="p-3 bg-muted/50 rounded-md border border-dashed">
                           <div className="flex items-center gap-2 mb-2">
@@ -1064,7 +1098,7 @@ export default function CMAPresentationBuilder() {
                   )}
 
                   {includedSections.includes("price_per_sqft") && (
-                    <PreviewSection title="Average Price Per Sq. Ft." icon={BarChart3}>
+                    <PreviewSection title="Average Price Per Sq. Ft." icon={BarChart3} sectionId="price_per_sqft" onClick={handlePreviewSectionClick}>
                       <div className="space-y-3">
                         {pricePerSqftData.length > 0 ? (
                           <>
@@ -1129,7 +1163,7 @@ export default function CMAPresentationBuilder() {
                   )}
 
                   {includedSections.includes("comparable_stats") && (
-                    <PreviewSection title="Comparable Property Statistics" icon={Table}>
+                    <PreviewSection title="Comparable Property Statistics" icon={Table} sectionId="comparable_stats" onClick={handlePreviewSectionClick}>
                       {statistics.propertyCount > 0 ? (
                         <div className="space-y-3">
                           <div className="grid grid-cols-2 gap-2 text-xs">
@@ -1191,6 +1225,144 @@ export default function CMAPresentationBuilder() {
           </Card>
         </div>
       </div>
+
+      <ExpandedPreviewModal
+        isOpen={isPreviewModalOpen}
+        onClose={() => setIsPreviewModalOpen(false)}
+        sectionsEnabled={includedSections.length}
+      >
+        <div className="p-4 space-y-4">
+          {includedSections.includes("cover_page") && (
+            <PreviewSection title="Cover Page" icon={FileText} sectionId="cover_page" onClick={handlePreviewSectionClick}>
+              <div className="text-center space-y-4">
+                {companySettings?.logoUrl ? (
+                  <img
+                    src={companySettings.logoUrl}
+                    alt="Company Logo"
+                    className="h-12 mx-auto object-contain"
+                  />
+                ) : (
+                  <div className="font-bold text-xl" style={{ color: companySettings?.primaryColor ?? undefined }}>
+                    {companySettings?.companyName || "Spyglass Realty"}
+                  </div>
+                )}
+                <div className="text-2xl font-bold">
+                  Comparative Market Analysis
+                </div>
+                <div className="text-muted-foreground">{cma?.name}</div>
+                <div className="text-sm text-muted-foreground">
+                  Prepared by {userName}
+                </div>
+              </div>
+            </PreviewSection>
+          )}
+
+          {includedSections.includes("listing_brochure") && (
+            <PreviewSection title="Listing Brochure" icon={ImageIcon} sectionId="listing_brochure" onClick={handlePreviewSectionClick}>
+              {brochure ? (
+                <div className="space-y-2">
+                  <div className="aspect-[8.5/11] bg-muted rounded-lg overflow-hidden border max-h-[300px]">
+                    {brochure.type === "pdf" ? (
+                      <div className="flex items-center justify-center h-full text-muted-foreground">
+                        <FileText className="h-8 w-8 mr-2" />
+                        <span className="text-sm">{brochure.filename}</span>
+                      </div>
+                    ) : (
+                      <img
+                        src={brochure.url.startsWith("http") ? brochure.url : `/${brochure.url}`}
+                        alt="Listing Brochure"
+                        className="w-full h-full object-contain"
+                      />
+                    )}
+                  </div>
+                </div>
+              ) : (
+                <p className="text-sm text-muted-foreground text-center">
+                  No brochure uploaded
+                </p>
+              )}
+            </PreviewSection>
+          )}
+
+          {includedSections.includes("cover_letter") && (
+            <PreviewSection title="Cover Letter" icon={FileText} sectionId="cover_letter" onClick={handlePreviewSectionClick}>
+              <p className="text-sm text-muted-foreground whitespace-pre-wrap">
+                {coverLetterOverride || agentProfile?.defaultCoverLetter || "Your personalized cover letter will appear here..."}
+              </p>
+            </PreviewSection>
+          )}
+
+          {includedSections.includes("agent_resume") && (
+            <PreviewSection title="Agent Resume" icon={User} sectionId="agent_resume" onClick={handlePreviewSectionClick}>
+              <div className="flex items-start gap-4">
+                <Avatar className="h-16 w-16">
+                  <AvatarImage src={agentProfile?.headshotUrl ?? undefined} />
+                  <AvatarFallback>{userName.charAt(0)}</AvatarFallback>
+                </Avatar>
+                <div className="flex-1 space-y-2">
+                  <div className="font-semibold">{userName}</div>
+                  <div className="text-sm text-muted-foreground">
+                    {agentProfile?.title || "Real Estate Agent"}
+                  </div>
+                  <p className="text-sm text-muted-foreground">
+                    {agentProfile?.bio || "Agent bio will appear here..."}
+                  </p>
+                </div>
+              </div>
+            </PreviewSection>
+          )}
+
+          {includedSections.includes("summary_comparables") && (
+            <PreviewSection title="Summary of Comparable Properties" icon={Table} sectionId="summary_comparables" onClick={handlePreviewSectionClick}>
+              {statistics.propertyCount > 0 ? (
+                <div className="space-y-3">
+                  <div className="grid grid-cols-3 gap-2 text-xs">
+                    <div className="p-2 bg-muted rounded-md text-center">
+                      <div className="text-muted-foreground mb-1">Avg Price</div>
+                      <div className="font-semibold">{formatCurrency(statistics.avgPrice)}</div>
+                    </div>
+                    <div className="p-2 bg-muted rounded-md text-center">
+                      <div className="text-muted-foreground mb-1">Avg $/SqFt</div>
+                      <div className="font-semibold">${formatNumber(statistics.avgPricePerSqft)}</div>
+                    </div>
+                    <div className="p-2 bg-muted rounded-md text-center">
+                      <div className="text-muted-foreground mb-1">Properties</div>
+                      <div className="font-semibold">{statistics.propertyCount}</div>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div className="h-20 bg-muted rounded-md flex items-center justify-center">
+                  <span className="text-muted-foreground text-sm">No comparable properties</span>
+                </div>
+              )}
+            </PreviewSection>
+          )}
+
+          {includedSections.includes("comparable_stats") && (
+            <PreviewSection title="Comparable Property Statistics" icon={Table} sectionId="comparable_stats" onClick={handlePreviewSectionClick}>
+              {statistics.propertyCount > 0 ? (
+                <div className="grid grid-cols-2 gap-2 text-xs">
+                  <StatCard 
+                    label="Average Price" 
+                    value={formatCurrency(statistics.avgPrice)}
+                    subValue={`Median: ${formatCurrency(statistics.medianPrice)}`}
+                  />
+                  <StatCard 
+                    label="Avg Price/SqFt" 
+                    value={`$${formatNumber(statistics.avgPricePerSqft)}`}
+                    subValue={`Median: $${formatNumber(statistics.medianPricePerSqft)}`}
+                  />
+                </div>
+              ) : (
+                <div className="h-20 bg-muted rounded-md flex items-center justify-center">
+                  <span className="text-muted-foreground text-sm">No comparable properties</span>
+                </div>
+              )}
+            </PreviewSection>
+          )}
+        </div>
+      </ExpandedPreviewModal>
     </div>
   );
 }
@@ -1199,13 +1371,26 @@ function PreviewSection({
   title,
   icon: Icon,
   children,
+  sectionId,
+  onClick,
 }: {
   title: string;
   icon: React.ComponentType<{ className?: string }>;
   children: React.ReactNode;
+  sectionId?: string;
+  onClick?: (sectionId: string) => void;
 }) {
+  const handleClick = () => {
+    if (sectionId && onClick) {
+      onClick(sectionId);
+    }
+  };
+
   return (
-    <div className="p-4 border rounded-md space-y-3">
+    <div 
+      className={`p-4 border rounded-md space-y-3 transition-colors ${onClick ? "cursor-pointer hover:border-primary/50 hover:bg-muted/30" : ""}`}
+      onClick={handleClick}
+    >
       <div className="flex items-center gap-2">
         <Icon className="w-4 h-4 text-muted-foreground" />
         <span className="font-medium text-sm">{title}</span>

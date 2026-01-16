@@ -1,0 +1,153 @@
+# Phase 1: Live Preview UX Improvements
+
+## Overview
+Improve the Live Preview experience with a larger modal view and real-time updates when sections/layout changes.
+
+---
+
+## Task 1.1: Add "Expand Preview" Modal
+
+Add a button to open the Live Preview in a full-screen modal for better viewing:
+```jsx// ExpandedPreviewModal.tsx
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Expand, X } from 'lucide-react';interface ExpandedPreviewModalProps {
+isOpen: boolean;
+onClose: () => void;
+children: React.ReactNode;
+sectionsEnabled: number;
+}export function ExpandedPreviewModal({
+isOpen,
+onClose,
+children,
+sectionsEnabled
+}: ExpandedPreviewModalProps) {
+return (
+<Dialog open={isOpen} onOpenChange={onClose}>
+<DialogContent className="max-w-4xl w-[90vw] h-[90vh] flex flex-col">
+<DialogHeader className="flex-shrink-0">
+<div className="flex items-center justify-between">
+<DialogTitle>CMA Presentation Preview</DialogTitle>
+<span className="text-sm text-gray-500 bg-gray-100 px-2 py-1 rounded">
+{sectionsEnabled} sections enabled
+</span>
+</div>
+</DialogHeader>    <div className="flex-1 overflow-y-auto bg-gray-50 rounded-lg p-4">
+      <div className="max-w-2xl mx-auto bg-white shadow-lg rounded-lg">
+        {children}
+      </div>
+    </div>    {/* Zoom controls (optional) */}
+    <div className="flex-shrink-0 flex justify-center gap-2 pt-4 border-t">
+      <button className="px-3 py-1 text-sm border rounded hover:bg-gray-50">
+        50%
+      </button>
+      <button className="px-3 py-1 text-sm border rounded bg-orange-50 border-orange-200">
+        100%
+      </button>
+      <button className="px-3 py-1 text-sm border rounded hover:bg-gray-50">
+        150%
+      </button>
+    </div>
+  </DialogContent>
+</Dialog>
+);
+}
+
+---
+
+## Task 1.2: Add Expand Button to Live Preview Header
+```jsx// In LivePreview component header
+<div className="flex items-center justify-between mb-4">
+  <div>
+    <h3 className="font-semibold">Live Preview</h3>
+    <p className="text-sm text-gray-500">
+      Preview how your CMA presentation will appear
+    </p>
+  </div>
+  <div className="flex items-center gap-2">
+    <span className="text-xs bg-gray-100 px-2 py-1 rounded">
+      {enabledSectionsCount} sections enabled
+    </span>
+    <button
+      onClick={() => setIsModalOpen(true)}
+      className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+      title="Expand preview"
+    >
+      <Expand size={18} />
+    </button>
+  </div>
+</div>
+````
+
+Task 1.3: Real-Time Preview Updates
+Ensure preview updates instantly when sections are toggled or layout changes:
+// In PresentationBuilder.tsx
+const [previewKey, setPreviewKey] = useState(0);// Debounced update to avoid too many re-renders
+const debouncedUpdatePreview = useMemo(
+() => debounce(() => {
+setPreviewKey(prev => prev + 1);
+}, 150),
+[]
+);// Watch for configuration changes
+useEffect(() => {
+debouncedUpdatePreview();
+}, [config.sections, config.layout, config.content]);// In the preview component
+<LivePreview 
+key={previewKey}
+config={config}
+cmaData={cmaData}
+/>
+
+---
+
+## Task 1.4: Add Visual Feedback for Updates
+
+Show a subtle animation when preview updates:
+```jsx// LivePreview.tsx
+const [isUpdating, setIsUpdating] = useState(false);useEffect(() => {
+setIsUpdating(true);
+const timer = setTimeout(() => setIsUpdating(false), 300);
+return () => clearTimeout(timer);
+}, [config]);return (
+  <div className={`
+    transition-opacity duration-300
+    ${isUpdating ? 'opacity-50' : 'opacity-100'}
+  `}>
+    {/* Preview content */}
+  </div>
+);
+````
+
+Task 1.5: Make Preview Sections Clickable
+Allow clicking a section in preview to jump to its settings:
+// PreviewSection.tsx
+<div 
+  className="border rounded-lg p-4 cursor-pointer hover:border-orange-300 transition-colors"
+  onClick={() => onSectionClick(section.id)}
+>
+  <div className="flex items-center gap-2 text-sm text-gray-500 mb-2">
+    <section.icon size={14} />
+    <span>{section.name}</span>
+  </div>
+  {/* Section preview content */}
+</div>// In parent, scroll to section settings
+const handleSectionClick = (sectionId: string) => {
+setActiveTab('sections');
+setTimeout(() => {
+document.getElementById(section-${sectionId})?.scrollIntoView({
+behavior: 'smooth',
+block: 'center'
+});
+}, 100);
+};
+
+---
+
+## Acceptance Criteria
+
+- [ ] "Expand" button opens full-screen modal with preview
+- [ ] Modal shows preview at larger size with scroll
+- [ ] Optional zoom controls (50%, 100%, 150%)
+- [ ] Preview updates within 200ms of section/layout changes
+- [ ] Visual feedback (fade) when preview is updating
+- [ ] Clicking a preview section jumps to its settings
+- [ ] Modal closes with X button or clicking outside
