@@ -7351,6 +7351,77 @@ OUTPUT JSON:
     }
   });
 
+  // CMA Brochure Routes
+  app.post("/api/cmas/:id/brochure", requireAuth, async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { url, filename, type, generated = false } = req.body;
+      
+      if (!url || !filename || !type) {
+        return res.status(400).json({ error: "Missing required fields: url, filename, type" });
+      }
+      
+      if (!["pdf", "image"].includes(type)) {
+        return res.status(400).json({ error: "Type must be 'pdf' or 'image'" });
+      }
+      
+      // Get current CMA
+      const cma = await storage.getCma(id);
+      if (!cma) {
+        return res.status(404).json({ error: "CMA not found" });
+      }
+      
+      // Update CMA with brochure data
+      const brochure = {
+        type: type as "pdf" | "image",
+        url,
+        filename,
+        generated,
+        uploadedAt: new Date().toISOString(),
+      };
+      
+      const updated = await storage.updateCma(id, { brochure });
+      res.json({ success: true, brochure: updated?.brochure });
+    } catch (error: any) {
+      console.error("[CMA Brochure] Error saving:", error.message);
+      res.status(500).json({ error: "Failed to save brochure" });
+    }
+  });
+
+  app.delete("/api/cmas/:id/brochure", requireAuth, async (req, res) => {
+    try {
+      const { id } = req.params;
+      
+      const cma = await storage.getCma(id);
+      if (!cma) {
+        return res.status(404).json({ error: "CMA not found" });
+      }
+      
+      // Remove brochure from CMA
+      const updated = await storage.updateCma(id, { brochure: null });
+      res.json({ success: true });
+    } catch (error: any) {
+      console.error("[CMA Brochure] Error deleting:", error.message);
+      res.status(500).json({ error: "Failed to delete brochure" });
+    }
+  });
+
+  app.get("/api/cmas/:id/brochure", async (req, res) => {
+    try {
+      const { id } = req.params;
+      
+      const cma = await storage.getCma(id);
+      if (!cma) {
+        return res.status(404).json({ error: "CMA not found" });
+      }
+      
+      res.json({ brochure: cma.brochure || null });
+    } catch (error: any) {
+      console.error("[CMA Brochure] Error fetching:", error.message);
+      res.status(500).json({ error: "Failed to fetch brochure" });
+    }
+  });
+
   // Get CMA report sections (available sections for presentation builder)
   app.get("/api/cma/report-sections", async (req, res) => {
     try {
