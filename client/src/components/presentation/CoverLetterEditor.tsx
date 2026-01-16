@@ -141,7 +141,7 @@ export function CoverLetterEditor({
         localClientName
       );
 
-      const response = await apiRequest("POST", "/api/ai/generate-cover-letter", {
+      const response = await apiRequest("/api/ai/generate-cover-letter", "POST", {
         context,
         tone,
       });
