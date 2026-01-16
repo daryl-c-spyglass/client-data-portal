@@ -10,6 +10,7 @@ import {
   calculateAdjustments,
   formatAdjustment,
   getUniqueFeatures,
+  getPropertyId,
   type PropertyForAdjustment,
   type CompAdjustmentResult,
 } from "@/lib/adjustmentCalculations";
@@ -58,7 +59,7 @@ export function AdjustmentsSection({
   const calculatedResults = useMemo<CompAdjustmentResult[]>(() => {
     if (!subjectProperty || comparables.length === 0) return [];
     return comparables.map((comp) =>
-      calculateAdjustments(subjectProperty, comp, rates, overrides[comp.listingId || comp.mlsNumber || comp.id || ""])
+      calculateAdjustments(subjectProperty, comp, rates, overrides[getPropertyId(comp)])
     );
   }, [subjectProperty, comparables, rates, overrides]);
 

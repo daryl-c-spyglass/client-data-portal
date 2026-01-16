@@ -86,6 +86,7 @@ import {
   calculateAdjustments,
   formatAdjustment,
   getUniqueFeatures,
+  getPropertyId,
   DEFAULT_ADJUSTMENT_RATES,
   type PropertyForAdjustment,
   type CompAdjustmentResult,
@@ -1472,7 +1473,7 @@ export default function CMAPresentationBuilder() {
                         const rates = adjustments?.rates || DEFAULT_ADJUSTMENT_RATES;
                         const results = subjectProperty && comparables.length > 0
                           ? comparables.map((comp) => {
-                              const compId = (comp as PropertyForAdjustment).listingId || (comp as PropertyForAdjustment).id || '';
+                              const compId = getPropertyId(comp as PropertyForAdjustment);
                               const compOverrides = adjustments?.compAdjustments?.[compId];
                               return calculateAdjustments(subjectProperty as PropertyForAdjustment, comp as PropertyForAdjustment, rates, compOverrides);
                             })
@@ -1986,7 +1987,7 @@ export default function CMAPresentationBuilder() {
                 const rates = adjustments?.rates || DEFAULT_ADJUSTMENT_RATES;
                 const results = subjectProperty && comparables.length > 0
                   ? comparables.map((comp) => {
-                      const compId = (comp as PropertyForAdjustment).listingId || (comp as PropertyForAdjustment).id || '';
+                      const compId = getPropertyId(comp as PropertyForAdjustment);
                       const compOverrides = adjustments?.compAdjustments?.[compId];
                       return calculateAdjustments(subjectProperty as PropertyForAdjustment, comp as PropertyForAdjustment, rates, compOverrides);
                     })

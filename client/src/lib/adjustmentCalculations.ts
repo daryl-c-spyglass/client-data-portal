@@ -98,7 +98,7 @@ function getSalePrice(property: PropertyForAdjustment): number {
          getNumericValue(property.listPrice);
 }
 
-function getPropertyId(property: PropertyForAdjustment): string {
+export function getPropertyId(property: PropertyForAdjustment): string {
   return property.listingId || property.mlsNumber || property.id || 'unknown';
 }
 
