@@ -131,9 +131,9 @@ export function AdjustmentsSection({
           </Button>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="sqftPerUnit">Square Footage ($/sqft)</Label>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-4 gap-y-4">
+            <div className="flex flex-col">
+              <Label htmlFor="sqftPerUnit" className="h-5 mb-2">Sq Ft ($/sqft)</Label>
               <Input
                 id="sqftPerUnit"
                 type="number"
@@ -142,8 +142,8 @@ export function AdjustmentsSection({
                 data-testid="input-rate-sqft"
               />
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="bedroomValue">Bedroom Value ($)</Label>
+            <div className="flex flex-col">
+              <Label htmlFor="bedroomValue" className="h-5 mb-2">Bedroom ($)</Label>
               <Input
                 id="bedroomValue"
                 type="number"
@@ -152,8 +152,8 @@ export function AdjustmentsSection({
                 data-testid="input-rate-bedroom"
               />
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="bathroomValue">Bathroom Value ($)</Label>
+            <div className="flex flex-col">
+              <Label htmlFor="bathroomValue" className="h-5 mb-2">Bathroom ($)</Label>
               <Input
                 id="bathroomValue"
                 type="number"
@@ -162,8 +162,8 @@ export function AdjustmentsSection({
                 data-testid="input-rate-bathroom"
               />
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="poolValue">Pool Value ($)</Label>
+            <div className="flex flex-col">
+              <Label htmlFor="poolValue" className="h-5 mb-2">Pool ($)</Label>
               <Input
                 id="poolValue"
                 type="number"
@@ -172,8 +172,8 @@ export function AdjustmentsSection({
                 data-testid="input-rate-pool"
               />
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="garagePerSpace">Garage Space Value ($)</Label>
+            <div className="flex flex-col">
+              <Label htmlFor="garagePerSpace" className="h-5 mb-2">Garage ($)</Label>
               <Input
                 id="garagePerSpace"
                 type="number"
@@ -182,8 +182,8 @@ export function AdjustmentsSection({
                 data-testid="input-rate-garage"
               />
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="yearBuiltPerYear">Year Built ($/year)</Label>
+            <div className="flex flex-col">
+              <Label htmlFor="yearBuiltPerYear" className="h-5 mb-2">Year Built ($/yr)</Label>
               <Input
                 id="yearBuiltPerYear"
                 type="number"
@@ -192,8 +192,8 @@ export function AdjustmentsSection({
                 data-testid="input-rate-year"
               />
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="lotSizePerSqft">Lot Size ($/sqft)</Label>
+            <div className="flex flex-col">
+              <Label htmlFor="lotSizePerSqft" className="h-5 mb-2">Lot Size ($/sqft)</Label>
               <Input
                 id="lotSizePerSqft"
                 type="number"
