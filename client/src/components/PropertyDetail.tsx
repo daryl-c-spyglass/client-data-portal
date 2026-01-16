@@ -106,14 +106,14 @@ export function PropertyDetail({
     !isNaN(Number(property.longitude))
   );
 
-  // Function to start auto-advance
+  // Function to start auto-advance - uses displayMedia.length for proper filtering
   const startAutoAdvance = () => {
     if (autoAdvanceRef.current) {
       clearInterval(autoAdvanceRef.current);
     }
-    if (media.length > 1) {
+    if (displayMedia.length > 1) {
       autoAdvanceRef.current = setInterval(() => {
-        setCurrentImageIndex((prev) => (prev + 1) % media.length);
+        setCurrentImageIndex((prev) => (prev + 1) % displayMedia.length);
       }, 3000);
     }
   };
@@ -135,6 +135,7 @@ export function PropertyDetail({
     }, 3000);
   };
 
+  // Restart auto-advance when displayMedia changes (filter or initial load)
   useEffect(() => {
     startAutoAdvance();
     return () => {
@@ -145,7 +146,7 @@ export function PropertyDetail({
         clearTimeout(pauseTimeoutRef.current);
       }
     };
-  }, [media.length]);
+  }, [displayMedia.length]);
   
   const formattedPrice = property.listPrice 
     ? new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(Number(property.listPrice))

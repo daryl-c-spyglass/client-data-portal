@@ -5,11 +5,14 @@ import {
   DialogHeader,
   DialogTitle,
   DialogFooter,
+  DialogDescription,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Sparkles, Check, Image as ImageIcon, Star, X, Loader2 } from "lucide-react";
+import { getBestPhotosForCMA } from "@/lib/photoNormalizer";
+import type { ClassifiedPhoto } from "@shared/types/photos";
 
 export interface Photo {
   url: string;
@@ -78,6 +81,19 @@ export function PhotoSelectionModal({
   }, [photos, category]);
 
   const aiSuggestedPhotos = useMemo(() => {
+    const classifiedPhotos: ClassifiedPhoto[] = photos.map(p => ({
+      url: p.url,
+      filename: p.url.split('/').pop() || p.url,
+      roomType: p.classification || null,
+      confidence: p.qualityScore || 0.95,
+    }));
+    
+    const hasClassifications = photos.some(p => p.classification);
+    if (hasClassifications) {
+      const bestPhotos = getBestPhotosForCMA(classifiedPhotos, maxPhotos);
+      return bestPhotos.map(p => p.url);
+    }
+    
     return [...photos]
       .sort((a, b) => (b.qualityScore || 0) - (a.qualityScore || 0))
       .slice(0, maxPhotos)
@@ -108,6 +124,8 @@ export function PhotoSelectionModal({
   };
 
   const hasQualityScores = photos.some((p) => p.qualityScore !== undefined);
+  const hasClassifications = photos.some((p) => p.classification);
+  const canUseAI = hasQualityScores || hasClassifications;
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
@@ -117,6 +135,9 @@ export function PhotoSelectionModal({
             <ImageIcon className="w-5 h-5" />
             Select Photos for {propertyAddress}
           </DialogTitle>
+          <DialogDescription className="sr-only">
+            Choose photos to include in your CMA report. AI suggestions available if photo classifications are present.
+          </DialogDescription>
         </DialogHeader>
 
         <div className="flex flex-wrap items-center justify-between gap-4 py-4 border-b">
@@ -135,7 +156,7 @@ export function PhotoSelectionModal({
             ))}
           </div>
 
-          {hasQualityScores && (
+          {canUseAI && (
             <Button
               onClick={handleAISuggest}
               variant="default"
