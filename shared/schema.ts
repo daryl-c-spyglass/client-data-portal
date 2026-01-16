@@ -300,6 +300,16 @@ export type InsertSellerUpdateSendHistory = z.infer<typeof insertSellerUpdateSen
 export type SellerUpdateSendHistory = typeof sellerUpdateSendHistory.$inferSelect;
 
 // CMA Schema
+// Brochure structure for CMA listing brochure
+export interface CmaBrochure {
+  type: "pdf" | "image";
+  url: string;
+  thumbnail?: string;
+  filename: string;
+  generated: boolean;
+  uploadedAt: string;
+}
+
 export const cmas = pgTable("cmas", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   userId: varchar("user_id").references(() => users.id), // Nullable for unauthenticated users
@@ -310,6 +320,7 @@ export const cmas = pgTable("cmas", {
   searchCriteria: json("search_criteria"),
   notes: text("notes"),
   publicLink: text("public_link").unique(),
+  brochure: json("brochure").$type<CmaBrochure>(), // Listing brochure for CMA presentation
   expiresAt: timestamp("expires_at"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
@@ -905,6 +916,7 @@ export type CustomReportPage = typeof customReportPages.$inferSelect;
 export const CMA_REPORT_SECTIONS = [
   // Introduction
   { id: 'cover_page', name: 'Cover Page', category: 'introduction', defaultEnabled: true },
+  { id: 'listing_brochure', name: 'Listing Brochure', category: 'introduction', defaultEnabled: false },
   { id: 'cover_letter', name: 'Cover Letter', category: 'introduction', defaultEnabled: true, editable: true },
   { id: 'agent_resume', name: 'Agent Resume', category: 'introduction', defaultEnabled: false, editable: true },
   { id: 'our_company', name: 'Our Company', category: 'introduction', defaultEnabled: false },
