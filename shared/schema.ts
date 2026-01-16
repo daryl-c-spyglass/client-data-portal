@@ -828,7 +828,10 @@ export const insertAgentProfileSchema = createInsertSchema(agentProfiles).omit({
 });
 export const updateAgentProfileSchema = z.object({
   title: z.string().optional(),
-  headshotUrl: z.string().url().optional().or(z.literal('')),
+  headshotUrl: z.string().refine(
+    (val) => !val || val === '' || val.startsWith('/objects/') || val.startsWith('http://') || val.startsWith('https://'),
+    { message: 'Must be a valid URL or object storage path' }
+  ).optional().or(z.literal('')),
   bio: z.string().optional(),
   defaultCoverLetter: z.string().optional(),
   facebookUrl: z.string().url().optional().or(z.literal('')),
