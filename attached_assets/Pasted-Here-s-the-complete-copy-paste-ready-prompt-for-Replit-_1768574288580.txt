@@ -1,0 +1,894 @@
+Here's the complete, copy-paste ready prompt for Replit:
+
+---
+
+```
+# CRITICAL FIX: Mapbox Token + Global Mapbox Migration + Light/Dark Mode
+
+## URGENT ISSUE: Mapbox Token Not Working in Presentation Builder
+
+The "Map of All Listings" in the Presentation Builder Live Preview shows:
+"Mapbox token not configured. Please configure VITE_MAPBOX_TOKEN"
+
+This token WAS configured and working previously, but is now broken again.
+
+---
+
+## PART 0: DEBUG & FIX MAPBOX TOKEN (CRITICAL - DO THIS FIRST)
+
+### Step 1: Verify Token Exists
+
+Check if the token is in the environment:
+
+```typescript
+// Add this debug log temporarily to the MapboxMap component or any component
+console.log('[MAPBOX DEBUG] Environment check:', {
+  token: import.meta.env.VITE_MAPBOX_TOKEN,
+  tokenExists: !!import.meta.env.VITE_MAPBOX_TOKEN,
+  tokenPrefix: import.meta.env.VITE_MAPBOX_TOKEN?.substring(0, 10),
+  allEnvKeys: Object.keys(import.meta.env)
+});
+```
+
+### Step 2: Common Causes & Fixes
+
+**Cause 1: Token not in .env file**
+```bash
+# Check .env file exists and has the token
+cat .env | grep MAPBOX
+```
+
+Ensure `.env` has:
+```
+VITE_MAPBOX_TOKEN=pk.eyJ1Ijoi...your_full_token_here
+```
+
+**Cause 2: Server not restarted after adding token**
+```bash
+# Restart the Replit server after any .env changes
+# Click "Stop" then "Run" in Replit
+```
+
+**Cause 3: Token is in wrong file**
+- Must be in root `.env` file (not `.env.local` or `.env.production`)
+- For Vite, must start with `VITE_` prefix
+
+**Cause 4: Component checks token incorrectly**
+```typescript
+// WRONG - May fail due to timing
+if (!import.meta.env.VITE_MAPBOX_TOKEN) {
+  return <Error />;
+}
+
+// CORRECT - Check with fallback
+const token = import.meta.env.VITE_MAPBOX_TOKEN || '';
+if (!token || token === 'undefined' || !token.startsWith('pk.')) {
+  console.error('[MAPBOX] Invalid token:', token);
+  return <Error />;
+}
+```
+
+**Cause 5: Token exposed as string "undefined"**
+```typescript
+// Check for string "undefined" (common bug)
+const token = import.meta.env.VITE_MAPBOX_TOKEN;
+if (!token || token === 'undefined' || token === 'null') {
+  setError('Mapbox token not configured');
+  return;
+}
+```
+
+### Step 3: Fix the Map Component Token Handling
+
+Find the current map component(s) and update token handling:
+
+```typescript
+// In whatever component renders the map in Live Preview
+// Likely: client/src/components/presentation/MapOfAllListings.tsx
+// Or: client/src/components/shared/MapboxMap.tsx
+
+import mapboxgl from 'mapbox-gl';
+import 'mapbox-gl/dist/mapbox-gl.css';
+
+function MapOfAllListings({ properties, config }) {
+  const mapContainer = useRef(null);
+  const map = useRef(null);
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    // DEBUG: Log token status
+    const token = import.meta.env.VITE_MAPBOX_TOKEN;
+    console.log('[MAPBOX] Token check:', {
+      exists: !!token,
+      isString: typeof token === 'string',
+      startsWithPk: token?.startsWith('pk.'),
+      length: token?.length
+    });
+
+    // Validate token
+    if (!token || token === 'undefined' || !token.startsWith('pk.')) {
+      console.error('[MAPBOX] Token invalid or missing');
+      setError('Mapbox token not configured. Please check VITE_MAPBOX_TOKEN in .env');
+      return;
+    }
+
+    // Set token BEFORE creating map
+    mapboxgl.accessToken = token;
+
+    if (!mapContainer.current || map.current) return;
+
+    try {
+      map.current = new mapboxgl.Map({
+        container: mapContainer.current,
+        style: 'mapbox://styles/mapbox/streets-v12',
+        center: [-97.7431, 30.2672], // Austin default
+        zoom: 10
+      });
+
+      map.current.on('load', () => {
+        console.log('[MAPBOX] Map loaded successfully');
+      });
+
+      map.current.on('error', (e) => {
+        console.error('[MAPBOX] Map error:', e);
+        setError('Failed to load map');
+      });
+
+    } catch (err) {
+      console.error('[MAPBOX] Init error:', err);
+      setError('Failed to initialize map');
+    }
+
+    return () => {
+      map.current?.remove();
+      map.current = null;
+    };
+  }, []);
+
+  if (error) {
+    return (
+      <div className="bg-gray-100 dark:bg-gray-800 rounded-lg p-8 text-center">
+        <div className="text-red-500 mb-2">⚠️ Map Error</div>
+        <div className="text-sm text-gray-600 dark:text-gray-400">{error}</div>
+        <div className="text-xs text-gray-400 mt-2">
+          Check browser console for details
+        </div>
+      </div>
+    );
+  }
+
+  return <div ref={mapContainer} className="w-full h-full min-h-[300px]" />;
+}
+```
+
+### Step 4: Verify in Replit Secrets
+
+If using Replit Secrets instead of .env:
+1. Go to Replit → Tools → Secrets
+2. Add: Key = `VITE_MAPBOX_TOKEN`, Value = `pk.eyJ1Ijoi...`
+3. Restart the Repl
+
+**IMPORTANT:** For Vite to read Replit Secrets, you may need to expose them:
+
+```javascript
+// vite.config.ts
+import { defineConfig } from 'vite';
+
+export default defineConfig({
+  define: {
+    'import.meta.env.VITE_MAPBOX_TOKEN': JSON.stringify(process.env.VITE_MAPBOX_TOKEN),
+  },
+  // ... rest of config
+});
+```
+
+---
+
+## PART 1: Create Unified MapboxMap Component
+
+Replace ALL map implementations with this single component.
+
+### Task 1.1: Install Mapbox
+
+```bash
+npm install mapbox-gl
+npm install -D @types/mapbox-gl
+```
+
+### Task 1.2: Create the Component
+
+Create file: `client/src/components/shared/MapboxMap.tsx`
+
+```typescript
+import { useEffect, useRef, useState, useCallback } from 'react';
+import mapboxgl from 'mapbox-gl';
+import 'mapbox-gl/dist/mapbox-gl.css';
+
+// Types
+interface PropertyMarker {
+  id: string;
+  lat: number;
+  lng: number;
+  price?: number;
+  address?: string;
+  status?: 'Active' | 'Active Under Contract' | 'Closed' | 'Pending';
+  isSubject?: boolean;
+}
+
+interface MapboxMapProps {
+  properties?: PropertyMarker[];
+  center?: [number, number];
+  zoom?: number;
+  style?: 'streets' | 'satellite' | 'dark';
+  showStyleSelector?: boolean;
+  showPolygon?: boolean;
+  showLegend?: boolean;
+  interactive?: boolean;
+  height?: string;
+  onStyleChange?: (style: string) => void;
+  onPropertyClick?: (property: PropertyMarker) => void;
+  className?: string;
+}
+
+const MAPBOX_STYLES = {
+  streets: 'mapbox://styles/mapbox/streets-v12',
+  satellite: 'mapbox://styles/mapbox/satellite-streets-v12',
+  dark: 'mapbox://styles/mapbox/dark-v11'
+};
+
+const STATUS_COLORS: Record<string, string> = {
+  'Active': '#22c55e',
+  'Active Under Contract': '#f97316',
+  'Pending': '#f97316',
+  'Closed': '#6b7280',
+  'Subject': '#ef4444'
+};
+
+export function MapboxMap({
+  properties = [],
+  center,
+  zoom = 11,
+  style: initialStyle = 'streets',
+  showStyleSelector = true,
+  showPolygon = false,
+  showLegend = true,
+  interactive = true,
+  height = '400px',
+  onStyleChange,
+  onPropertyClick,
+  className = ''
+}: MapboxMapProps) {
+  const mapContainer = useRef<HTMLDivElement>(null);
+  const map = useRef<mapboxgl.Map | null>(null);
+  const markersRef = useRef<mapboxgl.Marker[]>([]);
+  
+  const [currentStyle, setCurrentStyle] = useState(initialStyle);
+  const [mapLoaded, setMapLoaded] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  // Initialize map
+  useEffect(() => {
+    if (!mapContainer.current) return;
+    if (map.current) return; // Already initialized
+
+    // Get and validate token
+    const token = import.meta.env.VITE_MAPBOX_TOKEN;
+    
+    console.log('[MAPBOX] Initializing with token:', token ? `${token.substring(0, 15)}...` : 'MISSING');
+    
+    if (!token || token === 'undefined' || !token.startsWith('pk.')) {
+      setError('Mapbox token not configured. Please add VITE_MAPBOX_TOKEN to environment.');
+      return;
+    }
+
+    mapboxgl.accessToken = token;
+
+    try {
+      const initialCenter = center || getCenterFromProperties(properties) || [-97.7431, 30.2672];
+      
+      map.current = new mapboxgl.Map({
+        container: mapContainer.current,
+        style: MAPBOX_STYLES[currentStyle],
+        center: initialCenter,
+        zoom,
+        interactive
+      });
+
+      map.current.on('load', () => {
+        console.log('[MAPBOX] Map loaded successfully');
+        setMapLoaded(true);
+      });
+
+      map.current.on('error', (e) => {
+        console.error('[MAPBOX] Map error:', e);
+      });
+
+      if (interactive) {
+        map.current.addControl(new mapboxgl.NavigationControl(), 'top-right');
+      }
+
+    } catch (err) {
+      console.error('[MAPBOX] Initialization error:', err);
+      setError('Failed to initialize map');
+    }
+
+    return () => {
+      map.current?.remove();
+      map.current = null;
+    };
+  }, []);
+
+  // Update style when changed
+  useEffect(() => {
+    if (map.current && mapLoaded) {
+      map.current.setStyle(MAPBOX_STYLES[currentStyle]);
+      
+      // Re-add polygon after style change
+      map.current.once('style.load', () => {
+        addMarkersToMap();
+        if (showPolygon && properties.length >= 3) {
+          addPolygonLayer();
+        }
+      });
+    }
+  }, [currentStyle]);
+
+  // Update markers when properties change
+  useEffect(() => {
+    if (map.current && mapLoaded) {
+      addMarkersToMap();
+      if (showPolygon && properties.length >= 3) {
+        addPolygonLayer();
+      }
+      fitBoundsToProperties();
+    }
+  }, [properties, mapLoaded]);
+
+  const addMarkersToMap = () => {
+    if (!map.current) return;
+
+    // Clear existing markers
+    markersRef.current.forEach(m => m.remove());
+    markersRef.current = [];
+
+    // Add markers
+    properties.forEach(property => {
+      if (!property.lat || !property.lng) return;
+
+      const el = document.createElement('div');
+      const isSubject = property.isSubject;
+      const color = isSubject ? STATUS_COLORS.Subject : (STATUS_COLORS[property.status || 'Active'] || STATUS_COLORS.Active);
+      const size = isSubject ? 28 : 22;
+
+      el.style.cssText = `
+        width: ${size}px;
+        height: ${size}px;
+        background-color: ${color};
+        border: 3px solid white;
+        border-radius: 50%;
+        cursor: pointer;
+        box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+      `;
+
+      const popup = new mapboxgl.Popup({ offset: 25 }).setHTML(`
+        <div style="padding: 8px; min-width: 150px;">
+          <div style="font-weight: 600;">${property.address || 'Property'}</div>
+          ${property.price ? `<div style="color: #ea580c; font-weight: 500;">$${property.price.toLocaleString()}</div>` : ''}
+          <div style="font-size: 12px; color: #6b7280;">${property.isSubject ? 'Subject Property' : property.status || ''}</div>
+        </div>
+      `);
+
+      const marker = new mapboxgl.Marker(el)
+        .setLngLat([property.lng, property.lat])
+        .setPopup(popup)
+        .addTo(map.current!);
+
+      if (onPropertyClick) {
+        el.addEventListener('click', () => onPropertyClick(property));
+      }
+
+      markersRef.current.push(marker);
+    });
+  };
+
+  const addPolygonLayer = () => {
+    if (!map.current) return;
+
+    // Remove existing
+    if (map.current.getLayer('property-polygon-fill')) {
+      map.current.removeLayer('property-polygon-fill');
+    }
+    if (map.current.getLayer('property-polygon-line')) {
+      map.current.removeLayer('property-polygon-line');
+    }
+    if (map.current.getSource('property-polygon')) {
+      map.current.removeSource('property-polygon');
+    }
+
+    const coordinates = properties
+      .filter(p => p.lat && p.lng)
+      .map(p => [p.lng, p.lat] as [number, number]);
+
+    if (coordinates.length < 3) return;
+    coordinates.push(coordinates[0]); // Close polygon
+
+    try {
+      map.current.addSource('property-polygon', {
+        type: 'geojson',
+        data: {
+          type: 'Feature',
+          properties: {},
+          geometry: { type: 'Polygon', coordinates: [coordinates] }
+        }
+      });
+
+      map.current.addLayer({
+        id: 'property-polygon-fill',
+        type: 'fill',
+        source: 'property-polygon',
+        paint: { 'fill-color': '#f97316', 'fill-opacity': 0.1 }
+      });
+
+      map.current.addLayer({
+        id: 'property-polygon-line',
+        type: 'line',
+        source: 'property-polygon',
+        paint: { 'line-color': '#f97316', 'line-width': 2, 'line-dasharray': [2, 2] }
+      });
+    } catch (e) {
+      console.error('[MAPBOX] Failed to add polygon:', e);
+    }
+  };
+
+  const fitBoundsToProperties = () => {
+    if (!map.current || properties.length === 0) return;
+
+    const bounds = new mapboxgl.LngLatBounds();
+    properties.forEach(p => {
+      if (p.lat && p.lng) bounds.extend([p.lng, p.lat]);
+    });
+
+    map.current.fitBounds(bounds, { padding: 50, maxZoom: 14 });
+  };
+
+  const handleStyleChange = (style: 'streets' | 'satellite' | 'dark') => {
+    setCurrentStyle(style);
+    onStyleChange?.(style);
+  };
+
+  // Error state
+  if (error) {
+    return (
+      <div className={`bg-gray-100 dark:bg-gray-800 rounded-lg flex items-center justify-center ${className}`} style={{ height }}>
+        <div className="text-center p-6">
+          <div className="text-red-500 text-lg mb-2">⚠️ Map Error</div>
+          <div className="text-gray-600 dark:text-gray-400 text-sm">{error}</div>
+          <div className="text-gray-400 text-xs mt-3">
+            Check: .env file has VITE_MAPBOX_TOKEN=pk.xxx
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className={`relative ${className}`} style={{ height }}>
+      <div ref={mapContainer} className="w-full h-full rounded-lg overflow-hidden" />
+
+      {/* Style Selector ON the map */}
+      {showStyleSelector && mapLoaded && (
+        <div className="absolute top-3 left-3 bg-white dark:bg-gray-800 rounded-lg shadow-lg p-1 flex gap-1 z-10">
+          {(['streets', 'satellite', 'dark'] as const).map((s) => (
+            <button
+              key={s}
+              onClick={() => handleStyleChange(s)}
+              className={`px-3 py-1.5 text-xs font-medium rounded transition-colors capitalize ${
+                currentStyle === s
+                  ? 'bg-orange-500 text-white'
+                  : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
+              }`}
+            >
+              {s === 'streets' ? '🗺️ Streets' : s === 'satellite' ? '🛰️ Satellite' : '🌙 Dark'}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {/* Legend ON the map */}
+      {showLegend && properties.length > 0 && mapLoaded && (
+        <div className="absolute bottom-3 left-3 bg-white dark:bg-gray-800 rounded-lg shadow-lg p-3 z-10">
+          <div className="text-xs font-medium mb-2 text-gray-700 dark:text-gray-300">Legend</div>
+          <div className="space-y-1.5">
+            {properties.some(p => p.isSubject) && (
+              <div className="flex items-center gap-2 text-xs">
+                <span className="w-3 h-3 rounded-full" style={{ backgroundColor: STATUS_COLORS.Subject }} />
+                <span className="text-gray-600 dark:text-gray-400">Subject</span>
+              </div>
+            )}
+            <div className="flex items-center gap-2 text-xs">
+              <span className="w-3 h-3 rounded-full" style={{ backgroundColor: STATUS_COLORS.Active }} />
+              <span className="text-gray-600 dark:text-gray-400">Active</span>
+            </div>
+            <div className="flex items-center gap-2 text-xs">
+              <span className="w-3 h-3 rounded-full" style={{ backgroundColor: STATUS_COLORS['Active Under Contract'] }} />
+              <span className="text-gray-600 dark:text-gray-400">Under Contract</span>
+            </div>
+            <div className="flex items-center gap-2 text-xs">
+              <span className="w-3 h-3 rounded-full" style={{ backgroundColor: STATUS_COLORS.Closed }} />
+              <span className="text-gray-600 dark:text-gray-400">Closed</span>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function getCenterFromProperties(properties: PropertyMarker[]): [number, number] | null {
+  const valid = properties.filter(p => p.lat && p.lng);
+  if (valid.length === 0) return null;
+  const avgLng = valid.reduce((sum, p) => sum + p.lng, 0) / valid.length;
+  const avgLat = valid.reduce((sum, p) => sum + p.lat, 0) / valid.length;
+  return [avgLng, avgLat];
+}
+
+export default MapboxMap;
+```
+
+---
+
+## PART 2: Create Theme Context (Light/Dark Mode)
+
+Create file: `client/src/contexts/ThemeContext.tsx`
+
+```typescript
+import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
+
+type Theme = 'light' | 'dark' | 'system';
+
+interface ThemeContextType {
+  theme: Theme;
+  isDarkMode: boolean;
+  setTheme: (theme: Theme) => void;
+  toggleTheme: () => void;
+}
+
+const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
+
+export function ThemeProvider({ children }: { children: ReactNode }) {
+  const [theme, setThemeState] = useState<Theme>(() => {
+    if (typeof window !== 'undefined') {
+      return (localStorage.getItem('theme') as Theme) || 'system';
+    }
+    return 'system';
+  });
+
+  const [isDarkMode, setIsDarkMode] = useState(false);
+
+  useEffect(() => {
+    const updateDarkMode = () => {
+      let dark = false;
+      if (theme === 'dark') {
+        dark = true;
+      } else if (theme === 'system') {
+        dark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+      }
+
+      setIsDarkMode(dark);
+
+      if (dark) {
+        document.documentElement.classList.add('dark');
+      } else {
+        document.documentElement.classList.remove('dark');
+      }
+    };
+
+    updateDarkMode();
+
+    const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+    const handler = () => theme === 'system' && updateDarkMode();
+    mediaQuery.addEventListener('change', handler);
+    return () => mediaQuery.removeEventListener('change', handler);
+  }, [theme]);
+
+  const setTheme = (newTheme: Theme) => {
+    setThemeState(newTheme);
+    localStorage.setItem('theme', newTheme);
+  };
+
+  const toggleTheme = () => setTheme(isDarkMode ? 'light' : 'dark');
+
+  return (
+    <ThemeContext.Provider value={{ theme, isDarkMode, setTheme, toggleTheme }}>
+      {children}
+    </ThemeContext.Provider>
+  );
+}
+
+export function useTheme() {
+  const context = useContext(ThemeContext);
+  if (!context) throw new Error('useTheme must be used within ThemeProvider');
+  return context;
+}
+```
+
+---
+
+## PART 3: Create Theme Toggle Component
+
+Create file: `client/src/components/shared/ThemeToggle.tsx`
+
+```typescript
+import { Moon, Sun, Monitor } from 'lucide-react';
+import { useTheme } from '@/contexts/ThemeContext';
+
+export function ThemeToggle() {
+  const { theme, setTheme } = useTheme();
+
+  return (
+    <div className="flex items-center gap-1 bg-gray-100 dark:bg-gray-700 rounded-lg p-1">
+      <button
+        onClick={() => setTheme('light')}
+        className={`p-2 rounded-md transition-colors ${
+          theme === 'light' ? 'bg-white dark:bg-gray-600 shadow-sm' : 'hover:bg-gray-200 dark:hover:bg-gray-600'
+        }`}
+        title="Light mode"
+      >
+        <Sun size={16} className={theme === 'light' ? 'text-orange-500' : 'text-gray-500'} />
+      </button>
+      <button
+        onClick={() => setTheme('dark')}
+        className={`p-2 rounded-md transition-colors ${
+          theme === 'dark' ? 'bg-white dark:bg-gray-600 shadow-sm' : 'hover:bg-gray-200 dark:hover:bg-gray-600'
+        }`}
+        title="Dark mode"
+      >
+        <Moon size={16} className={theme === 'dark' ? 'text-orange-500' : 'text-gray-500'} />
+      </button>
+      <button
+        onClick={() => setTheme('system')}
+        className={`p-2 rounded-md transition-colors ${
+          theme === 'system' ? 'bg-white dark:bg-gray-600 shadow-sm' : 'hover:bg-gray-200 dark:hover:bg-gray-600'
+        }`}
+        title="System"
+      >
+        <Monitor size={16} className={theme === 'system' ? 'text-orange-500' : 'text-gray-500'} />
+      </button>
+    </div>
+  );
+}
+
+export function ThemeToggleSimple() {
+  const { isDarkMode, toggleTheme } = useTheme();
+  return (
+    <button
+      onClick={toggleTheme}
+      className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+      title={isDarkMode ? 'Light mode' : 'Dark mode'}
+    >
+      {isDarkMode ? <Sun size={20} className="text-yellow-500" /> : <Moon size={20} className="text-gray-600" />}
+    </button>
+  );
+}
+```
+
+---
+
+## PART 4: Update Application Entry Point
+
+Wrap the app with ThemeProvider in `client/src/main.tsx` or `App.tsx`:
+
+```typescript
+import { ThemeProvider } from '@/contexts/ThemeContext';
+
+function App() {
+  return (
+    <ThemeProvider>
+      <QueryClientProvider client={queryClient}>
+        {/* Your existing app content */}
+      </QueryClientProvider>
+    </ThemeProvider>
+  );
+}
+```
+
+---
+
+## PART 5: Update Tailwind Config
+
+In `tailwind.config.js`:
+
+```javascript
+module.exports = {
+  darkMode: 'class',
+  content: ['./index.html', './src/**/*.{js,ts,jsx,tsx}'],
+  theme: {
+    extend: {},
+  },
+  plugins: [],
+}
+```
+
+---
+
+## PART 6: Add Theme Toggle to Sidebar
+
+In your Sidebar component, add at the bottom:
+
+```typescript
+import { ThemeToggle } from '@/components/shared/ThemeToggle';
+
+// Inside sidebar, near the bottom
+<div className="mt-auto p-4 border-t dark:border-gray-700">
+  <div className="flex items-center justify-between">
+    <span className="text-sm text-gray-600 dark:text-gray-400">Theme</span>
+    <ThemeToggle />
+  </div>
+</div>
+```
+
+---
+
+## PART 7: Replace ALL Maps with MapboxMap Component
+
+### 7.1: Update Presentation Builder Live Preview Map
+
+Find the "Map of All Listings" component in the presentation preview and replace:
+
+```typescript
+import { MapboxMap } from '@/components/shared/MapboxMap';
+import { useTheme } from '@/contexts/ThemeContext';
+
+function MapOfAllListingsPreview({ cmaData, config }) {
+  const { isDarkMode } = useTheme();
+  
+  // Transform CMA properties to map markers
+  const markers = (cmaData?.propertiesData || []).map(p => ({
+    id: p.mlsNumber || p.id,
+    lat: p.coordinates?.latitude || p.latitude || p.address?.latitude,
+    lng: p.coordinates?.longitude || p.longitude || p.address?.longitude,
+    price: p.listPrice || p.closePrice,
+    address: p.address?.streetAddress || (typeof p.address === 'string' ? p.address : ''),
+    status: p.standardStatus || p.status,
+    isSubject: p.mlsNumber === cmaData?.subjectPropertyId
+  })).filter(m => m.lat && m.lng);
+
+  // Auto-select dark style when in dark mode
+  const defaultStyle = isDarkMode ? 'dark' : 'streets';
+
+  return (
+    <div className="border dark:border-gray-700 rounded-lg overflow-hidden">
+      <div className="flex items-center gap-2 p-3 border-b dark:border-gray-700 bg-gray-50 dark:bg-gray-800">
+        <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+          🗺️ Map of All Listings
+        </span>
+        <span className="text-xs text-gray-500">({markers.length} properties)</span>
+      </div>
+      
+      <MapboxMap
+        properties={markers}
+        style={defaultStyle}
+        showStyleSelector={true}
+        showPolygon={config?.showMapPolygon !== false}
+        showLegend={true}
+        height="350px"
+      />
+    </div>
+  );
+}
+```
+
+### 7.2: Update CMA Detail Page Map
+
+Replace the existing map with:
+
+```typescript
+import { MapboxMap } from '@/components/shared/MapboxMap';
+
+// In CMA Detail component
+const markers = cmaData.propertiesData?.map(p => ({
+  id: p.mlsNumber || p.id,
+  lat: p.coordinates?.latitude || p.latitude || p.address?.latitude,
+  lng: p.coordinates?.longitude || p.longitude || p.address?.longitude,
+  price: p.listPrice || p.closePrice,
+  address: p.address?.streetAddress,
+  status: p.standardStatus || p.status,
+  isSubject: p.mlsNumber === cmaData.subjectPropertyId
+})).filter(m => m.lat && m.lng) || [];
+
+<MapboxMap
+  properties={markers}
+  showStyleSelector={true}
+  showPolygon={true}
+  height="500px"
+/>
+```
+
+### 7.3: Find and Replace ALL Other Maps
+
+Search the codebase for:
+- `MapContainer` (react-leaflet)
+- `TileLayer` (react-leaflet)
+- `leaflet`
+- `L.map`
+- `OpenStreetMap`
+
+Replace ALL instances with the new `MapboxMap` component.
+
+---
+
+## PART 8: Add Dark Mode Classes to UI Components
+
+Update common classes throughout the app:
+
+```typescript
+// Cards
+"bg-white dark:bg-gray-800 border dark:border-gray-700"
+
+// Text
+"text-gray-900 dark:text-gray-100"
+"text-gray-600 dark:text-gray-400"
+
+// Inputs
+"border dark:border-gray-600 bg-white dark:bg-gray-700"
+
+// Sidebar
+"bg-white dark:bg-gray-900 border-r dark:border-gray-800"
+
+// Headers
+"bg-white dark:bg-gray-800 border-b dark:border-gray-700"
+
+// Hover
+"hover:bg-gray-100 dark:hover:bg-gray-700"
+```
+
+---
+
+## Acceptance Criteria
+
+### Mapbox Token Fix
+- [ ] Token is properly read from environment
+- [ ] Console shows "[MAPBOX] Map loaded successfully"
+- [ ] No more "token not configured" error
+- [ ] Map renders in Presentation Builder preview
+
+### Maps
+- [ ] ALL maps use Mapbox (no Leaflet/OpenStreetMap anywhere)
+- [ ] Style selector (Streets/Satellite/Dark) appears on each map
+- [ ] Legend displays on maps
+- [ ] Property markers show with correct status colors
+- [ ] Subject property marker is visually distinct
+
+### Dark Mode
+- [ ] Theme toggle in sidebar
+- [ ] Three options: Light, Dark, System
+- [ ] Theme persists on reload (localStorage)
+- [ ] All UI components have dark mode styles
+- [ ] Maps auto-switch to dark style in dark mode
+
+---
+
+## Debug Checklist
+
+If map still doesn't work after these changes:
+
+1. [ ] Check browser console for errors
+2. [ ] Verify token in console: `console.log(import.meta.env.VITE_MAPBOX_TOKEN)`
+3. [ ] Check .env file has `VITE_MAPBOX_TOKEN=pk.xxx`
+4. [ ] Restart Replit after .env changes
+5. [ ] Check token is valid at mapbox.com dashboard
+6. [ ] Verify mapbox-gl is installed: `npm list mapbox-gl`
+7. [ ] Check CSS is imported: `import 'mapbox-gl/dist/mapbox-gl.css'`
+```
+
+---
+
+This is the complete, copy-paste ready prompt. It includes:
+
+1. **CRITICAL DEBUG SECTION** for the Mapbox token issue (done first)
+2. **Complete MapboxMap component** with built-in style selector
+3. **Theme Context** for light/dark mode
+4. **Theme Toggle component**
+5. **Instructions to replace ALL maps** in the application
+6. **Dark mode CSS classes** reference
+7. **Acceptance criteria** and **debug checklist**
