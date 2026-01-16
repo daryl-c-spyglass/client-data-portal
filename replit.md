@@ -6,6 +6,8 @@ This project is a professional real estate IDX (Internet Data Exchange) platform
 ## User Preferences
 Preferred communication style: Simple, everyday language.
 **Mapping Solution**: Mapbox is the standard mapping library for all features across the application. All interactive maps, property visualizations, and location-based features should use Mapbox GL JS. Requires VITE_MAPBOX_TOKEN secret.
+- **Reusable MapboxMap Component**: `client/src/components/shared/MapboxMap.tsx` - Standard component for property maps with markers, price labels, popups, auto-fit bounds, legend, and static map URL generation for PDF export.
+- **Migration Status**: CMAReport.tsx fully migrated to Mapbox. Remaining files using Leaflet: MapLayersControl.tsx, PolygonMapSearch.tsx, PropertyMapView.tsx, NeighborhoodReview.tsx, PropertyDetail.tsx.
 
 ## System Architecture
 

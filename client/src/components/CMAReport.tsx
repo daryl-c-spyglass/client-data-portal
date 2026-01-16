@@ -7,17 +7,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, Legend, ResponsiveContainer, LineChart, Line, ReferenceLine, ScatterChart, Scatter, ZAxis, Cell } from "recharts";
 import { Save, Edit, FileText, Printer, Info, Home, Mail, ChevronLeft, ChevronRight, Bed, Bath, Maximize, MapPin, Calendar, Map as MapIcon, ExternalLink, DollarSign, TrendingUp, Target, Zap, Clock, BarChart3, Menu, LayoutGrid, MoreHorizontal } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
-import { MapContainer, TileLayer, Marker, Popup, useMap } from "react-leaflet";
-import "leaflet/dist/leaflet.css";
-import L from "leaflet";
-
-// Fix for default Leaflet marker icons
-delete (L.Icon.Default.prototype as any)._getIconUrl;
-L.Icon.Default.mergeOptions({
-  iconRetinaUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon-2x.png',
-  iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon.png',
-  shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
-});
+import { MapboxMap, type MapMarker } from "@/components/shared/MapboxMap";
 
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
@@ -27,110 +17,27 @@ import { cn } from "@/lib/utils";
 import type { Property, PropertyStatistics, TimelineDataPoint, Media } from "@shared/schema";
 import { isLikelyRentalProperty, filterOutRentalProperties } from "@shared/schema";
 
-// Component to fit map bounds to markers
-function FitBounds({ positions }: { positions: [number, number][] }) {
-  const map = useMap();
-  useEffect(() => {
-    if (positions.length > 0) {
-      const bounds = L.latLngBounds(positions.map(pos => L.latLng(pos[0], pos[1])));
-      map.fitBounds(bounds, { padding: [50, 50] });
-    }
-  }, [positions, map]);
-  return null;
-}
-
-// Custom marker icon for subject property
-const subjectIcon = new L.DivIcon({
-  html: '<div style="background-color:#ef4444;width:24px;height:24px;border-radius:50%;border:3px solid white;box-shadow:0 2px 4px rgba(0,0,0,0.3);"></div>',
-  className: 'custom-div-icon',
-  iconSize: [24, 24],
-  iconAnchor: [12, 12],
-});
-
-// Custom marker icon for comp properties based on status
-const getCompIcon = (status: string) => {
-  const statusLower = (status || '').toLowerCase();
-  let borderColor = '#22c55e'; // green for active
-  let bgColor = 'rgba(34, 197, 94, 0.15)'; // light green background
+// Helper to convert property to map marker
+function propertyToMapMarker(property: Property, isSubject?: boolean): MapMarker {
+  const isClosed = property.standardStatus === 'Closed';
+  const price = isClosed 
+    ? (property.closePrice ? Number(property.closePrice) : Number(property.listPrice || 0))
+    : Number(property.listPrice || 0);
   
-  // Check for sold/closed status
-  if (statusLower === 'closed' || statusLower === 'sold') {
-    borderColor = '#6b7280'; // gray for sold
-    bgColor = 'rgba(107, 114, 128, 0.15)';
-  } 
-  // Check for pending/under contract status (including variants like "Active Under Contract - Showing")
-  else if (
-    statusLower.includes('under contract') || 
-    statusLower.includes('pending') || 
-    statusLower.includes('in contract') ||
-    statusLower.includes('contingent')
-  ) {
-    borderColor = '#f59e0b'; // orange for under contract/pending
-    bgColor = 'rgba(245, 158, 11, 0.15)';
-  }
-  
-  return new L.DivIcon({
-    html: `<div style="display:flex;align-items:center;justify-content:center;width:32px;height:32px;background-color:${bgColor};border:3px solid ${borderColor};border-radius:8px;box-shadow:0 2px 6px rgba(0,0,0,0.3);font-size:18px;">🏠</div>`,
-    className: 'custom-house-icon',
-    iconSize: [32, 32],
-    iconAnchor: [16, 32],
-    popupAnchor: [0, -32],
-  });
-};
-
-// Price label marker icon - shows price directly on map (CloudCMA style)
-const getPriceMarkerIcon = (price: number, status: string, isSubject: boolean = false) => {
-  const statusLower = (status || '').toLowerCase();
-  let bgColor = '#22c55e'; // green for active
-  let textColor = '#ffffff';
-  
-  if (statusLower === 'closed' || statusLower === 'sold') {
-    bgColor = '#ef4444'; // red for sold (CloudCMA style)
-  } else if (
-    statusLower.includes('under contract') || 
-    statusLower.includes('pending') || 
-    statusLower.includes('in contract') ||
-    statusLower.includes('contingent')
-  ) {
-    bgColor = '#f59e0b'; // orange for under contract/pending
-  }
-  
-  // Subject property has special blue color
-  if (isSubject) {
-    bgColor = '#3b82f6'; // blue for subject
-  }
-  
-  // Format price to compact form (e.g., $525K or $1.2M)
-  const formatCompactPrice = (p: number) => {
-    if (p >= 1000000) {
-      return `$${(p / 1000000).toFixed(2)}M`;
-    }
-    return `$${Math.round(p / 1000)}K`;
+  return {
+    id: property.id,
+    latitude: Number(property.latitude),
+    longitude: Number(property.longitude),
+    label: property.unparsedAddress || `${property.streetNumber} ${property.streetName}`,
+    price,
+    status: property.standardStatus as MapMarker['status'],
+    isSubject,
+    beds: property.bedroomsTotal ?? undefined,
+    baths: property.bathroomsTotalInteger ?? undefined,
+    sqft: property.livingArea ? Number(property.livingArea) : undefined,
+    mlsNumber: property.listingId || undefined,
   };
-  
-  const priceLabel = formatCompactPrice(price);
-  
-  return new L.DivIcon({
-    html: `<div style="
-      display:inline-flex;
-      align-items:center;
-      gap:4px;
-      padding:5px 10px;
-      background-color:${bgColor};
-      color:${textColor};
-      font-size:12px;
-      font-weight:700;
-      border-radius:6px;
-      box-shadow:0 2px 8px rgba(0,0,0,0.4);
-      white-space:nowrap;
-      border:2px solid white;
-    ">${isSubject ? '🏠 ' : ''}${priceLabel}</div>`,
-    className: 'price-marker-icon',
-    iconSize: [80, 28],
-    iconAnchor: [40, 28],
-    popupAnchor: [0, -28],
-  });
-};
+}
 
 type StatMetricKey = 'price' | 'pricePerSqFt' | 'daysOnMarket' | 'livingArea' | 'lotSize' | 'acres' | 'bedrooms' | 'bathrooms' | 'yearBuilt';
 
@@ -1178,11 +1085,11 @@ export function CMAReport({
         <TabsContent value="map" className="space-y-0 mt-0 relative">
           <div className="h-[600px] rounded-b-lg overflow-hidden">
             {(() => {
-              const validPositions = properties
-                .filter(p => p.latitude && p.longitude && !excludedPropertyIds.has(p.id))
-                .map(p => [Number(p.latitude), Number(p.longitude)] as [number, number]);
+              const validProperties = properties.filter(
+                p => p.latitude && p.longitude && !excludedPropertyIds.has(p.id)
+              );
               
-              if (validPositions.length === 0) {
+              if (validProperties.length === 0) {
                 return (
                   <div className="h-full flex items-center justify-center bg-muted">
                     <p className="text-muted-foreground">No properties with valid coordinates</p>
@@ -1190,90 +1097,22 @@ export function CMAReport({
                 );
               }
               
-              const center = validPositions.reduce(
-                (acc, pos) => [acc[0] + pos[0] / validPositions.length, acc[1] + pos[1] / validPositions.length],
-                [0, 0]
-              ) as [number, number];
+              const mapMarkers: MapMarker[] = validProperties.map(property => 
+                propertyToMapMarker(property, subjectPropertyId ? property.id === subjectPropertyId : false)
+              );
               
               return (
-                <MapContainer
-                  center={center}
-                  zoom={13}
-                  style={{ height: '100%', width: '100%' }}
-                >
-                  <TileLayer
-                    url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-                    attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-                  />
-                  <FitBounds positions={validPositions} />
-                  {properties
-                    .filter(p => p.latitude && p.longitude && !excludedPropertyIds.has(p.id))
-                    .map((property) => {
-                      const isSold = property.standardStatus === 'Closed';
-                      const price = isSold 
-                        ? (property.closePrice ? Number(property.closePrice) : Number(property.listPrice || 0))
-                        : Number(property.listPrice || 0);
-                      const isSubject = subjectPropertyId ? property.id === subjectPropertyId : false;
-                      
-                      return (
-                        <Marker
-                          key={property.id}
-                          position={[Number(property.latitude), Number(property.longitude)]}
-                          icon={getPriceMarkerIcon(price, property.standardStatus || 'Active', isSubject)}
-                          eventHandlers={{
-                            click: () => handlePropertyClick(property),
-                          }}
-                        >
-                          <Popup>
-                            <div className="min-w-[200px]">
-                              {isSubject && (
-                                <Badge className="mb-2 bg-blue-500 text-white">Subject Property</Badge>
-                              )}
-                              <p className="font-semibold">{property.unparsedAddress}</p>
-                              <p className="text-lg font-bold text-primary">${price.toLocaleString()}</p>
-                              <p className="text-sm text-muted-foreground">
-                                {property.bedroomsTotal} beds | {property.bathroomsTotalInteger} baths | {property.livingArea ? Number(property.livingArea).toLocaleString() : 'N/A'} sqft
-                              </p>
-                              <Badge variant="outline" className="mt-1">{property.standardStatus}</Badge>
-                            </div>
-                          </Popup>
-                        </Marker>
-                      );
-                    })}
-                </MapContainer>
+                <MapboxMap
+                  markers={mapMarkers}
+                  height="100%"
+                  showLegend={true}
+                  onMarkerClick={(id) => {
+                    const property = properties.find(p => p.id === id);
+                    if (property) handlePropertyClick(property);
+                  }}
+                />
               );
             })()}
-          </div>
-          {/* Map Legend */}
-          <div className="absolute bottom-4 left-4 bg-white dark:bg-zinc-900 rounded-lg shadow-lg p-3 z-[1000]">
-            <div className="space-y-2">
-              <div className="flex items-center gap-2">
-                <div className="w-5 h-5 rounded bg-green-500 flex items-center justify-center">
-                  <span className="text-white text-[10px] font-bold">$</span>
-                </div>
-                <span className="text-xs">Active</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <div className="w-5 h-5 rounded bg-orange-500 flex items-center justify-center">
-                  <span className="text-white text-[10px] font-bold">$</span>
-                </div>
-                <span className="text-xs">Under Contract</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <div className="w-5 h-5 rounded bg-red-500 flex items-center justify-center">
-                  <span className="text-white text-[10px] font-bold">$</span>
-                </div>
-                <span className="text-xs">Closed</span>
-              </div>
-              {subjectPropertyId && (
-                <div className="flex items-center gap-2">
-                  <div className="w-5 h-5 rounded bg-blue-500 flex items-center justify-center">
-                    <span className="text-[10px]">🏠</span>
-                  </div>
-                  <span className="text-xs">Subject</span>
-                </div>
-              )}
-            </div>
           </div>
         </TabsContent>
 
@@ -2938,7 +2777,6 @@ export function CMAReport({
                 </CardHeader>
                 <CardContent>
                   {(() => {
-                    // Sync map with filter: use filtered properties based on activeListingTab and exclusions
                     const filteredForMap = (activeListingTab === 'all' ? allProperties :
                       activeListingTab === 'sold' ? soldProperties :
                       activeListingTab === 'under-contract' ? underContractProperties : activeProperties)
@@ -2961,59 +2799,15 @@ export function CMAReport({
                       );
                     }
                     
-                    const positions: [number, number][] = propertiesWithCoords.map(
-                      p => [Number(p.latitude), Number(p.longitude)]
-                    );
-                    const center: [number, number] = [
-                      positions.reduce((sum, pos) => sum + pos[0], 0) / positions.length,
-                      positions.reduce((sum, pos) => sum + pos[1], 0) / positions.length
-                    ];
+                    const mapMarkers: MapMarker[] = propertiesWithCoords.map(p => propertyToMapMarker(p));
                     
                     return (
                       <div className="h-[400px] rounded-lg overflow-hidden border">
-                        <MapContainer
+                        <MapboxMap
                           key={activeListingTab}
-                          center={center}
-                          zoom={13}
-                          style={{ height: '100%', width: '100%' }}
-                          scrollWheelZoom={true}
-                        >
-                          <TileLayer
-                            attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-                            url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-                          />
-                          <FitBounds positions={positions} />
-                          {propertiesWithCoords.map((property) => {
-                            const status = property.standardStatus || 'Active';
-                            const isClosed = status === 'Closed';
-                            const price = isClosed 
-                              ? (property.closePrice ? Number(property.closePrice) : (property.listPrice ? Number(property.listPrice) : 0))
-                              : (property.listPrice ? Number(property.listPrice) : 0);
-                            
-                            return (
-                              <Marker
-                                key={property.listingId}
-                                position={[Number(property.latitude), Number(property.longitude)]}
-                                icon={getPriceMarkerIcon(price, status)}
-                              >
-                                <Popup>
-                                  <div className="min-w-[200px]">
-                                    <p className="font-semibold text-sm">{property.unparsedAddress}</p>
-                                    <p className="text-lg font-bold text-primary">${Number(price).toLocaleString()}</p>
-                                    <Badge variant="outline" className="text-xs mt-1">
-                                      {status}
-                                    </Badge>
-                                    <div className="flex flex-wrap gap-2 text-xs text-muted-foreground mt-2">
-                                      <span>{property.bedroomsTotal || 0} beds</span>
-                                      <span>{property.bathroomsTotalInteger || 0} baths</span>
-                                      {property.livingArea && <span>{Number(property.livingArea).toLocaleString()} sqft</span>}
-                                    </div>
-                                  </div>
-                                </Popup>
-                              </Marker>
-                            );
-                          })}
-                        </MapContainer>
+                          markers={mapMarkers}
+                          height="100%"
+                        />
                       </div>
                     );
                   })()}
@@ -3744,7 +3538,6 @@ export function CMAReport({
                 </CardHeader>
                 <CardContent>
                   {(() => {
-                    // Filter out excluded properties
                     const propertiesWithCoords = allProperties
                       .filter(p => !excludedPropertyIds.has(p.id))
                       .filter(
@@ -3764,48 +3557,14 @@ export function CMAReport({
                       );
                     }
                     
-                    const bounds = propertiesWithCoords.map(p => [Number(p.latitude), Number(p.longitude)] as [number, number]);
-                    const centerLat = bounds.reduce((sum, [lat]) => sum + lat, 0) / bounds.length;
-                    const centerLng = bounds.reduce((sum, [, lng]) => sum + lng, 0) / bounds.length;
+                    const mapMarkers: MapMarker[] = propertiesWithCoords.map(p => propertyToMapMarker(p));
                     
                     return (
                       <div className="h-[300px] rounded-lg overflow-hidden border">
-                        <MapContainer
-                          center={[centerLat, centerLng]}
-                          zoom={12}
-                          style={{ height: '100%', width: '100%' }}
-                          scrollWheelZoom={false}
-                        >
-                          <TileLayer
-                            attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-                            url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-                          />
-                          {propertiesWithCoords.map((property) => {
-                            const status = property.standardStatus || 'Active';
-                            const isClosed = status === 'Closed';
-                            const price = isClosed 
-                              ? (property.closePrice ? Number(property.closePrice) : (property.listPrice ? Number(property.listPrice) : 0))
-                              : (property.listPrice ? Number(property.listPrice) : 0);
-                            
-                            return (
-                              <Marker
-                                key={property.listingId}
-                                position={[Number(property.latitude), Number(property.longitude)]}
-                                icon={getPriceMarkerIcon(price, status)}
-                              >
-                                <Popup>
-                                  <div className="min-w-[180px]">
-                                    <p className="font-semibold text-sm">{property.unparsedAddress}</p>
-                                    <p className="text-lg font-bold text-primary">${Number(price).toLocaleString()}</p>
-                                    <Badge variant="outline" className="text-xs mt-1">
-                                      {status}
-                                    </Badge>
-                                  </div>
-                                </Popup>
-                              </Marker>
-                            );
-                          })}
-                        </MapContainer>
+                        <MapboxMap
+                          markers={mapMarkers}
+                          height="100%"
+                        />
                       </div>
                     );
                   })()}
