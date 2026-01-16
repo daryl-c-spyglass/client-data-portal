@@ -1,7 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { MapContainer, TileLayer, Marker, Popup } from "react-leaflet";
-import L from "leaflet";
-import "leaflet/dist/leaflet.css";
+import { MapboxMap, type MapMarker } from "@/components/shared/MapboxMap";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -27,17 +25,6 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import type { Property, Media } from "@shared/schema";
 
-const defaultIcon = L.icon({
-  iconUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png",
-  iconRetinaUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png",
-  shadowUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png",
-  iconSize: [25, 41],
-  iconAnchor: [12, 41],
-  popupAnchor: [1, -34],
-  shadowSize: [41, 41],
-});
-
-L.Marker.prototype.options.icon = defaultIcon;
 
 interface DebugData {
   dataSource: string;
@@ -384,28 +371,22 @@ export function PropertyDetail({
           <CardContent>
             {hasCoordinates ? (
               <div className="aspect-video rounded-md overflow-hidden">
-                <MapContainer
-                  center={[Number(property.latitude), Number(property.longitude)]}
+                <MapboxMap
+                  markers={[{
+                    id: String(property.id || property.listingId || 'property'),
+                    latitude: Number(property.latitude),
+                    longitude: Number(property.longitude),
+                    price: Number(property.listPrice) || Number(property.closePrice) || 0,
+                    label: property.unparsedAddress || '',
+                    status: (property.standardStatus as MapMarker['status']) || 'Active',
+                    isSubject: false
+                  }]}
+                  center={[Number(property.longitude), Number(property.latitude)]}
                   zoom={15}
-                  style={{ height: "100%", width: "100%" }}
-                  scrollWheelZoom={false}
-                >
-                  <TileLayer
-                    attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-                    url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-                  />
-                  <Marker position={[Number(property.latitude), Number(property.longitude)]}>
-                    <Popup>
-                      <div className="text-sm">
-                        <strong>{property.unparsedAddress}</strong>
-                        <br />
-                        {property.city}, {property.stateOrProvince} {property.postalCode}
-                        <br />
-                        {formattedPrice}
-                      </div>
-                    </Popup>
-                  </Marker>
-                </MapContainer>
+                  height="100%"
+                  showLegend={false}
+                  interactive={true}
+                />
               </div>
             ) : (
               <div className="aspect-video bg-muted rounded-md flex items-center justify-center">

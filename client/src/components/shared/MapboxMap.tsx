@@ -168,17 +168,6 @@ export function MapboxMap({
   const [mapError, setMapError] = useState<string | null>(null);
 
   const mapboxToken = import.meta.env.VITE_MAPBOX_TOKEN;
-  
-  // Debug logging
-  useEffect(() => {
-    console.log('[MapboxMap] Rendered with:', {
-      markersCount: markers.length,
-      height,
-      hasToken: !!mapboxToken && mapboxToken !== 'undefined' && mapboxToken.startsWith('pk.'),
-      mapLoaded,
-      mapError
-    });
-  }, [markers.length, height, mapboxToken, mapLoaded, mapError]);
 
   const calculatedCenter = useMemo((): [number, number] => {
     if (center) return center;

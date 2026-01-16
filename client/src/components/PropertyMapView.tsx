@@ -1,13 +1,10 @@
-import { useEffect, useMemo, useState, useRef, useCallback } from "react";
-import { MapContainer, TileLayer, Marker, Popup, useMap } from "react-leaflet";
-import L from "leaflet";
+import { useMemo, useState, useRef, useEffect } from "react";
+import { MapboxMap, type MapMarker } from "@/components/shared/MapboxMap";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { MapPin, Home, Bed, Bath, Ruler, ExternalLink, AlertTriangle, Calendar, ImageOff } from "lucide-react";
-import { MapLayersControl } from "./MapLayersControl";
 import type { Property } from "@shared/schema";
-import "leaflet/dist/leaflet.css";
 
 interface PropertyMapViewProps {
   properties: Property[];
@@ -15,60 +12,8 @@ interface PropertyMapViewProps {
   isLoading?: boolean;
 }
 
-const defaultCenter: [number, number] = [30.2672, -97.7431];
+const defaultCenter: [number, number] = [-97.7431, 30.2672];
 const defaultZoom = 10;
-
-const createPropertyIcon = (status: string) => {
-  const color = status === "Active" 
-    ? "#22c55e" 
-    : status === "Active Under Contract" || status === "Pending"
-    ? "#f59e0b"
-    : "#6b7280";
-  
-  return L.divIcon({
-    className: "custom-marker",
-    html: `
-      <div style="
-        background-color: ${color};
-        width: 32px;
-        height: 32px;
-        border-radius: 50% 50% 50% 0;
-        transform: rotate(-45deg);
-        border: 2px solid white;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.3);
-        display: flex;
-        align-items: center;
-        justify-content: center;
-      ">
-        <svg style="transform: rotate(45deg); width: 14px; height: 14px; color: white;" viewBox="0 0 24 24" fill="currentColor">
-          <path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/>
-        </svg>
-      </div>
-    `,
-    iconSize: [32, 32],
-    iconAnchor: [16, 32],
-    popupAnchor: [0, -32],
-  });
-};
-
-function MapBoundsUpdater({ properties }: { properties: Property[] }) {
-  const map = useMap();
-  
-  useEffect(() => {
-    const validProperties = properties.filter(
-      p => p.latitude != null && p.longitude != null
-    );
-    
-    if (validProperties.length > 0) {
-      const bounds = L.latLngBounds(
-        validProperties.map(p => [Number(p.latitude), Number(p.longitude)] as [number, number])
-      );
-      map.fitBounds(bounds, { padding: [50, 50], maxZoom: 15 });
-    }
-  }, [properties, map]);
-  
-  return null;
-}
 
 function PropertyPopup({ property, onPropertyClick }: { property: Property; onPropertyClick?: (property: Property) => void }) {
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
@@ -237,8 +182,6 @@ function PropertyPopup({ property, onPropertyClick }: { property: Property; onPr
 }
 
 export function PropertyMapView({ properties, onPropertyClick, isLoading }: PropertyMapViewProps) {
-  const [mapReady, setMapReady] = useState(false);
-
   const propertiesWithCoords = useMemo(() => 
     properties.filter(p => p.latitude != null && p.longitude != null),
     [properties]
@@ -249,14 +192,39 @@ export function PropertyMapView({ properties, onPropertyClick, isLoading }: Prop
     [properties]
   );
 
-  const center = useMemo(() => {
-    if (propertiesWithCoords.length > 0) {
-      const avgLat = propertiesWithCoords.reduce((sum, p) => sum + Number(p.latitude), 0) / propertiesWithCoords.length;
-      const avgLng = propertiesWithCoords.reduce((sum, p) => sum + Number(p.longitude), 0) / propertiesWithCoords.length;
-      return [avgLat, avgLng] as [number, number];
-    }
-    return defaultCenter;
+  const mapMarkers: MapMarker[] = useMemo(() => 
+    propertiesWithCoords.map(property => ({
+      id: String(property.listingId || property.id),
+      latitude: Number(property.latitude),
+      longitude: Number(property.longitude),
+      price: Number(property.listPrice) || Number(property.closePrice) || 0,
+      label: property.unparsedAddress || '',
+      status: (property.standardStatus as MapMarker['status']) || 'Active',
+      beds: property.bedroomsTotal ?? undefined,
+      baths: property.bathroomsTotalInteger ?? undefined,
+      sqft: property.livingArea ? Number(property.livingArea) : undefined,
+      yearBuilt: property.yearBuilt ?? undefined,
+      mlsNumber: property.listingId || undefined,
+      photos: (property as any).photos || [],
+    })),
+    [propertiesWithCoords]
+  );
+
+  const mapCenter: [number, number] | undefined = useMemo(() => {
+    if (propertiesWithCoords.length === 0) return undefined;
+    const sumLng = propertiesWithCoords.reduce((sum, p) => sum + Number(p.longitude), 0);
+    const sumLat = propertiesWithCoords.reduce((sum, p) => sum + Number(p.latitude), 0);
+    return [sumLng / propertiesWithCoords.length, sumLat / propertiesWithCoords.length];
   }, [propertiesWithCoords]);
+
+  const handleMarkerClick = (markerId: string) => {
+    if (onPropertyClick) {
+      const property = properties.find(p => String(p.listingId || p.id) === markerId);
+      if (property) {
+        onPropertyClick(property);
+      }
+    }
+  };
 
   if (isLoading) {
     return (
@@ -301,36 +269,15 @@ export function PropertyMapView({ properties, onPropertyClick, isLoading }: Prop
       )}
 
       <Card className="overflow-hidden h-[600px]">
-        <MapContainer
-          center={center}
+        <MapboxMap
+          markers={mapMarkers}
+          center={mapCenter}
+          height="600px"
           zoom={defaultZoom}
-          className="h-full w-full"
-          whenReady={() => setMapReady(true)}
-          data-testid="leaflet-map"
-        >
-          <TileLayer
-            attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-            url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-          />
-          
-          {mapReady && <MapBoundsUpdater properties={propertiesWithCoords} />}
-          {mapReady && <MapLayersControl position="topright" />}
-          
-          {propertiesWithCoords.map((property) => {
-            const uniqueKey = property.listingId || property.id;
-            return (
-              <Marker
-                key={uniqueKey}
-                position={[Number(property.latitude), Number(property.longitude)]}
-                icon={createPropertyIcon(property.standardStatus || "Active")}
-              >
-                <Popup>
-                  <PropertyPopup property={property} onPropertyClick={onPropertyClick} />
-                </Popup>
-              </Marker>
-            );
-          })}
-        </MapContainer>
+          showLegend={true}
+          interactive={true}
+          onMarkerClick={handleMarkerClick}
+        />
       </Card>
 
       {properties.length === 0 && (
@@ -344,26 +291,6 @@ export function PropertyMapView({ properties, onPropertyClick, isLoading }: Prop
           </div>
         </Card>
       )}
-
-      <div className="absolute bottom-4 left-4 z-[1000]">
-        <Card className="p-3 bg-background/95 backdrop-blur-sm">
-          <p className="text-xs font-medium mb-2">Legend</p>
-          <div className="flex flex-col gap-1.5 text-xs">
-            <div className="flex items-center gap-2">
-              <div className="w-3 h-3 rounded-full bg-green-500"></div>
-              <span>Active</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <div className="w-3 h-3 rounded-full bg-amber-500"></div>
-              <span>AUC</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <div className="w-3 h-3 rounded-full bg-gray-500"></div>
-              <span>Closed</span>
-            </div>
-          </div>
-        </Card>
-      </div>
     </div>
   );
 }
