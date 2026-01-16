@@ -1,4 +1,5 @@
 import { cn } from "@/lib/utils";
+import { STATUS_COLORS } from "@/lib/statusColors";
 
 interface StatusFilterTabsProps {
   counts: {
@@ -41,9 +42,9 @@ export function StatusFilterTabs({ counts, activeFilter, onFilterChange }: Statu
             className={cn(
               "px-1.5 py-0.5 rounded-full text-xs tabular-nums",
               activeFilter === filter.key 
-                ? filter.key === 'active' ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"
-                : filter.key === 'underContract' ? "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400"
-                : filter.key === 'closed' ? "bg-gray-100 text-gray-700 dark:bg-gray-700/30 dark:text-gray-400"
+                ? filter.key === 'active' ? `${STATUS_COLORS.active.bgLight} ${STATUS_COLORS.active.text} dark:bg-green-900/30 dark:${STATUS_COLORS.active.textDark}`
+                : filter.key === 'underContract' ? `${STATUS_COLORS.underContract.bgLight} ${STATUS_COLORS.underContract.text} dark:bg-orange-900/30 dark:${STATUS_COLORS.underContract.textDark}`
+                : filter.key === 'closed' ? `${STATUS_COLORS.closed.bgLight} ${STATUS_COLORS.closed.text} dark:bg-red-900/30 dark:${STATUS_COLORS.closed.textDark}`
                 : "bg-primary/10 text-primary"
                 : "bg-muted text-muted-foreground"
             )}

@@ -104,11 +104,32 @@ export function getStatusHexFromMLS(mlsStatus: string, isSubject: boolean = fals
 }
 
 /**
- * Get Tailwind classes for status badge
+ * Get Tailwind classes for status badge (light background)
  */
 export function getStatusBadgeClasses(status: StatusKey): string {
   const colors = STATUS_COLORS[status];
   return `${colors.bgLight} ${colors.text} dark:bg-opacity-20 dark:${colors.textDark}`;
+}
+
+/**
+ * Get Tailwind classes for solid status badge (solid background with white text)
+ */
+export function getStatusBadgeSolidClasses(status: StatusKey): string {
+  const colors = STATUS_COLORS[status];
+  return `${colors.bg} text-white`;
+}
+
+/**
+ * Get status config object for a given MLS status (replaces legacy statusConfig)
+ */
+export function getStatusConfig(mlsStatus: string) {
+  const status = getStatusFromMLS(mlsStatus);
+  const colors = STATUS_COLORS[status];
+  return {
+    color: colors.bg,
+    textColor: 'text-white',
+    hex: colors.hex,
+  };
 }
 
 /**

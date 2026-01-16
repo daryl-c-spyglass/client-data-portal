@@ -43,6 +43,7 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import type { Cma, Property } from "@shared/schema";
 import { formatPropertyType } from "@/lib/property-type-utils";
 import { MarketingInsightsCarousel } from "@/components/MarketingInsightsCarousel";
+import { STATUS_COLORS, getStatusConfig } from "@/lib/statusColors";
 import {
   LineChart,
   Line,
@@ -229,12 +230,6 @@ const defaultConfig: DashboardConfig = {
   widgetOrder: ['metrics', 'quickActions', 'activeCarousel', 'marketInsights', 'recentCmas']
 };
 
-const statusConfig = {
-  Active: { color: "bg-emerald-500", textColor: "text-white" },
-  "Active Under Contract": { color: "bg-amber-500", textColor: "text-white" },
-  Closed: { color: "bg-slate-500", textColor: "text-white" },
-  Pending: { color: "bg-blue-500", textColor: "text-white" },
-} as const;
 
 function PropertyCarouselCard({ 
   property, 
@@ -276,7 +271,7 @@ function PropertyCarouselCard({
         {property.standardStatus && (
           <div className="absolute top-2 right-2">
             <Badge 
-              className={`${statusConfig[property.standardStatus as keyof typeof statusConfig]?.color || 'bg-slate-500'} ${statusConfig[property.standardStatus as keyof typeof statusConfig]?.textColor || 'text-white'} text-xs`}
+              className={`${getStatusConfig(property.standardStatus).color} ${getStatusConfig(property.standardStatus).textColor} text-xs`}
             >
               {property.standardStatus}
             </Badge>
@@ -405,7 +400,7 @@ function PropertyDetailModal({
           <div className="absolute top-4 right-4">
             {property.standardStatus && (
               <Badge 
-                className={`${statusConfig[property.standardStatus as keyof typeof statusConfig]?.color || 'bg-slate-500'} ${statusConfig[property.standardStatus as keyof typeof statusConfig]?.textColor || 'text-white'}`}
+                className={`${getStatusConfig(property.standardStatus).color} ${getStatusConfig(property.standardStatus).textColor}`}
               >
                 {property.standardStatus}
               </Badge>
@@ -1025,19 +1020,19 @@ export default function Dashboard() {
                           </div>
                           <div className="text-xs text-muted-foreground space-y-0.5 mt-1">
                             <p className="flex items-center gap-1">
-                              <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
+                              <span className={`w-2 h-2 rounded-full ${STATUS_COLORS.active.bg}`}></span>
                               {(inventorySummary?.countsByStatus?.['Active'] ?? stats?.totalActiveProperties ?? 0).toLocaleString()} Active
                             </p>
                             <p className="flex items-center gap-1">
-                              <span className="w-2 h-2 rounded-full bg-amber-500"></span>
+                              <span className={`w-2 h-2 rounded-full ${STATUS_COLORS.underContract.bg}`}></span>
                               {(inventorySummary?.countsByStatus?.['Active Under Contract'] ?? 0).toLocaleString()} Active Under Contract
                             </p>
                             <p className="flex items-center gap-1">
-                              <span className="w-2 h-2 rounded-full bg-blue-500"></span>
+                              <span className={`w-2 h-2 rounded-full ${STATUS_COLORS.pending.bg}`}></span>
                               {(inventorySummary?.countsByStatus?.['Pending'] ?? 0).toLocaleString()} Pending
                             </p>
                             <p className="flex items-center gap-1">
-                              <span className="w-2 h-2 rounded-full bg-slate-500"></span>
+                              <span className={`w-2 h-2 rounded-full ${STATUS_COLORS.closed.bg}`}></span>
                               {(inventorySummary?.countsByStatus?.['Closed'] ?? stats?.totalClosedProperties ?? 0).toLocaleString()} Closed
                             </p>
                           </div>

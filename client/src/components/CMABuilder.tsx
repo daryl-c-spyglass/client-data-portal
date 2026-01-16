@@ -20,6 +20,7 @@ import VisualMatchPanel, { type ImageSearchItem } from "@/components/VisualMatch
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import type { Property } from "@shared/schema";
+import { STATUS_COLORS, getStatusConfig } from "@/lib/statusColors";
 
 interface AutocompleteInputProps {
   placeholder?: string;
@@ -2116,15 +2117,13 @@ export function CMABuilder({ onCreateCMA, initialData }: CMABuilderProps) {
                     const listingDate = property.listingContractDate 
                       ? new Date(property.listingContractDate).toLocaleDateString()
                       : null;
+                    const statusConfig = getStatusConfig(property.standardStatus || 'Active');
                     const getStatusBadge = () => {
-                      if (property.standardStatus === 'Closed') {
-                        return <Badge variant="secondary" className="flex-shrink-0">Closed</Badge>;
-                      } else if (property.standardStatus === 'Active') {
-                        return <Badge variant="default" className="flex-shrink-0 bg-green-600 hover:bg-green-600">Active</Badge>;
-                      } else if (property.standardStatus === 'Active Under Contract') {
-                        return <Badge variant="default" className="flex-shrink-0 bg-amber-500 hover:bg-amber-500">Active Under Contract</Badge>;
-                      }
-                      return <Badge variant="secondary" className="flex-shrink-0">{property.standardStatus}</Badge>;
+                      return (
+                        <Badge className={`flex-shrink-0 ${statusConfig.color} hover:${statusConfig.color} ${statusConfig.textColor}`}>
+                          {property.standardStatus}
+                        </Badge>
+                      );
                     };
                     const matchTier = (property as any).matchTier as string | undefined;
                     
@@ -2275,15 +2274,13 @@ export function CMABuilder({ onCreateCMA, initialData }: CMABuilderProps) {
                           ? Number(property.closePrice) 
                           : Number(property.listPrice || 0)) / Number(property.livingArea)
                       : null;
+                    const statusConfig = getStatusConfig(property.standardStatus || 'Active');
                     const getStatusBadge = () => {
-                      if (property.standardStatus === 'Closed') {
-                        return <Badge variant="secondary" className="flex-shrink-0">Closed</Badge>;
-                      } else if (property.standardStatus === 'Active') {
-                        return <Badge variant="default" className="flex-shrink-0 bg-green-600 hover:bg-green-600">Active</Badge>;
-                      } else if (property.standardStatus === 'Active Under Contract') {
-                        return <Badge variant="default" className="flex-shrink-0 bg-amber-500 hover:bg-amber-500">Active Under Contract</Badge>;
-                      }
-                      return <Badge variant="secondary" className="flex-shrink-0">{property.standardStatus}</Badge>;
+                      return (
+                        <Badge className={`flex-shrink-0 ${statusConfig.color} hover:${statusConfig.color} ${statusConfig.textColor}`}>
+                          {property.standardStatus}
+                        </Badge>
+                      );
                     };
                     
                     return (
@@ -2422,15 +2419,14 @@ export function CMABuilder({ onCreateCMA, initialData }: CMABuilderProps) {
                               ? Number(property.closePrice) 
                               : Number(property.listPrice || 0)) / Number(property.livingArea)
                           : null;
+                        const statusConfig = getStatusConfig(property.standardStatus || 'Active');
                         const getStatusBadge = () => {
-                          if (property.standardStatus === 'Closed') {
-                            return <Badge variant="secondary" className="text-xs">Closed</Badge>;
-                          } else if (property.standardStatus === 'Active') {
-                            return <Badge variant="default" className="text-xs bg-green-600 hover:bg-green-600">Active</Badge>;
-                          } else if (property.standardStatus === 'Active Under Contract') {
-                            return <Badge variant="default" className="text-xs bg-amber-500 hover:bg-amber-500">AUC</Badge>;
-                          }
-                          return <Badge variant="secondary" className="text-xs">{property.standardStatus}</Badge>;
+                          const label = property.standardStatus === 'Active Under Contract' ? 'AUC' : property.standardStatus;
+                          return (
+                            <Badge className={`text-xs ${statusConfig.color} hover:${statusConfig.color} ${statusConfig.textColor}`}>
+                              {label}
+                            </Badge>
+                          );
                         };
                         
                         return (
@@ -2632,13 +2628,14 @@ export function CMABuilder({ onCreateCMA, initialData }: CMABuilderProps) {
                           <p className="text-sm text-muted-foreground">${pricePerSqft.toFixed(0)}/sqft</p>
                         )}
                       </div>
-                      {selectedProperty.standardStatus === 'Closed' ? (
-                        <Badge variant="secondary" className="text-base px-3 py-1">Closed</Badge>
-                      ) : selectedProperty.standardStatus === 'Active' ? (
-                        <Badge className="bg-green-600 hover:bg-green-600 text-base px-3 py-1">Active</Badge>
-                      ) : (
-                        <Badge className="bg-amber-500 hover:bg-amber-500 text-base px-3 py-1">Active Under Contract</Badge>
-                      )}
+                      {(() => {
+                        const dialogStatusConfig = getStatusConfig(selectedProperty.standardStatus || 'Active');
+                        return (
+                          <Badge className={`${dialogStatusConfig.color} hover:${dialogStatusConfig.color} ${dialogStatusConfig.textColor} text-base px-3 py-1`}>
+                            {selectedProperty.standardStatus}
+                          </Badge>
+                        );
+                      })()}
                     </div>
                     
                     {/* Property Details */}

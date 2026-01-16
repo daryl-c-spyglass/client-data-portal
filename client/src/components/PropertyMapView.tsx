@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { MapPin, Home, Bed, Bath, Ruler, ExternalLink, AlertTriangle, Calendar, ImageOff } from "lucide-react";
 import type { Property } from "@shared/schema";
+import { getStatusConfig } from "@/lib/statusColors";
 
 interface PropertyMapViewProps {
   properties: Property[];
@@ -65,11 +66,7 @@ function PropertyPopup({ property, onPropertyClick }: { property: Property; onPr
     ? new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 }).format(Number(price))
     : "Price N/A";
 
-  const statusColor = property.standardStatus === "Active" 
-    ? "bg-green-500" 
-    : property.standardStatus === "Active Under Contract" || property.standardStatus === "Pending"
-    ? "bg-amber-500"
-    : "bg-gray-500";
+  const statusClasses = getStatusConfig(property.standardStatus || 'Active');
 
   return (
     <div className="w-[320px]" data-testid={`popup-property-${property.id}`}>
@@ -111,7 +108,7 @@ function PropertyPopup({ property, onPropertyClick }: { property: Property; onPr
       <div className="p-3">
         <div className="flex items-start justify-between gap-2 mb-2">
           <span className="font-bold text-lg text-foreground">{formattedPrice}</span>
-          <Badge className={`${statusColor} text-white text-xs`}>
+          <Badge className={`${statusClasses.color} ${statusClasses.textColor} text-xs`}>
             {property.standardStatus || "Unknown"}
           </Badge>
         </div>

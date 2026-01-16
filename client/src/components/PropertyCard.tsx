@@ -5,6 +5,7 @@ import { Bed, Bath, Maximize, MapPin, Calendar, TrendingUp, Home } from "lucide-
 import type { Property, Media } from "@shared/schema";
 import { formatPropertyType } from "@/lib/property-type-utils";
 import { StatusInspector } from "./StatusInspector";
+import { getStatusConfig } from "@/lib/statusColors";
 
 interface PropertyCardProps {
   property: Property;
@@ -14,13 +15,6 @@ interface PropertyCardProps {
   onClick?: () => void;
   statusInspectorEnabled?: boolean;
 }
-
-const statusConfig = {
-  Active: { color: "bg-emerald-500", textColor: "text-white" },
-  "Active Under Contract": { color: "bg-amber-500", textColor: "text-white" },
-  Closed: { color: "bg-slate-500", textColor: "text-white" },
-  Pending: { color: "bg-blue-500", textColor: "text-white" },
-} as const;
 
 export function PropertyCard({ 
   property, 
@@ -66,7 +60,7 @@ export function PropertyCard({
         {property.standardStatus && (
           <div className="absolute top-4 right-4">
             <Badge 
-              className={`${(statusConfig[property.standardStatus as keyof typeof statusConfig]?.color || 'bg-slate-500')} ${(statusConfig[property.standardStatus as keyof typeof statusConfig]?.textColor || 'text-white')}`}
+              className={`${getStatusConfig(property.standardStatus).color} ${getStatusConfig(property.standardStatus).textColor}`}
               data-testid={`badge-status-${property.id}`}
             >
               {property.standardStatus}

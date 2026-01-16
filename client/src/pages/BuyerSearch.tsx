@@ -9,6 +9,7 @@ import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { STATUS_COLORS, getStatusConfig } from "@/lib/statusColors";
 
 interface AutocompleteInputProps {
   placeholder?: string;
@@ -3785,11 +3786,7 @@ export default function BuyerSearch() {
                 {floatingCardProperty.property.standardStatus && (
                   <div className="absolute top-2 left-2 z-20">
                     <Badge 
-                      className={cn(
-                        floatingCardProperty.property.standardStatus === 'Active' && "bg-emerald-500 text-white",
-                        floatingCardProperty.property.standardStatus === 'Active Under Contract' && "bg-amber-500 text-white",
-                        floatingCardProperty.property.standardStatus === 'Closed' && "bg-slate-500 text-white"
-                      )}
+                      className={`${getStatusConfig(floatingCardProperty.property.standardStatus).color} ${getStatusConfig(floatingCardProperty.property.standardStatus).textColor}`}
                     >
                       {floatingCardProperty.property.standardStatus}
                     </Badge>

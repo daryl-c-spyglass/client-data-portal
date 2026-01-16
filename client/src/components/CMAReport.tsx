@@ -9,7 +9,7 @@ import { Save, Edit, FileText, Printer, Info, Home, Mail, ChevronLeft, ChevronRi
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
 import { MapboxMap, type MapMarker } from "@/components/shared/MapboxMap";
 import { useTheme } from "@/contexts/ThemeContext";
-import { STATUS_COLORS, getStatusHexFromMLS } from "@/lib/statusColors";
+import { STATUS_COLORS, getStatusHexFromMLS, getStatusConfig } from "@/lib/statusColors";
 
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
@@ -3861,11 +3861,7 @@ export function CMAReport({
                 {floatingCardProperty.standardStatus && (
                   <div className="absolute top-2 left-2 z-20">
                     <Badge 
-                      className={cn(
-                        floatingCardProperty.standardStatus === 'Active' && "bg-emerald-500 text-white",
-                        floatingCardProperty.standardStatus === 'Active Under Contract' && "bg-amber-500 text-white",
-                        floatingCardProperty.standardStatus === 'Closed' && "bg-slate-500 text-white"
-                      )}
+                      className={`${getStatusConfig(floatingCardProperty.standardStatus).color} ${getStatusConfig(floatingCardProperty.standardStatus).textColor}`}
                     >
                       {floatingCardProperty.standardStatus}
                     </Badge>
