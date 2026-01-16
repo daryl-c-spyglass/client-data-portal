@@ -53,7 +53,7 @@ The UI incorporates Spyglass Realty branding with an orange primary color scheme
 - **Seller Updates**: Automated market update emails for sellers with SendGrid integration. Supports configurable frequency (weekly, bimonthly, quarterly), test emails, active/pause toggle, and send history tracking. Cron job runs daily at 9 AM Central to send due emails.
 - **Settings Page**: Management for agent profile (headshot, bio, title, cover letter, social links), data sync, display preferences, embed codes, and lead capture.
 - **Admin Panel**: Master admin controls for company branding (logo, colors), custom report pages, and user role management. Access restricted to admin users.
-- **CMA Presentation Builder**: Professional CMA report creation with agent profiles, customizable sections (16 sections in 3 categories), and company branding. Features include section toggles with ordering, cover letter customization, layout options (landscape/portrait), live preview, and agent footer toggle. Access via /cmas/:id/presentation. Database tables: agent_profiles, company_settings, custom_report_pages, cma_report_configs.
+- **CMA Presentation Builder**: Professional CMA report creation with agent profiles, customizable sections (17 sections in 3 categories), and company branding. Features include section toggles with ordering, cover letter customization, layout options (landscape/portrait), live preview, agent footer toggle, and listing brochure upload/management. Brochure support includes PDF and image upload (up to 10MB) with preview, stored via Replit Object Storage. Image brochures are included in PDF export. Access via /cmas/:id/presentation. Database tables: agent_profiles, company_settings, custom_report_pages, cma_report_configs. CMA schema includes brochure field (jsonb) for storing brochure metadata.
 - **Market Insights**: Year-over-Year price comparisons and neighborhood-level market statistics.
 - **Property Detail Page**: Enhanced property details with neighborhood reviews and boundary maps.
 - **Search Enhancements**: Autocomplete for cities, zip codes, subdivisions, and elementary schools.
@@ -66,6 +66,7 @@ The UI incorporates Spyglass Realty branding with an orange primary color scheme
 - **Repliers API**: Primary data source for active, pending, and closed property listings.
 - **PostgreSQL**: Persistent data storage, leveraging Neon serverless driver.
 - **Amazon S3**: Storage for media assets.
+- **Replit Object Storage**: Used for CMA listing brochure uploads (GCS-backed with presigned URL flow).
 - **Mission Control (ReZen) API**: For agent production volume reporting.
 - **Follow Up Boss (FUB) API**: For calendar events and lead management.
 - **`connect-pg-simple`**: PostgreSQL-backed session management.
