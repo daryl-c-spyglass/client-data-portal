@@ -1293,21 +1293,84 @@ export default function CMAPresentationBuilder() {
 
                   {includedSections.includes("property_details") && (
                     <PreviewSection title="Property Details" icon={Home} sectionId="property_details" onClick={handlePreviewSectionClick}>
-                      <div className="h-24 bg-muted rounded-md flex items-center justify-center">
-                        <span className="text-muted-foreground text-sm">
-                          Detailed property information pages
-                        </span>
-                      </div>
+                      {properties.length > 0 ? (
+                        <div className="space-y-2">
+                          {properties.slice(0, 3).map((property, index) => (
+                            <div key={property.id || property.listingId || index} className="p-2 bg-muted rounded-md">
+                              <div className="flex justify-between items-start">
+                                <div className="flex-1 min-w-0">
+                                  <p className="text-xs font-medium truncate">
+                                    {property.streetAddress || property.address || "Address"}
+                                  </p>
+                                  <p className="text-xs text-muted-foreground">
+                                    {property.city}
+                                  </p>
+                                </div>
+                                <Badge variant="outline" className="text-xs ml-2 shrink-0">
+                                  {property.standardStatus || "Active"}
+                                </Badge>
+                              </div>
+                              <div className="flex gap-3 mt-1 text-xs text-muted-foreground">
+                                <span>{formatCurrency(Number(property.listPrice || property.closePrice) || 0)}</span>
+                                <span>{property.bedroomsTotal} bd</span>
+                                <span>{property.bathroomsTotal} ba</span>
+                                <span>{formatNumber(Number(property.livingArea) || 0)} sqft</span>
+                              </div>
+                            </div>
+                          ))}
+                          {properties.length > 3 && (
+                            <p className="text-xs text-muted-foreground text-center">
+                              +{properties.length - 3} more properties
+                            </p>
+                          )}
+                        </div>
+                      ) : (
+                        <div className="h-20 bg-muted rounded-md flex items-center justify-center">
+                          <span className="text-muted-foreground text-sm">No properties in this CMA</span>
+                        </div>
+                      )}
                     </PreviewSection>
                   )}
 
                   {includedSections.includes("property_photos") && (
                     <PreviewSection title="Property Photos" icon={ImageIcon} sectionId="property_photos" onClick={handlePreviewSectionClick}>
-                      <div className="h-24 bg-muted rounded-md flex items-center justify-center">
-                        <span className="text-muted-foreground text-sm">
-                          Photo gallery ({photoLayout === "all" ? "All" : "First 12"} photos)
-                        </span>
-                      </div>
+                      {(() => {
+                        const allPhotos: { url: string; address: string }[] = [];
+                        properties.forEach(p => {
+                          (p.photos || []).slice(0, 2).forEach(url => {
+                            allPhotos.push({ url, address: p.streetAddress || p.address || "" });
+                          });
+                        });
+                        const displayPhotos = allPhotos.slice(0, 6);
+                        
+                        return displayPhotos.length > 0 ? (
+                          <div>
+                            <div className="grid grid-cols-3 gap-1">
+                              {displayPhotos.map((photo, index) => (
+                                <div key={index} className="aspect-video bg-muted rounded overflow-hidden">
+                                  <img 
+                                    src={photo.url} 
+                                    alt={`Property ${index + 1}`}
+                                    className="w-full h-full object-cover"
+                                    onError={(e) => {
+                                      (e.target as HTMLImageElement).style.display = 'none';
+                                    }}
+                                  />
+                                </div>
+                              ))}
+                            </div>
+                            {allPhotos.length > 6 && (
+                              <p className="text-xs text-muted-foreground text-center mt-2">
+                                +{allPhotos.length - 6} more photos
+                              </p>
+                            )}
+                          </div>
+                        ) : (
+                          <div className="h-20 bg-muted rounded-md flex items-center justify-center">
+                            <span className="text-muted-foreground text-sm">No photos available</span>
+                          </div>
+                        );
+                      })()}
                     </PreviewSection>
                   )}
 
@@ -1609,8 +1672,23 @@ export default function CMAPresentationBuilder() {
 
           {includedSections.includes("contact_me") && (
             <PreviewSection title="Contact Me" icon={Phone} sectionId="contact_me" onClick={handlePreviewSectionClick}>
-              <div className="text-sm text-muted-foreground">
-                Agent contact information
+              <div className="space-y-2">
+                <div className="flex items-center gap-2 text-sm">
+                  <Mail className="w-4 h-4 text-muted-foreground" />
+                  <span>{currentUser?.email}</span>
+                </div>
+                {companySettings?.phone && (
+                  <div className="flex items-center gap-2 text-sm">
+                    <Phone className="w-4 h-4 text-muted-foreground" />
+                    <span>{companySettings.phone}</span>
+                  </div>
+                )}
+                {agentProfile?.websiteUrl && (
+                  <div className="flex items-center gap-2 text-sm">
+                    <Globe className="w-4 h-4 text-muted-foreground" />
+                    <span>{agentProfile.websiteUrl}</span>
+                  </div>
+                )}
               </div>
             </PreviewSection>
           )}
@@ -1682,21 +1760,84 @@ export default function CMAPresentationBuilder() {
 
           {includedSections.includes("property_details") && (
             <PreviewSection title="Property Details" icon={Home} sectionId="property_details" onClick={handlePreviewSectionClick}>
-              <div className="h-24 bg-muted rounded-md flex items-center justify-center">
-                <span className="text-muted-foreground text-sm">
-                  Detailed property information pages
-                </span>
-              </div>
+              {properties.length > 0 ? (
+                <div className="space-y-2">
+                  {properties.slice(0, 4).map((property, index) => (
+                    <div key={property.id || property.listingId || index} className="p-2 bg-muted rounded-md">
+                      <div className="flex justify-between items-start">
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium truncate">
+                            {property.streetAddress || property.address || "Address"}
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            {property.city}
+                          </p>
+                        </div>
+                        <Badge variant="outline" className="text-xs ml-2 shrink-0">
+                          {property.standardStatus || "Active"}
+                        </Badge>
+                      </div>
+                      <div className="flex gap-3 mt-1 text-xs text-muted-foreground">
+                        <span>{formatCurrency(Number(property.listPrice || property.closePrice) || 0)}</span>
+                        <span>{property.bedroomsTotal} bd</span>
+                        <span>{property.bathroomsTotal} ba</span>
+                        <span>{formatNumber(Number(property.livingArea) || 0)} sqft</span>
+                      </div>
+                    </div>
+                  ))}
+                  {properties.length > 4 && (
+                    <p className="text-xs text-muted-foreground text-center">
+                      +{properties.length - 4} more properties
+                    </p>
+                  )}
+                </div>
+              ) : (
+                <div className="h-20 bg-muted rounded-md flex items-center justify-center">
+                  <span className="text-muted-foreground text-sm">No properties in this CMA</span>
+                </div>
+              )}
             </PreviewSection>
           )}
 
           {includedSections.includes("property_photos") && (
             <PreviewSection title="Property Photos" icon={ImageIcon} sectionId="property_photos" onClick={handlePreviewSectionClick}>
-              <div className="h-24 bg-muted rounded-md flex items-center justify-center">
-                <span className="text-muted-foreground text-sm">
-                  Photo gallery ({photoLayout === "all" ? "All" : "First 12"} photos)
-                </span>
-              </div>
+              {(() => {
+                const allPhotos: { url: string; address: string }[] = [];
+                properties.forEach(p => {
+                  (p.photos || []).slice(0, 3).forEach(url => {
+                    allPhotos.push({ url, address: p.streetAddress || p.address || "" });
+                  });
+                });
+                const displayPhotos = allPhotos.slice(0, 9);
+                
+                return displayPhotos.length > 0 ? (
+                  <div>
+                    <div className="grid grid-cols-3 gap-2">
+                      {displayPhotos.map((photo, index) => (
+                        <div key={index} className="aspect-video bg-muted rounded overflow-hidden">
+                          <img 
+                            src={photo.url} 
+                            alt={`Property ${index + 1}`}
+                            className="w-full h-full object-cover"
+                            onError={(e) => {
+                              (e.target as HTMLImageElement).style.display = 'none';
+                            }}
+                          />
+                        </div>
+                      ))}
+                    </div>
+                    {allPhotos.length > 9 && (
+                      <p className="text-xs text-muted-foreground text-center mt-2">
+                        +{allPhotos.length - 9} more photos in full report
+                      </p>
+                    )}
+                  </div>
+                ) : (
+                  <div className="h-20 bg-muted rounded-md flex items-center justify-center">
+                    <span className="text-muted-foreground text-sm">No photos available</span>
+                  </div>
+                );
+              })()}
             </PreviewSection>
           )}
 
@@ -1734,9 +1875,47 @@ export default function CMAPresentationBuilder() {
 
           {includedSections.includes("price_per_sqft") && (
             <PreviewSection title="Average Price Per Sq. Ft." icon={BarChart3} sectionId="price_per_sqft" onClick={handlePreviewSectionClick}>
-              <div className="h-32 bg-muted rounded-md flex items-center justify-center">
-                <span className="text-muted-foreground text-sm">Price per square foot chart</span>
-              </div>
+              {pricePerSqftData.length > 0 ? (
+                <div className="space-y-2">
+                  <div className="h-40">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart data={pricePerSqftData} margin={{ top: 5, right: 5, left: 5, bottom: 5 }}>
+                        <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                        <XAxis 
+                          dataKey="name" 
+                          tick={{ fontSize: 9 }} 
+                          angle={-45} 
+                          textAnchor="end" 
+                          height={50}
+                          interval={0}
+                        />
+                        <YAxis 
+                          tick={{ fontSize: 10 }} 
+                          tickFormatter={(value) => `$${value}`}
+                          width={50}
+                        />
+                        <Tooltip 
+                          formatter={(value: number) => [`$${value}/sqft`, "Price/SqFt"]}
+                          labelFormatter={(label) => pricePerSqftData.find(d => d.name === label)?.fullAddress || label}
+                        />
+                        <ReferenceLine 
+                          y={statistics.avgPricePerSqft} 
+                          stroke="hsl(var(--primary))" 
+                          strokeDasharray="5 5"
+                        />
+                        <Bar dataKey="value" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+                  <div className="text-xs text-muted-foreground text-center">
+                    Average: ${formatNumber(statistics.avgPricePerSqft)}/sqft
+                  </div>
+                </div>
+              ) : (
+                <div className="h-32 bg-muted rounded-md flex items-center justify-center">
+                  <span className="text-muted-foreground text-sm">No price data available</span>
+                </div>
+              )}
             </PreviewSection>
           )}
 

@@ -1,0 +1,530 @@
+# BUG FIX: CMA Preview Sections Showing Placeholder Text Instead of Real Data
+
+## Problem
+The CMA Presentation Preview modal shows placeholder text like "will appear here..." for most sections instead of pulling actual data from the CMA and user profile.
+
+## Current State (from screenshots)
+- ✅ Cover Page - Working (shows real data)
+- ✅ Summary of Comparables - Working ($909,686, $274, 7 properties)
+- ✅ Comparable Property Statistics - Working
+- 🔴 Listing Brochure - Broken image
+- 🔴 Map - "Mapbox token not configured"
+- 🟡 Everything else - Placeholder text only
+
+---
+
+## CRITICAL FIX 1: Mapbox Token
+
+### Issue
+Map shows: "Mapbox token not configured. Please configure VITE_MAPBOX_TOKEN"
+
+### Debug Steps
+```typescript
+// 1. Check if token exists in environment
+console.log('[MAPBOX] Token exists:', !!import.meta.env.VITE_MAPBOX_TOKEN);
+console.log('[MAPBOX] Token prefix:', import.meta.env.VITE_MAPBOX_TOKEN?.substring(0, 10));
+
+// 2. Verify the token is being read correctly in the component
+// The issue might be that the component checks for the token BEFORE it's available
+
+// 3. Fix: Add fallback and better error handling
+const mapboxToken = import.meta.env.VITE_MAPBOX_TOKEN;
+
+if (!mapboxToken || mapboxToken === 'undefined') {
+  console.error('[MAPBOX] Token not found. Check:');
+  console.error('  1. VITE_MAPBOX_TOKEN exists in .env');
+  console.error('  2. Server was restarted after adding token');
+  console.error('  3. Token starts with "pk."');
+}
+```
+
+### Likely Fix
+The token may exist but the component isn't reading it properly. Check:
+```typescript
+// In the map component, ensure token is set BEFORE creating the map
+useEffect(() => {
+  const token = import.meta.env.VITE_MAPBOX_TOKEN;
+  
+  if (!token) {
+    setError('Mapbox token not configured');
+    return;
+  }
+  
+  mapboxgl.accessToken = token;
+  
+  // Now create the map...
+}, []);
+```
+
+Also verify in `.env`:
+VITE_MAPBOX_TOKEN=pk.eyJ1Ijoi...your_full_token_here
+
+**Important:** After adding/changing env variables, the Replit server must be restarted.
+
+---
+
+## CRITICAL FIX 2: Listing Brochure Broken Image
+
+### Issue
+Brochure shows broken image icon with text "Listing Brochure"
+
+### Debug
+```typescript
+// Log the brochure URL to see what's being passed
+console.log('[BROCHURE] CMA brochure data:', cmaData.brochure);
+console.log('[BROCHURE] URL:', cmaData.brochure?.url);
+```
+
+### Fix
+```jsx
+// ListingBrochurePreview.tsx
+function ListingBrochurePreview({ brochure }) {
+  const [imageError, setImageError] = useState(false);
+  
+  if (!brochure || !brochure.url) {
+    return (
+      <div className="bg-gray-50 rounded-lg p-8 text-center text-gray-400">
+        <ImageIcon size={32} className="mx-auto mb-2" />
+        <p>No brochure uploaded</p>
+      </div>
+    );
+  }
+  
+  if (imageError) {
+    return (
+      <div className="bg-red-50 rounded-lg p-8 text-center text-red-400">
+        <AlertCircle size={32} className="mx-auto mb-2" />
+        <p>Failed to load brochure image</p>
+        <p className="text-xs mt-1">{brochure.url}</p>
+      </div>
+    );
+  }
+  
+  return (
+    <div className="rounded-lg overflow-hidden">
+      <img 
+        src={brochure.url}
+        alt="Listing Brochure"
+        className="w-full h-auto"
+        onError={(e) => {
+          console.error('[BROCHURE] Failed to load:', brochure.url);
+          setImageError(true);
+        }}
+        onLoad={() => console.log('[BROCHURE] Loaded successfully')}
+      />
+    </div>
+  );
+}
+```
+
+### Check Brochure URL
+The URL might be:
+1. Expired presigned URL (if using object storage)
+2. Incorrect path
+3. Missing from database
+
+---
+
+## FIX 3: Populate Cover Letter from CMA Data or User Input
+
+### Current
+Shows: "Your personalized cover letter will appear here..."
+
+### Fix
+```jsx
+function CoverLetterPreview({ config, cmaData, agentProfile }) {
+  // Priority: 1. User's custom text, 2. AI generated, 3. Default from profile, 4. Placeholder
+  const content = config.coverLetterOverride 
+    || config.coverLetter?.content
+    || agentProfile?.defaultCoverLetter
+    || null;
+  
+  if (!content) {
+    return (
+      <div className="text-gray-400 italic">
+        <p>No cover letter configured.</p>
+        <p className="text-sm mt-1">
+          Go to Content tab to write or generate a cover letter.
+        </p>
+      </div>
+    );
+  }
+  
+  return (
+    <div className="prose prose-sm">
+      {content.split('\n').map((paragraph, i) => (
+        <p key={i}>{paragraph}</p>
+      ))}
+    </div>
+  );
+}
+```
+
+---
+
+## FIX 4: Populate Agent Resume from Profile
+
+### Current
+Shows name but bio says "Agent bio will appear here..."
+
+### Fix
+```jsx
+function AgentResumePreview({ config, agentProfile }) {
+  const name = config.agentResume?.name || agentProfile?.name || 'Agent Name';
+  const title = config.agentResume?.title || agentProfile?.title || 'Real Estate Agent';
+  const bio = config.agentResume?.bio || agentProfile?.bio || null;
+  const photo = config.agentResume?.showPhoto !== false 
+    ? (agentProfile?.headshot || null) 
+    : null;
+  
+  return (
+    <div className="flex items-start gap-4">
+      {/* Photo */}
+      <div className="w-16 h-16 rounded-full bg-gray-200 flex items-center justify-center overflow-hidden">
+        {photo ? (
+          <img src={photo} alt={name} className="w-full h-full object-cover" />
+        ) : (
+          <span className="text-2xl text-gray-400">
+            {name.charAt(0).toUpperCase()}
+          </span>
+        )}
+      </div>
+      
+      {/* Info */}
+      <div>
+        <h4 className="font-semibold">{name}</h4>
+        <p className="text-sm text-gray-600">{title}</p>
+        {bio ? (
+          <p className="text-sm text-gray-500 mt-2">{bio}</p>
+        ) : (
+          <p className="text-sm text-gray-400 italic mt-2">
+            No bio configured. Add one in Settings → Profile.
+          </p>
+        )}
+      </div>
+    </div>
+  );
+}
+```
+
+---
+
+## FIX 5: Populate Contact Me from Profile
+
+### Current
+Shows: "Agent contact information"
+
+### Fix
+```jsx
+function ContactMePreview({ config, agentProfile }) {
+  const email = agentProfile?.email;
+  const phone = agentProfile?.phone;
+  
+  const showEmail = config.contactMe?.showEmail !== false;
+  const showPhone = config.contactMe?.showPhone !== false;
+  
+  if (!email && !phone) {
+    return (
+      <p className="text-gray-400 italic">
+        No contact information configured. Add in Settings → Profile.
+      </p>
+    );
+  }
+  
+  return (
+    <div className="space-y-2">
+      {showEmail && email && (
+        <div className="flex items-center gap-2">
+          <Mail size={16} className="text-gray-400" />
+          <span>{email}</span>
+        </div>
+      )}
+      {showPhone && phone && (
+        <div className="flex items-center gap-2">
+          <Phone size={16} className="text-gray-400" />
+          <span>{phone}</span>
+        </div>
+      )}
+    </div>
+  );
+}
+```
+
+---
+
+## FIX 6: Populate Property Details with Real Data
+
+### Current
+Shows: "Detailed property information pages"
+
+### Fix
+```jsx
+function PropertyDetailsPreview({ cmaData }) {
+  const properties = cmaData.propertiesData || [];
+  
+  if (properties.length === 0) {
+    return (
+      <p className="text-gray-400 italic">No properties in this CMA</p>
+    );
+  }
+  
+  // Show first 2-3 properties as preview
+  const previewProperties = properties.slice(0, 3);
+  
+  return (
+    <div className="space-y-3">
+      {previewProperties.map((property, index) => (
+        <div key={property.mlsNumber || index} className="border rounded-lg p-3">
+          <div className="flex justify-between items-start">
+            <div>
+              <p className="font-medium">
+                {property.address?.streetAddress || property.address || 'Address'}
+              </p>
+              <p className="text-sm text-gray-500">
+                {property.address?.city}, {property.address?.postalCode}
+              </p>
+            </div>
+            <span className={`
+              text-xs px-2 py-1 rounded
+              ${property.standardStatus === 'Active' ? 'bg-green-100 text-green-700' : ''}
+              ${property.standardStatus === 'Closed' ? 'bg-gray-100 text-gray-700' : ''}
+              ${property.standardStatus?.includes('Contract') ? 'bg-orange-100 text-orange-700' : ''}
+            `}>
+              {property.standardStatus || property.status}
+            </span>
+          </div>
+          <div className="flex gap-4 mt-2 text-sm text-gray-600">
+            <span>${(property.listPrice || property.closePrice)?.toLocaleString()}</span>
+            <span>{property.beds || property.bedrooms} bd</span>
+            <span>{property.baths || property.bathrooms} ba</span>
+            <span>{property.sqft?.toLocaleString() || property.livingArea?.toLocaleString()} sqft</span>
+          </div>
+        </div>
+      ))}
+      {properties.length > 3 && (
+        <p className="text-sm text-gray-400 text-center">
+          +{properties.length - 3} more properties
+        </p>
+      )}
+    </div>
+  );
+}
+```
+
+---
+
+## FIX 7: Populate Property Photos with Real Photos
+
+### Current
+Shows: "Photo gallery (First 12 photos)"
+
+### Fix
+```jsx
+function PropertyPhotosPreview({ cmaData, config }) {
+  // Collect all photos from properties
+  const allPhotos = [];
+  cmaData.propertiesData?.forEach(property => {
+    const photos = property.photos || [];
+    photos.slice(0, 4).forEach(url => {
+      allPhotos.push({
+        url,
+        address: property.address?.streetAddress || property.address
+      });
+    });
+  });
+  
+  const photoLimit = config.photoLayout === 'first_dozen' ? 12 : 
+                     config.photoLayout === 'all' ? allPhotos.length : 12;
+  
+  const displayPhotos = allPhotos.slice(0, Math.min(photoLimit, 6)); // Show max 6 in preview
+  
+  if (displayPhotos.length === 0) {
+    return (
+      <p className="text-gray-400 italic">No photos available</p>
+    );
+  }
+  
+  return (
+    <div>
+      <div className="grid grid-cols-3 gap-2">
+        {displayPhotos.map((photo, index) => (
+          <div key={index} className="aspect-video bg-gray-100 rounded overflow-hidden">
+            <img 
+              src={photo.url} 
+              alt={`Property ${index + 1}`}
+              className="w-full h-full object-cover"
+              onError={(e) => {
+                e.currentTarget.src = '/placeholder-property.png';
+              }}
+            />
+          </div>
+        ))}
+      </div>
+      {allPhotos.length > 6 && (
+        <p className="text-sm text-gray-400 text-center mt-2">
+          +{allPhotos.length - 6} more photos in full report
+        </p>
+      )}
+    </div>
+  );
+}
+```
+
+---
+
+## FIX 8: Populate Price Per Sq Ft Chart
+
+### Current
+Shows: "Price per square foot chart"
+
+### Fix
+```jsx
+function PricePerSqFtPreview({ cmaData, statistics }) {
+  const properties = cmaData.propertiesData || [];
+  
+  if (properties.length === 0) {
+    return <p className="text-gray-400 italic">No data available</p>;
+  }
+  
+  // Prepare chart data
+  const chartData = properties
+    .filter(p => p.listPrice && p.livingArea)
+    .map(p => ({
+      address: p.address?.streetAddress?.split(' ').slice(0, 2).join(' ') || 'Property',
+      pricePerSqFt: Math.round((p.listPrice || p.closePrice) / p.livingArea),
+      isSubject: p.mlsNumber === cmaData.subjectPropertyId
+    }))
+    .sort((a, b) => a.pricePerSqFt - b.pricePerSqFt);
+  
+  const avgPricePerSqFt = statistics?.pricePerSqFt?.average || 
+    Math.round(chartData.reduce((sum, p) => sum + p.pricePerSqFt, 0) / chartData.length);
+  
+  return (
+    <div>
+      {/* Simple bar chart representation */}
+      <div className="space-y-2">
+        {chartData.slice(0, 7).map((item, index) => (
+          <div key={index} className="flex items-center gap-2">
+            <span className="text-xs w-24 truncate">{item.address}</span>
+            <div className="flex-1 bg-gray-100 rounded h-6 relative">
+              <div 
+                className={`h-full rounded ${item.isSubject ? 'bg-orange-500' : 'bg-gray-300'}`}
+                style={{ width: `${(item.pricePerSqFt / Math.max(...chartData.map(d => d.pricePerSqFt))) * 100}%` }}
+              />
+              <span className="absolute right-2 top-1 text-xs">
+                ${item.pricePerSqFt}
+              </span>
+            </div>
+          </div>
+        ))}
+      </div>
+      <div className="mt-3 text-sm text-gray-500 flex items-center gap-2">
+        <div className="w-3 h-3 bg-orange-500 rounded" /> Subject
+        <div className="w-3 h-3 bg-gray-300 rounded ml-4" /> Comparables
+        <span className="ml-auto">Avg: ${avgPricePerSqFt}/sqft</span>
+      </div>
+    </div>
+  );
+}
+```
+
+---
+
+## FIX 9: Ensure All Preview Components Receive Data
+
+### Main Preview Component
+```jsx
+function CMAPreview({ cmaData, config, statistics, agentProfile }) {
+  // Ensure we have all the data needed
+  useEffect(() => {
+    console.log('[PREVIEW] CMA Data:', cmaData);
+    console.log('[PREVIEW] Config:', config);
+    console.log('[PREVIEW] Statistics:', statistics);
+    console.log('[PREVIEW] Agent Profile:', agentProfile);
+  }, [cmaData, config, statistics, agentProfile]);
+  
+  return (
+    <div className="space-y-6">
+      {config.includedSections.includes('cover-page') && (
+        <CoverPagePreview config={config} cmaData={cmaData} agentProfile={agentProfile} />
+      )}
+      
+      {config.includedSections.includes('listing-brochure') && (
+        <ListingBrochurePreview brochure={cmaData.brochure} />
+      )}
+      
+      {config.includedSections.includes('cover-letter') && (
+        <CoverLetterPreview config={config} cmaData={cmaData} agentProfile={agentProfile} />
+      )}
+      
+      {/* ... continue for all sections, passing the correct data */}
+    </div>
+  );
+}
+```
+
+---
+
+## Data Flow Check
+
+Ensure these API calls are made and data is passed correctly:
+```typescript
+// In Presentation Builder page
+const { data: cmaData } = useQuery({
+  queryKey: ['cma', cmaId],
+  queryFn: () => fetch(`/api/cmas/${cmaId}`).then(r => r.json())
+});
+
+const { data: statistics } = useQuery({
+  queryKey: ['cma-statistics', cmaId],
+  queryFn: () => fetch(`/api/cmas/${cmaId}/statistics`).then(r => r.json())
+});
+
+const { data: reportConfig } = useQuery({
+  queryKey: ['cma-report-config', cmaId],
+  queryFn: () => fetch(`/api/cmas/${cmaId}/report-config`).then(r => r.json())
+});
+
+const { data: agentProfile } = useQuery({
+  queryKey: ['agent-profile'],
+  queryFn: () => fetch('/api/agent-profile').then(r => r.json())
+});
+
+// Pass all data to preview
+<CMAPreview 
+  cmaData={cmaData}
+  config={reportConfig}
+  statistics={statistics}
+  agentProfile={agentProfile}
+/>
+```
+
+---
+
+## Acceptance Criteria
+
+- [ ] Mapbox map renders (token working)
+- [ ] Listing Brochure image loads (or shows proper error)
+- [ ] Cover Letter shows actual content or helpful message
+- [ ] Agent Resume shows name, title, and bio from profile
+- [ ] Contact Me shows email/phone from profile
+- [ ] Property Details shows actual property cards
+- [ ] Property Photos shows actual photos from CMA
+- [ ] Price Per Sq Ft shows actual chart
+- [ ] All data comes from CMA + Profile (no hardcoded placeholders)
+
+---
+
+## Console Logging for Debug
+
+Add these logs to help debug:
+```typescript
+console.log('[PREVIEW] Rendering with:', {
+  cmaId: cmaData?.id,
+  propertyCount: cmaData?.propertiesData?.length,
+  hasBrochure: !!cmaData?.brochure,
+  hasStatistics: !!statistics,
+  agentName: agentProfile?.name,
+  sectionsEnabled: config?.includedSections?.length
+});
+```
