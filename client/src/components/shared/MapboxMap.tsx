@@ -215,55 +215,14 @@ export function MapboxMap({
     };
   }, [mapboxToken, effectiveStyle]);
 
-  useEffect(() => {
-    if (!map.current || !mapLoaded) return;
-    map.current.setStyle(MAP_STYLES[effectiveStyle]);
-  }, [effectiveStyle, mapLoaded]);
+  // Track current style to detect changes
+  const currentStyleRef = useRef<MapStyleKey>(effectiveStyle);
 
-  useEffect(() => {
-    if (!map.current || !mapLoaded) return;
-
-    markersRef.current.forEach(m => m.remove());
-    markersRef.current = [];
-
-    const validMarkers = markers.filter(m => m.latitude && m.longitude);
-
-    validMarkers.forEach((marker) => {
-      const el = createMarkerElement(marker);
-      
-      const popup = new mapboxgl.Popup({ 
-        offset: 25, 
-        closeButton: true,
-        maxWidth: '300px'
-      }).setHTML(createPopupHTML(marker));
-
-      const mapboxMarker = new mapboxgl.Marker(el)
-        .setLngLat([marker.longitude, marker.latitude])
-        .setPopup(popup)
-        .addTo(map.current!);
-
-      if (onMarkerClick) {
-        el.addEventListener('click', () => onMarkerClick(marker.id));
-      }
-
-      markersRef.current.push(mapboxMarker);
-    });
-
-    if (validMarkers.length > 1) {
-      const bounds = new mapboxgl.LngLatBounds();
-      validMarkers.forEach((marker) => {
-        bounds.extend([marker.longitude, marker.latitude]);
-      });
-      map.current.fitBounds(bounds, { padding: 50, maxZoom: 15 });
-    } else if (validMarkers.length === 1) {
-      map.current.setCenter([validMarkers[0].longitude, validMarkers[0].latitude]);
-      map.current.setZoom(14);
-    }
-  }, [markers, mapLoaded, onMarkerClick]);
-
-  useEffect(() => {
-    if (!map.current || !mapLoaded) return;
-
+  // Function to add polygon overlays to map
+  const addPolygonToMap = () => {
+    if (!map.current) return;
+    
+    // Remove existing polygon layers/source
     if (map.current.getLayer('polygon-layer')) {
       map.current.removeLayer('polygon-layer');
     }
@@ -307,6 +266,77 @@ export function MapboxMap({
         },
       });
     }
+  };
+
+  // Handle style changes (theme sync)
+  useEffect(() => {
+    if (!map.current || !mapLoaded) return;
+    if (currentStyleRef.current === effectiveStyle) return;
+    
+    console.log('[MapboxMap] Theme changed, updating style from', currentStyleRef.current, 'to', effectiveStyle);
+    currentStyleRef.current = effectiveStyle;
+    
+    // Set new style - Mapbox will handle the transition
+    map.current.setStyle(MAP_STYLES[effectiveStyle]);
+    
+    // Re-add polygons after style loads (markers are DOM elements and persist,
+    // but polygon sources/layers need to be re-added)
+    map.current.once('style.load', () => {
+      console.log('[MapboxMap] Style loaded, restoring polygon overlays');
+      addPolygonToMap();
+    });
+  }, [effectiveStyle, mapLoaded, polygon, showPolygon, polygonColor]);
+
+  // Function to add markers to map
+  const addMarkersToMap = () => {
+    if (!map.current) return;
+    
+    markersRef.current.forEach(m => m.remove());
+    markersRef.current = [];
+
+    const validMarkers = markers.filter(m => m.latitude && m.longitude);
+
+    validMarkers.forEach((marker) => {
+      const el = createMarkerElement(marker);
+      
+      const popup = new mapboxgl.Popup({ 
+        offset: 25, 
+        closeButton: true,
+        maxWidth: '300px'
+      }).setHTML(createPopupHTML(marker));
+
+      const mapboxMarker = new mapboxgl.Marker(el)
+        .setLngLat([marker.longitude, marker.latitude])
+        .setPopup(popup)
+        .addTo(map.current!);
+
+      if (onMarkerClick) {
+        el.addEventListener('click', () => onMarkerClick(marker.id));
+      }
+
+      markersRef.current.push(mapboxMarker);
+    });
+
+    if (validMarkers.length > 1) {
+      const bounds = new mapboxgl.LngLatBounds();
+      validMarkers.forEach((marker) => {
+        bounds.extend([marker.longitude, marker.latitude]);
+      });
+      map.current.fitBounds(bounds, { padding: 50, maxZoom: 15 });
+    } else if (validMarkers.length === 1) {
+      map.current.setCenter([validMarkers[0].longitude, validMarkers[0].latitude]);
+      map.current.setZoom(14);
+    }
+  };
+
+  useEffect(() => {
+    if (!map.current || !mapLoaded) return;
+    addMarkersToMap();
+  }, [markers, mapLoaded, onMarkerClick]);
+
+  useEffect(() => {
+    if (!map.current || !mapLoaded) return;
+    addPolygonToMap();
   }, [polygon, showPolygon, polygonColor, mapLoaded]);
 
   if (mapError) {

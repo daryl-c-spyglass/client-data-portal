@@ -3,6 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { MapboxMap, type MapMarker } from "@/components/shared/MapboxMap";
+import { useTheme } from "@/contexts/ThemeContext";
 import { Map as MapIcon, Home, TrendingUp, Clock, DollarSign, Building } from "lucide-react";
 
 interface NeighborhoodReviewProps {
@@ -65,6 +66,7 @@ function StatCard({ icon: Icon, label, value, subValue }: {
 }
 
 export function NeighborhoodReview({ neighborhoodName, city, months = 6 }: NeighborhoodReviewProps) {
+  const { theme } = useTheme();
   const { data, isLoading, error } = useQuery<NeighborhoodStats>({
     queryKey: ['/api/neighborhoods/review', neighborhoodName, city, months],
     queryFn: async () => {
@@ -213,6 +215,8 @@ export function NeighborhoodReview({ neighborhoodName, city, months = 6 }: Neigh
               polygon={boundary || undefined}
               showPolygon={!!boundary}
               polygonColor="#ea580c"
+              syncWithTheme={true}
+              currentTheme={theme}
             />
           </div>
         )}

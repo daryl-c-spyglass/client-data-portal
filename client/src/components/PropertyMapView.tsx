@@ -1,5 +1,6 @@
 import { useMemo, useState, useRef, useEffect } from "react";
 import { MapboxMap, type MapMarker } from "@/components/shared/MapboxMap";
+import { useTheme } from "@/contexts/ThemeContext";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -182,6 +183,7 @@ function PropertyPopup({ property, onPropertyClick }: { property: Property; onPr
 }
 
 export function PropertyMapView({ properties, onPropertyClick, isLoading }: PropertyMapViewProps) {
+  const { theme } = useTheme();
   const propertiesWithCoords = useMemo(() => 
     properties.filter(p => p.latitude != null && p.longitude != null),
     [properties]
@@ -277,6 +279,8 @@ export function PropertyMapView({ properties, onPropertyClick, isLoading }: Prop
           showLegend={true}
           interactive={true}
           onMarkerClick={handleMarkerClick}
+          syncWithTheme={true}
+          currentTheme={theme}
         />
       </Card>
 

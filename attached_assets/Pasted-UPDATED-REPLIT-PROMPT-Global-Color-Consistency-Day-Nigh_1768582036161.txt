@@ -1,0 +1,532 @@
+UPDATED REPLIT PROMPT: Global Color Consistency + Day/Night Mode
+SCOPE
+
+Create a centralized color system for property statuses used across the entire portal
+Fix marker color inconsistencies on all maps
+Add Streets/Satellite/Dark toggle to CMA Detail Page map
+Implement global Day/Night mode for entire Client Data Portal
+Sync all maps with global theme preference
+Ensure all UI elements remain visible and use consistent colors in both modes
+
+
+TASK 1: Create Centralized Status Color System
+Create: client/src/lib/statusColors.ts
+typescript/**
+ * SINGLE SOURCE OF TRUTH - Property Status Colors
+ * Use these colors consistently across the entire Client Data Portal:
+ * - Maps (markers, legends)
+ * - Property cards
+ * - Tables/lists
+ * - Badges/chips
+ * - Charts/graphs
+ * - PDF exports
+ */
+
+export const STATUS_COLORS = {
+  subject: {
+    name: 'Subject Property',
+    hex: '#3b82f6',        // Blue
+    bg: 'bg-blue-500',
+    bgLight: 'bg-blue-100',
+    text: 'text-blue-500',
+    textDark: 'text-blue-400',
+    border: 'border-blue-500',
+    ring: 'ring-blue-500',
+  },
+  active: {
+    name: 'Active',
+    hex: '#22c55e',        // Green
+    bg: 'bg-green-500',
+    bgLight: 'bg-green-100',
+    text: 'text-green-500',
+    textDark: 'text-green-400',
+    border: 'border-green-500',
+    ring: 'ring-green-500',
+  },
+  underContract: {
+    name: 'Under Contract',
+    hex: '#f97316',        // Orange
+    bg: 'bg-orange-500',
+    bgLight: 'bg-orange-100',
+    text: 'text-orange-500',
+    textDark: 'text-orange-400',
+    border: 'border-orange-500',
+    ring: 'ring-orange-500',
+  },
+  closed: {
+    name: 'Closed',
+    hex: '#ef4444',        // Red
+    bg: 'bg-red-500',
+    bgLight: 'bg-red-100',
+    text: 'text-red-500',
+    textDark: 'text-red-400',
+    border: 'border-red-500',
+    ring: 'ring-red-500',
+  },
+  pending: {
+    name: 'Pending',
+    hex: '#6b7280',        // Gray
+    bg: 'bg-gray-500',
+    bgLight: 'bg-gray-100',
+    text: 'text-gray-500',
+    textDark: 'text-gray-400',
+    border: 'border-gray-500',
+    ring: 'ring-gray-500',
+  },
+} as const;
+
+export type StatusKey = keyof typeof STATUS_COLORS;
+
+/**
+ * Get status info from MLS status string
+ */
+export function getStatusFromMLS(mlsStatus: string, isSubject: boolean = false): StatusKey {
+  if (isSubject) return 'subject';
+  
+  const normalized = mlsStatus?.toLowerCase().trim();
+  
+  switch (normalized) {
+    case 'active':
+      return 'active';
+    case 'active under contract':
+    case 'under contract':
+      return 'underContract';
+    case 'closed':
+    case 'sold':
+      return 'closed';
+    case 'pending':
+      return 'pending';
+    default:
+      return 'active'; // Default fallback
+  }
+}
+
+/**
+ * Get hex color for map markers
+ */
+export function getStatusHex(status: StatusKey): string {
+  return STATUS_COLORS[status].hex;
+}
+
+/**
+ * Get hex color from MLS status string (convenience function)
+ */
+export function getStatusHexFromMLS(mlsStatus: string, isSubject: boolean = false): string {
+  const status = getStatusFromMLS(mlsStatus, isSubject);
+  return STATUS_COLORS[status].hex;
+}
+
+/**
+ * Get Tailwind classes for status badge
+ */
+export function getStatusBadgeClasses(status: StatusKey): string {
+  const colors = STATUS_COLORS[status];
+  return `${colors.bgLight} ${colors.text} dark:bg-opacity-20 dark:${colors.textDark}`;
+}
+
+/**
+ * Get all statuses for legends/filters
+ */
+export function getAllStatuses(): Array<{ key: StatusKey; name: string; hex: string }> {
+  return Object.entries(STATUS_COLORS).map(([key, value]) => ({
+    key: key as StatusKey,
+    name: value.name,
+    hex: value.hex,
+  }));
+}
+
+/**
+ * Get statuses for map legend (excludes subject in some contexts)
+ */
+export function getMapLegendStatuses(includeSubject: boolean = true): Array<{ key: StatusKey; name: string; hex: string }> {
+  const all = getAllStatuses();
+  return includeSubject ? all : all.filter(s => s.key !== 'subject');
+}
+
+TASK 2: Create Reusable Status Badge Component
+Create: client/src/components/ui/StatusBadge.tsx
+typescriptimport { STATUS_COLORS, StatusKey, getStatusFromMLS } from '@/lib/statusColors';
+
+interface StatusBadgeProps {
+  status: StatusKey | string;  // Can pass StatusKey or MLS status string
+  isSubject?: boolean;
+  size?: 'sm' | 'md' | 'lg';
+  showDot?: boolean;
+  className?: string;
+}
+
+export function StatusBadge({ 
+  status, 
+  isSubject = false, 
+  size = 'md',
+  showDot = true,
+  className = '' 
+}: StatusBadgeProps) {
+  // Convert MLS status string to StatusKey if needed
+  const statusKey: StatusKey = typeof status === 'string' && !(status in STATUS_COLORS)
+    ? getStatusFromMLS(status, isSubject)
+    : (isSubject ? 'subject' : status as StatusKey);
+  
+  const colors = STATUS_COLORS[statusKey];
+  
+  const sizeClasses = {
+    sm: 'text-xs px-1.5 py-0.5',
+    md: 'text-sm px-2 py-1',
+    lg: 'text-base px-3 py-1.5',
+  };
+  
+  const dotSizes = {
+    sm: 'w-1.5 h-1.5',
+    md: 'w-2 h-2',
+    lg: 'w-2.5 h-2.5',
+  };
+  
+  return (
+    <span 
+      className={`
+        inline-flex items-center gap-1.5 rounded-full font-medium
+        ${colors.bgLight} ${colors.text}
+        dark:bg-opacity-20 dark:${colors.textDark}
+        ${sizeClasses[size]}
+        ${className}
+      `}
+    >
+      {showDot && (
+        <span 
+          className={`rounded-full ${colors.bg} ${dotSizes[size]}`}
+        />
+      )}
+      {colors.name}
+    </span>
+  );
+}
+
+TASK 3: Create Reusable Map Legend Component
+Create: client/src/components/maps/MapLegend.tsx
+typescriptimport { STATUS_COLORS, StatusKey } from '@/lib/statusColors';
+
+interface MapLegendProps {
+  statuses?: StatusKey[];  // Which statuses to show (default: all)
+  orientation?: 'vertical' | 'horizontal';
+  className?: string;
+}
+
+const DEFAULT_STATUSES: StatusKey[] = ['subject', 'active', 'underContract', 'closed', 'pending'];
+
+export function MapLegend({ 
+  statuses = DEFAULT_STATUSES,
+  orientation = 'vertical',
+  className = ''
+}: MapLegendProps) {
+  return (
+    <div 
+      className={`
+        bg-white dark:bg-gray-800 rounded-lg shadow-md p-3 text-sm
+        ${orientation === 'horizontal' ? 'flex flex-wrap gap-4' : 'space-y-2'}
+        ${className}
+      `}
+    >
+      {orientation === 'vertical' && (
+        <div className="font-medium text-gray-700 dark:text-gray-300 mb-2">Legend</div>
+      )}
+      
+      {statuses.map((statusKey) => {
+        const status = STATUS_COLORS[statusKey];
+        return (
+          <div key={statusKey} className="flex items-center gap-2">
+            <span 
+              className="w-3 h-3 rounded-full"
+              style={{ backgroundColor: status.hex }}
+            />
+            <span className="text-gray-600 dark:text-gray-400">
+              {status.name}
+            </span>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+TASK 4: Update All Map Components
+Update: All map components to use centralized colors
+typescriptimport { getStatusHexFromMLS, STATUS_COLORS } from '@/lib/statusColors';
+import { MapLegend } from '@/components/maps/MapLegend';
+
+// When creating markers:
+markers.forEach((property) => {
+  const color = getStatusHexFromMLS(
+    property.mlsStatus, 
+    property.id === subjectPropertyId
+  );
+  
+  // Create marker with this color
+  createMarker({
+    position: [property.longitude, property.latitude],
+    color: color,
+    label: formatPrice(property.price),
+  });
+});
+
+// In the map component render:
+<div className="relative">
+  <Map ... />
+  
+  {/* Use the reusable legend component */}
+  <div className="absolute bottom-4 left-4">
+    <MapLegend statuses={['subject', 'active', 'underContract', 'closed', 'pending']} />
+  </div>
+</div>
+
+TASK 5: Update Property Cards/Lists
+Search and update all property card components:
+typescriptimport { StatusBadge } from '@/components/ui/StatusBadge';
+import { getStatusFromMLS, STATUS_COLORS } from '@/lib/statusColors';
+
+function PropertyCard({ property, isSubject }) {
+  const statusKey = getStatusFromMLS(property.mlsStatus, isSubject);
+  const borderColor = STATUS_COLORS[statusKey].hex;
+  
+  return (
+    <div 
+      className="rounded-lg border-l-4 bg-white dark:bg-gray-800 p-4"
+      style={{ borderLeftColor: borderColor }}
+    >
+      <div className="flex justify-between items-start">
+        <div>
+          <h3 className="font-semibold text-gray-900 dark:text-gray-100">
+            {property.address}
+          </h3>
+          <p className="text-gray-600 dark:text-gray-400">
+            {formatPrice(property.price)}
+          </p>
+        </div>
+        
+        {/* Use the reusable badge component */}
+        <StatusBadge status={property.mlsStatus} isSubject={isSubject} size="sm" />
+      </div>
+    </div>
+  );
+}
+
+TASK 6: Update Tables
+Update property tables to use consistent status colors:
+typescriptimport { StatusBadge } from '@/components/ui/StatusBadge';
+
+function PropertyTable({ properties, subjectId }) {
+  return (
+    <table className="w-full">
+      <thead>
+        <tr className="text-left text-gray-600 dark:text-gray-400">
+          <th>Address</th>
+          <th>Price</th>
+          <th>Status</th>
+          {/* ... */}
+        </tr>
+      </thead>
+      <tbody>
+        {properties.map((property) => (
+          <tr 
+            key={property.id}
+            className="border-b border-gray-200 dark:border-gray-700"
+          >
+            <td className="py-3 text-gray-900 dark:text-gray-100">
+              {property.address}
+            </td>
+            <td className="py-3 text-gray-900 dark:text-gray-100">
+              {formatPrice(property.price)}
+            </td>
+            <td className="py-3">
+              <StatusBadge 
+                status={property.mlsStatus} 
+                isSubject={property.id === subjectId}
+                size="sm"
+              />
+            </td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  );
+}
+
+TASK 7: Update Charts/Graphs
+If using Recharts or other charting libraries:
+typescriptimport { STATUS_COLORS } from '@/lib/statusColors';
+
+// For pie charts, bar charts, etc.
+const chartColors = [
+  STATUS_COLORS.active.hex,
+  STATUS_COLORS.underContract.hex,
+  STATUS_COLORS.pending.hex,
+  STATUS_COLORS.closed.hex,
+];
+
+// Example with Recharts
+<PieChart>
+  <Pie data={statusBreakdown} dataKey="count">
+    {statusBreakdown.map((entry, index) => (
+      <Cell 
+        key={entry.status} 
+        fill={STATUS_COLORS[entry.status]?.hex || '#gray'} 
+      />
+    ))}
+  </Pie>
+  <Legend />
+</PieChart>
+
+TASK 8: Update PDF Export
+File: client/src/components/CMAPdfDocument.tsx
+typescriptimport { STATUS_COLORS, getStatusFromMLS } from '@/lib/statusColors';
+
+// When rendering property details in PDF:
+const statusKey = getStatusFromMLS(property.mlsStatus, isSubject);
+const statusColor = STATUS_COLORS[statusKey].hex;
+
+<View style={styles.statusBadge}>
+  <View style={[styles.statusDot, { backgroundColor: statusColor }]} />
+  <Text style={styles.statusText}>{STATUS_COLORS[statusKey].name}</Text>
+</View>
+
+TASK 9: Add Map Style Toggle to CMA Detail Page
+File: Find CMA Detail Page map component
+Add Streets/Satellite/Dark toggle (same as Presentation Builder):
+typescriptimport { useTheme } from '@/contexts/ThemeContext';
+
+const MAP_STYLES = {
+  streets: 'mapbox://styles/mapbox/streets-v12',
+  satellite: 'mapbox://styles/mapbox/satellite-streets-v12',
+  dark: 'mapbox://styles/mapbox/dark-v11',
+};
+
+function CMAMap({ properties, subjectProperty }) {
+  const { theme } = useTheme();
+  const [mapStyle, setMapStyle] = useState<'streets' | 'satellite' | 'dark'>(
+    theme === 'dark' ? 'dark' : 'streets'
+  );
+  
+  // Sync with global theme when it changes
+  useEffect(() => {
+    if (theme === 'dark' && mapStyle === 'streets') {
+      setMapStyle('dark');
+    } else if (theme === 'light' && mapStyle === 'dark') {
+      setMapStyle('streets');
+    }
+  }, [theme]);
+  
+  return (
+    <div className="relative">
+      {/* Style Toggle */}
+      <div className="absolute top-3 left-3 z-10 flex rounded-lg overflow-hidden shadow-md">
+        {(['streets', 'satellite', 'dark'] as const).map((style) => (
+          <button
+            key={style}
+            onClick={() => setMapStyle(style)}
+            className={`px-3 py-1.5 text-sm font-medium capitalize transition-colors ${
+              mapStyle === style
+                ? 'bg-orange-500 text-white'
+                : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
+            }`}
+          >
+            {style}
+          </button>
+        ))}
+      </div>
+      
+      {/* Show All toggle */}
+      <div className="absolute top-3 right-3 z-10">
+        <label className="flex items-center gap-2 bg-white dark:bg-gray-800 rounded-lg shadow-md px-3 py-1.5">
+          <input type="checkbox" checked={showAll} onChange={...} />
+          <span className="text-sm text-gray-700 dark:text-gray-300">Show All</span>
+        </label>
+      </div>
+      
+      <MapboxMap 
+        style={MAP_STYLES[mapStyle]}
+        markers={...}
+      />
+      
+      <MapLegend 
+        statuses={['subject', 'active', 'underContract', 'closed', 'pending']}
+        className="absolute bottom-4 left-4"
+      />
+    </div>
+  );
+}
+
+TASK 10: Global Day/Night Mode
+(Same as previous prompt - ThemeContext, ThemeProvider, toggle button)
+See previous prompt for Tasks 3.1, 3.2, 3.3, 4, 5.
+
+TASK 11: Search & Replace Old Color References
+Search the entire codebase for hardcoded status colors and replace with centralized system:
+bash# Search for hardcoded color references
+grep -r "#22c55e" client/src  # Old green
+grep -r "#ef4444" client/src  # Red  
+grep -r "#f97316" client/src  # Orange
+grep -r "#3b82f6" client/src  # Blue
+grep -r "#6b7280" client/src  # Gray
+grep -r "bg-green-" client/src
+grep -r "bg-red-" client/src
+grep -r "bg-orange-" client/src
+grep -r "bg-blue-" client/src
+grep -r "text-green-" client/src
+# etc.
+```
+
+Replace all status-related color references with imports from `statusColors.ts`.
+
+---
+
+### ACCEPTANCE CRITERIA
+
+**Color Consistency:**
+- [ ] All maps use identical status colors
+- [ ] Subject Property = Blue (#3b82f6) everywhere
+- [ ] Active = Green (#22c55e) everywhere
+- [ ] Under Contract = Orange (#f97316) everywhere
+- [ ] Closed = Red (#ef4444) everywhere
+- [ ] Pending = Gray (#6b7280) everywhere
+- [ ] Property cards use consistent border/badge colors
+- [ ] Tables use consistent badge colors
+- [ ] Charts use consistent colors
+- [ ] PDF export uses consistent colors
+- [ ] Legends match across all maps
+
+**Map Features:**
+- [ ] CMA Detail Page has Streets/Satellite/Dark toggle
+- [ ] Presentation Builder has Streets/Satellite/Dark toggle
+- [ ] Map style syncs with global Day/Night mode
+- [ ] User can override map style manually
+
+**Day/Night Mode:**
+- [ ] Toggle visible in header/sidebar
+- [ ] All UI components styled for dark mode
+- [ ] Text readable in both modes
+- [ ] Status colors visible in both modes
+- [ ] Maps sync with theme
+- [ ] Preference saved to localStorage
+
+---
+
+### FILES IMPACTED
+```
+client/src/
+├── lib/
+│   └── statusColors.ts                     [NEW - Single source of truth]
+├── contexts/
+│   └── ThemeContext.tsx                    [NEW]
+├── components/
+│   ├── ui/
+│   │   └── StatusBadge.tsx                 [NEW]
+│   ├── maps/
+│   │   ├── MapboxMap.tsx                   [MODIFY - use statusColors]
+│   │   └── MapLegend.tsx                   [NEW]
+│   ├── AppSidebar.tsx                      [MODIFY - theme toggle, dark mode]
+│   └── ... (all components)                [MODIFY - dark mode classes]
+├── pages/
+│   ├── CMADetailPage.tsx                   [MODIFY - map toggle, statusColors]
+│   ├── CMAPresentationBuilder.tsx          [MODIFY - statusColors]
+│   └── ... (all pages)                     [MODIFY - dark mode, statusColors]
+└── components/
+    └── CMAPdfDocument.tsx                  [MODIFY - statusColors]

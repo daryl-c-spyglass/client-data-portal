@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { MapboxMap, type MapMarker } from "@/components/shared/MapboxMap";
+import { useTheme } from "@/contexts/ThemeContext";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -62,6 +63,7 @@ export function PropertyDetail({
   onScheduleViewing,
   debugData
 }: PropertyDetailProps) {
+  const { theme } = useTheme();
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [saved, setSaved] = useState(false);
   const [linkCopied, setLinkCopied] = useState(false);
@@ -386,6 +388,8 @@ export function PropertyDetail({
                   height="100%"
                   showLegend={false}
                   interactive={true}
+                  syncWithTheme={true}
+                  currentTheme={theme}
                 />
               </div>
             ) : (

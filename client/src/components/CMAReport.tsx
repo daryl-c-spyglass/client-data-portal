@@ -8,6 +8,7 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip,
 import { Save, Edit, FileText, Printer, Info, Home, Mail, ChevronLeft, ChevronRight, Bed, Bath, Maximize, MapPin, Calendar, Map as MapIcon, ExternalLink, DollarSign, TrendingUp, Target, Zap, Clock, BarChart3, Menu, LayoutGrid, MoreHorizontal } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
 import { MapboxMap, type MapMarker } from "@/components/shared/MapboxMap";
+import { useTheme } from "@/contexts/ThemeContext";
 
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
@@ -80,6 +81,7 @@ export function CMAReport({
   onAddNotes,
   onPrint
 }: CMAReportProps) {
+  const { theme } = useTheme();
   const [activeTab, setActiveTab] = useState("compare");
   const [activeListingTab, setActiveListingTab] = useState("all");
   
@@ -1106,6 +1108,8 @@ export function CMAReport({
                   markers={mapMarkers}
                   height="600px"
                   showLegend={true}
+                  syncWithTheme={true}
+                  currentTheme={theme}
                   onMarkerClick={(id) => {
                     const property = properties.find(p => p.id === id);
                     if (property) handlePropertyClick(property);
@@ -2807,6 +2811,8 @@ export function CMAReport({
                           key={activeListingTab}
                           markers={mapMarkers}
                           height="400px"
+                          syncWithTheme={true}
+                          currentTheme={theme}
                         />
                       </div>
                     );
@@ -3564,6 +3570,8 @@ export function CMAReport({
                         <MapboxMap
                           markers={mapMarkers}
                           height="300px"
+                          syncWithTheme={true}
+                          currentTheme={theme}
                         />
                       </div>
                     );
