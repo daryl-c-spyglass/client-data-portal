@@ -43,6 +43,7 @@ waitForPort = 5000
 [userenv.shared]
 HOMEREVIEW_API_URL = "https://95f0a894-8940-4717-a771-851029450d05-00-3octfev6njpgb.spock.replit.dev"
 ALLOWED_EMAIL_DOMAIN = "spyglassrealty.com"
+VITE_MAPBOX_TOKEN = "pk.eyJ1Ijoic3B5Z2xhc3NyZWFsdHkiLCJhIjoiY21pdXJlaHhsMTQ4MDNkcTBtMGZ5bTY0NSJ9.QEnVIWTRdMegSNk5FNdUJA"
 
 [agent]
 integrations = ["javascript_openai:1.0.0", "javascript_object_storage:2.0.0"]

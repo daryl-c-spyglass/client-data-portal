@@ -71,8 +71,16 @@ export function MapboxCMAMap({
   useEffect(() => {
     if (!mapContainer.current || map.current) return;
 
-    const token = import.meta.env.VITE_MAPBOX_TOKEN;
-    if (!token) {
+    // Check for token - try VITE_ prefixed first, then fall back to non-prefixed
+    const token = import.meta.env.VITE_MAPBOX_TOKEN || import.meta.env.MAPBOX_ACCESS_TOKEN;
+    
+    console.log('[MAPBOX] Token check:', {
+      hasViteToken: !!import.meta.env.VITE_MAPBOX_TOKEN,
+      hasAccessToken: !!import.meta.env.MAPBOX_ACCESS_TOKEN,
+      tokenPrefix: token?.substring(0, 10)
+    });
+    
+    if (!token || token === 'undefined' || !token.startsWith('pk.')) {
       setMapError('Mapbox token not configured');
       return;
     }
@@ -350,8 +358,8 @@ export function generateMapboxStaticMapUrl(
   width: number = 800,
   height: number = 400
 ): string | null {
-  const token = import.meta.env.VITE_MAPBOX_TOKEN;
-  if (!token) return null;
+  const token = import.meta.env.VITE_MAPBOX_TOKEN || import.meta.env.MAPBOX_ACCESS_TOKEN;
+  if (!token || token === 'undefined' || !token.startsWith('pk.')) return null;
 
   const styleId = {
     streets: 'streets-v11',
