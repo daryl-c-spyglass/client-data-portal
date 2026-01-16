@@ -1,0 +1,766 @@
+Excellent idea! The Presentation Preview looks polished, but the PDF export is quite basic. Let's upgrade the PDF to match the preview quality using the Spyglass logos you provided.
+
+🔧 REPLIT PROMPT: Upgrade CMA PDF Export to Match Presentation Preview
+SCOPE
+Redesign the CMA PDF export to match the visual quality and layout of the Presentation Preview. Incorporate proper Spyglass Realty branding with the provided logos.
+
+CURRENT STATE vs TARGET
+AspectCurrent PDFTarget (Match Preview)Cover PagePlain text onlyBranded with logo, styled titleLogoNone/text onlyProper Spyglass logoSection HeadersBasic textOrange accent bar + iconProperty PhotosNot includedGrid layout (3x3)MapNot includedStatic map image with markersAdjustments TableBasic tableColor-coded (green/red)ChartsBasic barsStyled orange barsSummary CardsPlain textCard layout with metricsAgent InfoPlain textPhoto + styled contact cardFooterBasicBranded footer on each page
+
+LOGO ASSETS
+Store these logos for PDF use:
+/public/logos/
+├── spyglass-logo-black.png    [For light backgrounds - main pages]
+├── spyglass-logo-white.png    [For dark backgrounds - cover page]
+├── spyglass-logo-icon.png     [Icon only - for compact spaces]
+Logo URLs to store/reference:
+
+Black logo (light bg): SpyglassRealty_Logo_Black__1_.png
+White logo (dark bg): SpyglassRealty_Logo_White__1_.png
+All-white version: SpyglassRealty_Logo_Al_White__1_.png
+
+
+PHASE 1: PDF STRUCTURE & STYLING
+Task 1.1: Create PDF style constants
+typescript// client/src/lib/pdfStyles.ts (NEW FILE)
+
+export const PDF_COLORS = {
+  primary: '#EA580C',        // Spyglass orange
+  primaryDark: '#C2410C',    // Darker orange
+  text: '#1F2937',           // Dark gray
+  textLight: '#6B7280',      // Medium gray
+  textMuted: '#9CA3AF',      // Light gray
+  background: '#FFFFFF',
+  backgroundAlt: '#F9FAFB',  // Light gray bg
+  success: '#22C55E',        // Green (positive adjustments)
+  danger: '#EF4444',         // Red (negative adjustments)
+  border: '#E5E7EB',
+  
+  // Status colors (match preview)
+  statusActive: '#22C55E',
+  statusUnderContract: '#F97316',
+  statusClosed: '#EF4444',
+  statusSubject: '#3B82F6',
+};
+
+export const PDF_FONTS = {
+  heading: 'Helvetica-Bold',
+  body: 'Helvetica',
+  mono: 'Courier',
+};
+
+export const PDF_SPACING = {
+  page: 40,           // Page margins
+  section: 24,        // Between sections
+  element: 12,        // Between elements
+  small: 8,
+};
+Task 1.2: Create reusable PDF components
+typescript// client/src/components/pdf/PDFComponents.tsx
+
+import { View, Text, Image, StyleSheet } from '@react-pdf/renderer';
+import { PDF_COLORS } from '@/lib/pdfStyles';
+
+// Section Header with orange accent bar
+export const SectionHeader = ({ icon, title }: { icon?: string; title: string }) => (
+  <View style={styles.sectionHeader}>
+    <View style={styles.accentBar} />
+    <Text style={styles.sectionTitle}>{title}</Text>
+  </View>
+);
+
+// Metric Card (for summary stats)
+export const MetricCard = ({ label, value, sublabel }: { label: string; value: string; sublabel?: string }) => (
+  <View style={styles.metricCard}>
+    <Text style={styles.metricValue}>{value}</Text>
+    <Text style={styles.metricLabel}>{label}</Text>
+    {sublabel && <Text style={styles.metricSublabel}>{sublabel}</Text>}
+  </View>
+);
+
+// Status Badge
+export const StatusBadge = ({ status }: { status: string }) => {
+  const color = status === 'Active' ? PDF_COLORS.statusActive
+    : status === 'Active Under Contract' ? PDF_COLORS.statusUnderContract
+    : status === 'Closed' ? PDF_COLORS.statusClosed
+    : PDF_COLORS.textMuted;
+    
+  return (
+    <View style={[styles.statusBadge, { backgroundColor: color }]}>
+      <Text style={styles.statusText}>{status}</Text>
+    </View>
+  );
+};
+
+// Adjustment Value (color-coded)
+export const AdjustmentValue = ({ value }: { value: number }) => {
+  const color = value > 0 ? PDF_COLORS.success : value < 0 ? PDF_COLORS.danger : PDF_COLORS.text;
+  const prefix = value > 0 ? '+' : '';
+  return (
+    <Text style={[styles.adjustmentValue, { color }]}>
+      {prefix}${Math.abs(value).toLocaleString()}
+    </Text>
+  );
+};
+
+const styles = StyleSheet.create({
+  sectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 16,
+    marginTop: 24,
+  },
+  accentBar: {
+    width: 4,
+    height: 24,
+    backgroundColor: PDF_COLORS.primary,
+    marginRight: 12,
+    borderRadius: 2,
+  },
+  sectionTitle: {
+    fontSize: 16,
+    fontFamily: 'Helvetica-Bold',
+    color: PDF_COLORS.text,
+  },
+  metricCard: {
+    backgroundColor: PDF_COLORS.backgroundAlt,
+    padding: 16,
+    borderRadius: 8,
+    alignItems: 'center',
+    flex: 1,
+    marginHorizontal: 4,
+  },
+  metricValue: {
+    fontSize: 20,
+    fontFamily: 'Helvetica-Bold',
+    color: PDF_COLORS.text,
+  },
+  metricLabel: {
+    fontSize: 10,
+    color: PDF_COLORS.textLight,
+    marginTop: 4,
+  },
+  metricSublabel: {
+    fontSize: 8,
+    color: PDF_COLORS.textMuted,
+    marginTop: 2,
+  },
+  statusBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 4,
+  },
+  statusText: {
+    fontSize: 8,
+    color: '#FFFFFF',
+    fontFamily: 'Helvetica-Bold',
+  },
+  adjustmentValue: {
+    fontSize: 10,
+    fontFamily: 'Helvetica-Bold',
+  },
+});
+
+PHASE 2: REDESIGN COVER PAGE
+Task 2.1: Create branded cover page
+typescript// Cover Page matching Preview style
+
+const CoverPage = ({ cma, agent, logoUrl }) => (
+  <Page size="LETTER" style={coverStyles.page}>
+    {/* Logo */}
+    <View style={coverStyles.logoContainer}>
+      <Image src={logoUrl || '/logos/spyglass-logo-black.png'} style={coverStyles.logo} />
+    </View>
+    
+    {/* Title */}
+    <View style={coverStyles.titleContainer}>
+      <Text style={coverStyles.companyName}>Spyglass Realty</Text>
+      <Text style={coverStyles.title}>Comparative Market Analysis</Text>
+      <Text style={coverStyles.subtitle}>Prepared exclusively for you</Text>
+    </View>
+    
+    {/* Property Info */}
+    <View style={coverStyles.propertyContainer}>
+      <Text style={coverStyles.propertyName}>
+        {cma.subjectProperty?.subdivision || cma.subjectProperty?.neighborhood || 'Property Address'}
+      </Text>
+      <Text style={coverStyles.propertyAddress}>
+        {cma.subjectProperty?.address}, {cma.subjectProperty?.city}, {cma.subjectProperty?.state} {cma.subjectProperty?.zipCode}
+      </Text>
+    </View>
+    
+    {/* Date */}
+    <Text style={coverStyles.date}>
+      {new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}
+    </Text>
+    
+    {/* Agent Info */}
+    <View style={coverStyles.agentContainer}>
+      {agent?.photoUrl && <Image src={agent.photoUrl} style={coverStyles.agentPhoto} />}
+      <Text style={coverStyles.agentName}>{agent?.name || 'Your Agent'}</Text>
+      <Text style={coverStyles.agentTitle}>{agent?.title || 'Real Estate Professional'}</Text>
+    </View>
+  </Page>
+);
+
+const coverStyles = StyleSheet.create({
+  page: {
+    padding: 60,
+    backgroundColor: '#FFFFFF',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  logoContainer: {
+    marginBottom: 40,
+  },
+  logo: {
+    width: 180,
+    height: 'auto',
+  },
+  titleContainer: {
+    alignItems: 'center',
+    marginBottom: 40,
+  },
+  companyName: {
+    fontSize: 14,
+    color: PDF_COLORS.primary,
+    fontFamily: 'Helvetica-Bold',
+    marginBottom: 8,
+    textTransform: 'uppercase',
+    letterSpacing: 2,
+  },
+  title: {
+    fontSize: 28,
+    fontFamily: 'Helvetica-Bold',
+    color: PDF_COLORS.text,
+    marginBottom: 8,
+  },
+  subtitle: {
+    fontSize: 12,
+    color: PDF_COLORS.textLight,
+  },
+  propertyContainer: {
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  propertyName: {
+    fontSize: 18,
+    fontFamily: 'Helvetica-Bold',
+    color: PDF_COLORS.text,
+    marginBottom: 4,
+  },
+  propertyAddress: {
+    fontSize: 12,
+    color: PDF_COLORS.textLight,
+  },
+  date: {
+    fontSize: 11,
+    color: PDF_COLORS.textMuted,
+    marginBottom: 40,
+  },
+  agentContainer: {
+    alignItems: 'center',
+  },
+  agentPhoto: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    marginBottom: 8,
+  },
+  agentName: {
+    fontSize: 14,
+    fontFamily: 'Helvetica-Bold',
+    color: PDF_COLORS.text,
+  },
+  agentTitle: {
+    fontSize: 10,
+    color: PDF_COLORS.textLight,
+  },
+});
+
+PHASE 3: SUMMARY PAGE WITH METRIC CARDS
+Task 3.1: Create summary page matching preview
+typescriptconst SummaryPage = ({ comparables, marketStats }) => (
+  <Page size="LETTER" style={pageStyles.page}>
+    <PageHeader title="Summary of Comparable Properties" />
+    
+    {/* Metric Cards Row */}
+    <View style={summaryStyles.metricsRow}>
+      <MetricCard
+        label="Avg Price"
+        value={`$${(marketStats.averagePrice / 1000).toFixed(0)}K`}
+        sublabel={`Median: $${(marketStats.medianPrice / 1000).toFixed(0)}K`}
+      />
+      <MetricCard
+        label="Avg $/SqFt"
+        value={`$${marketStats.averagePricePerSqft.toFixed(0)}`}
+        sublabel={`Median: $${marketStats.medianPricePerSqft.toFixed(0)}`}
+      />
+      <MetricCard
+        label="Properties"
+        value={comparables.length.toString()}
+        sublabel="Analyzed"
+      />
+    </View>
+    
+    {/* Price Range */}
+    <View style={summaryStyles.priceRange}>
+      <Text style={summaryStyles.priceRangeText}>
+        Price range: ${(marketStats.minPrice / 1000).toFixed(0)}K - ${(marketStats.maxPrice / 1000).toFixed(0)}K
+      </Text>
+    </View>
+    
+    <PageFooter agent={agent} />
+  </Page>
+);
+
+PHASE 4: PROPERTY DETAILS TABLE
+Task 4.1: Create styled property table
+typescriptconst PropertyDetailsPage = ({ comparables }) => (
+  <Page size="LETTER" style={pageStyles.page}>
+    <PageHeader title="Property Details" />
+    
+    {/* Table Header */}
+    <View style={tableStyles.headerRow}>
+      <Text style={[tableStyles.headerCell, { flex: 2 }]}>Address</Text>
+      <Text style={tableStyles.headerCell}>Price</Text>
+      <Text style={tableStyles.headerCell}>SqFt</Text>
+      <Text style={tableStyles.headerCell}>$/SqFt</Text>
+      <Text style={tableStyles.headerCell}>Bed/Bath</Text>
+      <Text style={[tableStyles.headerCell, { flex: 1.2 }]}>Status</Text>
+    </View>
+    
+    {/* Table Rows */}
+    {comparables.map((comp, index) => (
+      <View key={index} style={[tableStyles.row, index % 2 === 0 && tableStyles.rowAlt]}>
+        <View style={[tableStyles.cell, { flex: 2 }]}>
+          <Text style={tableStyles.address}>{comp.address}</Text>
+          <Text style={tableStyles.city}>{comp.city}</Text>
+        </View>
+        <Text style={tableStyles.cell}>${(comp.price / 1000).toFixed(0)}K</Text>
+        <Text style={tableStyles.cell}>{comp.sqft?.toLocaleString()}</Text>
+        <Text style={tableStyles.cell}>${comp.pricePerSqft?.toFixed(0)}</Text>
+        <Text style={tableStyles.cell}>{comp.beds}/{comp.baths}</Text>
+        <View style={[tableStyles.cell, { flex: 1.2 }]}>
+          <StatusBadge status={comp.status} />
+        </View>
+      </View>
+    ))}
+    
+    <PageFooter agent={agent} />
+  </Page>
+);
+
+const tableStyles = StyleSheet.create({
+  headerRow: {
+    flexDirection: 'row',
+    backgroundColor: PDF_COLORS.backgroundAlt,
+    borderBottomWidth: 2,
+    borderBottomColor: PDF_COLORS.primary,
+    paddingVertical: 10,
+    paddingHorizontal: 8,
+  },
+  headerCell: {
+    flex: 1,
+    fontSize: 9,
+    fontFamily: 'Helvetica-Bold',
+    color: PDF_COLORS.text,
+    textTransform: 'uppercase',
+  },
+  row: {
+    flexDirection: 'row',
+    paddingVertical: 10,
+    paddingHorizontal: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: PDF_COLORS.border,
+  },
+  rowAlt: {
+    backgroundColor: PDF_COLORS.backgroundAlt,
+  },
+  cell: {
+    flex: 1,
+    fontSize: 10,
+    color: PDF_COLORS.text,
+  },
+  address: {
+    fontSize: 10,
+    fontFamily: 'Helvetica-Bold',
+    color: PDF_COLORS.text,
+  },
+  city: {
+    fontSize: 8,
+    color: PDF_COLORS.textMuted,
+  },
+});
+
+PHASE 5: ADJUSTMENTS TABLE WITH COLORS
+Task 5.1: Create color-coded adjustments table
+typescriptconst AdjustmentsPage = ({ adjustments, comparables }) => (
+  <Page size="LETTER" style={pageStyles.page}>
+    <PageHeader title="Property Value Adjustments" />
+    
+    {/* Table Header */}
+    <View style={adjustStyles.headerRow}>
+      <Text style={[adjustStyles.headerCell, { flex: 1.5 }]}>Property</Text>
+      <Text style={adjustStyles.headerCell}>Sale Price</Text>
+      <Text style={adjustStyles.headerCell}>Sq Ft</Text>
+      <Text style={adjustStyles.headerCell}>Beds</Text>
+      <Text style={adjustStyles.headerCell}>Total Adj</Text>
+      <Text style={[adjustStyles.headerCell, adjustStyles.highlightHeader]}>Adj. Price</Text>
+    </View>
+    
+    {/* Adjustment Rows */}
+    {adjustments.map((adj, index) => (
+      <View key={index} style={adjustStyles.row}>
+        <Text style={[adjustStyles.cell, { flex: 1.5 }]}>{adj.address}</Text>
+        <Text style={adjustStyles.cell}>${(adj.salePrice / 1000).toFixed(0)}k</Text>
+        <AdjustmentValue value={adj.sqftAdjustment} />
+        <AdjustmentValue value={adj.bedsAdjustment} />
+        <AdjustmentValue value={adj.totalAdjustment} />
+        <Text style={[adjustStyles.cell, adjustStyles.adjustedPrice]}>
+          ${(adj.adjustedPrice / 1000).toFixed(0)}k
+        </Text>
+      </View>
+    ))}
+    
+    <PageFooter agent={agent} />
+  </Page>
+);
+
+const adjustStyles = StyleSheet.create({
+  headerRow: {
+    flexDirection: 'row',
+    backgroundColor: '#F3F4F6',
+    paddingVertical: 10,
+    paddingHorizontal: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: PDF_COLORS.border,
+  },
+  headerCell: {
+    flex: 1,
+    fontSize: 9,
+    fontFamily: 'Helvetica-Bold',
+    color: PDF_COLORS.text,
+  },
+  highlightHeader: {
+    color: PDF_COLORS.primary,
+  },
+  row: {
+    flexDirection: 'row',
+    paddingVertical: 8,
+    paddingHorizontal: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: PDF_COLORS.border,
+  },
+  cell: {
+    flex: 1,
+    fontSize: 10,
+  },
+  adjustedPrice: {
+    fontFamily: 'Helvetica-Bold',
+    color: PDF_COLORS.text,
+  },
+});
+
+PHASE 6: PHOTO GRID PAGE
+Task 6.1: Create photo grid layout
+typescriptconst PropertyPhotosPage = ({ photos }) => (
+  <Page size="LETTER" style={pageStyles.page}>
+    <PageHeader title="Property Photos" />
+    
+    {/* Photo Grid - 3 columns */}
+    <View style={photoStyles.grid}>
+      {photos.slice(0, 9).map((photo, index) => (
+        <View key={index} style={photoStyles.photoContainer}>
+          <Image src={photo.url} style={photoStyles.photo} />
+        </View>
+      ))}
+    </View>
+    
+    {photos.length > 9 && (
+      <Text style={photoStyles.moreText}>
+        +{photos.length - 9} more photos in full report
+      </Text>
+    )}
+    
+    <PageFooter agent={agent} />
+  </Page>
+);
+
+const photoStyles = StyleSheet.create({
+  grid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'flex-start',
+    marginTop: 16,
+  },
+  photoContainer: {
+    width: '32%',
+    marginRight: '1.33%',
+    marginBottom: 8,
+    borderRadius: 4,
+    overflow: 'hidden',
+  },
+  photo: {
+    width: '100%',
+    height: 120,
+    objectFit: 'cover',
+  },
+  moreText: {
+    textAlign: 'center',
+    fontSize: 10,
+    color: PDF_COLORS.textMuted,
+    marginTop: 8,
+  },
+});
+
+PHASE 7: CHARTS WITH ORANGE STYLING
+Task 7.1: Create styled bar chart
+typescriptconst PricePerSqFtChart = ({ data }) => {
+  const maxValue = Math.max(...data.map(d => d.pricePerSqft));
+  
+  return (
+    <View style={chartStyles.container}>
+      {data.map((item, index) => (
+        <View key={index} style={chartStyles.barRow}>
+          <Text style={chartStyles.barLabel} numberOfLines={1}>
+            {item.address}
+          </Text>
+          <View style={chartStyles.barContainer}>
+            <View 
+              style={[
+                chartStyles.bar, 
+                { 
+                  width: `${(item.pricePerSqft / maxValue) * 100}%`,
+                  backgroundColor: item.isSubject ? PDF_COLORS.statusSubject : PDF_COLORS.primary,
+                }
+              ]} 
+            />
+          </View>
+          <Text style={chartStyles.barValue}>${item.pricePerSqft}</Text>
+        </View>
+      ))}
+      
+      {/* Average Line */}
+      <View style={chartStyles.averageLine}>
+        <Text style={chartStyles.averageText}>
+          Average: ${data.reduce((sum, d) => sum + d.pricePerSqft, 0) / data.length}/sqft
+        </Text>
+      </View>
+    </View>
+  );
+};
+
+const chartStyles = StyleSheet.create({
+  container: {
+    marginTop: 16,
+  },
+  barRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  barLabel: {
+    width: 120,
+    fontSize: 8,
+    color: PDF_COLORS.textLight,
+  },
+  barContainer: {
+    flex: 1,
+    height: 20,
+    backgroundColor: '#F3F4F6',
+    borderRadius: 4,
+    overflow: 'hidden',
+  },
+  bar: {
+    height: '100%',
+    borderRadius: 4,
+  },
+  barValue: {
+    width: 50,
+    fontSize: 9,
+    fontFamily: 'Helvetica-Bold',
+    color: PDF_COLORS.text,
+    textAlign: 'right',
+  },
+  averageLine: {
+    marginTop: 12,
+    paddingTop: 8,
+    borderTopWidth: 1,
+    borderTopColor: PDF_COLORS.border,
+  },
+  averageText: {
+    fontSize: 10,
+    color: PDF_COLORS.textMuted,
+    textAlign: 'center',
+  },
+});
+
+PHASE 8: PAGE HEADER & FOOTER
+Task 8.1: Create consistent header/footer
+typescriptconst PageHeader = ({ title, date }) => (
+  <View style={headerStyles.container}>
+    <Text style={headerStyles.title}>{title}</Text>
+    <Text style={headerStyles.date}>
+      {date || new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}
+    </Text>
+  </View>
+);
+
+const PageFooter = ({ agent, logoUrl }) => (
+  <View style={footerStyles.container} fixed>
+    <View style={footerStyles.left}>
+      <Image src={logoUrl || '/logos/spyglass-logo-black.png'} style={footerStyles.logo} />
+    </View>
+    <Text style={footerStyles.prepared}>
+      Prepared by {agent?.name || 'Spyglass Realty'}
+    </Text>
+  </View>
+);
+
+const headerStyles = StyleSheet.create({
+  container: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    borderBottomWidth: 1,
+    borderBottomColor: PDF_COLORS.border,
+    paddingBottom: 12,
+    marginBottom: 20,
+  },
+  title: {
+    fontSize: 18,
+    fontFamily: 'Helvetica-Bold',
+    color: PDF_COLORS.text,
+  },
+  date: {
+    fontSize: 10,
+    color: PDF_COLORS.textMuted,
+  },
+});
+
+const footerStyles = StyleSheet.create({
+  container: {
+    position: 'absolute',
+    bottom: 30,
+    left: 40,
+    right: 40,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    borderTopWidth: 1,
+    borderTopColor: PDF_COLORS.border,
+    paddingTop: 12,
+  },
+  logo: {
+    width: 80,
+    height: 'auto',
+  },
+  prepared: {
+    fontSize: 9,
+    color: PDF_COLORS.textMuted,
+  },
+});
+
+PHASE 9: STORE LOGO ASSETS
+Task 9.1: Upload logos to storage
+typescript// Store logos in public folder or Object Storage
+
+// Option A: Public folder
+// Copy logos to: /public/logos/
+//   - spyglass-logo-black.png
+//   - spyglass-logo-white.png
+
+// Option B: Environment variable with CDN URL
+// SPYGLASS_LOGO_BLACK_URL=https://...
+// SPYGLASS_LOGO_WHITE_URL=https://...
+
+// Option C: Base64 embed (for PDF reliability)
+export const SPYGLASS_LOGO_BASE64 = 'data:image/png;base64,...';
+```
+
+---
+
+### FILES TO CREATE/MODIFY
+```
+client/src/
+├── lib/
+│   └── pdfStyles.ts                    [NEW - color/font constants]
+├── components/
+│   └── pdf/
+│       ├── PDFComponents.tsx           [NEW - reusable components]
+│       ├── CoverPage.tsx               [NEW - branded cover]
+│       ├── SummaryPage.tsx             [NEW - metric cards]
+│       ├── PropertyDetailsPage.tsx     [NEW - styled table]
+│       ├── AdjustmentsPage.tsx         [NEW - color-coded table]
+│       ├── PropertyPhotosPage.tsx      [NEW - photo grid]
+│       ├── ChartsPage.tsx              [NEW - styled charts]
+│       ├── PageHeader.tsx              [NEW - consistent header]
+│       ├── PageFooter.tsx              [NEW - branded footer]
+│       └── CMAPdfDocument.tsx          [MODIFY - use new components]
+
+public/
+└── logos/
+    ├── spyglass-logo-black.png         [ADD - provided logo]
+    ├── spyglass-logo-white.png         [ADD - provided logo]
+    └── spyglass-logo-icon.png          [ADD - icon only version]
+
+ACCEPTANCE CRITERIA
+Branding:
+
+ Spyglass logo appears on cover page
+ Logo in footer on every page
+ Orange accent color (#EA580C) used consistently
+ "Spyglass Realty" text styling matches preview
+
+Cover Page:
+
+ Centered layout with logo
+ "Comparative Market Analysis" title
+ Property name/address
+ Date
+ Agent name and photo
+
+Summary Section:
+
+ Metric cards with Avg Price, Avg $/SqFt, Properties count
+ Price range displayed
+ Median values shown as sublabels
+
+Property Details:
+
+ Clean table with alternating row colors
+ Status badges with correct colors
+ Address with city on second line
+
+Adjustments:
+
+ Color-coded values (green positive, red negative)
+ Adjusted price column highlighted
+ Clean column alignment
+
+Photos:
+
+ 3x3 grid layout
+ "+X more photos" indicator if > 9
+
+Charts:
+
+ Orange bars matching preview
+ Subject property highlighted differently
+ Average line/indicator
+
+Footer:
+
+ Appears on every page (fixed position)
+ Logo on left, "Prepared by [Agent]" on right
+
+
+VISUAL REFERENCE
+The attached screenshots show the target design. Key elements to match:
+
+Orange accent bar on section headers
+Card-style metric boxes with gray background
+Status badges with rounded corners and colors
+Clean table design with subtle borders
+Consistent typography hierarchy

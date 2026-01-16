@@ -7,6 +7,7 @@ import {
   Image,
   Font,
 } from "@react-pdf/renderer";
+import { PDF_COLORS, getStatusColor, formatCurrency, formatNumber } from "@/lib/pdfStyles";
 
 Font.register({
   family: "Inter",
@@ -22,177 +23,263 @@ const styles = StyleSheet.create({
     padding: 40,
     fontFamily: "Inter",
     fontSize: 10,
-    color: "#1f2937",
+    color: PDF_COLORS.text,
+    backgroundColor: PDF_COLORS.background,
   },
   coverPage: {
-    padding: 40,
+    padding: 60,
     fontFamily: "Inter",
     display: "flex",
     flexDirection: "column",
     justifyContent: "center",
     alignItems: "center",
     height: "100%",
-    backgroundColor: "#f8fafc",
+    backgroundColor: PDF_COLORS.background,
+  },
+  coverLogo: {
+    width: 200,
+    height: 70,
+    objectFit: "contain",
+    marginBottom: 40,
+  },
+  coverCompanyName: {
+    fontSize: 14,
+    fontWeight: 600,
+    color: PDF_COLORS.primary,
+    textTransform: "uppercase",
+    letterSpacing: 2,
+    marginBottom: 8,
   },
   coverTitle: {
-    fontSize: 32,
+    fontSize: 28,
     fontWeight: 700,
-    color: "#0f172a",
-    marginBottom: 16,
+    color: PDF_COLORS.text,
+    marginBottom: 8,
     textAlign: "center",
   },
   coverSubtitle: {
-    fontSize: 18,
-    color: "#475569",
+    fontSize: 14,
+    color: PDF_COLORS.textLight,
     marginBottom: 40,
     textAlign: "center",
   },
   coverAddress: {
-    fontSize: 24,
+    fontSize: 20,
     fontWeight: 600,
-    color: "#0f172a",
-    marginBottom: 8,
+    color: PDF_COLORS.text,
+    marginBottom: 6,
     textAlign: "center",
   },
   coverDetails: {
     fontSize: 14,
-    color: "#64748b",
+    color: PDF_COLORS.textLight,
     textAlign: "center",
-    marginBottom: 60,
+    marginBottom: 40,
+  },
+  coverDate: {
+    fontSize: 11,
+    color: PDF_COLORS.textMuted,
+    marginBottom: 40,
   },
   coverAgent: {
-    marginTop: 40,
-    textAlign: "center",
+    alignItems: "center",
+    marginTop: 20,
+  },
+  coverAgentPhoto: {
+    width: 70,
+    height: 70,
+    borderRadius: 35,
+    objectFit: "cover",
+    marginBottom: 12,
   },
   coverAgentName: {
     fontSize: 16,
     fontWeight: 600,
-    color: "#0f172a",
+    color: PDF_COLORS.text,
+    marginBottom: 4,
   },
   coverAgentTitle: {
-    fontSize: 12,
-    color: "#64748b",
-    marginTop: 4,
+    fontSize: 11,
+    color: PDF_COLORS.textLight,
+    marginBottom: 4,
   },
-  coverCompany: {
-    fontSize: 14,
-    color: "#475569",
-    marginTop: 8,
+  coverAgentCompany: {
+    fontSize: 12,
+    color: PDF_COLORS.textLight,
+    marginTop: 4,
   },
   header: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
     marginBottom: 20,
-    paddingBottom: 10,
+    paddingBottom: 12,
     borderBottomWidth: 1,
-    borderBottomColor: "#e2e8f0",
+    borderBottomColor: PDF_COLORS.border,
   },
   headerTitle: {
-    fontSize: 14,
-    fontWeight: 600,
-    color: "#0f172a",
+    fontSize: 18,
+    fontWeight: 700,
+    color: PDF_COLORS.text,
   },
   headerDate: {
-    fontSize: 9,
-    color: "#64748b",
+    fontSize: 10,
+    color: PDF_COLORS.textMuted,
+  },
+  sectionHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 16,
+    marginTop: 8,
+  },
+  sectionAccentBar: {
+    width: 4,
+    height: 24,
+    backgroundColor: PDF_COLORS.primary,
+    marginRight: 12,
+    borderRadius: 2,
   },
   sectionTitle: {
     fontSize: 16,
     fontWeight: 700,
-    color: "#0f172a",
-    marginBottom: 12,
-    paddingBottom: 6,
-    borderBottomWidth: 2,
-    borderBottomColor: "#3b82f6",
+    color: PDF_COLORS.text,
   },
   subsectionTitle: {
     fontSize: 12,
     fontWeight: 600,
-    color: "#334155",
-    marginTop: 12,
-    marginBottom: 8,
+    color: PDF_COLORS.textLight,
+    marginTop: 16,
+    marginBottom: 10,
   },
   paragraph: {
     fontSize: 10,
-    lineHeight: 1.6,
-    color: "#374151",
+    lineHeight: 1.7,
+    color: PDF_COLORS.textLight,
     marginBottom: 8,
   },
   table: {
-    marginTop: 10,
-    marginBottom: 10,
+    marginTop: 12,
+    marginBottom: 12,
   },
   tableHeader: {
     flexDirection: "row",
-    backgroundColor: "#f1f5f9",
-    paddingVertical: 8,
-    paddingHorizontal: 6,
-    borderTopLeftRadius: 4,
-    borderTopRightRadius: 4,
+    backgroundColor: PDF_COLORS.backgroundAlt,
+    paddingVertical: 10,
+    paddingHorizontal: 8,
+    borderBottomWidth: 2,
+    borderBottomColor: PDF_COLORS.primary,
   },
   tableHeaderCell: {
     fontSize: 9,
     fontWeight: 600,
-    color: "#475569",
+    color: PDF_COLORS.text,
     flex: 1,
+    textTransform: "uppercase",
   },
   tableRow: {
     flexDirection: "row",
-    paddingVertical: 8,
-    paddingHorizontal: 6,
+    paddingVertical: 10,
+    paddingHorizontal: 8,
     borderBottomWidth: 1,
-    borderBottomColor: "#e2e8f0",
+    borderBottomColor: PDF_COLORS.border,
+  },
+  tableRowAlt: {
+    backgroundColor: PDF_COLORS.backgroundAlt,
   },
   tableRowHighlight: {
-    backgroundColor: "#eff6ff",
+    backgroundColor: "#EFF6FF",
+    borderLeftWidth: 3,
+    borderLeftColor: PDF_COLORS.statusSubject,
   },
   tableCell: {
     fontSize: 9,
-    color: "#374151",
+    color: PDF_COLORS.text,
     flex: 1,
+  },
+  tableCellBold: {
+    fontSize: 9,
+    fontWeight: 600,
+    color: PDF_COLORS.text,
+  },
+  tableCellMuted: {
+    fontSize: 8,
+    color: PDF_COLORS.textMuted,
+  },
+  statusBadge: {
+    paddingHorizontal: 6,
+    paddingVertical: 3,
+    borderRadius: 4,
+    alignSelf: "flex-start",
+  },
+  statusBadgeText: {
+    fontSize: 7,
+    fontWeight: 600,
+    color: PDF_COLORS.background,
+    textTransform: "uppercase",
   },
   statsGrid: {
     flexDirection: "row",
     flexWrap: "wrap",
     gap: 12,
-    marginTop: 10,
+    marginTop: 12,
   },
   statCard: {
     width: "48%",
-    padding: 12,
-    backgroundColor: "#f8fafc",
-    borderRadius: 6,
+    padding: 16,
+    backgroundColor: PDF_COLORS.backgroundAlt,
+    borderRadius: 8,
     borderWidth: 1,
-    borderColor: "#e2e8f0",
+    borderColor: PDF_COLORS.borderLight,
+  },
+  statCardHighlight: {
+    borderColor: PDF_COLORS.primary,
+    borderWidth: 2,
   },
   statLabel: {
     fontSize: 9,
-    color: "#64748b",
+    color: PDF_COLORS.textLight,
     marginBottom: 4,
+    textTransform: "uppercase",
   },
   statValue: {
-    fontSize: 14,
-    fontWeight: 600,
-    color: "#0f172a",
+    fontSize: 18,
+    fontWeight: 700,
+    color: PDF_COLORS.text,
+  },
+  statValuePrimary: {
+    fontSize: 18,
+    fontWeight: 700,
+    color: PDF_COLORS.primary,
   },
   statSubValue: {
     fontSize: 8,
-    color: "#94a3b8",
-    marginTop: 2,
+    color: PDF_COLORS.textMuted,
+    marginTop: 4,
+  },
+  metricsRow: {
+    flexDirection: "row",
+    gap: 12,
+    marginTop: 12,
+  },
+  metricCard: {
+    flex: 1,
+    padding: 16,
+    backgroundColor: PDF_COLORS.backgroundAlt,
+    borderRadius: 8,
+    alignItems: "center",
   },
   propertyCard: {
     marginBottom: 16,
-    padding: 12,
-    backgroundColor: "#f8fafc",
-    borderRadius: 6,
+    padding: 14,
+    backgroundColor: PDF_COLORS.backgroundAlt,
+    borderRadius: 8,
     borderWidth: 1,
-    borderColor: "#e2e8f0",
+    borderColor: PDF_COLORS.borderLight,
   },
   propertyAddress: {
     fontSize: 12,
     fontWeight: 600,
-    color: "#0f172a",
+    color: PDF_COLORS.text,
     marginBottom: 8,
   },
   propertyDetails: {
@@ -202,111 +289,138 @@ const styles = StyleSheet.create({
   },
   propertyDetail: {
     fontSize: 9,
-    color: "#475569",
-    backgroundColor: "#e2e8f0",
-    paddingHorizontal: 6,
-    paddingVertical: 2,
+    color: PDF_COLORS.textLight,
+    backgroundColor: PDF_COLORS.backgroundDark,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
     borderRadius: 4,
   },
   propertyPrice: {
     fontSize: 14,
     fontWeight: 700,
-    color: "#059669",
-    marginTop: 8,
+    color: PDF_COLORS.primary,
+    marginTop: 10,
   },
   footer: {
     position: "absolute",
-    bottom: 20,
+    bottom: 25,
     left: 40,
     right: 40,
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    paddingTop: 10,
+    paddingTop: 12,
     borderTopWidth: 1,
-    borderTopColor: "#e2e8f0",
+    borderTopColor: PDF_COLORS.border,
+  },
+  footerLogo: {
+    width: 100,
+    height: 30,
+    objectFit: "contain",
   },
   footerText: {
     fontSize: 8,
-    color: "#94a3b8",
+    color: PDF_COLORS.textMuted,
   },
   coverLetter: {
     lineHeight: 1.8,
     fontSize: 11,
-    color: "#374151",
+    color: PDF_COLORS.text,
   },
   agentContact: {
-    marginTop: 20,
-    padding: 16,
-    backgroundColor: "#f8fafc",
+    marginTop: 24,
+    padding: 20,
+    backgroundColor: PDF_COLORS.backgroundAlt,
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: "#e2e8f0",
+    borderColor: PDF_COLORS.borderLight,
   },
   agentRow: {
     flexDirection: "row",
     gap: 16,
     alignItems: "flex-start",
   },
+  agentPhoto: {
+    width: 70,
+    height: 70,
+    borderRadius: 35,
+    objectFit: "cover",
+  },
   agentInfo: {
     flex: 1,
   },
   agentName: {
-    fontSize: 14,
+    fontSize: 16,
     fontWeight: 700,
-    color: "#0f172a",
+    color: PDF_COLORS.text,
     marginBottom: 4,
   },
   agentDetail: {
     fontSize: 10,
-    color: "#475569",
-    marginBottom: 2,
-  },
-  priceBar: {
-    height: 16,
-    backgroundColor: "#3b82f6",
-    borderRadius: 2,
-    marginVertical: 2,
-  },
-  priceBarSubject: {
-    backgroundColor: "#059669",
-  },
-  priceBarLabel: {
-    fontSize: 8,
-    color: "#475569",
-    marginBottom: 2,
-  },
-  priceBarValue: {
-    fontSize: 8,
-    fontWeight: 600,
-    color: "#0f172a",
-    marginLeft: 4,
+    color: PDF_COLORS.textLight,
+    marginBottom: 3,
   },
   chartRow: {
     flexDirection: "row",
     alignItems: "center",
-    marginBottom: 6,
+    marginBottom: 8,
   },
   chartLabel: {
-    width: 120,
+    width: 100,
     fontSize: 8,
-    color: "#475569",
+    color: PDF_COLORS.textLight,
   },
   chartBarContainer: {
     flex: 1,
     flexDirection: "row",
     alignItems: "center",
   },
-  logo: {
-    width: 120,
-    height: 40,
-    objectFit: "contain",
+  priceBar: {
+    height: 18,
+    backgroundColor: PDF_COLORS.primary,
+    borderRadius: 3,
+    marginVertical: 2,
   },
-  agentPhoto: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
+  priceBarSubject: {
+    backgroundColor: PDF_COLORS.statusSubject,
+  },
+  priceBarValue: {
+    fontSize: 9,
+    fontWeight: 600,
+    color: PDF_COLORS.text,
+    marginLeft: 8,
+  },
+  adjustmentPositive: {
+    color: PDF_COLORS.success,
+    fontWeight: 600,
+  },
+  adjustmentNegative: {
+    color: PDF_COLORS.danger,
+    fontWeight: 600,
+  },
+  photoGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+    marginTop: 12,
+  },
+  photoContainer: {
+    width: "31%",
+    aspectRatio: 1.3,
+    borderRadius: 6,
+    overflow: "hidden",
+    backgroundColor: PDF_COLORS.backgroundDark,
+  },
+  photo: {
+    width: "100%",
+    height: "100%",
     objectFit: "cover",
+  },
+  morePhotosText: {
+    textAlign: "center",
+    fontSize: 10,
+    color: PDF_COLORS.textMuted,
+    marginTop: 12,
   },
 });
 
@@ -315,6 +429,7 @@ interface PropertyData {
   listingId?: string;
   streetAddress?: string;
   address?: string;
+  unparsedAddress?: string;
   city?: string;
   state?: string;
   postalCode?: string;
@@ -326,6 +441,8 @@ interface PropertyData {
   yearBuilt?: number | string;
   status?: string;
   daysOnMarket?: number | string;
+  photos?: string[];
+  images?: string[];
 }
 
 interface CmaBrochure {
@@ -365,21 +482,8 @@ interface CMAPdfDocumentProps {
   coverLetterOverride?: string;
   includeAgentFooter: boolean;
   brochure?: CmaBrochure | null;
+  customPhotoSelections?: Record<string, string[]>;
 }
-
-const formatCurrency = (value: number): string => {
-  if (value >= 1000000) {
-    return `$${(value / 1000000).toFixed(2)}M`;
-  }
-  if (value >= 1000) {
-    return `$${(value / 1000).toFixed(0)}K`;
-  }
-  return `$${value.toFixed(0)}`;
-};
-
-const formatNumber = (value: number): string => {
-  return value.toLocaleString("en-US", { maximumFractionDigits: 0 });
-};
 
 const calculateStatistics = (properties: PropertyData[]) => {
   if (!properties || properties.length === 0) {
@@ -435,6 +539,42 @@ const calculateStatistics = (properties: PropertyData[]) => {
   };
 };
 
+const SectionHeaderComponent = ({ title }: { title: string }) => (
+  <View style={styles.sectionHeader}>
+    <View style={styles.sectionAccentBar} />
+    <Text style={styles.sectionTitle}>{title}</Text>
+  </View>
+);
+
+const StatusBadge = ({ status }: { status?: string }) => {
+  const color = getStatusColor(status);
+  const displayStatus = status || "Unknown";
+  return (
+    <View style={[styles.statusBadge, { backgroundColor: color }]}>
+      <Text style={styles.statusBadgeText}>{displayStatus}</Text>
+    </View>
+  );
+};
+
+const PageFooter = ({ 
+  companyName, 
+  agentName, 
+  logoUrl 
+}: { 
+  companyName: string; 
+  agentName: string;
+  logoUrl?: string | null;
+}) => (
+  <View style={styles.footer} fixed>
+    {logoUrl ? (
+      <Image src={logoUrl} style={styles.footerLogo} />
+    ) : (
+      <Text style={styles.footerText}>{companyName}</Text>
+    )}
+    <Text style={styles.footerText}>Prepared by {agentName}</Text>
+  </View>
+);
+
 export function CMAPdfDocument({
   cma,
   agentProfile,
@@ -444,6 +584,7 @@ export function CMAPdfDocument({
   coverLetterOverride,
   includeAgentFooter,
   brochure,
+  customPhotoSelections,
 }: CMAPdfDocumentProps) {
   const properties = (cma.propertiesData || []) as PropertyData[];
   const statistics = calculateStatistics(properties);
@@ -458,12 +599,16 @@ export function CMAPdfDocument({
     : currentUser?.email?.split("@")[0] || "Agent";
 
   const coverLetter = coverLetterOverride || agentProfile?.defaultCoverLetter || "";
-  const companyName = companySettings?.companyName || "Real Estate Company";
+  const companyName = companySettings?.companyName || "Spyglass Realty";
+  const logoUrl = companySettings?.logoUrl || "/logos/spyglass-logo-black.png";
   const currentDate = new Date().toLocaleDateString("en-US", {
     year: "numeric",
     month: "long",
     day: "numeric",
   });
+
+  const getPropertyAddress = (p: PropertyData) => 
+    p.streetAddress || p.unparsedAddress || p.address || "Property";
 
   const pricePerSqftData = properties
     .filter(p => Number(p.listPrice || p.closePrice) > 0 && Number(p.livingArea) > 0)
@@ -471,8 +616,8 @@ export function CMAPdfDocument({
       const price = Number(p.listPrice || p.closePrice);
       const sqft = Number(p.livingArea);
       const pricePerSqft = price / sqft;
-      const address = p.streetAddress || p.address || "Property";
-      const shortAddress = address.length > 25 ? address.substring(0, 22) + "..." : address;
+      const address = getPropertyAddress(p);
+      const shortAddress = address.length > 20 ? address.substring(0, 17) + "..." : address;
       const isSubject = subjectId ? (p.id === subjectId || p.listingId === subjectId) : false;
       return { name: shortAddress, pricePerSqft: Math.round(pricePerSqft), isSubject };
     })
@@ -484,32 +629,37 @@ export function CMAPdfDocument({
     <Document>
       {includedSections.includes("cover_page") && (
         <Page size="LETTER" style={styles.coverPage}>
-          {companySettings?.logoUrl && (
-            <Image src={companySettings.logoUrl} style={styles.logo} />
-          )}
-          <Text style={styles.coverTitle}>Comparative Market Analysis</Text>
-          <Text style={styles.coverSubtitle}>Prepared exclusively for you</Text>
+          <Image src={logoUrl} style={styles.coverLogo} />
+          
+          <View style={{ alignItems: "center", marginBottom: 40 }}>
+            <Text style={styles.coverCompanyName}>{companyName}</Text>
+            <Text style={styles.coverTitle}>Comparative Market Analysis</Text>
+            <Text style={styles.coverSubtitle}>Prepared exclusively for you</Text>
+          </View>
           
           {subjectProperty && (
-            <>
+            <View style={{ alignItems: "center", marginBottom: 20 }}>
               <Text style={styles.coverAddress}>
-                {subjectProperty.streetAddress || subjectProperty.address || "Property Address"}
+                {getPropertyAddress(subjectProperty)}
               </Text>
               <Text style={styles.coverDetails}>
                 {subjectProperty.city}, {subjectProperty.state} {subjectProperty.postalCode}
               </Text>
-            </>
+            </View>
           )}
 
+          <Text style={styles.coverDate}>{currentDate}</Text>
+
           <View style={styles.coverAgent}>
+            {agentProfile?.headshotUrl && (
+              <Image src={agentProfile.headshotUrl} style={styles.coverAgentPhoto} />
+            )}
             <Text style={styles.coverAgentName}>{agentName}</Text>
             {agentProfile?.title && (
               <Text style={styles.coverAgentTitle}>{agentProfile.title}</Text>
             )}
-            <Text style={styles.coverCompany}>{companyName}</Text>
+            <Text style={styles.coverAgentCompany}>{companyName}</Text>
           </View>
-
-          <Text style={{ ...styles.headerDate, marginTop: 40 }}>{currentDate}</Text>
         </Page>
       )}
 
@@ -525,6 +675,9 @@ export function CMAPdfDocument({
               style={{ maxWidth: "100%", maxHeight: "90%", objectFit: "contain" }}
             />
           </View>
+          {includeAgentFooter && (
+            <PageFooter companyName={companyName} agentName={agentName} logoUrl={logoUrl} />
+          )}
         </Page>
       )}
 
@@ -535,27 +688,32 @@ export function CMAPdfDocument({
             <Text style={styles.headerDate}>{currentDate}</Text>
           </View>
 
-          <Text style={styles.sectionTitle}>Dear Homeowner,</Text>
+          <SectionHeaderComponent title="Dear Homeowner," />
           <Text style={styles.coverLetter}>{coverLetter}</Text>
 
           <View style={styles.agentContact}>
-            <Text style={styles.agentName}>{agentName}</Text>
-            {agentProfile?.title && (
-              <Text style={styles.agentDetail}>{agentProfile.title}</Text>
-            )}
-            {currentUser?.email && (
-              <Text style={styles.agentDetail}>{currentUser.email}</Text>
-            )}
-            {currentUser?.phone && (
-              <Text style={styles.agentDetail}>{currentUser.phone}</Text>
-            )}
+            <View style={styles.agentRow}>
+              {agentProfile?.headshotUrl && (
+                <Image src={agentProfile.headshotUrl} style={styles.agentPhoto} />
+              )}
+              <View style={styles.agentInfo}>
+                <Text style={styles.agentName}>{agentName}</Text>
+                {agentProfile?.title && (
+                  <Text style={styles.agentDetail}>{agentProfile.title}</Text>
+                )}
+                <Text style={styles.agentDetail}>{companyName}</Text>
+                {currentUser?.email && (
+                  <Text style={styles.agentDetail}>{currentUser.email}</Text>
+                )}
+                {currentUser?.phone && (
+                  <Text style={styles.agentDetail}>{currentUser.phone}</Text>
+                )}
+              </View>
+            </View>
           </View>
 
           {includeAgentFooter && (
-            <View style={styles.footer}>
-              <Text style={styles.footerText}>{companyName}</Text>
-              <Text style={styles.footerText}>Prepared by {agentName}</Text>
-            </View>
+            <PageFooter companyName={companyName} agentName={agentName} logoUrl={logoUrl} />
           )}
         </Page>
       )}
@@ -567,10 +725,13 @@ export function CMAPdfDocument({
             <Text style={styles.headerDate}>{currentDate}</Text>
           </View>
 
-          <Text style={styles.sectionTitle}>Your Real Estate Professional</Text>
+          <SectionHeaderComponent title="Your Real Estate Professional" />
 
           <View style={styles.agentContact}>
             <View style={styles.agentRow}>
+              {agentProfile?.headshotUrl && (
+                <Image src={agentProfile.headshotUrl} style={styles.agentPhoto} />
+              )}
               <View style={styles.agentInfo}>
                 <Text style={styles.agentName}>{agentName}</Text>
                 {agentProfile?.title && (
@@ -587,7 +748,7 @@ export function CMAPdfDocument({
             </View>
 
             {agentProfile?.bio && (
-              <View style={{ marginTop: 16 }}>
+              <View style={{ marginTop: 20 }}>
                 <Text style={styles.subsectionTitle}>About Me</Text>
                 <Text style={styles.paragraph}>{agentProfile.bio}</Text>
               </View>
@@ -595,10 +756,7 @@ export function CMAPdfDocument({
           </View>
 
           {includeAgentFooter && (
-            <View style={styles.footer}>
-              <Text style={styles.footerText}>{companyName}</Text>
-              <Text style={styles.footerText}>Prepared by {agentName}</Text>
-            </View>
+            <PageFooter companyName={companyName} agentName={agentName} logoUrl={logoUrl} />
           )}
         </Page>
       )}
@@ -610,34 +768,33 @@ export function CMAPdfDocument({
             <Text style={styles.headerDate}>{currentDate}</Text>
           </View>
 
-          <Text style={styles.sectionTitle}>Market Overview</Text>
+          <SectionHeaderComponent title="Market Overview" />
 
-          <View style={styles.statsGrid}>
-            <View style={styles.statCard}>
-              <Text style={styles.statLabel}>Average Price</Text>
-              <Text style={styles.statValue}>{formatCurrency(statistics.avgPrice)}</Text>
+          <View style={styles.metricsRow}>
+            <View style={styles.metricCard}>
+              <Text style={styles.statValuePrimary}>{formatCurrency(statistics.avgPrice)}</Text>
+              <Text style={styles.statLabel}>Avg Price</Text>
               <Text style={styles.statSubValue}>Median: {formatCurrency(statistics.medianPrice)}</Text>
             </View>
-            <View style={styles.statCard}>
-              <Text style={styles.statLabel}>Average $/SqFt</Text>
-              <Text style={styles.statValue}>${formatNumber(statistics.avgPricePerSqft)}</Text>
+            <View style={styles.metricCard}>
+              <Text style={styles.statValuePrimary}>${formatNumber(statistics.avgPricePerSqft)}</Text>
+              <Text style={styles.statLabel}>Avg $/SqFt</Text>
               <Text style={styles.statSubValue}>Median: ${formatNumber(statistics.medianPricePerSqft)}</Text>
             </View>
-            <View style={styles.statCard}>
-              <Text style={styles.statLabel}>Properties Analyzed</Text>
-              <Text style={styles.statValue}>{statistics.propertyCount}</Text>
-              <Text style={styles.statSubValue}>Comparable properties</Text>
-            </View>
-            <View style={styles.statCard}>
-              <Text style={styles.statLabel}>Price Range</Text>
-              <Text style={styles.statValue}>
-                {formatCurrency(statistics.priceRange.min)} - {formatCurrency(statistics.priceRange.max)}
-              </Text>
-              <Text style={styles.statSubValue}>Market spread</Text>
+            <View style={styles.metricCard}>
+              <Text style={styles.statValuePrimary}>{statistics.propertyCount}</Text>
+              <Text style={styles.statLabel}>Properties</Text>
+              <Text style={styles.statSubValue}>Analyzed</Text>
             </View>
           </View>
 
-          <View style={{ marginTop: 20 }}>
+          <View style={{ marginTop: 16, padding: 12, backgroundColor: PDF_COLORS.backgroundAlt, borderRadius: 6 }}>
+            <Text style={{ fontSize: 10, color: PDF_COLORS.textLight, textAlign: "center" }}>
+              Price range: {formatCurrency(statistics.priceRange.min)} - {formatCurrency(statistics.priceRange.max)}
+            </Text>
+          </View>
+
+          <View style={{ marginTop: 24 }}>
             <Text style={styles.subsectionTitle}>Additional Statistics</Text>
             <View style={styles.statsGrid}>
               <View style={styles.statCard}>
@@ -654,10 +811,7 @@ export function CMAPdfDocument({
           </View>
 
           {includeAgentFooter && (
-            <View style={styles.footer}>
-              <Text style={styles.footerText}>{companyName}</Text>
-              <Text style={styles.footerText}>Prepared by {agentName}</Text>
-            </View>
+            <PageFooter companyName={companyName} agentName={agentName} logoUrl={logoUrl} />
           )}
         </Page>
       )}
@@ -669,7 +823,7 @@ export function CMAPdfDocument({
             <Text style={styles.headerDate}>{currentDate}</Text>
           </View>
 
-          <Text style={styles.sectionTitle}>Comparable Properties</Text>
+          <SectionHeaderComponent title="Comparable Properties" />
 
           <View style={styles.table}>
             <View style={styles.tableHeader}>
@@ -678,7 +832,7 @@ export function CMAPdfDocument({
               <Text style={styles.tableHeaderCell}>SqFt</Text>
               <Text style={styles.tableHeaderCell}>$/SqFt</Text>
               <Text style={styles.tableHeaderCell}>Bed/Bath</Text>
-              <Text style={styles.tableHeaderCell}>Status</Text>
+              <Text style={{ ...styles.tableHeaderCell, flex: 1.2 }}>Status</Text>
             </View>
             {properties.slice(0, 15).map((property, index) => {
               const isSubject = subjectId 
@@ -691,19 +845,27 @@ export function CMAPdfDocument({
               return (
                 <View 
                   key={index} 
-                  style={isSubject ? [styles.tableRow, styles.tableRowHighlight] : styles.tableRow}
+                  style={[
+                    styles.tableRow,
+                    index % 2 === 1 && styles.tableRowAlt,
+                    isSubject && styles.tableRowHighlight
+                  ]}
                 >
-                  <Text style={{ ...styles.tableCell, flex: 2 }}>
-                    {isSubject ? "★ " : ""}
-                    {property.streetAddress || property.address || "N/A"}
-                  </Text>
+                  <View style={{ flex: 2 }}>
+                    <Text style={styles.tableCellBold}>
+                      {isSubject ? "★ " : ""}{getPropertyAddress(property)}
+                    </Text>
+                    <Text style={styles.tableCellMuted}>{property.city}</Text>
+                  </View>
                   <Text style={styles.tableCell}>{formatCurrency(price)}</Text>
                   <Text style={styles.tableCell}>{formatNumber(sqft)}</Text>
                   <Text style={styles.tableCell}>${formatNumber(pricePerSqft)}</Text>
                   <Text style={styles.tableCell}>
                     {property.bedroomsTotal || "-"}/{property.bathroomsTotal || "-"}
                   </Text>
-                  <Text style={styles.tableCell}>{property.status || "N/A"}</Text>
+                  <View style={{ flex: 1.2 }}>
+                    <StatusBadge status={property.status} />
+                  </View>
                 </View>
               );
             })}
@@ -716,10 +878,7 @@ export function CMAPdfDocument({
           )}
 
           {includeAgentFooter && (
-            <View style={styles.footer}>
-              <Text style={styles.footerText}>{companyName}</Text>
-              <Text style={styles.footerText}>Prepared by {agentName}</Text>
-            </View>
+            <PageFooter companyName={companyName} agentName={agentName} logoUrl={logoUrl} />
           )}
         </Page>
       )}
@@ -731,23 +890,23 @@ export function CMAPdfDocument({
             <Text style={styles.headerDate}>{currentDate}</Text>
           </View>
 
-          <Text style={styles.sectionTitle}>Price Per Sq. Ft. Comparison</Text>
+          <SectionHeaderComponent title="Price Per Sq. Ft. Comparison" />
           <Text style={styles.paragraph}>
             This chart compares the price per square foot across all comparable properties.
-            {subjectId && " Your property is highlighted in green."}
+            {subjectId && " Your property is highlighted in blue."}
           </Text>
 
-          <View style={{ marginTop: 16 }}>
+          <View style={{ marginTop: 20 }}>
             {pricePerSqftData.slice(0, 12).map((item, index) => (
               <View key={index} style={styles.chartRow}>
                 <Text style={styles.chartLabel}>{item.name}</Text>
                 <View style={styles.chartBarContainer}>
                   <View
-                    style={
-                      item.isSubject 
-                        ? [styles.priceBar, styles.priceBarSubject, { width: `${(item.pricePerSqft / maxPricePerSqft) * 70}%` }]
-                        : [styles.priceBar, { width: `${(item.pricePerSqft / maxPricePerSqft) * 70}%` }]
-                    }
+                    style={[
+                      styles.priceBar, 
+                      item.isSubject && styles.priceBarSubject,
+                      { width: `${(item.pricePerSqft / maxPricePerSqft) * 65}%` }
+                    ]}
                   />
                   <Text style={styles.priceBarValue}>${item.pricePerSqft}</Text>
                 </View>
@@ -755,7 +914,7 @@ export function CMAPdfDocument({
             ))}
           </View>
 
-          <View style={{ marginTop: 20 }}>
+          <View style={{ marginTop: 24 }}>
             <Text style={styles.subsectionTitle}>Key Insights</Text>
             <Text style={styles.paragraph}>
               • Average price per sq. ft.: ${formatNumber(statistics.avgPricePerSqft)}
@@ -769,10 +928,7 @@ export function CMAPdfDocument({
           </View>
 
           {includeAgentFooter && (
-            <View style={styles.footer}>
-              <Text style={styles.footerText}>{companyName}</Text>
-              <Text style={styles.footerText}>Prepared by {agentName}</Text>
-            </View>
+            <PageFooter companyName={companyName} agentName={agentName} logoUrl={logoUrl} />
           )}
         </Page>
       )}
@@ -784,17 +940,17 @@ export function CMAPdfDocument({
             <Text style={styles.headerDate}>{currentDate}</Text>
           </View>
 
-          <Text style={styles.sectionTitle}>Comparable Property Statistics</Text>
+          <SectionHeaderComponent title="Comparable Property Statistics" />
 
           <View style={styles.statsGrid}>
-            <View style={styles.statCard}>
+            <View style={[styles.statCard, styles.statCardHighlight]}>
               <Text style={styles.statLabel}>Average Price</Text>
-              <Text style={styles.statValue}>{formatCurrency(statistics.avgPrice)}</Text>
+              <Text style={styles.statValuePrimary}>{formatCurrency(statistics.avgPrice)}</Text>
               <Text style={styles.statSubValue}>Median: {formatCurrency(statistics.medianPrice)}</Text>
             </View>
-            <View style={styles.statCard}>
+            <View style={[styles.statCard, styles.statCardHighlight]}>
               <Text style={styles.statLabel}>Average $/SqFt</Text>
-              <Text style={styles.statValue}>${formatNumber(statistics.avgPricePerSqft)}</Text>
+              <Text style={styles.statValuePrimary}>${formatNumber(statistics.avgPricePerSqft)}</Text>
               <Text style={styles.statSubValue}>Median: ${formatNumber(statistics.medianPricePerSqft)}</Text>
             </View>
             <View style={styles.statCard}>
@@ -821,17 +977,58 @@ export function CMAPdfDocument({
               properties averaging {formatNumber(statistics.avgLivingArea)} square feet.
             </Text>
             <Text style={styles.paragraph}>
-              The price per square foot ranges from ${formatNumber(statistics.avgPricePerSqft - 50)} to
+              The price per square foot ranges from ${formatNumber(Math.max(0, statistics.avgPricePerSqft - 50))} to
               ${formatNumber(statistics.avgPricePerSqft + 50)}, with the market median at
               ${formatNumber(statistics.medianPricePerSqft)} per square foot.
             </Text>
           </View>
 
           {includeAgentFooter && (
-            <View style={styles.footer}>
-              <Text style={styles.footerText}>{companyName}</Text>
-              <Text style={styles.footerText}>Prepared by {agentName}</Text>
-            </View>
+            <PageFooter companyName={companyName} agentName={agentName} logoUrl={logoUrl} />
+          )}
+        </Page>
+      )}
+
+      {includedSections.includes("property_photos") && properties.length > 0 && (
+        <Page size="LETTER" style={styles.page}>
+          <View style={styles.header}>
+            <Text style={styles.headerTitle}>Property Photos</Text>
+            <Text style={styles.headerDate}>{currentDate}</Text>
+          </View>
+
+          <SectionHeaderComponent title="Comparable Property Photos" />
+
+          {properties.slice(0, 6).map((property, propIndex) => {
+            const propertyId = property.listingId || property.id || `prop-${propIndex}`;
+            const selectedPhotos = customPhotoSelections?.[propertyId] || property.photos || property.images || [];
+            const photosToShow = selectedPhotos.slice(0, 3);
+            
+            if (photosToShow.length === 0) return null;
+
+            return (
+              <View key={propIndex} style={{ marginBottom: 16 }}>
+                <Text style={{ fontSize: 10, fontWeight: 600, color: PDF_COLORS.text, marginBottom: 6 }}>
+                  {getPropertyAddress(property)}
+                </Text>
+                <View style={styles.photoGrid}>
+                  {photosToShow.map((photoUrl, photoIndex) => (
+                    <View key={photoIndex} style={styles.photoContainer}>
+                      <Image src={photoUrl} style={styles.photo} />
+                    </View>
+                  ))}
+                </View>
+              </View>
+            );
+          })}
+
+          {properties.length > 6 && (
+            <Text style={styles.morePhotosText}>
+              +{properties.length - 6} more properties in full report
+            </Text>
+          )}
+
+          {includeAgentFooter && (
+            <PageFooter companyName={companyName} agentName={agentName} logoUrl={logoUrl} />
           )}
         </Page>
       )}
