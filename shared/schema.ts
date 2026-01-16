@@ -938,6 +938,15 @@ export const CMA_REPORT_SECTIONS = [
 
 export type CmaSectionId = typeof CMA_REPORT_SECTIONS[number]['id'];
 
+// Cover Page Config type for CMA presentations
+export interface CoverPageConfig {
+  title: string;
+  subtitle: string;
+  showDate: boolean;
+  showAgentPhoto: boolean;
+  background: "none" | "gradient" | "property";
+}
+
 // CMA Report Configs - Per-CMA presentation configuration
 export const cmaReportConfigs = pgTable("cma_report_configs", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -948,10 +957,32 @@ export const cmaReportConfigs = pgTable("cma_report_configs", {
   layout: text("layout").default("two_photos"), // 'two_photos', 'single_photo', 'no_photos'
   template: text("template").default("default"),
   theme: text("theme").default("spyglass"), // Theme name
-  photoLayout: text("photo_layout").default("first_dozen"), // 'first_dozen', 'all'
+  photoLayout: text("photo_layout").default("first_dozen"), // 'first_dozen', 'all', 'ai_suggested', 'custom'
   mapStyle: text("map_style").default("streets"), // 'streets', 'satellite', 'dark'
   showMapPolygon: boolean("show_map_polygon").default(true),
   includeAgentFooter: boolean("include_agent_footer").default(true),
+  coverPageConfig: json("cover_page_config").$type<CoverPageConfig>(), // Cover page customization
+  customPhotoSelections: json("custom_photo_selections").$type<Record<string, string[]>>(), // MLS number -> selected photo URLs
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+// CMA Report Templates - Reusable presentation configurations
+export const cmaReportTemplates = pgTable("cma_report_templates", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: 'cascade' }),
+  name: text("name").notNull(),
+  isDefault: boolean("is_default").default(false),
+  includedSections: json("included_sections").$type<string[]>(),
+  sectionOrder: json("section_order").$type<string[]>(),
+  coverLetterOverride: text("cover_letter_override"),
+  layout: text("layout").default("two_photos"),
+  theme: text("theme").default("spyglass"),
+  photoLayout: text("photo_layout").default("first_dozen"),
+  mapStyle: text("map_style").default("streets"),
+  showMapPolygon: boolean("show_map_polygon").default(true),
+  includeAgentFooter: boolean("include_agent_footer").default(true),
+  coverPageConfig: json("cover_page_config").$type<CoverPageConfig>(),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });
@@ -961,6 +992,15 @@ export const insertCmaReportConfigSchema = createInsertSchema(cmaReportConfigs).
   createdAt: true,
   updatedAt: true,
 });
+
+const coverPageConfigSchema = z.object({
+  title: z.string(),
+  subtitle: z.string(),
+  showDate: z.boolean(),
+  showAgentPhoto: z.boolean(),
+  background: z.enum(['none', 'gradient', 'property']),
+});
+
 export const updateCmaReportConfigSchema = z.object({
   includedSections: z.array(z.string()).optional(),
   sectionOrder: z.array(z.string()).optional(),
@@ -968,11 +1008,22 @@ export const updateCmaReportConfigSchema = z.object({
   layout: z.enum(['two_photos', 'single_photo', 'no_photos']).optional(),
   template: z.string().optional(),
   theme: z.string().optional(),
-  photoLayout: z.enum(['first_dozen', 'all']).optional(),
+  photoLayout: z.enum(['first_dozen', 'all', 'ai_suggested', 'custom']).optional(),
   mapStyle: z.enum(['streets', 'satellite', 'dark']).optional(),
   showMapPolygon: z.boolean().optional(),
   includeAgentFooter: z.boolean().optional(),
+  coverPageConfig: coverPageConfigSchema.optional(),
+  customPhotoSelections: z.record(z.string(), z.array(z.string())).optional(),
 });
 export type InsertCmaReportConfig = z.infer<typeof insertCmaReportConfigSchema>;
 export type UpdateCmaReportConfig = z.infer<typeof updateCmaReportConfigSchema>;
 export type CmaReportConfig = typeof cmaReportConfigs.$inferSelect;
+
+// Template schemas
+export const insertCmaReportTemplateSchema = createInsertSchema(cmaReportTemplates).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export type InsertCmaReportTemplate = z.infer<typeof insertCmaReportTemplateSchema>;
+export type CmaReportTemplate = typeof cmaReportTemplates.$inferSelect;

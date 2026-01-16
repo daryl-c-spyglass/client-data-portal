@@ -1,0 +1,226 @@
+# Phase 5: Editable Cover Page & Polish
+
+## Overview
+Allow customization of the Cover Page text and finalize UI polish.
+
+---
+
+## Task 5.1: Editable Cover Page Content
+```jsx
+// components/presentation/CoverPageEditor.tsx
+interface CoverPageConfig {
+  title: string;
+  subtitle: string;
+  showDate: boolean;
+  showAgentPhoto: boolean;
+  backgroundImage?: string;
+}
+
+export function CoverPageEditor({ 
+  config, 
+  onChange,
+  cmaName,
+  agentInfo 
+}: CoverPageEditorProps) {
+  return (
+    <div className="space-y-4">
+      <h3 className="font-semibold">Cover Page</h3>
+      <p className="text-sm text-gray-600">
+        Customize how your CMA cover page appears
+      </p>
+
+      <div>
+        <label className="block text-sm font-medium mb-1">Title</label>
+        <input
+          type="text"
+          value={config.title || 'Comparative Market Analysis'}
+          onChange={(e) => onChange({ ...config, title: e.target.value })}
+          placeholder="Comparative Market Analysis"
+          className="w-full border rounded-lg px-3 py-2"
+        />
+      </div>
+
+      <div>
+        <label className="block text-sm font-medium mb-1">Subtitle</label>
+        <input
+          type="text"
+          value={config.subtitle || 'Prepared exclusively for you'}
+          onChange={(e) => onChange({ ...config, subtitle: e.target.value })}
+          placeholder="Prepared exclusively for you"
+          className="w-full border rounded-lg px-3 py-2"
+        />
+      </div>
+
+      <div className="flex items-center justify-between">
+        <div>
+          <label className="font-medium">Show Date</label>
+          <p className="text-sm text-gray-500">Display report date on cover</p>
+        </div>
+        <Switch
+          checked={config.showDate !== false}
+          onCheckedChange={(v) => onChange({ ...config, showDate: v })}
+        />
+      </div>
+
+      <div className="flex items-center justify-between">
+        <div>
+          <label className="font-medium">Show Agent Photo</label>
+          <p className="text-sm text-gray-500">Include your photo on cover</p>
+        </div>
+        <Switch
+          checked={config.showAgentPhoto !== false}
+          onCheckedChange={(v) => onChange({ ...config, showAgentPhoto: v })}
+        />
+      </div>
+
+      <div>
+        <label className="block text-sm font-medium mb-2">Cover Background</label>
+        <div className="grid grid-cols-3 gap-2">
+          {['none', 'gradient', 'property'].map(bg => (
+            <button
+              key={bg}
+              onClick={() => onChange({ ...config, background: bg })}
+              className={`
+                p-3 border rounded-lg text-center capitalize
+                ${config.background === bg ? 'border-orange-500 bg-orange-50' : ''}
+              `}
+            >
+              {bg === 'none' && 'Plain White'}
+              {bg === 'gradient' && 'Gradient'}
+              {bg === 'property' && 'Property Photo'}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Preview */}
+      <div className="border rounded-lg p-4 bg-gray-50">
+        <p className="text-xs text-gray-500 mb-2">Preview:</p>
+        <div className="bg-white rounded shadow-sm p-4 text-center">
+          <p className="text-orange-500 font-medium">{agentInfo.brokerage}</p>
+          <h2 className="text-xl font-bold mt-2">
+            {config.title || 'Comparative Market Analysis'}
+          </h2>
+          <p className="text-gray-500 mt-1">
+            {config.subtitle || 'Prepared exclusively for you'}
+          </p>
+          <p className="text-sm text-gray-400 mt-2">{cmaName}</p>
+        </div>
+      </div>
+    </div>
+  );
+}
+```
+
+---
+
+## Task 5.2: Reset to Defaults Button
+```jsx
+// In Presentation Builder header
+<div className="flex items-center gap-2">
+  <button
+    onClick={handleReset}
+    className="flex items-center gap-2 px-3 py-2 border rounded-lg hover:bg-gray-50"
+  >
+    <RotateCcw size={16} />
+    Reset
+  </button>
+  <button
+    onClick={handleSaveConfiguration}
+    className="flex items-center gap-2 px-4 py-2 bg-orange-500 text-white rounded-lg"
+  >
+    <Save size={16} />
+    Save Configuration
+  </button>
+  <button
+    onClick={handleExportPDF}
+    className="flex items-center gap-2 px-4 py-2 border rounded-lg hover:bg-gray-50"
+  >
+    <Download size={16} />
+    Export PDF
+  </button>
+</div>
+```
+
+---
+
+## Task 5.3: Save Configuration as Template
+
+Allow agents to save their preferred configuration as a reusable template:
+```jsx
+// SaveAsTemplateModal.tsx
+export function SaveAsTemplateModal({ config, onSave, onClose }) {
+  const [name, setName] = useState('');
+  const [isDefault, setIsDefault] = useState(false);
+
+  const handleSave = () => {
+    onSave({
+      name,
+      config,
+      isDefault
+    });
+    onClose();
+  };
+
+  return (
+    <Dialog open onOpenChange={onClose}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Save as Template</DialogTitle>
+        </DialogHeader>
+        
+        <div className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium mb-1">Template Name</label>
+            <input
+              type="text"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="e.g., My Standard CMA"
+              className="w-full border rounded-lg px-3 py-2"
+            />
+          </div>
+          
+          <div className="flex items-center gap-2">
+            <input
+              type="checkbox"
+              id="isDefault"
+              checked={isDefault}
+              onChange={(e) => setIsDefault(e.target.checked)}
+            />
+            <label htmlFor="isDefault" className="text-sm">
+              Set as default for new CMAs
+            </label>
+          </div>
+        </div>
+        
+        <div className="flex justify-end gap-3 mt-6">
+          <button onClick={onClose} className="px-4 py-2 border rounded-lg">
+            Cancel
+          </button>
+          <button
+            onClick={handleSave}
+            disabled={!name}
+            className="px-4 py-2 bg-orange-500 text-white rounded-lg disabled:opacity-50"
+          >
+            Save Template
+          </button>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+```
+
+---
+
+## Acceptance Criteria
+
+- [ ] Cover Page title and subtitle editable
+- [ ] Show/hide date option
+- [ ] Show/hide agent photo option
+- [ ] Background style options (plain, gradient, property photo)
+- [ ] Live preview updates with cover page changes
+- [ ] Reset button restores defaults
+- [ ] Save as Template functionality
+- [ ] Default template option for new CMAs

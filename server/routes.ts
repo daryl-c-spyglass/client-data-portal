@@ -7400,6 +7400,165 @@ OUTPUT JSON:
     }
   });
 
+  // CMA Report Templates Routes
+  app.get("/api/report-templates", requireAuth, async (req, res) => {
+    try {
+      const userId = req.user!.id;
+      const { cmaReportTemplates } = await import("@shared/schema");
+      const { drizzle } = await import("drizzle-orm/neon-serverless");
+      const { Pool } = await import("@neondatabase/serverless");
+      const { eq, desc } = await import("drizzle-orm");
+      
+      const pool = new Pool({ connectionString: process.env.DATABASE_URL });
+      const db = drizzle(pool);
+      
+      const templates = await db
+        .select()
+        .from(cmaReportTemplates)
+        .where(eq(cmaReportTemplates.userId, userId))
+        .orderBy(desc(cmaReportTemplates.isDefault), desc(cmaReportTemplates.createdAt));
+      
+      res.json(templates);
+    } catch (error: any) {
+      console.error("[Report Templates] Error fetching:", error.message);
+      res.status(500).json({ error: "Failed to fetch templates" });
+    }
+  });
+
+  app.post("/api/report-templates", requireAuth, async (req, res) => {
+    try {
+      const userId = req.user!.id;
+      const { name, isDefault, config } = req.body;
+      
+      if (!name || typeof name !== 'string' || name.trim().length === 0) {
+        return res.status(400).json({ error: "Template name is required" });
+      }
+      
+      // Import zod for validation
+      const { z } = await import("zod");
+      
+      // Validate config structure if provided
+      const templateConfigSchema = z.object({
+        includedSections: z.array(z.string()).optional(),
+        sectionOrder: z.array(z.string()).optional(),
+        coverLetterOverride: z.string().optional(),
+        layout: z.enum(['two_photos', 'single_photo', 'no_photos']).optional(),
+        theme: z.string().optional(),
+        photoLayout: z.enum(['first_dozen', 'all', 'ai_suggested', 'custom']).optional(),
+        mapStyle: z.enum(['streets', 'satellite', 'dark']).optional(),
+        showMapPolygon: z.boolean().optional(),
+        includeAgentFooter: z.boolean().optional(),
+        coverPageConfig: z.object({
+          title: z.string(),
+          subtitle: z.string(),
+          showDate: z.boolean(),
+          showAgentPhoto: z.boolean(),
+          background: z.enum(['none', 'gradient', 'property']),
+        }).optional(),
+      }).optional();
+      
+      const configResult = templateConfigSchema.safeParse(config);
+      if (!configResult.success) {
+        return res.status(400).json({ error: "Invalid config data", details: configResult.error.issues });
+      }
+      
+      const validConfig = configResult.data || {};
+      
+      const { cmaReportTemplates } = await import("@shared/schema");
+      const { drizzle } = await import("drizzle-orm/neon-serverless");
+      const { Pool } = await import("@neondatabase/serverless");
+      const { eq, and } = await import("drizzle-orm");
+      
+      const pool = new Pool({ connectionString: process.env.DATABASE_URL });
+      const db = drizzle(pool);
+      
+      // If setting as default, unset any existing default
+      if (isDefault) {
+        await db
+          .update(cmaReportTemplates)
+          .set({ isDefault: false, updatedAt: new Date() })
+          .where(and(eq(cmaReportTemplates.userId, userId), eq(cmaReportTemplates.isDefault, true)));
+      }
+      
+      const [template] = await db
+        .insert(cmaReportTemplates)
+        .values({
+          userId,
+          name: name.trim(),
+          isDefault: isDefault === true,
+          includedSections: validConfig.includedSections,
+          sectionOrder: validConfig.sectionOrder,
+          coverLetterOverride: validConfig.coverLetterOverride,
+          layout: validConfig.layout,
+          theme: validConfig.theme,
+          photoLayout: validConfig.photoLayout,
+          mapStyle: validConfig.mapStyle,
+          showMapPolygon: validConfig.showMapPolygon,
+          includeAgentFooter: validConfig.includeAgentFooter,
+          coverPageConfig: validConfig.coverPageConfig,
+        })
+        .returning();
+      
+      res.json({ success: true, template });
+    } catch (error: any) {
+      console.error("[Report Templates] Error creating:", error.message);
+      res.status(500).json({ error: "Failed to create template" });
+    }
+  });
+
+  app.delete("/api/report-templates/:id", requireAuth, async (req, res) => {
+    try {
+      const userId = req.user!.id;
+      const { id } = req.params;
+      
+      const { cmaReportTemplates } = await import("@shared/schema");
+      const { drizzle } = await import("drizzle-orm/neon-serverless");
+      const { Pool } = await import("@neondatabase/serverless");
+      const { eq, and } = await import("drizzle-orm");
+      
+      const pool = new Pool({ connectionString: process.env.DATABASE_URL });
+      const db = drizzle(pool);
+      
+      const result = await db
+        .delete(cmaReportTemplates)
+        .where(and(eq(cmaReportTemplates.id, id), eq(cmaReportTemplates.userId, userId)))
+        .returning();
+      
+      if (result.length === 0) {
+        return res.status(404).json({ error: "Template not found" });
+      }
+      
+      res.json({ success: true });
+    } catch (error: any) {
+      console.error("[Report Templates] Error deleting:", error.message);
+      res.status(500).json({ error: "Failed to delete template" });
+    }
+  });
+
+  app.get("/api/report-templates/default", requireAuth, async (req, res) => {
+    try {
+      const userId = req.user!.id;
+      const { cmaReportTemplates } = await import("@shared/schema");
+      const { drizzle } = await import("drizzle-orm/neon-serverless");
+      const { Pool } = await import("@neondatabase/serverless");
+      const { eq, and } = await import("drizzle-orm");
+      
+      const pool = new Pool({ connectionString: process.env.DATABASE_URL });
+      const db = drizzle(pool);
+      
+      const [template] = await db
+        .select()
+        .from(cmaReportTemplates)
+        .where(and(eq(cmaReportTemplates.userId, userId), eq(cmaReportTemplates.isDefault, true)))
+        .limit(1);
+      
+      res.json(template || null);
+    } catch (error: any) {
+      console.error("[Report Templates] Error fetching default:", error.message);
+      res.status(500).json({ error: "Failed to fetch default template" });
+    }
+  });
+
   // Get all users (Admin only)
   app.get("/api/admin/users", requireAuth, requireRole("admin"), async (req, res) => {
     try {

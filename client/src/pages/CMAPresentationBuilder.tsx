@@ -57,7 +57,9 @@ import { ListingBrochureContent } from "@/components/ListingBrochureContent";
 import { ExpandedPreviewModal } from "@/components/ExpandedPreviewModal";
 import { MapboxCMAMap } from "@/components/presentation/MapboxCMAMap";
 import { CoverLetterEditor } from "@/components/presentation/CoverLetterEditor";
+import { CoverPageEditor, getDefaultCoverPageConfig, type CoverPageConfig } from "@/components/presentation/CoverPageEditor";
 import { PhotoSelectionModal, type Photo } from "@/components/presentation/PhotoSelectionModal";
+import { SaveAsTemplateModal } from "@/components/presentation/SaveAsTemplateModal";
 import {
   BarChart,
   Bar,
@@ -94,6 +96,7 @@ interface ReportConfigResponse {
   showMapPolygon?: boolean;
   includeAgentFooter?: boolean;
   customPhotoSelections?: Record<string, string[]>;
+  coverPageConfig?: CoverPageConfig;
 }
 
 interface AuthUser {
@@ -242,6 +245,9 @@ export default function CMAPresentationBuilder() {
   const [isPhotoModalOpen, setIsPhotoModalOpen] = useState(false);
   const [selectedPhotoProperty, setSelectedPhotoProperty] = useState<string | null>(null);
   const [customPhotoSelections, setCustomPhotoSelections] = useState<Record<string, string[]>>({});
+  const [coverPageConfig, setCoverPageConfig] = useState<CoverPageConfig>(getDefaultCoverPageConfig());
+  const [isTemplateModalOpen, setIsTemplateModalOpen] = useState(false);
+  const [isSavingTemplate, setIsSavingTemplate] = useState(false);
 
   const { data: cma, isLoading: cmaLoading, isError: cmaError } = useQuery<Cma | null>({
     queryKey: ["/api/cmas", cmaId],
@@ -373,12 +379,14 @@ export default function CMAPresentationBuilder() {
       setShowMapPolygon(reportConfig.showMapPolygon ?? true);
       setIncludeAgentFooter(reportConfig.includeAgentFooter ?? true);
       setCustomPhotoSelections(reportConfig.customPhotoSelections || {});
+      setCoverPageConfig(reportConfig.coverPageConfig || getDefaultCoverPageConfig());
     } else if (!configLoading) {
       const defaultSections = CMA_REPORT_SECTIONS.filter(s => s.defaultEnabled).map(s => s.id);
       setIncludedSections(defaultSections);
       setSectionOrder(CMA_REPORT_SECTIONS.map(s => s.id));
       setCoverLetterOverride(agentProfile?.defaultCoverLetter || "");
       setCustomPhotoSelections({});
+      setCoverPageConfig(getDefaultCoverPageConfig());
     }
   }, [reportConfig, configLoading, agentProfile]);
 
@@ -394,7 +402,7 @@ export default function CMAPresentationBuilder() {
     setIsPreviewUpdating(true);
     const timer = setTimeout(() => setIsPreviewUpdating(false), 300);
     return () => clearTimeout(timer);
-  }, [includedSections, sectionOrder, layout, photoLayout, includeAgentFooter, coverLetterOverride, brochure]);
+  }, [includedSections, sectionOrder, layout, photoLayout, includeAgentFooter, coverLetterOverride, brochure, coverPageConfig]);
 
   // Handle section click from preview to jump to settings
   const handlePreviewSectionClick = (sectionId: string) => {
@@ -429,6 +437,7 @@ export default function CMAPresentationBuilder() {
         customPhotoSelections: Object.keys(customPhotoSelections).length > 0 
           ? customPhotoSelections 
           : undefined,
+        coverPageConfig,
       };
 
       return apiRequest(`/api/cmas/${cmaId}/report-config`, "PUT", configData);
@@ -490,11 +499,51 @@ export default function CMAPresentationBuilder() {
     setShowMapPolygon(true);
     setIncludeAgentFooter(true);
     setCustomPhotoSelections({});
+    setCoverPageConfig(getDefaultCoverPageConfig());
     setHasChanges(true);
     toast({
       title: "Reset to defaults",
       description: "Settings have been reset. Save to apply.",
     });
+  };
+
+  const handleSaveAsTemplate = async (data: { name: string; isDefault: boolean }) => {
+    setIsSavingTemplate(true);
+    try {
+      const config = {
+        includedSections,
+        sectionOrder,
+        coverLetterOverride: coverLetterOverride || undefined,
+        layout,
+        photoLayout,
+        mapStyle,
+        showMapPolygon,
+        includeAgentFooter,
+        coverPageConfig,
+      };
+
+      await apiRequest("/api/report-templates", "POST", {
+        name: data.name,
+        isDefault: data.isDefault,
+        config,
+      });
+
+      setIsTemplateModalOpen(false);
+      toast({
+        title: "Template saved",
+        description: data.isDefault 
+          ? `"${data.name}" is now your default template.`
+          : `Template "${data.name}" has been saved.`,
+      });
+    } catch (error) {
+      toast({
+        title: "Save failed",
+        description: "Failed to save template. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSavingTemplate(false);
+    }
   };
 
   const handleExportPdf = async () => {
@@ -645,6 +694,14 @@ export default function CMAPresentationBuilder() {
             Save Configuration
           </Button>
           <Button
+            variant="outline"
+            onClick={() => setIsTemplateModalOpen(true)}
+            data-testid="button-save-as-template"
+          >
+            <FileText className="w-4 h-4 mr-2" />
+            Save as Template
+          </Button>
+          <Button
             onClick={handleExportPdf}
             disabled={isGeneratingPdf || !cma}
             variant="secondary"
@@ -659,6 +716,13 @@ export default function CMAPresentationBuilder() {
           </Button>
         </div>
       </div>
+
+      <SaveAsTemplateModal
+        open={isTemplateModalOpen}
+        onOpenChange={setIsTemplateModalOpen}
+        onSave={handleSaveAsTemplate}
+        isSaving={isSavingTemplate}
+      />
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <div className="space-y-6">
@@ -781,6 +845,29 @@ export default function CMAPresentationBuilder() {
             </TabsContent>
 
             <TabsContent value="content" className="space-y-4 mt-4">
+              <Card>
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-lg">Cover Page</CardTitle>
+                  <CardDescription>
+                    Customize the title and appearance of your cover page
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <CoverPageEditor
+                    config={coverPageConfig}
+                    onChange={(config) => {
+                      setCoverPageConfig(config);
+                      setHasChanges(true);
+                    }}
+                    cmaName={cma?.name || "CMA Report"}
+                    agentInfo={{
+                      name: userName,
+                      brokerage: companySettings?.companyName || "Spyglass Realty",
+                    }}
+                  />
+                </CardContent>
+              </Card>
+
               <Card>
                 <CardHeader className="pb-3">
                   <CardTitle className="text-lg">Cover Letter</CardTitle>
@@ -1046,7 +1133,15 @@ export default function CMAPresentationBuilder() {
                 <div className={`p-4 space-y-4 transition-opacity duration-300 ${isPreviewUpdating ? "opacity-50" : "opacity-100"}`}>
                   {includedSections.includes("cover_page") && (
                     <PreviewSection title="Cover Page" icon={FileText} sectionId="cover_page" onClick={handlePreviewSectionClick}>
-                      <div className="text-center space-y-4">
+                      <div 
+                        className={`text-center space-y-4 p-4 rounded-md ${
+                          coverPageConfig.background === "gradient" 
+                            ? "bg-gradient-to-br from-orange-50 to-orange-100" 
+                            : coverPageConfig.background === "property"
+                            ? "bg-gray-200"
+                            : ""
+                        }`}
+                      >
                         {companySettings?.logoUrl ? (
                           <img
                             src={companySettings.logoUrl}
@@ -1059,12 +1154,26 @@ export default function CMAPresentationBuilder() {
                           </div>
                         )}
                         <div className="text-2xl font-bold">
-                          Comparative Market Analysis
+                          {coverPageConfig.title || "Comparative Market Analysis"}
+                        </div>
+                        <div className="text-muted-foreground">
+                          {coverPageConfig.subtitle || "Prepared exclusively for you"}
                         </div>
                         <div className="text-muted-foreground">{cma.name}</div>
-                        <div className="text-sm text-muted-foreground">
-                          Prepared by {userName}
-                        </div>
+                        {coverPageConfig.showDate !== false && (
+                          <div className="text-sm text-muted-foreground">
+                            {new Date().toLocaleDateString()}
+                          </div>
+                        )}
+                        {coverPageConfig.showAgentPhoto !== false && (
+                          <div className="flex justify-center items-center gap-2 mt-2">
+                            <Avatar className="h-8 w-8">
+                              <AvatarImage src={agentProfile?.headshotUrl ?? undefined} />
+                              <AvatarFallback>{userName.charAt(0)}</AvatarFallback>
+                            </Avatar>
+                            <span className="text-sm text-muted-foreground">{userName}</span>
+                          </div>
+                        )}
                       </div>
                     </PreviewSection>
                   )}
@@ -1430,7 +1539,15 @@ export default function CMAPresentationBuilder() {
         <div className="p-4 space-y-4">
           {includedSections.includes("cover_page") && (
             <PreviewSection title="Cover Page" icon={FileText} sectionId="cover_page" onClick={handlePreviewSectionClick}>
-              <div className="text-center space-y-4">
+              <div 
+                className={`text-center space-y-4 p-4 rounded-md ${
+                  coverPageConfig.background === "gradient" 
+                    ? "bg-gradient-to-br from-orange-50 to-orange-100" 
+                    : coverPageConfig.background === "property"
+                    ? "bg-gray-200"
+                    : ""
+                }`}
+              >
                 {companySettings?.logoUrl ? (
                   <img
                     src={companySettings.logoUrl}
@@ -1443,12 +1560,26 @@ export default function CMAPresentationBuilder() {
                   </div>
                 )}
                 <div className="text-2xl font-bold">
-                  Comparative Market Analysis
+                  {coverPageConfig.title || "Comparative Market Analysis"}
+                </div>
+                <div className="text-muted-foreground">
+                  {coverPageConfig.subtitle || "Prepared exclusively for you"}
                 </div>
                 <div className="text-muted-foreground">{cma?.name}</div>
-                <div className="text-sm text-muted-foreground">
-                  Prepared by {userName}
-                </div>
+                {coverPageConfig.showDate !== false && (
+                  <div className="text-sm text-muted-foreground">
+                    {new Date().toLocaleDateString()}
+                  </div>
+                )}
+                {coverPageConfig.showAgentPhoto !== false && (
+                  <div className="flex justify-center items-center gap-2 mt-2">
+                    <Avatar className="h-8 w-8">
+                      <AvatarImage src={agentProfile?.headshotUrl ?? undefined} />
+                      <AvatarFallback>{userName.charAt(0)}</AvatarFallback>
+                    </Avatar>
+                    <span className="text-sm text-muted-foreground">{userName}</span>
+                  </div>
+                )}
               </div>
             </PreviewSection>
           )}

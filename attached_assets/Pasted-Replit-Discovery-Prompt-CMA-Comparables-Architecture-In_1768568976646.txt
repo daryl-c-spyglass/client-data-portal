@@ -1,0 +1,120 @@
+Replit Discovery Prompt: CMA + Comparables Architecture
+# Information Request: CMA + Comparables Architecture Overview
+
+## Context
+I need to understand how the CMA (Comparative Market Analysis) feature currently works in the Client Data Portal before making improvements. Please provide a detailed explanation of the current implementation — no code changes needed, just documentation.
+
+---
+
+## Questions to Answer
+
+### 1. CMA Creation Flow
+
+Please explain step-by-step how a new CMA is created:
+
+a) What happens when a user clicks "Create New CMA"?
+b) What data is required to create a CMA?
+c) What is the database schema for the `cmas` table?
+d) How is the CMA ID generated?
+e) What default values are set on creation?
+
+### 2. Subject Property
+
+a) How is the subject property defined/selected?
+b) Is it required to have a subject property?
+c) Can the subject property be:
+   - An MLS listing (from Repliers)?
+   - A manually entered property (not in MLS)?
+   - Selected from search results?
+d) What fields are stored for the subject property?
+e) Where is subject property data stored (separate table or JSON field in cmas table)?
+
+### 3. Comparable Properties Search
+
+a) How does the "Search Properties" feature work?
+b) What Repliers API endpoints are called?
+c) What search parameters are supported:
+   - Subdivision?
+   - ZIP code?
+   - City?
+   - School district?
+   - Price range?
+   - Sqft range?
+   - Beds/Baths?
+   - Property type?
+   - Status (Active, Under Contract, Closed)?
+   - Close date range?
+   - Map/polygon search?
+d) How is the three-query strategy implemented (Active + UC + Closed)?
+e) How are results deduplicated?
+f) What is the pagination logic?
+
+### 4. Adding Comparables to CMA
+
+a) How does a user add a property to the CMA as a comparable?
+b) What happens when clicking "+ Add" on a search result?
+c) How is the comparable data stored?
+d) Is it stored as:
+   - A reference (mlsNumber only)?
+   - A full snapshot of the listing data?
+   - A relationship to a separate properties table?
+e) What is the maximum number of comparables allowed?
+f) Can comparables be reordered?
+g) Can comparables be removed?
+
+### 5. Data Relationships
+
+Please describe the data model:
+CMAs Table
+├── id
+├── name
+├── created_at
+├── updated_at
+├── user_id
+├── subject_property (JSON? Foreign key?)
+├── comparable_properties (JSON array? Separate table?)
+├── configuration (presentation settings?)
+├── brochure (JSON?)
+└── ... other fields?
+How do these relate to:
+
+Users table
+Properties table (if exists)
+Presentation configurations
+
+
+### 6. CMA Statistics Calculation
+
+a) How are these statistics calculated:
+   - Average price
+   - Median price
+   - Average $/sqft
+   - Price range
+   - Average DOM
+   - Bed/Bath averages
+b) Are statistics calculated on-the-fly or stored?
+c) Do statistics include the subject property or only comparables?
+d) How are statistics recalculated when comparables change?
+
+### 7. Presentation Builder Integration
+
+a) How does the Presentation Builder get CMA data?
+b) What API endpoint serves the CMA detail?
+c) How is the presentation configuration stored?
+d) What is the relationship between CMA data and presentation sections?
+
+### 8. API Endpoints
+
+Please list all CMA-related API endpoints:
+GET    /api/cmas              - List all CMAs
+POST   /api/cmas              - Create new CMA
+GET    /api/cmas/:id          - Get CMA detail
+PUT    /api/cmas/:id          - Update CMA
+DELETE /api/cmas/:id          - Delete CMA
+POST   /api/cmas/:id/search   - Search for comparables?
+POST   /api/cmas/:id/comparables - Add comparable?
+DELETE /api/cmas/:id/comparables/:mlsNumber - Remove comparable?
+GET    /api/cmas/:id/presentation - Get presentation config?
+PUT    /api/cmas/:id/presentation - Update presentation config?
+POST   /api/cmas/:id/export-pdf - Export to PDF?
+... any others?
