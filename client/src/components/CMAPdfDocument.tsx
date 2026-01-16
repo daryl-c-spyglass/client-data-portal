@@ -847,8 +847,8 @@ export function CMAPdfDocument({
                   key={index} 
                   style={[
                     styles.tableRow,
-                    index % 2 === 1 && styles.tableRowAlt,
-                    isSubject && styles.tableRowHighlight
+                    ...(index % 2 === 1 ? [styles.tableRowAlt] : []),
+                    ...(isSubject ? [styles.tableRowHighlight] : [])
                   ]}
                 >
                   <View style={{ flex: 2 }}>
@@ -904,7 +904,7 @@ export function CMAPdfDocument({
                   <View
                     style={[
                       styles.priceBar, 
-                      item.isSubject && styles.priceBarSubject,
+                      ...(item.isSubject ? [styles.priceBarSubject] : []),
                       { width: `${(item.pricePerSqft / maxPricePerSqft) * 65}%` }
                     ]}
                   />

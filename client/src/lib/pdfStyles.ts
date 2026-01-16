@@ -1,6 +1,6 @@
 export const PDF_COLORS = {
-  primary: '#EA580C',
-  primaryDark: '#C2410C',
+  primary: '#F97316',
+  primaryDark: '#EA580C',
   primaryLight: '#FB923C',
   text: '#1F2937',
   textLight: '#6B7280',
