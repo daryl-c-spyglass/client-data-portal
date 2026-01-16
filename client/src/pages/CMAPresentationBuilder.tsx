@@ -62,6 +62,7 @@ import { CoverPageEditor, getDefaultCoverPageConfig, type CoverPageConfig } from
 import { PhotoSelectionModal, type Photo } from "@/components/presentation/PhotoSelectionModal";
 import { SaveAsTemplateModal } from "@/components/presentation/SaveAsTemplateModal";
 import { LoadTemplateDropdown } from "@/components/presentation/LoadTemplateDropdown";
+import { ExpandableList, ExpandableTable, ExpandableGrid } from "@/components/presentation/ExpandableList";
 import {
   BarChart,
   Bar,
@@ -1425,8 +1426,11 @@ export default function CMAPresentationBuilder() {
                   {includedSections.includes("property_details") && (
                     <PreviewSection title="Property Details" icon={Home} sectionId="property_details" onClick={handlePreviewSectionClick}>
                       {properties.length > 0 ? (
-                        <div className="space-y-2">
-                          {properties.slice(0, 3).map((property, index) => (
+                        <ExpandableList
+                          items={properties}
+                          initialCount={3}
+                          itemLabel="properties"
+                          renderItem={(property, index) => (
                             <div key={property.id || property.listingId || index} className="p-2 bg-muted rounded-md">
                               <div className="flex justify-between items-start">
                                 <div className="flex-1 min-w-0">
@@ -1448,13 +1452,8 @@ export default function CMAPresentationBuilder() {
                                 <span>{property.livingArea ? `${formatNumber(Number(property.livingArea))} sqft` : "— sqft"}</span>
                               </div>
                             </div>
-                          ))}
-                          {properties.length > 3 && (
-                            <p className="text-xs text-muted-foreground text-center">
-                              +{properties.length - 3} more properties
-                            </p>
                           )}
-                        </div>
+                        />
                       ) : (
                         <div className="h-20 bg-muted rounded-md flex items-center justify-center">
                           <span className="text-muted-foreground text-sm">No properties in this CMA</span>
@@ -1472,30 +1471,26 @@ export default function CMAPresentationBuilder() {
                             allPhotos.push({ url, address: p.streetAddress || p.address || "" });
                           });
                         });
-                        const displayPhotos = allPhotos.slice(0, 6);
                         
-                        return displayPhotos.length > 0 ? (
-                          <div>
-                            <div className="grid grid-cols-3 gap-1">
-                              {displayPhotos.map((photo, index) => (
-                                <div key={index} className="aspect-video bg-muted rounded overflow-hidden">
-                                  <img 
-                                    src={photo.url} 
-                                    alt={`Property ${index + 1}`}
-                                    className="w-full h-full object-cover"
-                                    onError={(e) => {
-                                      (e.target as HTMLImageElement).style.display = 'none';
-                                    }}
-                                  />
-                                </div>
-                              ))}
-                            </div>
-                            {allPhotos.length > 6 && (
-                              <p className="text-xs text-muted-foreground text-center mt-2">
-                                +{allPhotos.length - 6} more photos
-                              </p>
+                        return allPhotos.length > 0 ? (
+                          <ExpandableGrid
+                            items={allPhotos}
+                            initialCount={6}
+                            itemLabel="photos"
+                            columns={3}
+                            renderItem={(photo, index) => (
+                              <div key={index} className="aspect-video bg-muted rounded overflow-hidden">
+                                <img 
+                                  src={photo.url} 
+                                  alt={`Property ${index + 1}`}
+                                  className="w-full h-full object-cover"
+                                  onError={(e) => {
+                                    (e.target as HTMLImageElement).style.display = 'none';
+                                  }}
+                                />
+                              </div>
                             )}
-                          </div>
+                          />
                         ) : (
                           <div className="h-20 bg-muted rounded-md flex items-center justify-center">
                             <span className="text-muted-foreground text-sm">No photos available</span>
@@ -1528,35 +1523,29 @@ export default function CMAPresentationBuilder() {
                         }
 
                         return (
-                          <div className="overflow-x-auto">
-                            <table className="w-full text-xs">
-                              <thead>
-                                <tr className="border-b">
-                                  <th className="text-left p-1.5 font-medium">Property</th>
-                                  <th className="text-right p-1.5 font-medium">Sale Price</th>
-                                  <th className="text-right p-1.5 font-medium">Adj. Total</th>
-                                  <th className="text-right p-1.5 font-medium">Adj. Price</th>
-                                </tr>
-                              </thead>
-                              <tbody>
-                                {results.slice(0, 3).map((result: CompAdjustmentResult) => (
-                                  <tr key={result.compId} className="border-b border-muted">
-                                    <td className="p-1.5 truncate max-w-[120px]">{result.compAddress}</td>
-                                    <td className="text-right p-1.5">${(result.salePrice / 1000).toFixed(0)}k</td>
-                                    <td className={`text-right p-1.5 ${result.totalAdjustment >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                                      {formatAdjustment(result.totalAdjustment)}
-                                    </td>
-                                    <td className="text-right p-1.5 font-medium">${(result.adjustedPrice / 1000).toFixed(0)}k</td>
-                                  </tr>
-                                ))}
-                              </tbody>
-                            </table>
-                            {results.length > 3 && (
-                              <p className="text-xs text-muted-foreground text-center mt-2">
-                                +{results.length - 3} more comparables
-                              </p>
+                          <ExpandableTable
+                            items={results}
+                            initialCount={3}
+                            itemLabel="comparables"
+                            header={
+                              <tr className="border-b">
+                                <th className="text-left p-1.5 font-medium">Property</th>
+                                <th className="text-right p-1.5 font-medium">Sale Price</th>
+                                <th className="text-right p-1.5 font-medium">Adj. Total</th>
+                                <th className="text-right p-1.5 font-medium">Adj. Price</th>
+                              </tr>
+                            }
+                            renderRow={(result: CompAdjustmentResult) => (
+                              <tr key={result.compId} className="border-b border-muted">
+                                <td className="p-1.5 truncate max-w-[120px]">{result.compAddress}</td>
+                                <td className="text-right p-1.5">${(result.salePrice / 1000).toFixed(0)}k</td>
+                                <td className={`text-right p-1.5 ${result.totalAdjustment >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                                  {formatAdjustment(result.totalAdjustment)}
+                                </td>
+                                <td className="text-right p-1.5 font-medium">${(result.adjustedPrice / 1000).toFixed(0)}k</td>
+                              </tr>
                             )}
-                          </div>
+                          />
                         );
                       })()}
                     </PreviewSection>

@@ -1,0 +1,219 @@
+Make Truncated Lists Expandable in Live Preview
+SCOPE
+In the CMA Presentation Builder Live Preview, truncated sections show "+X more items" but are not clickable. Make these expandable so users can see all content. Ensure the PDF output shows all items (not truncated).
+
+CURRENT STATE
+SectionShowsHiddenUser ActionProperty Details3 properties+4 more propertiesNone (not clickable)Property Photos8 photos+5 more photosNone (not clickable)Adjustments3 comparables+3 more comparablesNone (not clickable)
+
+TARGET BEHAVIOR
+In Live Preview:
+
+"+X more" text is clickable
+Clicking expands to show all items
+Shows "Show less" option to collapse back
+Smooth expand/collapse animation
+
+In PDF Export:
+
+Always show ALL items (no truncation)
+Paginate if necessary
+
+
+TASKS
+Task 1: Create Expandable List Component
+typescript// client/src/components/CMA/ExpandableList.tsx (NEW)
+
+interface ExpandableListProps<T> {
+  items: T[];
+  initialCount: number;
+  renderItem: (item: T, index: number) => React.ReactNode;
+  itemLabel?: string; // "properties", "photos", "comparables"
+}
+
+const ExpandableList = <T,>({ 
+  items, 
+  initialCount, 
+  renderItem, 
+  itemLabel = "items" 
+}: ExpandableListProps<T>) => {
+  const [expanded, setExpanded] = useState(false);
+  
+  const visibleItems = expanded ? items : items.slice(0, initialCount);
+  const hiddenCount = items.length - initialCount;
+  const hasMore = hiddenCount > 0;
+
+  return (
+    <div className="space-y-2">
+      {visibleItems.map((item, index) => renderItem(item, index))}
+      
+      {hasMore && (
+        <button
+          onClick={() => setExpanded(!expanded)}
+          className="w-full py-2 text-sm text-primary hover:text-primary/80 
+                     hover:bg-gray-50 rounded-lg transition-colors
+                     flex items-center justify-center gap-1"
+        >
+          {expanded ? (
+            <>
+              <ChevronUp className="w-4 h-4" />
+              Show less
+            </>
+          ) : (
+            <>
+              <ChevronDown className="w-4 h-4" />
+              +{hiddenCount} more {itemLabel}
+            </>
+          )}
+        </button>
+      )}
+    </div>
+  );
+};
+Task 2: Update Property Details Section
+typescript// In the Live Preview component
+
+// BEFORE (truncated, not expandable):
+{properties.slice(0, 3).map(prop => <PropertyCard {...prop} />)}
+{properties.length > 3 && (
+  <p className="text-gray-500">+{properties.length - 3} more properties</p>
+)}
+
+// AFTER (expandable):
+<ExpandableList
+  items={properties}
+  initialCount={3}
+  itemLabel="properties"
+  renderItem={(prop, index) => (
+    <PropertyCard key={prop.mlsNumber || index} {...prop} />
+  )}
+/>
+Task 3: Update Property Photos Section
+typescript// BEFORE:
+{photos.slice(0, 8).map(photo => <PhotoThumbnail {...photo} />)}
+{photos.length > 8 && <p>+{photos.length - 8} more photos</p>}
+
+// AFTER:
+<ExpandableList
+  items={photos}
+  initialCount={8}
+  itemLabel="photos"
+  renderItem={(photo, index) => (
+    <PhotoThumbnail key={index} src={photo.url} />
+  )}
+/>
+Task 4: Update Adjustments Section
+typescript// BEFORE:
+{adjustments.slice(0, 3).map(adj => <AdjustmentRow {...adj} />)}
+{adjustments.length > 3 && <p>+{adjustments.length - 3} more comparables</p>}
+
+// AFTER:
+<ExpandableList
+  items={adjustments}
+  initialCount={3}
+  itemLabel="comparables"
+  renderItem={(adj, index) => (
+    <AdjustmentRow key={adj.compId || index} {...adj} />
+  )}
+/>
+Task 5: Add Expand Animation
+css/* Add to global styles or component */
+.expandable-content {
+  overflow: hidden;
+  transition: max-height 0.3s ease-in-out;
+}
+
+.expandable-content.collapsed {
+  max-height: 0;
+}
+
+.expandable-content.expanded {
+  max-height: 2000px; /* Large enough for content */
+}
+Task 6: Ensure PDF Shows All Items
+typescript// In PDF generation, do NOT truncate
+
+// Property Details - show all
+{comparables.map((comp, index) => (
+  <PropertyDetailRow key={index} property={comp} />
+))}
+
+// Photos - show all (paginate if needed)
+{photos.map((photo, index) => (
+  <Image key={index} src={photo.url} style={styles.photo} />
+))}
+
+// Adjustments - show all
+{adjustments.map((adj, index) => (
+  <AdjustmentRow key={index} adjustment={adj} />
+))}
+```
+
+---
+
+### FILES TO MODIFY
+```
+client/src/
+├── components/
+│   └── CMA/
+│       ├── ExpandableList.tsx              [NEW - reusable component]
+│       ├── PresentationPreview.tsx         [MODIFY - use ExpandableList]
+│       └── sections/
+│           ├── PropertyDetailsSection.tsx  [MODIFY]
+│           ├── PropertyPhotosSection.tsx   [MODIFY]
+│           └── AdjustmentsSection.tsx      [MODIFY]
+└── components/
+    └── pdf/
+        ├── PropertyDetailsPage.tsx         [VERIFY - shows all items]
+        ├── PropertyPhotosPage.tsx          [VERIFY - shows all items]
+        └── AdjustmentsPage.tsx             [VERIFY - shows all items]
+```
+
+---
+
+### ACCEPTANCE CRITERIA
+
+**Live Preview:**
+- [ ] "+4 more properties" is clickable and expands to show all 7
+- [ ] "+5 more photos" is clickable and expands to show all photos
+- [ ] "+3 more comparables" is clickable and expands to show all adjustments
+- [ ] "Show less" collapses back to initial count
+- [ ] Smooth animation on expand/collapse
+- [ ] Cursor shows pointer on hover
+- [ ] Subtle hover effect on the expand button
+
+**PDF Export:**
+- [ ] Property Details shows ALL properties (7 in this case)
+- [ ] Property Photos shows ALL photos
+- [ ] Adjustments shows ALL comparables
+- [ ] Content paginates correctly if too long for one page
+
+---
+
+### VISUAL REFERENCE
+
+**Before (current):**
+```
+Property Details
+├── 260 Saltgrass CV      Active
+├── 1589 Cool Spring WAY  Active
+├── 116 Egret LN          Active
+└── +4 more properties    (plain text, not clickable)
+```
+
+**After (target):**
+```
+Property Details
+├── 260 Saltgrass CV      Active
+├── 1589 Cool Spring WAY  Active
+├── 116 Egret LN          Active
+└── [+4 more properties ▼] (clickable button)
+
+Expanded:
+├── 260 Saltgrass CV      Active
+├── 1589 Cool Spring WAY  Active
+├── 116 Egret LN          Active
+├── 569 Stone River DR    Active Under Contract
+├── 125 Stoney Point RD   Closed
+├── 433 Stoney Point RD   Closed
+├── 194 Daisey Path       Subject
+└── [Show less ▲]         (clickable button)

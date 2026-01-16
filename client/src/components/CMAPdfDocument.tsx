@@ -873,7 +873,7 @@ export function CMAPdfDocument({
               <Text style={styles.tableHeaderCell}>Bed/Bath</Text>
               <Text style={{ ...styles.tableHeaderCell, flex: 1.2 }}>Status</Text>
             </View>
-            {properties.slice(0, 15).map((property, index) => {
+            {properties.map((property, index) => {
               const isSubject = isPropertySubject(property, subjectId);
               const price = Number(property.listPrice || property.closePrice) || 0;
               const sqft = Number(property.livingArea) || 0;
@@ -890,6 +890,7 @@ export function CMAPdfDocument({
                     ...(index % 2 === 1 ? [styles.tableRowAlt] : []),
                     ...(isSubject ? [styles.tableRowHighlight] : [])
                   ]}
+                  wrap={false}
                 >
                   <View style={{ flex: 2 }}>
                     <Text style={styles.tableCellBold}>
@@ -911,12 +912,6 @@ export function CMAPdfDocument({
             })}
           </View>
 
-          {properties.length > 15 && (
-            <Text style={{ ...styles.paragraph, fontStyle: "italic", textAlign: "center" }}>
-              Showing 15 of {properties.length} properties. Full list available upon request.
-            </Text>
-          )}
-
           {includeAgentFooter && (
             <PageFooter companyName={companyName} agentName={agentName} logoUrl={logoUrl} />
           )}
@@ -937,8 +932,8 @@ export function CMAPdfDocument({
           </Text>
 
           <View style={{ marginTop: 20 }}>
-            {pricePerSqftData.slice(0, 12).map((item, index) => (
-              <View key={index} style={styles.chartRow}>
+            {pricePerSqftData.map((item, index) => (
+              <View key={index} style={styles.chartRow} wrap={false}>
                 <Text style={styles.chartLabel}>{item.name}</Text>
                 <View style={styles.chartBarContainer}>
                   <View
@@ -1038,18 +1033,18 @@ export function CMAPdfDocument({
 
           <SectionHeaderComponent title="Comparable Property Photos" />
 
-          {properties.slice(0, 6).map((property, propIndex) => {
+          {properties.map((property, propIndex) => {
             const propertyId = property.listingId || property.id || `prop-${propIndex}`;
             const selectedPhotos = customPhotoSelections?.[propertyId] || property.photos || property.images || [];
             const photosToShow = selectedPhotos
-              .slice(0, 3)
+              .slice(0, 4)
               .map(url => getAbsolutePhotoUrl(url))
               .filter(url => url.length > 0);
             
             if (photosToShow.length === 0) return null;
 
             return (
-              <View key={propIndex} style={{ marginBottom: 16 }}>
+              <View key={propIndex} style={{ marginBottom: 16 }} wrap={false}>
                 <Text style={{ fontSize: 10, fontWeight: 600, color: PDF_COLORS.text, marginBottom: 6 }}>
                   {getPropertyAddress(property)}
                 </Text>
@@ -1063,12 +1058,6 @@ export function CMAPdfDocument({
               </View>
             );
           })}
-
-          {properties.length > 6 && (
-            <Text style={styles.morePhotosText}>
-              +{properties.length - 6} more properties in full report
-            </Text>
-          )}
 
           {includeAgentFooter && (
             <PageFooter companyName={companyName} agentName={agentName} logoUrl={logoUrl} />
