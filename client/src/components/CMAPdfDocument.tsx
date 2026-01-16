@@ -427,6 +427,7 @@ const styles = StyleSheet.create({
 interface PropertyData {
   id?: string;
   listingId?: string;
+  mlsNumber?: string;
   streetAddress?: string;
   address?: string;
   unparsedAddress?: string;
@@ -438,8 +439,14 @@ interface PropertyData {
   livingArea?: number | string;
   bedroomsTotal?: number | string;
   bathroomsTotal?: number | string;
+  baths?: number | string;
+  bathrooms?: number | string;
+  bathroomsFull?: number | string;
+  bathroomsHalf?: number | string;
   yearBuilt?: number | string;
   status?: string;
+  standardStatus?: string;
+  lastStatus?: string;
   daysOnMarket?: number | string;
   photos?: string[];
   images?: string[];
@@ -485,6 +492,25 @@ interface CMAPdfDocumentProps {
   customPhotoSelections?: Record<string, string[]>;
 }
 
+const getBathCount = (property: PropertyData): number => {
+  const baths = Number(property.bathroomsTotal) ||
+    Number(property.baths) ||
+    Number(property.bathrooms) ||
+    0;
+  
+  if (baths > 0) return baths;
+  
+  const full = Number(property.bathroomsFull) || 0;
+  const half = Number(property.bathroomsHalf) || 0;
+  return full + (half * 0.5);
+};
+
+const getAbsolutePhotoUrl = (url: string): string => {
+  if (!url) return '';
+  if (url.startsWith('http')) return url;
+  return `https://cdn.repliers.io${url}`;
+};
+
 const calculateStatistics = (properties: PropertyData[]) => {
   if (!properties || properties.length === 0) {
     return {
@@ -514,7 +540,7 @@ const calculateStatistics = (properties: PropertyData[]) => {
     .map(p => Number(p.bedroomsTotal))
     .filter(b => b > 0);
   const bathrooms = properties
-    .map(p => Number(p.bathroomsTotal))
+    .map(p => getBathCount(p))
     .filter(b => b > 0);
 
   const avg = (arr: number[]) => arr.length ? arr.reduce((a, b) => a + b, 0) / arr.length : 0;
@@ -534,8 +560,14 @@ const calculateStatistics = (properties: PropertyData[]) => {
     avgBedrooms: avg(bedrooms),
     avgBathrooms: avg(bathrooms),
     propertyCount: properties.length,
-    priceRange: { min: Math.min(...prices, 0), max: Math.max(...prices, 0) },
-    sqftRange: { min: Math.min(...livingAreas, 0), max: Math.max(...livingAreas, 0) },
+    priceRange: { 
+      min: prices.length > 0 ? Math.min(...prices) : 0, 
+      max: prices.length > 0 ? Math.max(...prices) : 0 
+    },
+    sqftRange: { 
+      min: livingAreas.length > 0 ? Math.min(...livingAreas) : 0, 
+      max: livingAreas.length > 0 ? Math.max(...livingAreas) : 0 
+    },
   };
 };
 
@@ -546,14 +578,21 @@ const SectionHeaderComponent = ({ title }: { title: string }) => (
   </View>
 );
 
-const StatusBadge = ({ status }: { status?: string }) => {
-  const color = getStatusColor(status);
-  const displayStatus = status || "Unknown";
+const StatusBadge = ({ status, isSubject }: { status?: string; isSubject?: boolean }) => {
+  const displayStatus = isSubject ? 'Subject' : (status || 'Unknown');
+  const color = isSubject ? PDF_COLORS.statusSubject : getStatusColor(status);
   return (
     <View style={[styles.statusBadge, { backgroundColor: color }]}>
       <Text style={styles.statusBadgeText}>{displayStatus}</Text>
     </View>
   );
+};
+
+const isPropertySubject = (property: PropertyData, subjectId?: string | null): boolean => {
+  if (!subjectId) return false;
+  return property.id === subjectId || 
+         property.listingId === subjectId || 
+         property.mlsNumber === subjectId;
 };
 
 const PageFooter = ({ 
@@ -591,7 +630,7 @@ export function CMAPdfDocument({
   const subjectId = cma.subjectPropertyId;
   
   const subjectProperty = subjectId 
-    ? properties.find(p => p.id === subjectId || p.listingId === subjectId)
+    ? properties.find(p => isPropertySubject(p, subjectId))
     : properties[0];
 
   const agentName = currentUser?.firstName && currentUser?.lastName
@@ -618,7 +657,7 @@ export function CMAPdfDocument({
       const pricePerSqft = price / sqft;
       const address = getPropertyAddress(p);
       const shortAddress = address.length > 20 ? address.substring(0, 17) + "..." : address;
-      const isSubject = subjectId ? (p.id === subjectId || p.listingId === subjectId) : false;
+      const isSubject = isPropertySubject(p, subjectId);
       return { name: shortAddress, pricePerSqft: Math.round(pricePerSqft), isSubject };
     })
     .sort((a, b) => a.pricePerSqft - b.pricePerSqft);
@@ -835,12 +874,13 @@ export function CMAPdfDocument({
               <Text style={{ ...styles.tableHeaderCell, flex: 1.2 }}>Status</Text>
             </View>
             {properties.slice(0, 15).map((property, index) => {
-              const isSubject = subjectId 
-                ? (property.id === subjectId || property.listingId === subjectId) 
-                : false;
+              const isSubject = isPropertySubject(property, subjectId);
               const price = Number(property.listPrice || property.closePrice) || 0;
               const sqft = Number(property.livingArea) || 0;
               const pricePerSqft = sqft > 0 ? price / sqft : 0;
+              const beds = Number(property.bedroomsTotal) || 0;
+              const baths = getBathCount(property);
+              const status = property.standardStatus || property.status || property.lastStatus;
 
               return (
                 <View 
@@ -855,16 +895,16 @@ export function CMAPdfDocument({
                     <Text style={styles.tableCellBold}>
                       {isSubject ? "★ " : ""}{getPropertyAddress(property)}
                     </Text>
-                    <Text style={styles.tableCellMuted}>{property.city}</Text>
+                    <Text style={styles.tableCellMuted}>{property.city || ''}</Text>
                   </View>
                   <Text style={styles.tableCell}>{formatCurrency(price)}</Text>
                   <Text style={styles.tableCell}>{formatNumber(sqft)}</Text>
                   <Text style={styles.tableCell}>${formatNumber(pricePerSqft)}</Text>
                   <Text style={styles.tableCell}>
-                    {property.bedroomsTotal || "-"}/{property.bathroomsTotal || "-"}
+                    {beds > 0 ? beds : "-"}/{baths > 0 ? baths : "-"}
                   </Text>
                   <View style={{ flex: 1.2 }}>
-                    <StatusBadge status={property.status} />
+                    <StatusBadge status={status} isSubject={isSubject} />
                   </View>
                 </View>
               );
@@ -1001,7 +1041,10 @@ export function CMAPdfDocument({
           {properties.slice(0, 6).map((property, propIndex) => {
             const propertyId = property.listingId || property.id || `prop-${propIndex}`;
             const selectedPhotos = customPhotoSelections?.[propertyId] || property.photos || property.images || [];
-            const photosToShow = selectedPhotos.slice(0, 3);
+            const photosToShow = selectedPhotos
+              .slice(0, 3)
+              .map(url => getAbsolutePhotoUrl(url))
+              .filter(url => url.length > 0);
             
             if (photosToShow.length === 0) return null;
 
