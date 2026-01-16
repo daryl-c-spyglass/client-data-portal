@@ -1,0 +1,144 @@
+I need to understand the current architecture before implementing a new Listing Presentation feature with role-based access control. Please answer the following questions about this project:
+
+
+1. DATABASE
+□ What database is this project using?
+  - PostgreSQL?
+  - Supabase?
+  - Firebase/Firestore?
+  - MongoDB?
+  - Replit Database (key-value)?
+  - Other?
+
+□ Where is the database connection configured?
+  - File path?
+  - Environment variables used?
+
+□ What ORM or database client is used?
+  - Prisma?
+  - Drizzle?
+  - Knex?
+  - Raw SQL?
+  - Supabase client?
+  - Other?
+
+□ Where are database schemas/models defined?
+  - Prisma schema file?
+  - Migration files?
+  - Type definitions?
+
+2. AUTHENTICATION
+□ What OAuth provider is used?
+  - Google?
+  - Auth0?
+  - Clerk?
+  - Supabase Auth?
+  - NextAuth?
+  - Custom?
+
+□ Where is auth configured?
+  - File path(s)?
+
+□ What user data is stored after login?
+  - id?
+  - email?
+  - name?
+  - profile photo?
+  - Other fields?
+
+□ Where is the user model/table defined?
+  - File path or table name?
+
+□ Does a "role" field already exist on users?
+  - If yes, what values?
+  - If no, confirm we need to add it
+
+□ How is the current user accessed in components?
+  - Context/hook name? (e.g., useAuth, useUser, useSession)
+  - File path?
+
+3. EXISTING CMA MODULE
+□ Where is the CMA feature implemented?
+  - Folder/file paths?
+
+□ What is the CMA data model/schema?
+  - Fields stored?
+  - Table name?
+
+□ How does CMA PDF export currently work?
+  - What library? (pdf-lib, pdfmake, puppeteer, react-pdf?)
+  - Where is export logic?
+
+□ Is there a Presentation Builder already?
+  - If yes, where is it located?
+  - What sections/toggles exist?
+
+4. FILE STORAGE
+□ Where are uploaded files stored?
+  - Replit Object Storage?
+  - Supabase Storage?
+  - AWS S3?
+  - Cloudinary?
+  - Local filesystem?
+
+□ Where is file upload logic implemented?
+  - File path?
+  - What library/SDK?
+
+□ What is the current max file size limit?
+
+5. PROJECT STRUCTURE
+□ What is the frontend framework?
+  - React?
+  - Next.js?
+  - Vite + React?
+
+□ What is the folder structure?
+  Please show output of:
+  - /src or root directory tree
+  - /components
+  - /pages or /app
+  - /api or /server
+
+□ What styling is used?
+  - Tailwind CSS?
+  - CSS Modules?
+  - Styled Components?
+  - Other?
+
+□ What UI component library (if any)?
+  - shadcn/ui?
+  - Material UI?
+  - Chakra?
+  - Custom?
+
+6. API STRUCTURE
+□ How are API routes structured?
+  - Next.js API routes (/pages/api or /app/api)?
+  - Express backend?
+  - Separate server?
+
+□ Where is the Repliers API integration?
+  - File path?
+  - How is the API key stored?
+
+7. ENVIRONMENT VARIABLES
+□ List all current environment variables (names only, not values):
+  - Database connection?
+  - Auth secrets?
+  - API keys?
+  - Is VITE_MAPBOX_TOKEN configured? (saw error in screenshot)
+
+8. EXISTING USER ROLES (if any)
+□ Are there any existing admin/role concepts in the codebase?
+  - Search for: "admin", "role", "permission", "super"
+  - Any results?
+
+📋 SUMMARY REQUEST
+
+After answering the above, please provide:
+
+A summary of the tech stack
+The exact file path where I should add a "role" field to users
+The exact file path where route protection/auth checks happen
+Any concerns or blockers for adding role-based access control
