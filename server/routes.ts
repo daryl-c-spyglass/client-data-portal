@@ -6799,6 +6799,41 @@ OUTPUT JSON:
     }
   });
 
+  // AI Cover Letter Generation endpoint
+  app.post("/api/ai/generate-cover-letter", async (req, res) => {
+    try {
+      const { generateCoverLetter, isOpenAIConfigured } = await import("./openai-client");
+      
+      if (!isOpenAIConfigured()) {
+        res.status(503).json({ 
+          error: "AI assistant is not configured. Please add your OpenAI API key.",
+          configured: false
+        });
+        return;
+      }
+
+      const { context, tone = 'professional' } = req.body;
+      
+      if (!context || !context.subjectProperty) {
+        res.status(400).json({ error: "Context with subject property is required" });
+        return;
+      }
+
+      // Validate tone
+      const validTones = ['professional', 'friendly', 'confident'];
+      if (!validTones.includes(tone)) {
+        res.status(400).json({ error: "Tone must be professional, friendly, or confident" });
+        return;
+      }
+
+      const coverLetter = await generateCoverLetter(context, tone);
+      res.json({ coverLetter });
+    } catch (error: any) {
+      console.error("[AI Cover Letter] Error:", error.message);
+      res.status(500).json({ error: "Failed to generate cover letter. Please try again." });
+    }
+  });
+
   // CMA Draft endpoint - creates a draft CMA from AI-collected criteria
   app.post("/api/cma/draft", async (req, res) => {
     try {

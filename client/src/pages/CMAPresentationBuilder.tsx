@@ -56,6 +56,7 @@ import { CMAPdfDocument } from "@/components/CMAPdfDocument";
 import { ListingBrochureContent } from "@/components/ListingBrochureContent";
 import { ExpandedPreviewModal } from "@/components/ExpandedPreviewModal";
 import { MapboxCMAMap } from "@/components/presentation/MapboxCMAMap";
+import { CoverLetterEditor } from "@/components/presentation/CoverLetterEditor";
 import {
   BarChart,
   Bar,
@@ -771,19 +772,18 @@ export default function CMAPresentationBuilder() {
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <Textarea
+                  <CoverLetterEditor
                     value={coverLetterOverride}
-                    onChange={(e) => {
-                      setCoverLetterOverride(e.target.value);
+                    onChange={(value) => {
+                      setCoverLetterOverride(value);
                       setHasChanges(true);
                     }}
-                    placeholder="Enter your cover letter content..."
-                    className="min-h-[200px]"
-                    data-testid="textarea-cover-letter"
+                    subjectProperty={subjectProperty}
+                    properties={(cma?.propertiesData || []) as PropertyData[]}
+                    statistics={statistics}
+                    agentName={userName}
+                    companyName={companySettings?.companyName || "Spyglass Realty"}
                   />
-                  <p className="text-xs text-muted-foreground mt-2">
-                    Leave blank to use your default cover letter from agent settings
-                  </p>
                 </CardContent>
               </Card>
 

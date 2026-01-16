@@ -166,3 +166,95 @@ export async function getChatResponse(
 export function isOpenAIConfigured(): boolean {
   return !!process.env.OPENAI_API_KEY;
 }
+
+export interface CoverLetterContext {
+  subjectProperty: {
+    address: string;
+    price: number;
+    beds: number;
+    baths: number;
+    sqft: number;
+    description?: string;
+  };
+  comparables: {
+    count: number;
+    avgPrice: number;
+    medianPrice: number;
+    avgPricePerSqft: number;
+    priceRange: { min: number; max: number };
+  };
+  marketStats: {
+    avgDOM: number;
+    activeCount: number;
+    closedCount: number;
+  };
+  agentInfo: {
+    name: string;
+    brokerage: string;
+  };
+  clientName?: string;
+}
+
+export type CoverLetterTone = 'professional' | 'friendly' | 'confident';
+
+function buildCoverLetterPrompt(context: CoverLetterContext, tone: CoverLetterTone): string {
+  return `You are a real estate professional writing a cover letter for a Comparative Market Analysis (CMA) report.
+
+Property Details:
+- Address: ${context.subjectProperty.address}
+- List Price: $${context.subjectProperty.price.toLocaleString()}
+- Beds/Baths: ${context.subjectProperty.beds}/${context.subjectProperty.baths}
+- Square Feet: ${context.subjectProperty.sqft.toLocaleString()}
+${context.subjectProperty.description ? `- Description: ${context.subjectProperty.description}` : ''}
+
+Market Analysis Summary:
+- ${context.comparables.count} comparable properties analyzed
+- Average Price: $${context.comparables.avgPrice.toLocaleString()}
+- Median Price: $${context.comparables.medianPrice.toLocaleString()}
+- Average Price/SqFt: $${Math.round(context.comparables.avgPricePerSqft)}
+- Price Range: $${context.comparables.priceRange.min.toLocaleString()} - $${context.comparables.priceRange.max.toLocaleString()}
+- Average Days on Market: ${context.marketStats.avgDOM} days
+- Active Listings: ${context.marketStats.activeCount}
+- Recently Sold: ${context.marketStats.closedCount}
+
+Write a ${tone} cover letter that:
+1. ${context.clientName ? `Addresses the client (${context.clientName}) by name` : 'Has a professional greeting'}
+2. Introduces the CMA report and its purpose
+3. Summarizes the key market findings in an accessible way
+4. Provides context on current local market conditions
+5. Explains how this analysis helps make informed real estate decisions
+6. Offers to discuss the findings in more detail
+
+Keep it concise (2-3 paragraphs) and ${tone}. Do not use overly formal language or industry jargon.
+Sign off as: ${context.agentInfo.name}, ${context.agentInfo.brokerage}
+
+Return ONLY the cover letter text, no additional formatting or explanation.`;
+}
+
+export async function generateCoverLetter(
+  context: CoverLetterContext,
+  tone: CoverLetterTone = 'professional'
+): Promise<string> {
+  const prompt = buildCoverLetterPrompt(context, tone);
+
+  try {
+    const response = await openai.chat.completions.create({
+      model: "gpt-4o",
+      messages: [
+        { role: "user", content: prompt }
+      ],
+      max_tokens: 1024,
+      temperature: 0.7,
+    });
+
+    const content = response.choices[0].message.content;
+    if (!content) {
+      throw new Error("Empty response from AI");
+    }
+
+    return content.trim();
+  } catch (error: any) {
+    console.error("Cover letter generation error:", error);
+    throw new Error(`Failed to generate cover letter: ${error.message}`);
+  }
+}

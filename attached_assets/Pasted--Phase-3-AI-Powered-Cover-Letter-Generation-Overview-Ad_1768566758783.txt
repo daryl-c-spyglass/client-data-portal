@@ -1,0 +1,330 @@
+# Phase 3: AI-Powered Cover Letter Generation
+
+## Overview
+Add an AI assistant to generate personalized cover letters based on the CMA data, comparable properties, market statistics, and property description.
+
+---
+
+## Task 3.1: Create AI Cover Letter Generator Service
+```typescript
+// services/aiCoverLetterGenerator.ts
+interface CMAContext {
+  subjectProperty: {
+    address: string;
+    price: number;
+    beds: number;
+    baths: number;
+    sqft: number;
+    description?: string;
+  };
+  comparables: {
+    count: number;
+    avgPrice: number;
+    medianPrice: number;
+    avgPricePerSqft: number;
+    priceRange: { min: number; max: number };
+  };
+  marketStats: {
+    avgDOM: number;
+    activeCount: number;
+    closedCount: number;
+  };
+  agentInfo: {
+    name: string;
+    brokerage: string;
+  };
+  clientName?: string;
+}
+
+export async function generateCoverLetter(
+  context: CMAContext,
+  tone: 'professional' | 'friendly' | 'confident' = 'professional'
+): Promise<string> {
+  const prompt = buildCoverLetterPrompt(context, tone);
+  
+  const response = await fetch('/api/ai/generate-cover-letter', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ prompt, context })
+  });
+  
+  const data = await response.json();
+  return data.coverLetter;
+}
+
+function buildCoverLetterPrompt(context: CMAContext, tone: string): string {
+  return `
+You are a real estate professional writing a cover letter for a Comparative Market Analysis (CMA) report.
+
+Property Details:
+- Address: ${context.subjectProperty.address}
+- List Price: $${context.subjectProperty.price.toLocaleString()}
+- Beds/Baths: ${context.subjectProperty.beds}/${context.subjectProperty.baths}
+- Square Feet: ${context.subjectProperty.sqft.toLocaleString()}
+
+Market Analysis Summary:
+- ${context.comparables.count} comparable properties analyzed
+- Average Price: $${context.comparables.avgPrice.toLocaleString()}
+- Median Price: $${context.comparables.medianPrice.toLocaleString()}
+- Average Price/SqFt: $${context.comparables.avgPricePerSqft}
+- Price Range: $${context.comparables.priceRange.min.toLocaleString()} - $${context.comparables.priceRange.max.toLocaleString()}
+- Average Days on Market: ${context.marketStats.avgDOM} days
+
+Write a ${tone} cover letter that:
+1. Introduces the CMA report
+2. Summarizes the key market findings
+3. Provides context on the local market conditions
+4. Explains how this analysis helps the client make informed decisions
+5. Offers to discuss the findings in detail
+
+Keep it concise (2-3 paragraphs) and professional.
+Agent: ${context.agentInfo.name}, ${context.agentInfo.brokerage}
+${context.clientName ? `Client: ${context.clientName}` : ''}
+  `.trim();
+}
+```
+
+---
+
+## Task 3.2: Create API Endpoint for AI Generation
+```typescript
+// pages/api/ai/generate-cover-letter.ts (or routes/ai.ts)
+import Anthropic from '@anthropic-ai/sdk';
+
+const anthropic = new Anthropic({
+  apiKey: process.env.ANTHROPIC_API_KEY,
+});
+
+export async function POST(req: Request) {
+  const { prompt, context } = await req.json();
+  
+  try {
+    const message = await anthropic.messages.create({
+      model: 'claude-sonnet-4-20250514',
+      max_tokens: 1024,
+      messages: [
+        {
+          role: 'user',
+          content: prompt
+        }
+      ]
+    });
+    
+    const coverLetter = message.content[0].type === 'text' 
+      ? message.content[0].text 
+      : '';
+    
+    return Response.json({ coverLetter });
+  } catch (error) {
+    console.error('AI generation error:', error);
+    return Response.json(
+      { error: 'Failed to generate cover letter' },
+      { status: 500 }
+    );
+  }
+}
+```
+
+---
+
+## Task 3.3: Create Cover Letter UI with AI Option
+```jsx
+// components/presentation/CoverLetterEditor.tsx
+import { useState } from 'react';
+import { Sparkles, RefreshCw, Copy, Check } from 'lucide-react';
+import { generateCoverLetter } from '@/services/aiCoverLetterGenerator';
+
+interface CoverLetterEditorProps {
+  value: string;
+  onChange: (value: string) => void;
+  cmaData: CMAData;
+  agentInfo: AgentInfo;
+}
+
+export function CoverLetterEditor({ 
+  value, 
+  onChange, 
+  cmaData, 
+  agentInfo 
+}: CoverLetterEditorProps) {
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [tone, setTone] = useState<'professional' | 'friendly' | 'confident'>('professional');
+  const [copied, setCopied] = useState(false);
+
+  const handleGenerate = async () => {
+    setIsGenerating(true);
+    try {
+      const context = buildContextFromCMA(cmaData, agentInfo);
+      const letter = await generateCoverLetter(context, tone);
+      onChange(letter);
+    } catch (error) {
+      console.error('Failed to generate:', error);
+      // Show error toast
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
+  const handleCopy = () => {
+    navigator.clipboard.writeText(value);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <div>
+          <h3 className="font-semibold">Cover Letter</h3>
+          <p className="text-sm text-gray-600">
+            Customize the cover letter for this CMA report
+          </p>
+        </div>
+      </div>
+
+      {/* AI Generation Controls */}
+      <div className="bg-gradient-to-r from-purple-50 to-blue-50 border border-purple-100 rounded-lg p-4">
+        <div className="flex items-center gap-2 mb-3">
+          <Sparkles className="text-purple-500" size={18} />
+          <span className="font-medium text-purple-900">AI Assistant</span>
+        </div>
+        
+        <div className="flex flex-wrap items-center gap-3">
+          <div>
+            <label className="text-sm text-gray-600 mr-2">Tone:</label>
+            <select
+              value={tone}
+              onChange={(e) => setTone(e.target.value as any)}
+              className="border rounded px-2 py-1 text-sm"
+            >
+              <option value="professional">Professional</option>
+              <option value="friendly">Friendly</option>
+              <option value="confident">Confident</option>
+            </select>
+          </div>
+          
+          <button
+            onClick={handleGenerate}
+            disabled={isGenerating}
+            className={`
+              flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium
+              ${isGenerating 
+                ? 'bg-gray-100 text-gray-400 cursor-not-allowed' 
+                : 'bg-purple-500 text-white hover:bg-purple-600'
+              }
+            `}
+          >
+            {isGenerating ? (
+              <>
+                <RefreshCw size={16} className="animate-spin" />
+                Generating...
+              </>
+            ) : (
+              <>
+                <Sparkles size={16} />
+                Generate with AI
+              </>
+            )}
+          </button>
+        </div>
+        
+        <p className="text-xs text-gray-500 mt-2">
+          AI will create a cover letter based on your CMA data, comparables, and market statistics.
+        </p>
+      </div>
+
+      {/* Text Editor */}
+      <div className="relative">
+        <textarea
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          placeholder="Enter your cover letter content..."
+          className="w-full h-64 p-4 border rounded-lg resize-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+        />
+        
+        {value && (
+          <button
+            onClick={handleCopy}
+            className="absolute top-2 right-2 p-2 text-gray-400 hover:text-gray-600"
+            title="Copy to clipboard"
+          >
+            {copied ? <Check size={16} className="text-green-500" /> : <Copy size={16} />}
+          </button>
+        )}
+      </div>
+
+      <p className="text-xs text-gray-500">
+        Leave blank to use your default cover letter from agent settings.
+      </p>
+    </div>
+  );
+}
+
+function buildContextFromCMA(cmaData: CMAData, agentInfo: AgentInfo) {
+  const comparables = cmaData.comparableProperties || [];
+  const prices = comparables.map(p => p.price).filter(Boolean);
+  
+  return {
+    subjectProperty: {
+      address: cmaData.subjectProperty?.address || 'Property Address',
+      price: cmaData.subjectProperty?.price || 0,
+      beds: cmaData.subjectProperty?.beds || 0,
+      baths: cmaData.subjectProperty?.baths || 0,
+      sqft: cmaData.subjectProperty?.sqft || 0,
+    },
+    comparables: {
+      count: comparables.length,
+      avgPrice: prices.length ? prices.reduce((a, b) => a + b, 0) / prices.length : 0,
+      medianPrice: prices.length ? prices.sort((a, b) => a - b)[Math.floor(prices.length / 2)] : 0,
+      avgPricePerSqft: cmaData.stats?.avgPricePerSqft || 0,
+      priceRange: {
+        min: prices.length ? Math.min(...prices) : 0,
+        max: prices.length ? Math.max(...prices) : 0
+      }
+    },
+    marketStats: {
+      avgDOM: cmaData.stats?.avgDOM || 0,
+      activeCount: comparables.filter(p => p.status === 'Active').length,
+      closedCount: comparables.filter(p => p.status === 'Closed').length
+    },
+    agentInfo: {
+      name: agentInfo.name,
+      brokerage: agentInfo.brokerage || 'Spyglass Realty'
+    }
+  };
+}
+```
+
+---
+
+## Task 3.4: Add Client Name Input (Optional Personalization)
+```jsx
+// In Content tab, above Cover Letter
+<div className="mb-6">
+  <label className="block text-sm font-medium mb-2">Client Name (Optional)</label>
+  <input
+    type="text"
+    value={config.content.clientName || ''}
+    onChange={(e) => updateConfig('content.clientName', e.target.value)}
+    placeholder="e.g., John and Jane Smith"
+    className="w-full border rounded-lg px-3 py-2"
+  />
+  <p className="text-xs text-gray-500 mt-1">
+    Include client name for personalized cover letter greeting
+  </p>
+</div>
+```
+
+---
+
+## Acceptance Criteria
+
+- [ ] AI generate button appears in Cover Letter section
+- [ ] Three tone options: Professional, Friendly, Confident
+- [ ] AI uses actual CMA data (comparables, stats, property info)
+- [ ] Generated letter appears in editable textarea
+- [ ] User can edit AI-generated content
+- [ ] Loading state shown during generation
+- [ ] Error handling for API failures
+- [ ] Optional client name for personalization
+- [ ] Copy to clipboard functionality
