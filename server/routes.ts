@@ -3991,6 +3991,73 @@ This email was sent by ${senderName} (${senderEmail}) via the MLS Grid IDX Platf
     }
   });
 
+  // Get photo insights with AI classification and quality scores
+  // Reference: https://help.repliers.com/en/article/ai-powered-property-photo-classification-implementation-guide-l8jltq/
+  app.get("/api/repliers/listings/:mlsNumber/photo-insights", async (req, res) => {
+    try {
+      const client = getRepliersClient();
+      if (!client) {
+        // Return consistent response structure with error flag when API not configured
+        res.json({
+          mlsNumber: req.params.mlsNumber,
+          photos: [],
+          hasInsights: false,
+          error: "api_not_configured",
+          errorMessage: "Repliers API is not configured",
+        });
+        return;
+      }
+
+      // Request listing with imageInsights field included
+      const listing = await client.getListing(req.params.mlsNumber, 'photos,images,imageInsights');
+      
+      if (!listing) {
+        // Return consistent response structure with error flag when listing not found
+        res.json({
+          mlsNumber: req.params.mlsNumber,
+          photos: [],
+          hasInsights: false,
+          error: "listing_not_found",
+          errorMessage: "Listing not found in Repliers API",
+        });
+        return;
+      }
+
+      const photos = listing.images || listing.photos || [];
+      const imageInsights = (listing as any).imageInsights || [];
+
+      // Merge photos with their insights
+      const photosWithInsights = photos.map((photoUrl: string, index: number) => {
+        const insight = imageInsights[index] || {};
+        const url = photoUrl.startsWith('http') ? photoUrl : `https://cdn.repliers.io/${photoUrl}`;
+        
+        return {
+          url,
+          thumbnailUrl: url.replace('/full/', '/thumbnail/'), // Attempt thumbnail URL
+          classification: insight.classification || insight.label || null,
+          qualityScore: insight.qualityScore ?? insight.score ?? null,
+          confidence: insight.confidence ?? null,
+        };
+      });
+
+      res.json({
+        mlsNumber: req.params.mlsNumber,
+        photos: photosWithInsights,
+        hasInsights: imageInsights.length > 0,
+      });
+    } catch (error: any) {
+      console.error("Repliers photo insights error:", error.message);
+      // Return consistent response structure with error flag on error
+      res.json({
+        mlsNumber: req.params.mlsNumber,
+        photos: [],
+        hasInsights: false,
+        error: "fetch_failed",
+        errorMessage: error.message || "Failed to fetch photo insights",
+      });
+    }
+  });
+
   app.get("/api/repliers/locations", async (req, res) => {
     try {
       const client = getRepliersClient();

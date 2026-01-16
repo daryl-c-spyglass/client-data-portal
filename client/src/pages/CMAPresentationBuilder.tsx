@@ -57,6 +57,7 @@ import { ListingBrochureContent } from "@/components/ListingBrochureContent";
 import { ExpandedPreviewModal } from "@/components/ExpandedPreviewModal";
 import { MapboxCMAMap } from "@/components/presentation/MapboxCMAMap";
 import { CoverLetterEditor } from "@/components/presentation/CoverLetterEditor";
+import { PhotoSelectionModal, type Photo } from "@/components/presentation/PhotoSelectionModal";
 import {
   BarChart,
   Bar,
@@ -92,6 +93,7 @@ interface ReportConfigResponse {
   mapStyle?: 'streets' | 'satellite' | 'dark';
   showMapPolygon?: boolean;
   includeAgentFooter?: boolean;
+  customPhotoSelections?: Record<string, string[]>;
 }
 
 interface AuthUser {
@@ -116,6 +118,8 @@ const LAYOUT_OPTIONS = [
 const PHOTO_LAYOUT_OPTIONS = [
   { value: "first_dozen", label: "First 12 Photos" },
   { value: "all", label: "All Photos" },
+  { value: "ai_suggested", label: "AI Suggested (Best Quality)" },
+  { value: "custom", label: "Custom Selection" },
 ];
 
 interface PropertyData {
@@ -235,6 +239,9 @@ export default function CMAPresentationBuilder() {
     analysis: true,
   });
   const [brochure, setBrochure] = useState<CmaBrochure | null>(null);
+  const [isPhotoModalOpen, setIsPhotoModalOpen] = useState(false);
+  const [selectedPhotoProperty, setSelectedPhotoProperty] = useState<string | null>(null);
+  const [customPhotoSelections, setCustomPhotoSelections] = useState<Record<string, string[]>>({});
 
   const { data: cma, isLoading: cmaLoading, isError: cmaError } = useQuery<Cma | null>({
     queryKey: ["/api/cmas", cmaId],
@@ -290,10 +297,15 @@ export default function CMAPresentationBuilder() {
     queryKey: ["/api/auth/me"],
   });
 
+  // Get properties from CMA data
+  const properties = useMemo(() => {
+    return (cma?.propertiesData || []) as PropertyData[];
+  }, [cma?.propertiesData]);
+
   // Calculate statistics from CMA properties
   const { statistics, pricePerSqftData } = useMemo(() => {
-    const properties = (cma?.propertiesData || []) as PropertyData[];
-    const stats = calculateStatistics(properties);
+    const allProperties = properties;
+    const stats = calculateStatistics(allProperties);
     
     // Prepare chart data for price per sqft visualization
     const subjectId = cma?.subjectPropertyId;
@@ -319,11 +331,10 @@ export default function CMAPresentationBuilder() {
       .sort((a, b) => a.pricePerSqft - b.pricePerSqft);
 
     return { statistics: stats, pricePerSqftData: chartData };
-  }, [cma?.propertiesData, cma?.subjectPropertyId]);
+  }, [properties, cma?.subjectPropertyId]);
 
   // Prepare property locations for the map
   const { propertyLocations, subjectLocation } = useMemo(() => {
-    const properties = (cma?.propertiesData || []) as PropertyData[];
     const subjectId = cma?.subjectPropertyId;
     
     const locations = properties
@@ -348,7 +359,7 @@ export default function CMAPresentationBuilder() {
       propertyLocations: locations, 
       subjectLocation: subject 
     };
-  }, [cma?.propertiesData, cma?.subjectPropertyId]);
+  }, [properties, cma?.subjectPropertyId]);
 
   useEffect(() => {
     if (reportConfig) {
@@ -361,11 +372,13 @@ export default function CMAPresentationBuilder() {
       setMapStyle(reportConfig.mapStyle || "streets");
       setShowMapPolygon(reportConfig.showMapPolygon ?? true);
       setIncludeAgentFooter(reportConfig.includeAgentFooter ?? true);
+      setCustomPhotoSelections(reportConfig.customPhotoSelections || {});
     } else if (!configLoading) {
       const defaultSections = CMA_REPORT_SECTIONS.filter(s => s.defaultEnabled).map(s => s.id);
       setIncludedSections(defaultSections);
       setSectionOrder(CMA_REPORT_SECTIONS.map(s => s.id));
       setCoverLetterOverride(agentProfile?.defaultCoverLetter || "");
+      setCustomPhotoSelections({});
     }
   }, [reportConfig, configLoading, agentProfile]);
 
@@ -413,6 +426,9 @@ export default function CMAPresentationBuilder() {
         mapStyle,
         showMapPolygon,
         includeAgentFooter,
+        customPhotoSelections: Object.keys(customPhotoSelections).length > 0 
+          ? customPhotoSelections 
+          : undefined,
       };
 
       return apiRequest(`/api/cmas/${cmaId}/report-config`, "PUT", configData);
@@ -473,6 +489,7 @@ export default function CMAPresentationBuilder() {
     setMapStyle("streets");
     setShowMapPolygon(true);
     setIncludeAgentFooter(true);
+    setCustomPhotoSelections({});
     setHasChanges(true);
     toast({
       title: "Reset to defaults",
@@ -894,6 +911,43 @@ export default function CMAPresentationBuilder() {
                         ))}
                       </SelectContent>
                     </Select>
+                    
+                    {photoLayout === "ai_suggested" && (
+                      <p className="text-xs text-muted-foreground">
+                        Photos will be automatically ranked by AI quality scores from Repliers.
+                      </p>
+                    )}
+                    
+                    {photoLayout === "custom" && (
+                      <div className="mt-3 space-y-2">
+                        <p className="text-xs text-muted-foreground mb-2">
+                          Select photos for each property in your CMA
+                        </p>
+                        {properties.map((property, index) => {
+                          const mlsNumber = property.listingId || property.id || `prop-${index}`;
+                          const address = property.streetAddress || property.address || "Unknown Property";
+                          const photoCount = customPhotoSelections[mlsNumber]?.length || 0;
+                          
+                          return (
+                            <Button
+                              key={mlsNumber}
+                              variant="outline"
+                              className="w-full justify-between"
+                              onClick={() => {
+                                setSelectedPhotoProperty(mlsNumber);
+                                setIsPhotoModalOpen(true);
+                              }}
+                              data-testid={`button-select-photos-${index}`}
+                            >
+                              <span className="truncate text-left flex-1">{address}</span>
+                              <Badge variant="secondary" className="ml-2">
+                                {photoCount} selected
+                              </Badge>
+                            </Button>
+                          );
+                        })}
+                      </div>
+                    )}
                   </div>
                 </CardContent>
               </Card>
@@ -1622,7 +1676,78 @@ export default function CMAPresentationBuilder() {
           )}
         </div>
       </ExpandedPreviewModal>
+
+      {selectedPhotoProperty && (
+        <PhotoSelectionModalWrapper
+          isOpen={isPhotoModalOpen}
+          onClose={() => {
+            setIsPhotoModalOpen(false);
+            setSelectedPhotoProperty(null);
+          }}
+          mlsNumber={selectedPhotoProperty}
+          selectedPhotos={customPhotoSelections[selectedPhotoProperty] || []}
+          onSelectionChange={(urls) => {
+            setCustomPhotoSelections(prev => ({
+              ...prev,
+              [selectedPhotoProperty]: urls,
+            }));
+            setHasChanges(true);
+          }}
+          propertyAddress={
+            properties.find(p => (p.listingId || p.id) === selectedPhotoProperty)?.streetAddress ||
+            properties.find(p => (p.listingId || p.id) === selectedPhotoProperty)?.address ||
+            "Property"
+          }
+        />
+      )}
     </div>
+  );
+}
+
+function PhotoSelectionModalWrapper({
+  isOpen,
+  onClose,
+  mlsNumber,
+  selectedPhotos,
+  onSelectionChange,
+  propertyAddress,
+}: {
+  isOpen: boolean;
+  onClose: () => void;
+  mlsNumber: string;
+  selectedPhotos: string[];
+  onSelectionChange: (urls: string[]) => void;
+  propertyAddress: string;
+}) {
+  const { data: photoInsights, isLoading } = useQuery<{
+    photos: Photo[];
+    hasInsights: boolean;
+  }>({
+    queryKey: ["/api/repliers/listings", mlsNumber, "photo-insights"],
+    enabled: isOpen && !!mlsNumber,
+    queryFn: async () => {
+      const response = await fetch(`/api/repliers/listings/${mlsNumber}/photo-insights`);
+      if (!response.ok) {
+        // Fall back to basic photos if insights not available
+        return { photos: [], hasInsights: false };
+      }
+      return response.json();
+    },
+  });
+
+  const photos: Photo[] = photoInsights?.photos || [];
+
+  return (
+    <PhotoSelectionModal
+      isOpen={isOpen}
+      onClose={onClose}
+      photos={photos}
+      selectedPhotos={selectedPhotos}
+      onSelectionChange={onSelectionChange}
+      maxPhotos={12}
+      propertyAddress={propertyAddress}
+      isLoading={isLoading}
+    />
   );
 }
 

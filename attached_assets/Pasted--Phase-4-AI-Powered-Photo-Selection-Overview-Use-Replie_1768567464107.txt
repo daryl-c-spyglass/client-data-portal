@@ -1,0 +1,318 @@
+# Phase 4: AI-Powered Photo Selection
+
+## Overview
+Use Repliers AI photo classification to suggest the best property photos for the CMA presentation. Allow users to preview and select preferred photos.
+
+## Repliers API References
+- Photo Classification: https://repliers.com/introducing-ai-powered-photo-classification
+- Implementation Guide: https://help.repliers.com/en/article/ai-powered-property-photo-classification-implementation-guide-l8jltq/
+- Quality Scores: https://help.repliers.com/en/article/quality-scores-feature-implementation-guide-1kkedog/
+
+---
+
+## Task 4.1: Create Photo Selection Modal
+```jsx
+// components/presentation/PhotoSelectionModal.tsx
+import { useState, useEffect } from 'react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Sparkles, Check, Image as ImageIcon, Star } from 'lucide-react';
+
+interface Photo {
+  url: string;
+  thumbnailUrl?: string;
+  classification?: string;  // From Repliers: kitchen, bedroom, bathroom, exterior, etc.
+  qualityScore?: number;    // From Repliers: 0-100
+  isAISuggested?: boolean;
+}
+
+interface PhotoSelectionModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  photos: Photo[];
+  selectedPhotos: string[];
+  onSelectionChange: (urls: string[]) => void;
+  maxPhotos?: number;
+  propertyAddress: string;
+}
+
+const PHOTO_CATEGORIES = [
+  { id: 'all', label: 'All Photos' },
+  { id: 'exterior', label: 'Exterior' },
+  { id: 'kitchen', label: 'Kitchen' },
+  { id: 'living', label: 'Living Room' },
+  { id: 'bedroom', label: 'Bedroom' },
+  { id: 'bathroom', label: 'Bathroom' },
+  { id: 'other', label: 'Other' }
+];
+
+export function PhotoSelectionModal({
+  isOpen,
+  onClose,
+  photos,
+  selectedPhotos,
+  onSelectionChange,
+  maxPhotos = 12,
+  propertyAddress
+}: PhotoSelectionModalProps) {
+  const [selected, setSelected] = useState<string[]>(selectedPhotos);
+  const [category, setCategory] = useState('all');
+  const [showAISuggestions, setShowAISuggestions] = useState(false);
+
+  // Filter photos by category
+  const filteredPhotos = photos.filter(photo => {
+    if (category === 'all') return true;
+    return photo.classification?.toLowerCase().includes(category);
+  });
+
+  // Get AI suggested photos (top quality scores)
+  const aiSuggestedPhotos = [...photos]
+    .sort((a, b) => (b.qualityScore || 0) - (a.qualityScore || 0))
+    .slice(0, maxPhotos)
+    .map(p => p.url);
+
+  const togglePhoto = (url: string) => {
+    if (selected.includes(url)) {
+      setSelected(selected.filter(u => u !== url));
+    } else if (selected.length < maxPhotos) {
+      setSelected([...selected, url]);
+    }
+  };
+
+  const handleAISuggest = () => {
+    setSelected(aiSuggestedPhotos);
+    setShowAISuggestions(true);
+  };
+
+  const handleSave = () => {
+    onSelectionChange(selected);
+    onClose();
+  };
+
+  return (
+    <Dialog open={isOpen} onOpenChange={onClose}>
+      <DialogContent className="max-w-4xl max-h-[90vh] flex flex-col">
+        <DialogHeader>
+          <DialogTitle>Select Photos for {propertyAddress}</DialogTitle>
+        </DialogHeader>
+
+        {/* Controls */}
+        <div className="flex flex-wrap items-center justify-between gap-4 py-4 border-b">
+          {/* Category Filter */}
+          <div className="flex gap-1 overflow-x-auto">
+            {PHOTO_CATEGORIES.map(cat => (
+              <button
+                key={cat.id}
+                onClick={() => setCategory(cat.id)}
+                className={`
+                  px-3 py-1.5 text-sm rounded-full whitespace-nowrap
+                  ${category === cat.id 
+                    ? 'bg-orange-500 text-white' 
+                    : 'bg-gray-100 hover:bg-gray-200'
+                  }
+                `}
+              >
+                {cat.label}
+              </button>
+            ))}
+          </div>
+
+          {/* AI Suggest Button */}
+          <button
+            onClick={handleAISuggest}
+            className="flex items-center gap-2 px-4 py-2 bg-purple-500 text-white rounded-lg hover:bg-purple-600"
+          >
+            <Sparkles size={16} />
+            AI Suggest Best {maxPhotos}
+          </button>
+        </div>
+
+        {/* Selection Count */}
+        <div className="flex items-center justify-between py-2">
+          <span className="text-sm text-gray-600">
+            {selected.length} of {maxPhotos} photos selected
+          </span>
+          {selected.length > 0 && (
+            <button
+              onClick={() => setSelected([])}
+              className="text-sm text-red-500 hover:text-red-600"
+            >
+              Clear selection
+            </button>
+          )}
+        </div>
+
+        {/* Photo Grid */}
+        <div className="flex-1 overflow-y-auto">
+          <div className="grid grid-cols-4 gap-3 p-2">
+            {filteredPhotos.map((photo, index) => {
+              const isSelected = selected.includes(photo.url);
+              const isAISuggested = aiSuggestedPhotos.includes(photo.url);
+              const selectionIndex = selected.indexOf(photo.url);
+              
+              return (
+                <div
+                  key={photo.url}
+                  onClick={() => togglePhoto(photo.url)}
+                  className={`
+                    relative aspect-[4/3] rounded-lg overflow-hidden cursor-pointer
+                    border-2 transition-all
+                    ${isSelected 
+                      ? 'border-orange-500 ring-2 ring-orange-200' 
+                      : 'border-transparent hover:border-gray-300'
+                    }
+                  `}
+                >
+                  <img
+                    src={photo.thumbnailUrl || photo.url}
+                    alt={`Photo ${index + 1}`}
+                    className="w-full h-full object-cover"
+                  />
+                  
+                  {/* Selection indicator */}
+                  {isSelected && (
+                    <div className="absolute top-2 left-2 w-6 h-6 bg-orange-500 rounded-full flex items-center justify-center text-white text-xs font-bold">
+                      {selectionIndex + 1}
+                    </div>
+                  )}
+                  
+                  {/* AI badge */}
+                  {showAISuggestions && isAISuggested && (
+                    <div className="absolute top-2 right-2 bg-purple-500 text-white px-2 py-0.5 rounded text-xs flex items-center gap-1">
+                      <Sparkles size={10} />
+                      AI
+                    </div>
+                  )}
+                  
+                  {/* Quality score */}
+                  {photo.qualityScore && (
+                    <div className="absolute bottom-2 right-2 bg-black/70 text-white px-2 py-0.5 rounded text-xs flex items-center gap-1">
+                      <Star size={10} />
+                      {photo.qualityScore}
+                    </div>
+                  )}
+                  
+                  {/* Classification label */}
+                  {photo.classification && (
+                    <div className="absolute bottom-2 left-2 bg-black/70 text-white px-2 py-0.5 rounded text-xs capitalize">
+                      {photo.classification}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Footer */}
+        <div className="flex justify-end gap-3 pt-4 border-t">
+          <button
+            onClick={onClose}
+            className="px-4 py-2 border rounded-lg hover:bg-gray-50"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={handleSave}
+            className="px-4 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600"
+          >
+            Save Selection ({selected.length} photos)
+          </button>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+```
+
+---
+
+## Task 4.2: Integrate with Repliers imageInsights API
+```typescript
+// services/photoClassification.ts
+interface ImageInsight {
+  url: string;
+  classification: string;
+  confidence: number;
+  qualityScore: number;
+}
+
+export async function getPhotoInsights(mlsNumber: string): Promise<ImageInsight[]> {
+  // Repliers returns imageInsights in the listing response
+  const response = await fetch(
+    `/api/repliers/listings/${mlsNumber}?fields=photos,imageInsights`
+  );
+  const data = await response.json();
+  
+  const photos = data.photos || [];
+  const insights = data.imageInsights || [];
+  
+  // Merge photos with their insights
+  return photos.map((photoUrl: string, index: number) => ({
+    url: photoUrl,
+    classification: insights[index]?.classification || 'unknown',
+    confidence: insights[index]?.confidence || 0,
+    qualityScore: insights[index]?.qualityScore || 50
+  }));
+}
+```
+
+---
+
+## Task 4.3: Add Photo Selection to Layout Tab
+```jsx
+// In Layout tab
+<div className="space-y-4">
+  <h4 className="font-medium">Property Photos</h4>
+  
+  <div>
+    <label className="block text-sm font-medium mb-2">Photos per property</label>
+    <select
+      value={config.layout.photosPerProperty}
+      onChange={(e) => updateConfig('layout.photosPerProperty', e.target.value)}
+      className="w-full border rounded-lg px-3 py-2"
+    >
+      <option value="two">Two Photos per Property</option>
+      <option value="single">Single Photo per Property</option>
+      <option value="none">No Photos</option>
+    </select>
+  </div>
+  
+  <div>
+    <label className="block text-sm font-medium mb-2">Photo selection</label>
+    <select
+      value={config.layout.photoSelection}
+      onChange={(e) => updateConfig('layout.photoSelection', e.target.value)}
+      className="w-full border rounded-lg px-3 py-2"
+    >
+      <option value="first12">First 12 Photos</option>
+      <option value="all">All Photos</option>
+      <option value="aiSuggested">AI Suggested (Best Quality)</option>
+      <option value="custom">Custom Selection</option>
+    </select>
+  </div>
+  
+  {config.layout.photoSelection === 'custom' && (
+    <button
+      onClick={() => setPhotoModalOpen(true)}
+      className="w-full flex items-center justify-center gap-2 px-4 py-3 border-2 border-dashed rounded-lg hover:border-orange-300 hover:bg-orange-50"
+    >
+      <ImageIcon size={20} />
+      <span>Select Photos Manually</span>
+    </button>
+  )}
+</div>
+```
+
+---
+
+## Acceptance Criteria
+
+- [ ] Photo selection modal shows all property photos
+- [ ] Photos can be filtered by category (exterior, kitchen, etc.)
+- [ ] AI Suggest button selects top quality photos
+- [ ] Quality scores displayed on photos (when available)
+- [ ] Users can manually select/deselect photos
+- [ ] Selection order is preserved (numbered badges)
+- [ ] Maximum photo limit enforced
+- [ ] Selected photos saved to configuration
+- [ ] Integration with Repliers imageInsights API
