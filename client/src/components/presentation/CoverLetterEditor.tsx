@@ -18,6 +18,7 @@ import { apiRequest } from "@/lib/queryClient";
 interface PropertyData {
   address?: string;
   streetAddress?: string;
+  unparsedAddress?: string;
   listPrice?: number | string | null;
   bedroomsTotal?: number | string | null;
   bathroomsTotal?: number | string | null;
@@ -58,7 +59,7 @@ function buildContext(
   clientName?: string
 ) {
   const subject = subjectProperty || {};
-  const address = subject.streetAddress || subject.address || "Property Address";
+  const address = subject.streetAddress || subject.unparsedAddress || subject.address || "Property Address";
   const price = Number(subject.listPrice) || 0;
   const beds = Number(subject.bedroomsTotal) || 0;
   const baths = Number(subject.bathroomsTotal) || 0;
@@ -180,7 +181,7 @@ export function CoverLetterEditor({
     onClientNameChange?.(name);
   };
 
-  const hasSubjectData = !!(subjectProperty?.streetAddress || subjectProperty?.address);
+  const hasSubjectData = !!(subjectProperty?.streetAddress || subjectProperty?.unparsedAddress || subjectProperty?.address);
   const hasComparables = (statistics?.propertyCount || 0) > 0;
 
   return (

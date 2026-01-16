@@ -1,0 +1,689 @@
+🔧 REPLIT PROMPT: Fix AI Cover Letter — Data Binding + OpenAI Integration
+SCOPE
+Fix the AI Cover Letter feature so it:
+
+Properly detects CMA subject property data (currently shows warning even when data exists)
+Uses OpenAI API to generate personalized cover letters based on CMA data
+
+
+CURRENT STATE
+ComponentStatusCMA has subject property✅ ExistsCover Letter UI✅ BuiltAI Assistant UI✅ BuiltClient Name input✅ WorksTone selector✅ Works"Generate with AI" button❌ Disabled — thinks no dataWarning shown"Subject property data is needed for AI generation"OpenAI integration❌ Not connected
+
+PROBLEM SUMMARY
+┌─────────────────────────────────────────────────────────────────┐
+│                     CURRENT (BROKEN)                            │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                 │
+│   CMA Data ──────X──────► Cover Letter Component               │
+│   (has subject)           (doesn't see it)                      │
+│                                                                 │
+│   Result: "Subject property data is needed for AI generation"  │
+│                                                                 │
+└─────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────┐
+│                     TARGET (FIXED)                              │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                 │
+│   CMA Data ──────────────► Cover Letter Component               │
+│   (has subject)            (receives data)                      │
+│         │                        │                              │
+│         ▼                        ▼                              │
+│   Subject + Comps ──────► OpenAI API ──────► Generated Letter   │
+│                                                                 │
+└─────────────────────────────────────────────────────────────────┘
+
+PHASE 1: DIAGNOSIS — Find the Data Flow Issue
+Task 1.1: Locate the Cover Letter component
+bashgrep -ri "cover letter" --include="*.tsx" client/src/
+grep -ri "coverLetter" --include="*.tsx" client/src/
+grep -ri "Generate with AI" --include="*.tsx" client/src/
+grep -ri "Subject property data is needed" --include="*.tsx" client/src/
+Task 1.2: Add debug logging
+typescript// In the Cover Letter component, add:
+console.log('[CoverLetter] Full CMA:', cma);
+console.log('[CoverLetter] propertiesData:', cma?.propertiesData);
+console.log('[CoverLetter] subjectProperty:', cma?.subjectProperty);
+console.log('[CoverLetter] comparables:', cma?.comparablePropertyIds);
+Task 1.3: Identify the condition blocking AI generation
+typescript// Find the condition that shows the warning - likely something like:
+if (!subjectProperty) {
+  return <p>Subject property data is needed for AI generation</p>;
+}
+
+// Or:
+const canGenerate = !!cma?.subjectProperty?.address;
+
+PHASE 2: FIX DATA BINDING
+Task 2.1: Ensure subject property is passed to component
+typescript// In parent component (likely ContentTab.tsx or CMAPresentationBuilder.tsx)
+// Make sure Cover Letter component receives the data:
+
+<CoverLetterSection
+  cma={cma}
+  subjectProperty={cma?.propertiesData?.subject || cma?.subjectProperty}
+  comparables={cma?.propertiesData?.comparables || []}
+  onCoverLetterChange={handleCoverLetterChange}
+/>
+Task 2.2: Fix property path in component
+typescript// In CoverLetterSection component, normalize data access:
+
+const CoverLetterSection = ({ cma, subjectProperty, comparables, onCoverLetterChange }) => {
+  // Normalize subject property - check multiple possible paths
+  const subject = subjectProperty 
+    || cma?.propertiesData?.subject 
+    || cma?.subjectProperty
+    || null;
+  
+  // Normalize comparables
+  const comps = comparables 
+    || cma?.propertiesData?.comparables 
+    || [];
+  
+  // Check if we have minimum data for AI generation
+  const canGenerate = !!(subject?.address || subject?.streetAddress);
+  
+  console.log('[CoverLetter] Subject resolved:', subject);
+  console.log('[CoverLetter] Can generate:', canGenerate);
+  
+  // ... rest of component
+};
+Task 2.3: Update the warning condition
+typescript// Replace hardcoded check with proper validation:
+
+{!canGenerate ? (
+  <div className="flex items-center gap-2 text-amber-600 text-sm">
+    <AlertCircle className="w-4 h-4" />
+    <span>Subject property data is needed for AI generation</span>
+  </div>
+) : (
+  <Button 
+    onClick={handleGenerateWithAI}
+    disabled={isGenerating}
+  >
+    <Sparkles className="w-4 h-4 mr-2" />
+    {isGenerating ? 'Generating...' : 'Generate with AI'}
+  </Button>
+)}
+
+PHASE 3: OPENAI INTEGRATION
+Task 3.1: Add OpenAI API key to environment
+bash# In Replit Secrets, add:
+OPENAI_API_KEY=sk-...your-key...
+Task 3.2: Create server endpoint for AI generation
+typescript// server/routes/ai.ts (NEW FILE)
+
+import OpenAI from 'openai';
+import { Router } from 'express';
+import { requireAuth } from '../auth';
+
+const router = Router();
+
+const openai = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY,
+});
+
+interface GenerateCoverLetterRequest {
+  subjectProperty: {
+    address: string;
+    city: string;
+    state: string;
+    zipCode: string;
+    listPrice: number;
+    beds: number;
+    baths: number;
+    sqft: number;
+    yearBuilt?: number;
+    propertyType?: string;
+    description?: string;
+  };
+  comparables: {
+    address: string;
+    soldPrice: number;
+    sqft: number;
+  }[];
+  marketStats: {
+    averagePrice: number;
+    averagePricePerSqft: number;
+    averageDaysOnMarket: number;
+    totalActive: number;
+    totalSold: number;
+  };
+  clientName?: string;
+  tone: 'professional' | 'friendly' | 'luxury';
+  agentName: string;
+  agentTitle?: string;
+  brokerageName?: string;
+}
+
+router.post('/generate-cover-letter', requireAuth, async (req, res) => {
+  try {
+    const {
+      subjectProperty,
+      comparables,
+      marketStats,
+      clientName,
+      tone,
+      agentName,
+      agentTitle,
+      brokerageName,
+    }: GenerateCoverLetterRequest = req.body;
+
+    // Validate required data
+    if (!subjectProperty?.address) {
+      return res.status(400).json({ error: 'Subject property address is required' });
+    }
+
+    // Build the prompt
+    const prompt = buildCoverLetterPrompt({
+      subjectProperty,
+      comparables,
+      marketStats,
+      clientName,
+      tone,
+      agentName,
+      agentTitle,
+      brokerageName,
+    });
+
+    console.log('[AI] Generating cover letter for:', subjectProperty.address);
+
+    const completion = await openai.chat.completions.create({
+      model: 'gpt-4o',
+      messages: [
+        {
+          role: 'system',
+          content: `You are an expert real estate agent writing a CMA (Comparative Market Analysis) cover letter. 
+Write compelling, personalized cover letters that demonstrate market expertise and build client trust.
+Keep the letter concise (3-4 paragraphs) but informative.
+Do not use placeholder brackets like [Your Name] - use the actual data provided.
+Format the letter professionally with proper greeting and signature.`,
+        },
+        {
+          role: 'user',
+          content: prompt,
+        },
+      ],
+      temperature: 0.7,
+      max_tokens: 1000,
+    });
+
+    const generatedLetter = completion.choices[0]?.message?.content?.trim();
+
+    if (!generatedLetter) {
+      throw new Error('No content generated');
+    }
+
+    console.log('[AI] Cover letter generated successfully');
+
+    res.json({ 
+      coverLetter: generatedLetter,
+      tokensUsed: completion.usage?.total_tokens,
+    });
+
+  } catch (error) {
+    console.error('[AI] Cover letter generation error:', error);
+    res.status(500).json({ 
+      error: 'Failed to generate cover letter',
+      details: error instanceof Error ? error.message : 'Unknown error',
+    });
+  }
+});
+
+function buildCoverLetterPrompt(data: GenerateCoverLetterRequest): string {
+  const {
+    subjectProperty,
+    comparables,
+    marketStats,
+    clientName,
+    tone,
+    agentName,
+    agentTitle,
+    brokerageName,
+  } = data;
+
+  const toneInstructions = {
+    professional: 'Use a professional, business-like tone. Be formal but approachable.',
+    friendly: 'Use a warm, friendly tone. Be conversational and personable while maintaining professionalism.',
+    luxury: 'Use an elevated, sophisticated tone. Emphasize exclusivity, premium service, and attention to detail.',
+  };
+
+  const greeting = clientName 
+    ? `Address the letter to: ${clientName}`
+    : 'Use a general greeting like "Dear Homeowner" or "Dear Valued Client"';
+
+  const comparablesSummary = comparables?.length > 0
+    ? `
+Comparable properties analyzed:
+${comparables.slice(0, 5).map((c, i) => 
+  `${i + 1}. ${c.address} - Sold for $${c.soldPrice?.toLocaleString()} (${c.sqft?.toLocaleString()} sqft)`
+).join('\n')}`
+    : 'No comparable sales data available yet.';
+
+  const marketSummary = marketStats
+    ? `
+Current market conditions:
+- Average sale price: $${marketStats.averagePrice?.toLocaleString()}
+- Average price per sqft: $${marketStats.averagePricePerSqft?.toFixed(0)}
+- Average days on market: ${marketStats.averageDaysOnMarket} days
+- Active listings: ${marketStats.totalActive}
+- Recently sold: ${marketStats.totalSold}`
+    : '';
+
+  return `
+Write a CMA cover letter with the following details:
+
+TONE: ${toneInstructions[tone]}
+
+${greeting}
+
+SUBJECT PROPERTY:
+- Address: ${subjectProperty.address}, ${subjectProperty.city}, ${subjectProperty.state} ${subjectProperty.zipCode}
+- List/Estimated Price: $${subjectProperty.listPrice?.toLocaleString()}
+- Bedrooms: ${subjectProperty.beds}
+- Bathrooms: ${subjectProperty.baths}
+- Square Feet: ${subjectProperty.sqft?.toLocaleString()}
+- Year Built: ${subjectProperty.yearBuilt || 'N/A'}
+- Property Type: ${subjectProperty.propertyType || 'Residential'}
+
+${comparablesSummary}
+
+${marketSummary}
+
+AGENT INFORMATION:
+- Name: ${agentName}
+- Title: ${agentTitle || 'Real Estate Agent'}
+- Brokerage: ${brokerageName || 'Spyglass Realty'}
+
+Write a cover letter that:
+1. Opens with a personalized greeting
+2. Introduces the purpose of the CMA
+3. Highlights key insights about the property and market
+4. Demonstrates expertise with specific data points
+5. Ends with a call to action and professional signature
+
+Keep it to 3-4 paragraphs. Do not use any placeholder text or brackets.
+`;
+}
+
+export default router;
+Task 3.3: Register the AI route
+typescript// In server/index.ts or server/routes/index.ts
+
+import aiRouter from './routes/ai';
+
+// Add to routes
+app.use('/api/ai', aiRouter);
+Task 3.4: Install OpenAI package
+bashnpm install openai
+
+PHASE 4: FRONTEND — Connect to OpenAI Endpoint
+Task 4.1: Create AI generation hook
+typescript// client/src/hooks/useAICoverLetter.ts (NEW FILE)
+
+import { useState } from 'react';
+import { useToast } from '@/hooks/use-toast';
+
+interface GenerateCoverLetterParams {
+  subjectProperty: any;
+  comparables: any[];
+  marketStats?: any;
+  clientName?: string;
+  tone: 'professional' | 'friendly' | 'luxury';
+  agentName: string;
+  agentTitle?: string;
+  brokerageName?: string;
+}
+
+export function useAICoverLetter() {
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const { toast } = useToast();
+
+  const generateCoverLetter = async (params: GenerateCoverLetterParams): Promise<string | null> => {
+    setIsGenerating(true);
+    setError(null);
+
+    try {
+      console.log('[AI] Requesting cover letter generation:', params.subjectProperty?.address);
+
+      const response = await fetch('/api/ai/generate-cover-letter', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(params),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to generate cover letter');
+      }
+
+      const data = await response.json();
+      
+      toast({
+        title: 'Cover letter generated!',
+        description: 'Review and edit as needed.',
+      });
+
+      console.log('[AI] Cover letter generated, tokens used:', data.tokensUsed);
+      return data.coverLetter;
+
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Unknown error';
+      setError(message);
+      toast({
+        title: 'Generation failed',
+        description: message,
+        variant: 'destructive',
+      });
+      console.error('[AI] Generation error:', err);
+      return null;
+
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
+  return {
+    generateCoverLetter,
+    isGenerating,
+    error,
+  };
+}
+Task 4.2: Update Cover Letter component
+typescript// In CoverLetterSection.tsx (or wherever the component lives)
+
+import { useAICoverLetter } from '@/hooks/useAICoverLetter';
+import { useAuth } from '@/hooks/useAuth'; // or your auth hook
+
+const CoverLetterSection = ({ cma, onCoverLetterChange }) => {
+  const { user } = useAuth();
+  const { generateCoverLetter, isGenerating } = useAICoverLetter();
+  
+  const [clientName, setClientName] = useState(cma?.coverLetterClientName || '');
+  const [tone, setTone] = useState<'professional' | 'friendly' | 'luxury'>('professional');
+  const [coverLetter, setCoverLetter] = useState(cma?.coverLetter || '');
+
+  // Normalize subject property - check multiple possible paths
+  const subject = cma?.propertiesData?.subject 
+    || cma?.subjectProperty
+    || null;
+  
+  // Normalize comparables
+  const comparables = cma?.propertiesData?.comparables || [];
+  
+  // Calculate market stats from comparables
+  const marketStats = useMemo(() => {
+    if (!comparables.length) return null;
+    
+    const soldComps = comparables.filter(c => c.soldPrice);
+    if (!soldComps.length) return null;
+    
+    const avgPrice = soldComps.reduce((sum, c) => sum + c.soldPrice, 0) / soldComps.length;
+    const avgPricePerSqft = soldComps.reduce((sum, c) => sum + (c.soldPrice / c.sqft), 0) / soldComps.length;
+    const avgDOM = soldComps.reduce((sum, c) => sum + (c.daysOnMarket || 0), 0) / soldComps.length;
+    
+    return {
+      averagePrice: avgPrice,
+      averagePricePerSqft: avgPricePerSqft,
+      averageDaysOnMarket: Math.round(avgDOM),
+      totalActive: comparables.filter(c => c.status === 'Active').length,
+      totalSold: soldComps.length,
+    };
+  }, [comparables]);
+
+  // Check if we have minimum data for AI generation
+  const canGenerate = !!(subject?.address || subject?.streetAddress);
+
+  const handleGenerateWithAI = async () => {
+    if (!canGenerate || !subject) return;
+
+    const generated = await generateCoverLetter({
+      subjectProperty: {
+        address: subject.address || subject.streetAddress,
+        city: subject.city,
+        state: subject.state || subject.stateOrProvince,
+        zipCode: subject.zipCode || subject.postalCode,
+        listPrice: subject.listPrice || subject.price,
+        beds: subject.beds || subject.bedsTotal,
+        baths: subject.baths || subject.bathsTotal,
+        sqft: subject.sqft || subject.livingArea,
+        yearBuilt: subject.yearBuilt,
+        propertyType: subject.propertyType,
+        description: subject.description || subject.publicRemarks,
+      },
+      comparables: comparables.map(c => ({
+        address: c.address || c.streetAddress,
+        soldPrice: c.soldPrice || c.closePrice,
+        sqft: c.sqft || c.livingArea,
+      })),
+      marketStats,
+      clientName: clientName || undefined,
+      tone,
+      agentName: user?.name || user?.fullName || 'Your Agent',
+      agentTitle: user?.title,
+      brokerageName: user?.brokerage || 'Spyglass Realty',
+    });
+
+    if (generated) {
+      setCoverLetter(generated);
+      onCoverLetterChange?.(generated);
+    }
+  };
+
+  return (
+    <div className="space-y-4 p-4 border rounded-lg">
+      <div>
+        <h3 className="font-semibold text-lg">Cover Letter</h3>
+        <p className="text-sm text-muted-foreground">
+          Customize the cover letter for this CMA report
+        </p>
+      </div>
+
+      {/* Client Name Input */}
+      <div>
+        <Label htmlFor="clientName">Client Name (Optional)</Label>
+        <Input
+          id="clientName"
+          placeholder="e.g., John and Jane Smith"
+          value={clientName}
+          onChange={(e) => setClientName(e.target.value)}
+        />
+        <p className="text-xs text-muted-foreground mt-1">
+          Include client name for personalized cover letter greeting
+        </p>
+      </div>
+
+      {/* AI Assistant Section */}
+      <div className="bg-purple-50 dark:bg-purple-950/20 rounded-lg p-4 space-y-3">
+        <div className="flex items-center gap-2">
+          <Sparkles className="w-5 h-5 text-purple-600" />
+          <span className="font-medium text-purple-900 dark:text-purple-100">AI Assistant</span>
+        </div>
+
+        <div className="flex items-center gap-3">
+          <Label htmlFor="tone" className="text-sm">Tone:</Label>
+          <Select value={tone} onValueChange={(v) => setTone(v as typeof tone)}>
+            <SelectTrigger className="w-40">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="professional">Professional</SelectItem>
+              <SelectItem value="friendly">Friendly</SelectItem>
+              <SelectItem value="luxury">Luxury</SelectItem>
+            </SelectContent>
+          </Select>
+
+          {canGenerate ? (
+            <Button
+              onClick={handleGenerateWithAI}
+              disabled={isGenerating}
+              className="bg-purple-600 hover:bg-purple-700"
+            >
+              <Sparkles className="w-4 h-4 mr-2" />
+              {isGenerating ? 'Generating...' : 'Generate with AI'}
+            </Button>
+          ) : (
+            <div className="flex items-center gap-2 text-amber-600 text-sm">
+              <AlertCircle className="w-4 h-4" />
+              <span>Subject property data is needed for AI generation</span>
+            </div>
+          )}
+        </div>
+
+        <p className="text-xs text-muted-foreground">
+          AI will create a cover letter based on your CMA data, comparables, and market statistics.
+        </p>
+      </div>
+
+      {/* Cover Letter Textarea */}
+      <div>
+        <Textarea
+          placeholder="Enter your cover letter content, or use AI to generate one based on your CMA data..."
+          value={coverLetter}
+          onChange={(e) => {
+            setCoverLetter(e.target.value);
+            onCoverLetterChange?.(e.target.value);
+          }}
+          rows={12}
+          className="font-serif"
+        />
+        <p className="text-xs text-muted-foreground mt-1">
+          Leave blank to use your default cover letter from agent settings.
+        </p>
+      </div>
+    </div>
+  );
+};
+
+export default CoverLetterSection;
+
+PHASE 5: PERSIST COVER LETTER TO CMA
+Task 5.1: Add cover letter fields to CMA (if not already present)
+typescript// In shared/schema.ts - check if these exist, add if not:
+
+// In cmas table:
+coverLetter: text('cover_letter'),
+coverLetterClientName: varchar('cover_letter_client_name', { length: 255 }),
+Task 5.2: Add endpoint to save cover letter
+typescript// In server/routes/cma.ts
+
+app.put('/api/cmas/:id/cover-letter', requireAuth, async (req, res) => {
+  const { id } = req.params;
+  const { coverLetter, clientName } = req.body;
+
+  await db.update(cmas)
+    .set({
+      coverLetter,
+      coverLetterClientName: clientName,
+      updatedAt: new Date(),
+    })
+    .where(eq(cmas.id, id));
+
+  console.log('[CMA] Cover letter saved for:', id);
+  res.json({ success: true });
+});
+```
+
+---
+
+### FILES TO CREATE/MODIFY
+```
+server/
+├── routes/
+│   ├── ai.ts                           [NEW - OpenAI endpoint]
+│   ├── cma.ts                          [MODIFY - add cover letter save]
+│   └── index.ts                        [MODIFY - register ai routes]
+
+client/src/
+├── hooks/
+│   └── useAICoverLetter.ts             [NEW - AI generation hook]
+├── components/
+│   └── CMA/
+│       └── CoverLetterSection.tsx      [MODIFY - fix data binding + AI]
+
+shared/
+└── schema.ts                           [CHECK - cover letter fields]
+
+.env / Replit Secrets:
+└── OPENAI_API_KEY                      [ADD - OpenAI API key]
+
+ENVIRONMENT SETUP
+bash# Add to Replit Secrets:
+OPENAI_API_KEY=sk-...your-openai-api-key...
+```
+
+---
+
+### ACCEPTANCE CRITERIA
+
+**Data Binding:**
+- [ ] Subject property data detected when CMA has one
+- [ ] Warning message only shows when data truly missing
+- [ ] "Generate with AI" button enabled when data present
+
+**OpenAI Integration:**
+- [ ] OpenAI API key configured in Secrets
+- [ ] API endpoint `/api/ai/generate-cover-letter` works
+- [ ] Proper error handling for API failures
+- [ ] Rate limiting / token usage logged
+
+**Generated Content:**
+- [ ] Cover letter uses actual subject property address
+- [ ] Cover letter includes actual price, beds, baths, sqft
+- [ ] Comparable data referenced when available
+- [ ] Market stats included when available
+- [ ] Client name used in greeting (if provided)
+- [ ] Tone selection affects output style
+- [ ] Agent name and brokerage in signature
+
+**UX:**
+- [ ] Loading state shown during generation
+- [ ] Success toast on completion
+- [ ] Error toast on failure
+- [ ] Generated text appears in textarea
+- [ ] User can edit generated text
+- [ ] Cover letter saves to CMA record
+
+---
+
+### VALIDATION TESTS
+```
+Test 1: Data Detection
+1. Open CMA with subject property
+2. Navigate to Cover Letter section
+3. Verify NO warning about missing data
+4. Verify "Generate with AI" button is enabled
+
+Test 2: AI Generation
+1. Enter client name: "John Smith"
+2. Select tone: "Professional"
+3. Click "Generate with AI"
+4. Verify loading state appears
+5. Verify generated letter appears in textarea
+6. Verify letter mentions the actual subject address
+7. Verify letter addresses "John Smith"
+
+Test 3: Tone Variations
+1. Generate with "Professional" tone
+2. Generate with "Friendly" tone
+3. Generate with "Luxury" tone
+4. Verify each has distinctly different style
+
+Test 4: Persistence
+1. Generate a cover letter
+2. Make edits to the text
+3. Navigate away and return
+4. Verify edited text persists
+
+LOGGING
+typescript// Server-side
+console.log('[AI] Generating cover letter for:', subjectProperty.address);
+console.log('[AI] Cover letter generated, tokens used:', tokensUsed);
+console.log('[AI] Generation error:', error);
+console.log('[CMA] Cover letter saved for:', cmaId);
+
+// Client-side
+console.log('[CoverLetter] Subject resolved:', subject);
+console.log('[CoverLetter] Can generate:', canGenerate);
+console.log('[AI] Requesting cover letter generation:', address);

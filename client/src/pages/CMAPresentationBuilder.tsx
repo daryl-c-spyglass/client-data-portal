@@ -140,6 +140,7 @@ interface PropertyData {
   listingId?: string;
   address?: string;
   streetAddress?: string;
+  unparsedAddress?: string;
   city?: string;
   listPrice?: number | string | null;
   closePrice?: number | string | null;
