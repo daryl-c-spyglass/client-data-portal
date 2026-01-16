@@ -301,7 +301,7 @@ export default function CMAPresentationBuilder() {
   const { data: agentProfile, isLoading: profileLoading, isError: profileError } = useQuery<AgentProfile | null>({
     queryKey: ["/api/agent/profile"],
     queryFn: async () => {
-      const response = await fetch("/api/agent/profile");
+      const response = await fetch("/api/agent/profile", { cache: "no-store" });
       if (response.status === 404) return null;
       if (!response.ok) throw new Error("Failed to fetch profile");
       const data = await response.json();

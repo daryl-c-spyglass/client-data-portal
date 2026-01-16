@@ -1,0 +1,498 @@
+ Implement Repliers AI Photo Classification for Property Gallery
+SCOPE
+Implement "Browse by Room Type" tabs on Property Detail pages using Repliers imageInsights API data. Also enable AI-suggested photo selection for CMA reports based on classification and quality scores.
+
+ENGINEERING TASKS
+Task 1: Verify Repliers API returns imageInsights
+bash# Check current listing detail fetch
+grep -ri "imageInsights" --include="*.ts" --include="*.tsx" server/ client/
+
+# Check the Repliers API call for listing detail
+grep -ri "/listings/" --include="*.ts" server/routes/
+typescript// In server route that fetches listing detail, ensure imageInsights is requested
+// Repliers may require a specific parameter to include imageInsights
+
+// Example: Check if we need to add a query param
+const response = await fetch(
+  `https://api.repliers.io/listings/${mlsNumber}?imageInsights=true`,
+  { headers: { 'REPLIERS-API-KEY': process.env.REPLIERS_API_KEY } }
+);
+Task 2: Create normalized photo model with classifications
+typescript// shared/types/photos.ts
+
+export interface ClassifiedPhoto {
+  url: string;                    // Full CDN URL from images[]
+  filename: string;               // Original filename for matching
+  roomType: string | null;        // From imageInsights.classification.imageOf
+  confidence: number | null;      // From imageInsights.classification.prediction
+  qualityScore?: number | null;   // If using quality scores feature
+}
+
+export interface PhotoGalleryData {
+  allPhotos: ClassifiedPhoto[];
+  roomTypes: string[];            // Distinct room types with photos
+  hasClassifications: boolean;    // Whether imageInsights was available
+}
+
+// Room type display order (from Repliers supported list)
+export const ROOM_TYPE_ORDER = [
+  'Front of Structure',
+  'Entrance Foyer',
+  'Living Room',
+  'Dining Room',
+  'Kitchen',
+  'Primary Bedroom',
+  'Bedroom',
+  'Primary Bathroom',
+  'Bathroom',
+  'Office',
+  'Family Room',
+  'Laundry',
+  'Garage',
+  'Backyard',
+  'Pool',
+  'Other'
+];
+
+// Minimum confidence threshold (Repliers recommends 0.90)
+export const CLASSIFICATION_CONFIDENCE_THRESHOLD = 0.90;
+Task 3: Build photo normalizer utility
+typescript// server/utils/photoNormalizer.ts (or client-side)
+
+import { ClassifiedPhoto, PhotoGalleryData, ROOM_TYPE_ORDER, CLASSIFICATION_CONFIDENCE_THRESHOLD } from '@/shared/types/photos';
+
+interface RepliersListing {
+  images: string[];
+  imageInsights?: {
+    images: Array<{
+      image: string;
+      classification?: {
+        imageOf: string;
+        prediction: number;
+      };
+    }>;
+  };
+}
+
+export function normalizePhotos(listing: RepliersListing): PhotoGalleryData {
+  const { images = [], imageInsights } = listing;
+  
+  // Build lookup from imageInsights
+  const insightsMap = new Map<string, { roomType: string; confidence: number }>();
+  
+  if (imageInsights?.images) {
+    imageInsights.images.forEach(insight => {
+      if (insight.classification) {
+        insightsMap.set(insight.image, {
+          roomType: insight.classification.imageOf,
+          confidence: insight.classification.prediction
+        });
+      }
+    });
+  }
+  
+  // Normalize all photos
+  const allPhotos: ClassifiedPhoto[] = images.map(imageUrl => {
+    // Extract filename from URL for matching
+    const filename = imageUrl.split('/').pop() || imageUrl;
+    const insight = insightsMap.get(filename);
+    
+    return {
+      url: imageUrl,
+      filename,
+      roomType: insight?.roomType || null,
+      confidence: insight?.confidence || null
+    };
+  });
+  
+  // Get distinct room types that meet confidence threshold
+  const roomTypesSet = new Set<string>();
+  allPhotos.forEach(photo => {
+    if (photo.roomType && photo.confidence && photo.confidence >= CLASSIFICATION_CONFIDENCE_THRESHOLD) {
+      roomTypesSet.add(photo.roomType);
+    }
+  });
+  
+  // Sort room types by preferred order
+  const roomTypes = Array.from(roomTypesSet).sort((a, b) => {
+    const indexA = ROOM_TYPE_ORDER.indexOf(a);
+    const indexB = ROOM_TYPE_ORDER.indexOf(b);
+    // Unknown types go to end
+    return (indexA === -1 ? 999 : indexA) - (indexB === -1 ? 999 : indexB);
+  });
+  
+  // Log stats for debugging
+  console.log('[PhotoNormalizer] Stats:', {
+    totalPhotos: images.length,
+    hasImageInsights: !!imageInsights,
+    classifiedPhotos: allPhotos.filter(p => p.roomType).length,
+    highConfidencePhotos: allPhotos.filter(p => p.confidence && p.confidence >= CLASSIFICATION_CONFIDENCE_THRESHOLD).length,
+    roomTypesFound: roomTypes.length
+  });
+  
+  return {
+    allPhotos,
+    roomTypes,
+    hasClassifications: !!imageInsights && insightsMap.size > 0
+  };
+}
+
+// Get photos filtered by room type
+export function getPhotosByRoom(
+  photos: ClassifiedPhoto[], 
+  roomType: string | 'all',
+  includeUnclassified = false
+): ClassifiedPhoto[] {
+  if (roomType === 'all') {
+    return photos;
+  }
+  
+  return photos.filter(photo => {
+    if (photo.roomType === roomType && photo.confidence && photo.confidence >= CLASSIFICATION_CONFIDENCE_THRESHOLD) {
+      return true;
+    }
+    // Optionally include unclassified in "Other"
+    if (roomType === 'Other' && includeUnclassified && !photo.roomType) {
+      return true;
+    }
+    return false;
+  });
+}
+Task 4: Create Room Type Tabs component
+typescript// client/src/components/property/RoomTypeTabs.tsx
+
+import { useState } from 'react';
+import { ClassifiedPhoto, ROOM_TYPE_ORDER } from '@/shared/types/photos';
+
+interface RoomTypeTabsProps {
+  photos: ClassifiedPhoto[];
+  roomTypes: string[];
+  hasClassifications: boolean;
+  onFilterChange: (roomType: string | 'all') => void;
+}
+
+export function RoomTypeTabs({ 
+  photos, 
+  roomTypes, 
+  hasClassifications,
+  onFilterChange 
+}: RoomTypeTabsProps) {
+  const [activeTab, setActiveTab] = useState<string | 'all'>('all');
+  
+  const handleTabClick = (roomType: string | 'all') => {
+    setActiveTab(roomType);
+    onFilterChange(roomType);
+  };
+  
+  // Get count for each room type
+  const getCount = (roomType: string | 'all') => {
+    if (roomType === 'all') return photos.length;
+    return photos.filter(p => 
+      p.roomType === roomType && 
+      p.confidence && 
+      p.confidence >= 0.90
+    ).length;
+  };
+  
+  // If no classifications, don't show tabs
+  if (!hasClassifications || roomTypes.length === 0) {
+    return null;
+  }
+  
+  return (
+    <div className="mb-4">
+      <p className="text-sm text-muted-foreground mb-2">Browse by Room Type</p>
+      <div className="flex flex-wrap gap-2">
+        {/* All tab */}
+        <button
+          onClick={() => handleTabClick('all')}
+          className={`
+            px-3 py-1.5 text-sm rounded-full transition-colors
+            ${activeTab === 'all' 
+              ? 'bg-primary text-primary-foreground' 
+              : 'bg-muted hover:bg-muted/80'
+            }
+          `}
+        >
+          All ({getCount('all')})
+        </button>
+        
+        {/* Room type tabs */}
+        {roomTypes.map(roomType => (
+          <button
+            key={roomType}
+            onClick={() => handleTabClick(roomType)}
+            className={`
+              px-3 py-1.5 text-sm rounded-full transition-colors
+              ${activeTab === roomType 
+                ? 'bg-primary text-primary-foreground' 
+                : 'bg-muted hover:bg-muted/80'
+              }
+            `}
+          >
+            {roomType} ({getCount(roomType)})
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+Task 5: Integrate into Property Detail page
+typescript// In PropertyDetail.tsx or similar
+
+import { normalizePhotos, getPhotosByRoom } from '@/utils/photoNormalizer';
+import { RoomTypeTabs } from '@/components/property/RoomTypeTabs';
+
+function PropertyGallery({ listing }) {
+  const [activeRoomFilter, setActiveRoomFilter] = useState<string | 'all'>('all');
+  
+  // Normalize photos with classifications
+  const photoData = useMemo(() => normalizePhotos(listing), [listing]);
+  
+  // Filter photos based on active tab
+  const displayedPhotos = useMemo(() => 
+    getPhotosByRoom(photoData.allPhotos, activeRoomFilter),
+    [photoData.allPhotos, activeRoomFilter]
+  );
+  
+  return (
+    <div>
+      {/* Room Type Tabs */}
+      <RoomTypeTabs
+        photos={photoData.allPhotos}
+        roomTypes={photoData.roomTypes}
+        hasClassifications={photoData.hasClassifications}
+        onFilterChange={setActiveRoomFilter}
+      />
+      
+      {/* Photo Grid */}
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
+        {displayedPhotos.map((photo, index) => (
+          <div key={photo.url} className="relative aspect-[4/3]">
+            <img
+              src={photo.url}
+              alt={photo.roomType || `Photo ${index + 1}`}
+              className="w-full h-full object-cover rounded-lg"
+            />
+            {/* Optional: Show room type badge */}
+            {photo.roomType && (
+              <span className="absolute bottom-2 left-2 bg-black/60 text-white text-xs px-2 py-1 rounded">
+                {photo.roomType}
+              </span>
+            )}
+          </div>
+        ))}
+      </div>
+      
+      {/* No classifications warning (dev only) */}
+      {!photoData.hasClassifications && process.env.NODE_ENV === 'development' && (
+        <p className="text-xs text-amber-500 mt-2">
+          [Dev] imageInsights not available for this listing
+        </p>
+      )}
+    </div>
+  );
+}
+Task 6: AI-Suggested Best Photos for CMA
+typescript// client/src/components/CMA/PhotoSelectionModal.tsx
+
+import { ClassifiedPhoto } from '@/shared/types/photos';
+
+interface PhotoSelectionModalProps {
+  photos: ClassifiedPhoto[];
+  selectedPhotos: string[];
+  onSelectionChange: (urls: string[]) => void;
+  maxPhotos?: number;
+}
+
+export function PhotoSelectionModal({ 
+  photos, 
+  selectedPhotos, 
+  onSelectionChange,
+  maxPhotos = 12 
+}: PhotoSelectionModalProps) {
+  
+  // AI Suggest: Select best photos based on:
+  // 1. High confidence classifications
+  // 2. Variety of room types
+  // 3. Quality scores (if available)
+  const handleAISuggest = () => {
+    const suggested: string[] = [];
+    const usedRoomTypes = new Set<string>();
+    
+    // Priority room types for CMA
+    const priorityRooms = [
+      'Front of Structure',
+      'Kitchen',
+      'Living Room',
+      'Primary Bedroom',
+      'Primary Bathroom',
+      'Backyard'
+    ];
+    
+    // First pass: Get one of each priority room type
+    priorityRooms.forEach(roomType => {
+      const photo = photos.find(p => 
+        p.roomType === roomType && 
+        p.confidence && p.confidence >= 0.90 &&
+        !suggested.includes(p.url)
+      );
+      if (photo && suggested.length < maxPhotos) {
+        suggested.push(photo.url);
+        usedRoomTypes.add(roomType);
+      }
+    });
+    
+    // Second pass: Fill remaining slots with highest confidence photos
+    const remaining = photos
+      .filter(p => !suggested.includes(p.url) && p.confidence)
+      .sort((a, b) => (b.confidence || 0) - (a.confidence || 0));
+    
+    remaining.forEach(photo => {
+      if (suggested.length < maxPhotos) {
+        suggested.push(photo.url);
+      }
+    });
+    
+    onSelectionChange(suggested);
+    
+    console.log('[PhotoSelection] AI suggested:', {
+      total: suggested.length,
+      roomTypesIncluded: Array.from(usedRoomTypes)
+    });
+  };
+  
+  return (
+    <div>
+      <Button onClick={handleAISuggest} variant="outline">
+        <Sparkles className="w-4 h-4 mr-2" />
+        AI Suggest Best Photos
+      </Button>
+      {/* ... rest of modal */}
+    </div>
+  );
+}
+```
+
+---
+
+### FILES TO CREATE/MODIFY
+```
+shared/
+└── types/
+    └── photos.ts                       [CREATE - photo types and constants]
+
+server/
+├── routes/
+│   └── listings.ts                     [MODIFY - ensure imageInsights returned]
+└── utils/
+    └── photoNormalizer.ts              [CREATE - normalize photos with classifications]
+
+client/src/
+├── components/
+│   ├── property/
+│   │   ├── RoomTypeTabs.tsx            [CREATE - room filter tabs]
+│   │   └── PropertyGallery.tsx         [MODIFY - integrate room tabs]
+│   └── CMA/
+│       └── PhotoSelectionModal.tsx     [MODIFY - add AI suggest feature]
+└── pages/
+    └── PropertyDetail.tsx              [MODIFY - use normalized photos]
+
+ACCEPTANCE CRITERIA
+Room Type Tabs:
+
+ Property detail page shows "Browse by Room Type" tabs when imageInsights available
+ Tabs appear in standard order: All, Front of Structure, Kitchen, Living Room, etc.
+ Only room types with photos (confidence >= 0.90) appear as tabs
+ Clicking tab filters gallery to show only that room type
+ "All" tab shows all photos regardless of classification
+ Photos without classification still appear in "All" (never dropped)
+
+AI Photo Suggestions:
+
+ "AI Suggest Best Photos" button in CMA photo selection
+ Selects variety of room types (exterior, kitchen, living, bedroom, bath)
+ Prioritizes high-confidence classifications
+ Respects max photo limit
+
+No Silent Fallbacks:
+
+ If imageInsights missing, show "All" tab only (no room tabs)
+ Log dev warning when imageInsights unavailable
+ Never drop photos due to missing classification
+
+
+LOGGING
+typescript// Photo normalizer
+console.log('[PhotoNormalizer] Stats:', {
+  totalPhotos: images.length,
+  hasImageInsights: !!imageInsights,
+  classifiedPhotos: classifiedCount,
+  highConfidencePhotos: highConfCount,
+  roomTypesFound: roomTypes.length,
+  roomTypes: roomTypes
+});
+
+// Room tab selection
+console.log('[RoomTabs] Filter changed:', {
+  roomType: activeTab,
+  photosShown: displayedPhotos.length
+});
+
+// AI photo suggestion
+console.log('[PhotoSelection] AI suggested:', {
+  total: suggested.length,
+  roomTypesIncluded: Array.from(usedRoomTypes)
+});
+```
+
+---
+
+### VALIDATION TESTS
+
+**Test 1: Listing with imageInsights**
+```
+1. Open a property detail page
+2. Verify room type tabs appear (Front of Structure, Kitchen, etc.)
+3. Click "Kitchen" tab
+4. Verify only kitchen photos shown
+5. Click "All" tab
+6. Verify all photos shown
+7. Check console for [PhotoNormalizer] stats
+```
+
+**Test 2: Listing without imageInsights**
+```
+1. Find/mock a listing without imageInsights
+2. Open property detail page
+3. Verify NO room type tabs appear
+4. Verify all photos still display
+5. Check console shows warning: "imageInsights not available"
+```
+
+**Test 3: CMA AI Photo Selection**
+```
+1. Go to CMA > Add comparables
+2. Open photo selection for a property
+3. Click "AI Suggest Best Photos"
+4. Verify it selects variety of room types
+5. Verify it doesn't exceed max photo limit
+6. Check console for selection stats
+```
+
+**Test 4: Low confidence filtering**
+```
+1. Find listing with mixed confidence scores
+2. Verify tabs only show for rooms with >= 0.90 confidence
+3. Verify low-confidence photos still appear in "All"
+
+REPLIERS API VERIFICATION
+Before implementing, verify with a test API call:
+bashcurl -X GET "https://api.repliers.io/listings/YOUR_MLS_NUMBER" \
+  -H "REPLIERS-API-KEY: your-key" \
+  | jq '.imageInsights'
+If imageInsights is null/missing, check Repliers docs for:
+
+Is it a separate API feature that needs enabling?
+Does it require a query parameter like ?imageInsights=true?
+Is it only available for certain MLS boards (ACTRIS)?
