@@ -61,6 +61,7 @@ import { CoverLetterEditor } from "@/components/presentation/CoverLetterEditor";
 import { CoverPageEditor, getDefaultCoverPageConfig, type CoverPageConfig } from "@/components/presentation/CoverPageEditor";
 import { PhotoSelectionModal, type Photo } from "@/components/presentation/PhotoSelectionModal";
 import { SaveAsTemplateModal } from "@/components/presentation/SaveAsTemplateModal";
+import { LoadTemplateDropdown } from "@/components/presentation/LoadTemplateDropdown";
 import {
   BarChart,
   Bar,
@@ -81,6 +82,7 @@ import {
   type Cma,
   type CmaBrochure,
   type CmaAdjustmentsData,
+  type CmaReportTemplate,
 } from "@shared/schema";
 import {
   calculateAdjustments,
@@ -618,6 +620,41 @@ export default function CMAPresentationBuilder() {
     }
   };
 
+  const handleApplyTemplate = (template: CmaReportTemplate) => {
+    if (template.includedSections) {
+      setIncludedSections(template.includedSections as CmaSectionId[]);
+    }
+    if (template.sectionOrder) {
+      setSectionOrder(template.sectionOrder as CmaSectionId[]);
+    }
+    if (template.coverLetterOverride) {
+      setCoverLetterOverride(template.coverLetterOverride);
+    }
+    if (template.layout) {
+      setLayout(template.layout);
+    }
+    if (template.photoLayout) {
+      setPhotoLayout(template.photoLayout);
+    }
+    if (template.mapStyle) {
+      setMapStyle(template.mapStyle as 'streets' | 'satellite');
+    }
+    if (template.showMapPolygon !== null && template.showMapPolygon !== undefined) {
+      setShowMapPolygon(template.showMapPolygon);
+    }
+    if (template.includeAgentFooter !== null && template.includeAgentFooter !== undefined) {
+      setIncludeAgentFooter(template.includeAgentFooter);
+    }
+    if (template.coverPageConfig) {
+      setCoverPageConfig(template.coverPageConfig);
+    }
+    
+    toast({
+      title: "Template applied",
+      description: `Configuration loaded from "${template.name}".`,
+    });
+  };
+
   const handleExportPdf = async () => {
     if (!cma) return;
     
@@ -765,6 +802,7 @@ export default function CMAPresentationBuilder() {
             )}
             Save Configuration
           </Button>
+          <LoadTemplateDropdown onApply={handleApplyTemplate} />
           <Button
             variant="outline"
             onClick={() => setIsTemplateModalOpen(true)}

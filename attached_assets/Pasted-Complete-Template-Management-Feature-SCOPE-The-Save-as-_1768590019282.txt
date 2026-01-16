@@ -1,0 +1,543 @@
+Complete Template Management Feature
+SCOPE
+The "Save as Template" button exists in the Presentation Builder, but users cannot view, manage, or apply saved templates. Complete the template management feature.
+
+CURRENT STATE
+ComponentStatus"Save as Template" button✅ Exists (UI)Save template logic❓ UnknownView saved templates❌ MissingApply template to new CMA❌ MissingDelete/edit templates❌ MissingTemplate storage (DB)❓ Unknown
+
+DIAGNOSIS TASKS
+Task 1: Check if template saving actually works
+bash# Search for template-related code
+grep -ri "template" --include="*.tsx" client/src/
+grep -ri "template" --include="*.ts" server/
+grep -ri "saveAsTemplate" --include="*.tsx" client/src/
+grep -ri "presentation_templates" shared/schema.ts
+Task 2: Check database for templates table
+typescript// Does a templates table exist in schema.ts?
+// Look for: presentation_templates, cma_templates, or similar
+Task 3: Check what "Save as Template" button does
+typescript// In CMAPresentationBuilder.tsx, find the button handler:
+// What function does it call?
+// Does it save to DB or just show a toast?
+
+console.log('[Template] Save as Template clicked');
+```
+
+---
+
+### REQUIRED FEATURES
+
+**Feature 1: Save as Template (complete the flow)**
+```
+When user clicks "Save as Template":
+1. Show modal asking for template name
+2. Save current section configuration to templates table
+3. Show success toast
+4. Template is now available for future use
+```
+
+**Feature 2: Template Library / Manager**
+```
+Location: Accessible from Presentation Builder OR Settings
+
+┌─────────────────────────────────────────────────────────────────┐
+│ My Presentation Templates                        [+ New Template]│
+├─────────────────────────────────────────────────────────────────┤
+│                                                                 │
+│ ┌─────────────────────────────────────────────────────────────┐ │
+│ │ ★ Default Template                              [Apply] [⋮] │ │
+│ │   12 sections enabled • Created Jan 10, 2026                │ │
+│ └─────────────────────────────────────────────────────────────┘ │
+│                                                                 │
+│ ┌─────────────────────────────────────────────────────────────┐ │
+│ │   Luxury Listing Template                       [Apply] [⋮] │ │
+│ │   8 sections enabled • Created Jan 15, 2026                 │ │
+│ └─────────────────────────────────────────────────────────────┘ │
+│                                                                 │
+│ ┌─────────────────────────────────────────────────────────────┐ │
+│ │   Quick CMA Template                            [Apply] [⋮] │ │
+│ │   5 sections enabled • Created Jan 16, 2026                 │ │
+│ └─────────────────────────────────────────────────────────────┘ │
+│                                                                 │
+└─────────────────────────────────────────────────────────────────┘
+
+Dropdown menu [⋮]:
+- Rename
+- Set as Default
+- Duplicate
+- Delete
+```
+
+**Feature 3: Apply Template**
+```
+Option A: From Template Library
+- Click "Apply" on a template
+- Select which CMA to apply it to (or current)
+
+Option B: When creating new CMA Presentation
+- Show template selector before builder loads
+- "Start from: [Default Template ▼]"
+
+Option C: In Presentation Builder
+- Add "Load Template" button next to "Save as Template"
+- Shows dropdown of available templates
+
+DATA MODEL
+Task 4: Create/verify templates table
+typescript// In shared/schema.ts
+
+export const presentationTemplates = pgTable('presentation_templates', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  name: varchar('name', { length: 255 }).notNull(),
+  description: text('description'),
+  
+  // The actual template configuration
+  sectionConfig: jsonb('section_config').$type<{
+    sections: {
+      id: string;
+      enabled: boolean;
+      order: number;
+    }[];
+    layout?: {
+      // any layout settings
+    };
+  }>().notNull(),
+  
+  // Ownership
+  userId: uuid('user_id').references(() => users.id).notNull(),
+  isDefault: boolean('is_default').default(false),
+  isShared: boolean('is_shared').default(false), // For team templates
+  
+  // Metadata
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+});
+
+API ENDPOINTS
+Task 5: Create template API routes
+typescript// server/routes/templates.ts (NEW FILE)
+
+import { Router } from 'express';
+import { requireAuth } from '../auth';
+import { db } from '../db';
+import { presentationTemplates } from '@shared/schema';
+import { eq, and } from 'drizzle-orm';
+
+const router = Router();
+
+// GET /api/templates - List user's templates
+router.get('/', requireAuth, async (req, res) => {
+  const templates = await db.query.presentationTemplates.findMany({
+    where: eq(presentationTemplates.userId, req.user.id),
+    orderBy: (t, { desc }) => [desc(t.isDefault), desc(t.createdAt)],
+  });
+  
+  console.log('[Templates] Fetched templates for user:', req.user.id, 'Count:', templates.length);
+  res.json(templates);
+});
+
+// GET /api/templates/:id - Get single template
+router.get('/:id', requireAuth, async (req, res) => {
+  const template = await db.query.presentationTemplates.findFirst({
+    where: and(
+      eq(presentationTemplates.id, req.params.id),
+      eq(presentationTemplates.userId, req.user.id)
+    ),
+  });
+  
+  if (!template) {
+    return res.status(404).json({ error: 'Template not found' });
+  }
+  
+  res.json(template);
+});
+
+// POST /api/templates - Create new template
+router.post('/', requireAuth, async (req, res) => {
+  const { name, description, sectionConfig, isDefault } = req.body;
+  
+  if (!name || !sectionConfig) {
+    return res.status(400).json({ error: 'Name and section config required' });
+  }
+  
+  // If setting as default, unset other defaults first
+  if (isDefault) {
+    await db.update(presentationTemplates)
+      .set({ isDefault: false })
+      .where(eq(presentationTemplates.userId, req.user.id));
+  }
+  
+  const [template] = await db.insert(presentationTemplates)
+    .values({
+      name,
+      description,
+      sectionConfig,
+      isDefault: isDefault || false,
+      userId: req.user.id,
+    })
+    .returning();
+  
+  console.log('[Templates] Created template:', template.id, template.name);
+  res.json(template);
+});
+
+// PUT /api/templates/:id - Update template
+router.put('/:id', requireAuth, async (req, res) => {
+  const { name, description, sectionConfig, isDefault } = req.body;
+  
+  // If setting as default, unset other defaults first
+  if (isDefault) {
+    await db.update(presentationTemplates)
+      .set({ isDefault: false })
+      .where(eq(presentationTemplates.userId, req.user.id));
+  }
+  
+  const [template] = await db.update(presentationTemplates)
+    .set({
+      name,
+      description,
+      sectionConfig,
+      isDefault,
+      updatedAt: new Date(),
+    })
+    .where(and(
+      eq(presentationTemplates.id, req.params.id),
+      eq(presentationTemplates.userId, req.user.id)
+    ))
+    .returning();
+  
+  if (!template) {
+    return res.status(404).json({ error: 'Template not found' });
+  }
+  
+  console.log('[Templates] Updated template:', template.id);
+  res.json(template);
+});
+
+// DELETE /api/templates/:id - Delete template
+router.delete('/:id', requireAuth, async (req, res) => {
+  const [deleted] = await db.delete(presentationTemplates)
+    .where(and(
+      eq(presentationTemplates.id, req.params.id),
+      eq(presentationTemplates.userId, req.user.id)
+    ))
+    .returning();
+  
+  if (!deleted) {
+    return res.status(404).json({ error: 'Template not found' });
+  }
+  
+  console.log('[Templates] Deleted template:', req.params.id);
+  res.json({ success: true });
+});
+
+export default router;
+
+FRONTEND IMPLEMENTATION
+Task 6: Save as Template Modal
+typescript// client/src/components/CMA/SaveTemplateModal.tsx (NEW)
+
+interface SaveTemplateModalProps {
+  open: boolean;
+  onClose: () => void;
+  sectionConfig: SectionConfig;
+  onSaved: (template: Template) => void;
+}
+
+const SaveTemplateModal = ({ open, onClose, sectionConfig, onSaved }) => {
+  const [name, setName] = useState('');
+  const [description, setDescription] = useState('');
+  const [isDefault, setIsDefault] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+
+  const handleSave = async () => {
+    if (!name.trim()) {
+      toast.error('Please enter a template name');
+      return;
+    }
+
+    setIsSaving(true);
+    try {
+      const response = await fetch('/api/templates', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: name.trim(),
+          description: description.trim() || null,
+          sectionConfig,
+          isDefault,
+        }),
+      });
+
+      if (!response.ok) throw new Error('Failed to save template');
+
+      const template = await response.json();
+      toast.success(`Template "${name}" saved!`);
+      onSaved(template);
+      onClose();
+    } catch (error) {
+      toast.error('Failed to save template');
+      console.error('[Template] Save error:', error);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onClose}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Save as Template</DialogTitle>
+          <DialogDescription>
+            Save your current section configuration as a reusable template.
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="space-y-4 py-4">
+          <div>
+            <Label htmlFor="template-name">Template Name *</Label>
+            <Input
+              id="template-name"
+              placeholder="e.g., Luxury Listing Template"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+            />
+          </div>
+
+          <div>
+            <Label htmlFor="template-description">Description (optional)</Label>
+            <Textarea
+              id="template-description"
+              placeholder="Describe when to use this template..."
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              rows={2}
+            />
+          </div>
+
+          <div className="flex items-center gap-2">
+            <Checkbox
+              id="is-default"
+              checked={isDefault}
+              onCheckedChange={setIsDefault}
+            />
+            <Label htmlFor="is-default" className="text-sm">
+              Set as my default template for new presentations
+            </Label>
+          </div>
+
+          <div className="bg-muted p-3 rounded-lg">
+            <p className="text-sm text-muted-foreground">
+              This template will save:
+            </p>
+            <ul className="text-sm mt-2 space-y-1">
+              <li>• {sectionConfig.sections.filter(s => s.enabled).length} enabled sections</li>
+              <li>• Section order and arrangement</li>
+              <li>• Layout settings</li>
+            </ul>
+          </div>
+        </div>
+
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose}>Cancel</Button>
+          <Button onClick={handleSave} disabled={isSaving || !name.trim()}>
+            {isSaving ? 'Saving...' : 'Save Template'}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+};
+Task 7: Load Template Dropdown
+typescript// client/src/components/CMA/LoadTemplateDropdown.tsx (NEW)
+
+const LoadTemplateDropdown = ({ onApply }) => {
+  const { data: templates, isLoading } = useQuery({
+    queryKey: ['presentation-templates'],
+    queryFn: () => fetch('/api/templates').then(r => r.json()),
+  });
+
+  const handleApply = (template: Template) => {
+    // Confirm before overwriting current config
+    if (confirm(`Apply "${template.name}" template? This will replace your current section configuration.`)) {
+      onApply(template.sectionConfig);
+      toast.success(`Applied template: ${template.name}`);
+    }
+  };
+
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button variant="outline" size="sm">
+          <FolderOpen className="w-4 h-4 mr-2" />
+          Load Template
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="w-64">
+        <DropdownMenuLabel>My Templates</DropdownMenuLabel>
+        <DropdownMenuSeparator />
+        
+        {isLoading ? (
+          <DropdownMenuItem disabled>Loading...</DropdownMenuItem>
+        ) : templates?.length === 0 ? (
+          <DropdownMenuItem disabled>No saved templates</DropdownMenuItem>
+        ) : (
+          templates?.map((template) => (
+            <DropdownMenuItem
+              key={template.id}
+              onClick={() => handleApply(template)}
+              className="flex flex-col items-start"
+            >
+              <div className="flex items-center gap-2">
+                {template.isDefault && <Star className="w-3 h-3 text-yellow-500" />}
+                <span className="font-medium">{template.name}</span>
+              </div>
+              <span className="text-xs text-muted-foreground">
+                {template.sectionConfig.sections.filter(s => s.enabled).length} sections
+              </span>
+            </DropdownMenuItem>
+          ))
+        )}
+        
+        <DropdownMenuSeparator />
+        <DropdownMenuItem onClick={() => navigate('/settings/templates')}>
+          <Settings className="w-4 h-4 mr-2" />
+          Manage Templates
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+};
+Task 8: Update Presentation Builder header
+typescript// In CMAPresentationBuilder.tsx - Update header buttons
+
+<div className="flex items-center gap-2">
+  <Button variant="outline" size="sm" onClick={handleReset}>
+    <RotateCcw className="w-4 h-4 mr-2" />
+    Reset
+  </Button>
+  
+  {/* NEW: Load Template dropdown */}
+  <LoadTemplateDropdown onApply={handleApplyTemplate} />
+  
+  <Button 
+    variant="default" 
+    size="sm" 
+    onClick={() => handleSaveConfiguration()}
+    className="bg-orange-500 hover:bg-orange-600"
+  >
+    <Save className="w-4 h-4 mr-2" />
+    Save Configuration
+  </Button>
+  
+  <Button 
+    variant="outline" 
+    size="sm" 
+    onClick={() => setShowSaveTemplateModal(true)}
+  >
+    <FileText className="w-4 h-4 mr-2" />
+    Save as Template
+  </Button>
+  
+  <Button variant="outline" size="sm" onClick={handleExportPDF}>
+    <Download className="w-4 h-4 mr-2" />
+    Export PDF
+  </Button>
+</div>
+
+{/* Save Template Modal */}
+<SaveTemplateModal
+  open={showSaveTemplateModal}
+  onClose={() => setShowSaveTemplateModal(false)}
+  sectionConfig={currentSectionConfig}
+  onSaved={(template) => {
+    console.log('[Template] Saved:', template.name);
+  }}
+/>
+Task 9: Template Management Page (optional but recommended)
+typescript// client/src/pages/TemplatesPage.tsx (NEW)
+// Accessible from Settings or direct route
+
+// Full CRUD interface for managing templates
+// - List all templates
+// - Edit template names/descriptions
+// - Set default
+// - Delete templates
+// - Preview template section configuration
+```
+
+---
+
+### FILES TO CREATE/MODIFY
+```
+shared/
+└── schema.ts                           [MODIFY - add presentationTemplates table]
+
+server/
+├── routes/
+│   ├── templates.ts                    [NEW - template API routes]
+│   └── index.ts                        [MODIFY - register template routes]
+
+client/src/
+├── components/
+│   └── CMA/
+│       ├── SaveTemplateModal.tsx       [NEW]
+│       ├── LoadTemplateDropdown.tsx    [NEW]
+│       └── CMAPresentationBuilder.tsx  [MODIFY - integrate template features]
+├── pages/
+│   └── TemplatesPage.tsx               [NEW - template management page]
+└── hooks/
+    └── useTemplates.ts                 [NEW - template data hooks]
+```
+
+---
+
+### ACCEPTANCE CRITERIA
+
+**Save as Template:**
+- [ ] Click "Save as Template" opens modal
+- [ ] Modal asks for name (required) and description (optional)
+- [ ] Can set as default template
+- [ ] Shows summary of what will be saved
+- [ ] Saves to database successfully
+- [ ] Toast confirms save
+
+**Load Template:**
+- [ ] "Load Template" dropdown shows saved templates
+- [ ] Default template marked with star
+- [ ] Shows section count for each template
+- [ ] Clicking template applies configuration
+- [ ] Confirmation before overwriting current config
+- [ ] Toast confirms application
+
+**Template Management:**
+- [ ] Can view all saved templates
+- [ ] Can rename templates
+- [ ] Can delete templates
+- [ ] Can set/change default template
+- [ ] Templates persist across sessions
+
+---
+
+### VALIDATION TESTS
+```
+Test 1: Save Template
+1. Configure sections in Presentation Builder
+2. Click "Save as Template"
+3. Enter name "Test Template"
+4. Check "Set as default"
+5. Click Save
+6. Verify toast shows success
+7. Verify template appears in Load Template dropdown
+
+Test 2: Load Template
+1. Create a new CMA presentation
+2. Click "Load Template"
+3. Select "Test Template"
+4. Confirm dialog
+5. Verify sections match saved template
+
+Test 3: Template Persistence
+1. Save a template
+2. Log out and log back in
+3. Verify template still exists in dropdown

@@ -1,0 +1,241 @@
+Fix Remaining PDF Data Issues
+SCOPE
+Fix data display issues in the CMA PDF export: broken photos, incorrect bath counts, wrong price ranges, and subject property status.
+
+ISSUE 1: Property Photos Not Loading (Gray Boxes)
+Problem: Photos show as gray placeholder boxes on pages 8-9
+Likely Causes:
+
+Image URLs not resolving in PDF context
+CORS issues with Repliers photo URLs
+URLs need to be absolute, not relative
+
+Fix:
+typescript// When preparing photos for PDF, ensure absolute URLs and handle failures
+
+const preparePhotosForPdf = async (comparables: Property[]) => {
+  const photosWithValidUrls = [];
+  
+  for (const comp of comparables) {
+    if (comp.photos && comp.photos.length > 0) {
+      // Test if photo URL is accessible
+      for (const photoUrl of comp.photos.slice(0, 3)) {
+        try {
+          // Ensure absolute URL
+          const absoluteUrl = photoUrl.startsWith('http') 
+            ? photoUrl 
+            : `https://api.repliers.io${photoUrl}`;
+          
+          photosWithValidUrls.push({
+            address: comp.address,
+            url: absoluteUrl,
+          });
+        } catch (error) {
+          console.log('[PDF] Photo failed to load:', photoUrl);
+        }
+      }
+    }
+  }
+  
+  return photosWithValidUrls;
+};
+
+// In PDF component, add error handling for images
+<Image 
+  src={photo.url} 
+  style={styles.photo}
+  // Add fallback or skip if image fails
+/>
+Alternative Fix - Proxy images through backend:
+typescript// server/routes/proxy.ts
+// Proxy Repliers images to avoid CORS issues in PDF
+
+router.get('/proxy-image', async (req, res) => {
+  const { url } = req.query;
+  
+  try {
+    const response = await fetch(url as string);
+    const buffer = await response.arrayBuffer();
+    
+    res.set('Content-Type', response.headers.get('content-type') || 'image/jpeg');
+    res.send(Buffer.from(buffer));
+  } catch (error) {
+    res.status(404).send('Image not found');
+  }
+});
+
+ISSUE 2: Bath Count Showing 0.0
+Problem: "AVG BED/BATH: 4.3 / 0.0" — baths are not being calculated
+Likely Cause: Wrong property path for bath count
+Fix:
+typescript// Check the actual property names in Repliers data
+// Could be: baths, bathsTotal, bathroomsTotal, bathrooms, etc.
+
+const getBathCount = (property: Property): number => {
+  return property.baths 
+    || property.bathsTotal 
+    || property.bathroomsTotal 
+    || property.bathrooms
+    || property.bathsFull + (property.bathsHalf * 0.5)
+    || 0;
+};
+
+// Calculate average
+const avgBaths = comparables.reduce((sum, c) => sum + getBathCount(c), 0) / comparables.length;
+
+// Format display
+const bedBathDisplay = `${avgBeds.toFixed(1)} / ${avgBaths.toFixed(1)}`;
+Debug logging:
+typescriptconsole.log('[PDF] Comparable bath data:', comparables.map(c => ({
+  address: c.address,
+  baths: c.baths,
+  bathsTotal: c.bathsTotal,
+  bathroomsTotal: c.bathroomsTotal,
+  bathsFull: c.bathsFull,
+  bathsHalf: c.bathsHalf,
+})));
+
+ISSUE 3: Price Range Shows $0
+Problem: "Price range: $0 - $1.07M" — minimum is $0
+Likely Cause: Subject property or a comp has no price, or calculation includes 0
+Fix:
+typescript// Filter out zero/null prices before calculating range
+const prices = comparables
+  .map(c => c.listPrice || c.soldPrice || c.price)
+  .filter(p => p && p > 0);
+
+const minPrice = Math.min(...prices);
+const maxPrice = Math.max(...prices);
+
+// Format
+const priceRange = `$${(minPrice / 1000).toFixed(0)}K - $${(maxPrice / 1000000).toFixed(2)}M`;
+
+// Or simpler formatting
+const formatPrice = (price: number) => {
+  if (price >= 1000000) return `$${(price / 1000000).toFixed(2)}M`;
+  return `$${(price / 1000).toFixed(0)}K`;
+};
+
+ISSUE 4: Subject Property Shows "UNKNOWN" Status
+Problem: 194 Daisey Path (subject) shows status "UNKNOWN" instead of being identified as subject
+Fix:
+typescript// When rendering property details, identify subject property
+
+const getStatusDisplay = (property: Property, isSubject: boolean): string => {
+  if (isSubject) {
+    return 'SUBJECT';
+  }
+  
+  // Normalize status from Repliers
+  const status = property.status || property.lastStatus || '';
+  
+  switch (status.toLowerCase()) {
+    case 'a':
+    case 'active':
+      return 'ACTIVE';
+    case 'p':
+    case 'pending':
+    case 'active under contract':
+      return 'ACTIVE UNDER CONTRACT';
+    case 's':
+    case 'sold':
+    case 'closed':
+      return 'CLOSED';
+    default:
+      return status.toUpperCase() || 'UNKNOWN';
+  }
+};
+
+// In the table rendering
+{comparables.map((comp, index) => {
+  const isSubject = comp.mlsNumber === subjectProperty?.mlsNumber 
+    || comp.address === subjectProperty?.address;
+  
+  return (
+    <View style={[styles.row, isSubject && styles.subjectRow]}>
+      {/* ... other cells ... */}
+      <StatusBadge 
+        status={getStatusDisplay(comp, isSubject)} 
+        isSubject={isSubject}
+      />
+    </View>
+  );
+})}
+
+// Update StatusBadge to handle subject
+const StatusBadge = ({ status, isSubject }) => {
+  const getColor = () => {
+    if (isSubject) return '#3B82F6'; // Blue for subject
+    switch (status) {
+      case 'ACTIVE': return '#22C55E';
+      case 'ACTIVE UNDER CONTRACT': return '#F97316';
+      case 'CLOSED': return '#EF4444';
+      default: return '#6B7280';
+    }
+  };
+  
+  return (
+    <View style={[styles.badge, { backgroundColor: getColor() }]}>
+      <Text style={styles.badgeText}>{status}</Text>
+    </View>
+  );
+};
+
+ISSUE 5: Living Area Range Shows "0 - 3,556"
+Problem: Same as price range — 0 minimum is incorrect
+Fix:
+typescript// Filter out zero/null sqft before calculating range
+const sqftValues = comparables
+  .map(c => c.sqft || c.livingArea || c.squareFeet)
+  .filter(s => s && s > 0);
+
+const minSqft = Math.min(...sqftValues);
+const maxSqft = Math.max(...sqftValues);
+
+const sqftRange = `${minSqft.toLocaleString()} - ${maxSqft.toLocaleString()}`;
+```
+
+---
+
+### FILES TO MODIFY
+```
+client/src/
+└── components/
+    └── pdf/
+        ├── CMAPdfDocument.tsx          [MODIFY - fix all calculations]
+        ├── PropertyPhotosPage.tsx      [MODIFY - fix image loading]
+        ├── SummaryPage.tsx             [MODIFY - fix price/sqft ranges]
+        └── PropertyDetailsPage.tsx     [MODIFY - subject status]
+
+server/
+└── routes/
+    └── proxy.ts                        [NEW - optional image proxy]
+
+ACCEPTANCE CRITERIA
+
+ Photos load correctly in PDF (no gray boxes)
+ Bath count shows actual values (not 0.0)
+ Price range shows correct min/max (no $0)
+ Living area range shows correct min/max (no 0)
+ Subject property shows "SUBJECT" badge in blue
+ Subject property row has blue left border (already working)
+
+
+LOGGING
+typescriptconsole.log('[PDF] Preparing photos for:', comparables.length, 'properties');
+console.log('[PDF] Photo URLs:', photos.map(p => p.url));
+console.log('[PDF] Bath data check:', comparables.map(c => ({ addr: c.address, baths: getBathCount(c) })));
+console.log('[PDF] Price range:', { min: minPrice, max: maxPrice });
+console.log('[PDF] Subject identified:', subjectProperty?.address);
+```
+
+---
+
+### VALIDATION TEST
+```
+After fix, verify PDF shows:
+1. Page 4: "Price range: $725K - $1.07M" (not $0)
+2. Page 4: "AVG BED/BATH: 4.3 / 3.2" (actual bath count)
+3. Page 5: Subject property shows "SUBJECT" badge in blue
+4. Page 7: "Range: 3,032 - 3,556" (not 0)
+5. Pages 8-9: All property photos load (no gray boxes)
