@@ -1,0 +1,271 @@
+Sync ALL Agent Settings Data to CMA Presentation Builder
+SCOPE
+Fix data flow from Settings to CMA Presentation Builder for:
+
+Profile Photo → Cover Page preview (currently gray circle)
+Agent Bio/Resume → Agent Resume section (currently placeholder)
+Default Cover Letter → Cover Letter section (currently not used when blank)
+
+This is a single architectural fix - fetch agent settings data and pass it to all relevant preview/PDF components.
+
+CURRENT STATE vs EXPECTED
+Data PointSettings HasPresentation ShowsExpected BehaviorProfile PhotoUploadedGray circle "D"Show uploaded photoAgent Bio"AI Specialist test..."PlaceholderShow bio from SettingsDefault Cover Letter"AI Specialist test..."Placeholder textAuto-populate when CMA cover letter is blank
+
+ENGINEERING TASKS
+Task 1: Identify where user/agent settings are stored
+bash# Find the schema for user settings
+grep -ri "agentBio\|defaultCoverLetter\|profilePhoto\|avatar" shared/schema.ts
+
+# Find the Settings page that saves this data
+grep -ri "Bio & Cover Letter\|Agent Bio\|Default Cover Letter" --include="*.tsx" client/src/
+Task 2: Check API endpoint for user profile
+bash# Find the endpoint that returns user settings
+grep -ri "/api/users/me\|/api/profile\|/api/settings" server/routes/
+
+# Verify it returns bio, cover letter, photo fields
+Task 3: Trace data flow in CMA Presentation Builder
+bash# Find where Presentation Builder fetches data
+grep -ri "useAuth\|useUser\|userProfile\|agentProfile" client/src/pages/CMAPresentationBuilder.tsx
+
+# Find the Preview component
+grep -ri "PresentationPreview\|LivePreview" --include="*.tsx" client/src/
+
+REQUIRED FIXES
+Fix A: Fetch complete user profile with settings data
+typescript// In CMAPresentationBuilder.tsx or parent component
+
+// Option 1: Extend existing useAuth/useUser hook
+const { user } = useAuth();
+
+// Option 2: Separate query for full profile with settings
+const { data: agentProfile } = useQuery({
+  queryKey: ['agent-profile-settings'],
+  queryFn: async () => {
+    const res = await fetch('/api/users/me/settings');
+    return res.json();
+  },
+});
+
+// agentProfile should contain:
+// {
+//   name: string,
+//   email: string,
+//   phone: string,
+//   profilePhoto: string | null,
+//   title: string,
+//   agentBio: string,           // From Settings > Bio & Cover Letter
+//   defaultCoverLetter: string, // From Settings > Bio & Cover Letter
+// }
+Fix B: Pass agent profile to all preview sections
+typescript// In CMAPresentationBuilder.tsx
+
+<PresentationPreview
+  cmaData={cmaData}
+  config={presentationConfig}
+  agentProfile={agentProfile}  // ← ADD THIS
+/>
+Fix C: Update Cover Letter component to use default when blank
+typescript// In CoverLetterSection.tsx or similar
+
+interface CoverLetterProps {
+  value: string;
+  onChange: (value: string) => void;
+  agentProfile: AgentProfile;
+}
+
+function CoverLetterSection({ value, onChange, agentProfile }: CoverLetterProps) {
+  // Determine what to display in preview
+  const displayContent = value || agentProfile?.defaultCoverLetter || null;
+  
+  // The textarea shows user input (can be blank)
+  // The preview shows: user input > default from settings > placeholder
+  
+  return (
+    <div>
+      {/* Input Section */}
+      <Textarea
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder="Enter your cover letter content, or use AI to generate one based on your CMA data..."
+      />
+      <p className="text-xs text-muted-foreground">
+        Leave blank to use your default cover letter from agent settings.
+      </p>
+    </div>
+  );
+}
+
+// In Preview, use the resolved content:
+function CoverLetterPreview({ coverLetterInput, agentProfile }) {
+  const content = coverLetterInput || agentProfile?.defaultCoverLetter;
+  
+  if (!content) {
+    return <p className="text-gray-400 italic">No cover letter configured.</p>;
+  }
+  
+  return (
+    <div className="prose prose-sm">
+      {content.split('\n').map((p, i) => <p key={i}>{p}</p>)}
+    </div>
+  );
+}
+Fix D: Update Cover Page preview to use profile photo
+typescript// In CoverPagePreview.tsx or similar
+
+function CoverPagePreview({ cmaData, agentProfile }) {
+  return (
+    <div>
+      {/* ... other cover page content ... */}
+      
+      {/* Agent Photo */}
+      {agentProfile?.profilePhoto ? (
+        <img 
+          src={agentProfile.profilePhoto} 
+          alt={agentProfile.name}
+          className="w-12 h-12 rounded-full object-cover"
+        />
+      ) : (
+        <div className="w-12 h-12 rounded-full bg-gray-200 flex items-center justify-center">
+          <span className="text-gray-500 font-medium">
+            {agentProfile?.name?.charAt(0) || 'A'}
+          </span>
+        </div>
+      )}
+      
+      {/* Agent Name */}
+      <p className="font-medium">{agentProfile?.name}</p>
+    </div>
+  );
+}
+Fix E: Update Agent Resume section to use bio from settings
+typescript// In AgentResumePreview.tsx or similar
+
+function AgentResumePreview({ agentProfile }) {
+  return (
+    <div>
+      {/* Photo */}
+      {agentProfile?.profilePhoto ? (
+        <img src={agentProfile.profilePhoto} alt={agentProfile.name} className="w-16 h-16 rounded-full object-cover" />
+      ) : (
+        <div className="w-16 h-16 rounded-full bg-gray-200 flex items-center justify-center">
+          {agentProfile?.name?.charAt(0) || 'A'}
+        </div>
+      )}
+      
+      {/* Name & Title */}
+      <h4>{agentProfile?.name}</h4>
+      <p>{agentProfile?.title || 'Real Estate Agent'}</p>
+      
+      {/* Bio - FROM SETTINGS */}
+      {agentProfile?.agentBio ? (
+        <p>{agentProfile.agentBio}</p>
+      ) : (
+        <p className="text-gray-400 italic">No bio added. Add one in Settings.</p>
+      )}
+    </div>
+  );
+}
+Fix F: Ensure API returns all required fields
+typescript// In server/routes/users.ts
+
+router.get('/me', async (req, res) => {
+  const user = await db.query.users.findFirst({
+    where: eq(users.id, req.userId),
+  });
+  
+  // Ensure all fields are returned
+  res.json({
+    id: user.id,
+    name: user.name,
+    email: user.email,
+    phone: user.phone,
+    profilePhoto: user.profilePhoto,      // ← Must include
+    title: user.title,
+    agentBio: user.agentBio,              // ← Must include
+    defaultCoverLetter: user.defaultCoverLetter, // ← Must include
+  });
+});
+```
+
+---
+
+### FILES TO CHECK/MODIFY
+```
+client/src/
+├── pages/
+│   └── CMAPresentationBuilder.tsx      [MODIFY - fetch and pass agentProfile]
+├── components/
+│   └── CMA/
+│       ├── PresentationPreview.tsx     [MODIFY - receive agentProfile prop]
+│       ├── CoverLetterSection.tsx      [MODIFY - use defaultCoverLetter fallback]
+│       └── sections/
+│           ├── CoverPagePreview.tsx    [MODIFY - use profilePhoto]
+│           ├── AgentResumePreview.tsx  [MODIFY - use agentBio]
+│           └── CoverLetterPreview.tsx  [MODIFY - use defaultCoverLetter]
+└── hooks/
+    └── useAuth.ts                      [CHECK - does it include settings fields?]
+
+server/
+└── routes/
+    └── users.ts                        [MODIFY - return all settings fields]
+
+shared/
+└── schema.ts                           [CHECK - user table has required columns]
+
+ACCEPTANCE CRITERIA
+
+ Profile photo from Settings displays on Cover Page preview (not gray circle)
+ Agent Bio from Settings displays in Agent Resume section
+ Default Cover Letter from Settings is used when CMA cover letter is blank
+ If user types in Cover Letter field, that overrides the default
+ Changes in Settings immediately reflect in Presentation Preview (no cache issues)
+ Same data flows correctly to PDF export
+ Placeholder text only shows when Settings field is also empty
+
+
+LOGGING
+typescript// Add at component mount
+console.log('[Presentation] Agent profile loaded:', {
+  hasPhoto: !!agentProfile?.profilePhoto,
+  hasBio: !!agentProfile?.agentBio,
+  hasDefaultCoverLetter: !!agentProfile?.defaultCoverLetter,
+  photoUrl: agentProfile?.profilePhoto?.substring(0, 50),
+});
+
+// Add in preview render
+console.log('[CoverLetter] Resolved content:', {
+  userInput: coverLetterInput?.substring(0, 30),
+  defaultFromSettings: agentProfile?.defaultCoverLetter?.substring(0, 30),
+  using: (coverLetterInput || agentProfile?.defaultCoverLetter)?.substring(0, 30),
+});
+```
+
+---
+
+### VALIDATION TEST
+```
+1. Go to Settings > Bio & Cover Letter
+2. Set Agent Bio to "Test Bio - 10 years experience in Austin"
+3. Set Default Cover Letter to "Test Cover Letter - Thank you for choosing..."
+4. Save settings
+5. Go to Settings > Profile (or wherever photo is uploaded)
+6. Upload a profile photo
+7. Save settings
+8. Go to CMA > Presentation Builder
+9. Leave Cover Letter field BLANK
+10. Check Live Preview:
+    - Cover Page: Photo shows (not gray circle) ✓
+    - Agent Resume: Bio shows "Test Bio - 10 years..." ✓
+    - Cover Letter: Shows "Test Cover Letter - Thank you..." ✓
+11. Now type custom text in Cover Letter field
+12. Verify preview updates to show custom text (overrides default)
+13. Clear the Cover Letter field
+14. Verify preview reverts to default from Settings
+15. Export PDF and verify all data appears correctly
+
+EXPLICIT BLOCKERS
+
+❌ Do NOT use hardcoded placeholder text when Settings data exists
+❌ Do NOT show "Agent bio will appear here..." if agentBio has value
+❌ Do NOT show gray circle if profilePhoto URL exists
+❌ Do NOT ignore defaultCoverLetter when Cover Letter input is blank
