@@ -1312,9 +1312,9 @@ export default function CMAPresentationBuilder() {
                               </div>
                               <div className="flex gap-3 mt-1 text-xs text-muted-foreground">
                                 <span>{formatCurrency(Number(property.listPrice || property.closePrice) || 0)}</span>
-                                <span>{property.bedroomsTotal} bd</span>
-                                <span>{property.bathroomsTotal} ba</span>
-                                <span>{formatNumber(Number(property.livingArea) || 0)} sqft</span>
+                                <span>{property.bedroomsTotal ?? "—"} bd</span>
+                                <span>{property.bathroomsTotal ?? "—"} ba</span>
+                                <span>{property.livingArea ? `${formatNumber(Number(property.livingArea))} sqft` : "— sqft"}</span>
                               </div>
                             </div>
                           ))}
@@ -1779,9 +1779,9 @@ export default function CMAPresentationBuilder() {
                       </div>
                       <div className="flex gap-3 mt-1 text-xs text-muted-foreground">
                         <span>{formatCurrency(Number(property.listPrice || property.closePrice) || 0)}</span>
-                        <span>{property.bedroomsTotal} bd</span>
-                        <span>{property.bathroomsTotal} ba</span>
-                        <span>{formatNumber(Number(property.livingArea) || 0)} sqft</span>
+                        <span>{property.bedroomsTotal ?? "—"} bd</span>
+                        <span>{property.bathroomsTotal ?? "—"} ba</span>
+                        <span>{property.livingArea ? `${formatNumber(Number(property.livingArea))} sqft` : "— sqft"}</span>
                       </div>
                     </div>
                   ))}
@@ -1903,7 +1903,7 @@ export default function CMAPresentationBuilder() {
                           stroke="hsl(var(--primary))" 
                           strokeDasharray="5 5"
                         />
-                        <Bar dataKey="value" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
+                        <Bar dataKey="pricePerSqft" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
                       </BarChart>
                     </ResponsiveContainer>
                   </div>
