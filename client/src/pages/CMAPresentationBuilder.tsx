@@ -55,6 +55,7 @@ import { pdf } from "@react-pdf/renderer";
 import { CMAPdfDocument } from "@/components/CMAPdfDocument";
 import { ListingBrochureContent } from "@/components/ListingBrochureContent";
 import { ExpandedPreviewModal } from "@/components/ExpandedPreviewModal";
+import { MapboxCMAMap } from "@/components/presentation/MapboxCMAMap";
 import {
   BarChart,
   Bar,
@@ -87,6 +88,8 @@ interface ReportConfigResponse {
   template?: string;
   theme?: string;
   photoLayout?: string;
+  mapStyle?: 'streets' | 'satellite' | 'dark';
+  showMapPolygon?: boolean;
   includeAgentFooter?: boolean;
 }
 
@@ -129,6 +132,10 @@ interface PropertyData {
   daysOnMarket?: number | string | null;
   standardStatus?: string;
   closeDate?: string;
+  latitude?: number | string | null;
+  longitude?: number | string | null;
+  publicRemarks?: string;
+  photos?: string[];
 }
 
 interface PropertyStatistics {
@@ -218,6 +225,8 @@ export default function CMAPresentationBuilder() {
   const [coverLetterOverride, setCoverLetterOverride] = useState("");
   const [layout, setLayout] = useState("two_photos");
   const [photoLayout, setPhotoLayout] = useState("first_dozen");
+  const [mapStyle, setMapStyle] = useState<'streets' | 'satellite' | 'dark'>("streets");
+  const [showMapPolygon, setShowMapPolygon] = useState(true);
   const [includeAgentFooter, setIncludeAgentFooter] = useState(true);
   const [expandedCategories, setExpandedCategories] = useState<Record<string, boolean>>({
     introduction: true,
@@ -311,6 +320,35 @@ export default function CMAPresentationBuilder() {
     return { statistics: stats, pricePerSqftData: chartData };
   }, [cma?.propertiesData, cma?.subjectPropertyId]);
 
+  // Prepare property locations for the map
+  const { propertyLocations, subjectLocation } = useMemo(() => {
+    const properties = (cma?.propertiesData || []) as PropertyData[];
+    const subjectId = cma?.subjectPropertyId;
+    
+    const locations = properties
+      .filter(p => {
+        const lat = Number(p.latitude);
+        const lng = Number(p.longitude);
+        return lat !== 0 && lng !== 0 && !isNaN(lat) && !isNaN(lng);
+      })
+      .map(p => ({
+        id: p.id || p.listingId || '',
+        address: p.streetAddress || p.address || 'Unknown',
+        lat: Number(p.latitude),
+        lng: Number(p.longitude),
+        price: Number(p.listPrice || p.closePrice) || 0,
+        status: p.standardStatus || 'Active',
+        isSubject: subjectId ? (p.id === subjectId || p.listingId === subjectId) : false,
+      }));
+    
+    const subject = locations.find(l => l.isSubject) || null;
+    
+    return { 
+      propertyLocations: locations, 
+      subjectLocation: subject 
+    };
+  }, [cma?.propertiesData, cma?.subjectPropertyId]);
+
   useEffect(() => {
     if (reportConfig) {
       const defaultSections = CMA_REPORT_SECTIONS.filter(s => s.defaultEnabled).map(s => s.id);
@@ -319,6 +357,8 @@ export default function CMAPresentationBuilder() {
       setCoverLetterOverride(reportConfig.coverLetterOverride || "");
       setLayout(reportConfig.layout || "two_photos");
       setPhotoLayout(reportConfig.photoLayout || "first_dozen");
+      setMapStyle(reportConfig.mapStyle || "streets");
+      setShowMapPolygon(reportConfig.showMapPolygon ?? true);
       setIncludeAgentFooter(reportConfig.includeAgentFooter ?? true);
     } else if (!configLoading) {
       const defaultSections = CMA_REPORT_SECTIONS.filter(s => s.defaultEnabled).map(s => s.id);
@@ -369,6 +409,8 @@ export default function CMAPresentationBuilder() {
         coverLetterOverride: coverLetterOverride || undefined,
         layout,
         photoLayout,
+        mapStyle,
+        showMapPolygon,
         includeAgentFooter,
       };
 
@@ -427,6 +469,8 @@ export default function CMAPresentationBuilder() {
     setCoverLetterOverride(agentProfile?.defaultCoverLetter || "");
     setLayout("two_photos");
     setPhotoLayout("first_dozen");
+    setMapStyle("streets");
+    setShowMapPolygon(true);
     setIncludeAgentFooter(true);
     setHasChanges(true);
     toast({
@@ -853,6 +897,66 @@ export default function CMAPresentationBuilder() {
                   </div>
                 </CardContent>
               </Card>
+
+              <Card>
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-lg">Map Settings</CardTitle>
+                  <CardDescription>
+                    Customize the Map of All Listings appearance
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="space-y-2">
+                    <Label>Map Style</Label>
+                    <div className="grid grid-cols-3 gap-2">
+                      {[
+                        { id: 'streets' as const, label: 'Streets' },
+                        { id: 'satellite' as const, label: 'Satellite' },
+                        { id: 'dark' as const, label: 'Dark' }
+                      ].map(style => (
+                        <button
+                          key={style.id}
+                          type="button"
+                          onClick={() => {
+                            setMapStyle(style.id);
+                            setHasChanges(true);
+                          }}
+                          className={`
+                            border rounded-lg p-3 text-center transition-all
+                            ${mapStyle === style.id 
+                              ? 'border-primary bg-primary/10' 
+                              : 'hover:border-muted-foreground/50'
+                            }
+                          `}
+                          data-testid={`button-map-style-${style.id}`}
+                        >
+                          <Map className="w-6 h-6 mx-auto mb-1 text-muted-foreground" />
+                          <span className="text-sm">{style.label}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  
+                  <Separator />
+                  
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <Label className="text-sm font-medium">Show Search Area Polygon</Label>
+                      <p className="text-xs text-muted-foreground">
+                        Display a boundary around all properties on the map
+                      </p>
+                    </div>
+                    <Switch 
+                      checked={showMapPolygon}
+                      onCheckedChange={(v) => {
+                        setShowMapPolygon(v);
+                        setHasChanges(true);
+                      }}
+                      data-testid="switch-show-polygon"
+                    />
+                  </div>
+                </CardContent>
+              </Card>
             </TabsContent>
           </Tabs>
         </div>
@@ -1015,11 +1119,23 @@ export default function CMAPresentationBuilder() {
 
                   {includedSections.includes("map_all_listings") && (
                     <PreviewSection title="Map of All Listings" icon={Map} sectionId="map_all_listings" onClick={handlePreviewSectionClick}>
-                      <div className="h-32 bg-muted rounded-md flex items-center justify-center">
-                        <span className="text-muted-foreground text-sm">
-                          Interactive map with {cma.propertiesData?.length || 0} properties
-                        </span>
-                      </div>
+                      {propertyLocations.length > 0 ? (
+                        <div className="h-48 rounded-md overflow-hidden">
+                          <MapboxCMAMap
+                            properties={propertyLocations}
+                            subjectProperty={subjectLocation}
+                            style={mapStyle}
+                            showPolygon={showMapPolygon}
+                            height="192px"
+                          />
+                        </div>
+                      ) : (
+                        <div className="h-32 bg-muted rounded-md flex items-center justify-center">
+                          <span className="text-muted-foreground text-sm">
+                            No properties with location data available
+                          </span>
+                        </div>
+                      )}
                     </PreviewSection>
                   )}
 
@@ -1367,11 +1483,23 @@ export default function CMAPresentationBuilder() {
 
           {includedSections.includes("map_all_listings") && (
             <PreviewSection title="Map of All Listings" icon={Map} sectionId="map_all_listings" onClick={handlePreviewSectionClick}>
-              <div className="h-32 bg-muted rounded-md flex items-center justify-center">
-                <span className="text-muted-foreground text-sm">
-                  Interactive map with {cma?.propertiesData?.length || 0} properties
-                </span>
-              </div>
+              {propertyLocations.length > 0 ? (
+                <div className="h-64 rounded-md overflow-hidden">
+                  <MapboxCMAMap
+                    properties={propertyLocations}
+                    subjectProperty={subjectLocation}
+                    style={mapStyle}
+                    showPolygon={showMapPolygon}
+                    height="256px"
+                  />
+                </div>
+              ) : (
+                <div className="h-32 bg-muted rounded-md flex items-center justify-center">
+                  <span className="text-muted-foreground text-sm">
+                    No properties with location data available
+                  </span>
+                </div>
+              )}
             </PreviewSection>
           )}
 

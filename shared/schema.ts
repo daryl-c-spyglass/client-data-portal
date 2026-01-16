@@ -949,6 +949,8 @@ export const cmaReportConfigs = pgTable("cma_report_configs", {
   template: text("template").default("default"),
   theme: text("theme").default("spyglass"), // Theme name
   photoLayout: text("photo_layout").default("first_dozen"), // 'first_dozen', 'all'
+  mapStyle: text("map_style").default("streets"), // 'streets', 'satellite', 'dark'
+  showMapPolygon: boolean("show_map_polygon").default(true),
   includeAgentFooter: boolean("include_agent_footer").default(true),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
@@ -967,6 +969,8 @@ export const updateCmaReportConfigSchema = z.object({
   template: z.string().optional(),
   theme: z.string().optional(),
   photoLayout: z.enum(['first_dozen', 'all']).optional(),
+  mapStyle: z.enum(['streets', 'satellite', 'dark']).optional(),
+  showMapPolygon: z.boolean().optional(),
   includeAgentFooter: z.boolean().optional(),
 });
 export type InsertCmaReportConfig = z.infer<typeof insertCmaReportConfigSchema>;
