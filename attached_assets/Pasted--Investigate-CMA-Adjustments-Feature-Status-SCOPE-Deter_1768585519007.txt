@@ -1,0 +1,98 @@
+ Investigate CMA Adjustments Feature Status
+SCOPE
+Determine whether the CMA Adjustments feature exists in the codebase, is partially implemented, or needs to be built from scratch.
+
+INVESTIGATION TASKS
+Task 1: Search codebase for "adjustments" references
+bash# Search for adjustment-related code
+grep -ri "adjustment" --include="*.ts" --include="*.tsx" client/src/
+grep -ri "adjustment" --include="*.ts" server/
+
+# Check database schema
+grep -ri "adjustment" shared/schema.ts
+```
+
+**Task 2: Check CMA data model**
+```
+- File: shared/schema.ts
+- Look for: cmas table definition
+- Question: Is there an "adjustments" field/column?
+- If yes: What is the data type and structure?
+```
+
+**Task 3: Check CMA UI components**
+```
+- Search: client/src/components/CMA/
+- Search: client/src/pages/ (CMA-related pages)
+- Question: Is there an Adjustments tab, section, or form?
+- Question: Is there any UI for entering adjustment values?
+```
+
+**Task 4: Check Presentation Preview component**
+```
+- File: CMAPresentationBuilder.tsx or PresentationPreview.tsx
+- Find: Where "Adjustments" section renders
+- Question: What data does it expect?
+- Question: Is it just a placeholder or does it have real rendering logic?
+```
+
+**Task 5: Check API routes**
+```
+- File: server/routes/cma.ts (or similar)
+- Question: Are there any endpoints for adjustments?
+- Question: Is adjustments data included in CMA fetch responses?
+```
+
+---
+
+### REPORT FORMAT
+
+Please provide findings in this format:
+```
+## ADJUSTMENTS FEATURE STATUS
+
+### Database
+- [ ] Adjustments field exists in cmas table: YES / NO
+- [ ] Field type: _______________
+- [ ] Current structure: _______________
+
+### Backend/API
+- [ ] Adjustments endpoints exist: YES / NO
+- [ ] Adjustments included in CMA response: YES / NO
+
+### Frontend - Entry UI
+- [ ] Adjustments input form exists: YES / NO
+- [ ] Location: _______________
+- [ ] Current functionality: _______________
+
+### Frontend - Display/Preview
+- [ ] Adjustments section in Preview: YES / NO
+- [ ] Current state: PLACEHOLDER / PARTIAL / COMPLETE
+- [ ] What data it expects: _______________
+
+### Conclusion
+- [ ] SCENARIO A: Feature fully exists, just a data flow bug
+- [ ] SCENARIO B: Feature partially exists, needs completion
+- [ ] SCENARIO C: Feature doesn't exist, needs to be built
+```
+
+---
+
+### FILES TO CHECK
+```
+shared/
+└── schema.ts                    [Check for adjustments in CMA model]
+
+server/
+└── routes/
+    └── cma.ts                   [Check for adjustments endpoints]
+
+client/src/
+├── pages/
+│   ├── CMADetailPage.tsx        [Check for adjustments tab/section]
+│   └── CMAPresentationBuilder.tsx
+├── components/
+│   └── CMA/
+│       ├── AdjustmentsTab.tsx   [Does this exist?]
+│       ├── ContentTab.tsx       [Any adjustments UI here?]
+│       └── PresentationPreview.tsx
