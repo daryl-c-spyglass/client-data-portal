@@ -420,6 +420,11 @@ export default function CMAPresentationBuilder() {
     
     setIsGeneratingPdf(true);
     try {
+      const brochureWithAbsoluteUrl = brochure ? {
+        ...brochure,
+        url: brochure.url.startsWith("http") ? brochure.url : `${window.location.origin}/${brochure.url.replace(/^\//, "")}`,
+      } : null;
+      
       const pdfDoc = (
         <CMAPdfDocument
           cma={{
@@ -432,7 +437,7 @@ export default function CMAPresentationBuilder() {
           includedSections={includedSections}
           coverLetterOverride={coverLetterOverride}
           includeAgentFooter={includeAgentFooter}
-          brochure={brochure}
+          brochure={brochureWithAbsoluteUrl}
         />
       );
       

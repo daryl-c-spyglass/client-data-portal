@@ -513,7 +513,7 @@ export function CMAPdfDocument({
         </Page>
       )}
 
-      {includedSections.includes("listing_brochure") && brochure && brochure.type === "image" && (
+      {includedSections.includes("listing_brochure") && brochure && brochure.type === "image" && brochure.url && (
         <Page size="LETTER" style={styles.page}>
           <View style={styles.header}>
             <Text style={styles.headerTitle}>Property Brochure</Text>
@@ -521,7 +521,7 @@ export function CMAPdfDocument({
           </View>
           <View style={{ flex: 1, justifyContent: "center", alignItems: "center", padding: 20 }}>
             <Image 
-              src={brochure.url.startsWith("http") ? brochure.url : `${window.location.origin}/${brochure.url}`}
+              src={brochure.url}
               style={{ maxWidth: "100%", maxHeight: "90%", objectFit: "contain" }}
             />
           </View>
