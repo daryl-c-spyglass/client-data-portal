@@ -1,0 +1,118 @@
+Fix Listing Brochure Image Not Displaying in Presentation Preview
+SCOPE
+The Listing Brochure image uploads successfully and displays in the Content tab, but appears broken in the CMA Presentation Preview. This is a data flow / component wiring issue.
+
+PROBLEM SUMMARY
+LocationStatusContent Tab → Listing Brochure upload✅ WorksContent Tab → Thumbnail preview✅ DisplaysPresentation Preview → Listing Brochure❌ Broken image
+
+DIAGNOSIS TASKS
+Task 1: Trace the data flow
+1. Find where brochure URL is stored after upload
+   - Likely in CMA record: cmas.brochure (JSONB field)
+   - Check the structure: { url: string, filename: string, ... }
+
+2. Find where Presentation Preview fetches CMA data
+   - File: client/src/pages/CMAPresentationBuilder.tsx (or similar)
+   - Check if brochure field is included in the query/fetch
+
+3. Find where Listing Brochure section renders in Preview
+   - Check what prop/data it expects
+   - Console.log the value it receives
+Task 2: Add debug logging
+typescript// In the Presentation Preview component
+console.log('CMA Data:', cmaData);
+console.log('Brochure field:', cmaData?.brochure);
+console.log('Brochure URL:', cmaData?.brochure?.url || cmaData?.brochureUrl);
+
+LIKELY FIXES
+Fix A: Preview component not reading brochure field
+typescript// WRONG - Looking for wrong property name
+<img src={cma.listingBrochure} alt="Listing Brochure" />
+
+// CORRECT - Use actual field name from database
+<img src={cma.brochure?.url} alt="Listing Brochure" />
+Fix B: Brochure not included in CMA query
+typescript// In the API route or query that fetches CMA for preview
+// Ensure brochure field is selected
+
+// If using Drizzle:
+const cma = await db.query.cmas.findFirst({
+  where: eq(cmas.id, cmaId),
+  columns: {
+    id: true,
+    // ... other fields
+    brochure: true,  // ← Make sure this is included
+  }
+});
+Fix C: Data structure mismatch
+typescript// Content tab might store:
+brochure: {
+  url: "https://storage.replit.com/...",
+  filename: "brochure.png",
+  mimeType: "image/png"
+}
+
+// But Preview might expect:
+brochureUrl: "https://storage.replit.com/..."
+
+// FIX: Normalize in the component
+const brochureUrl = cma.brochure?.url || cma.brochureUrl || null;
+Fix D: Preview uses different data source
+typescript// If Preview builds its own sections array, ensure brochure is mapped:
+
+const sections = [
+  // ... other sections
+  {
+    id: 'listing-brochure',
+    title: 'Listing Brochure',
+    enabled: cma.sections?.listingBrochure ?? true,
+    content: cma.brochure?.url,  // ← Ensure this mapping exists
+  }
+];
+```
+
+---
+
+### FILES TO CHECK
+```
+client/src/
+├── pages/
+│   └── CMAPresentationBuilder.tsx    [Check how CMA data is fetched]
+├── components/
+│   └── CMA/
+│       ├── PresentationPreview.tsx   [Check how brochure renders]
+│       ├── ContentTab.tsx            [Working - reference this]
+│       └── sections/
+│           └── ListingBrochure.tsx   [Check data structure expected]
+server/
+├── routes/
+│   └── cma.ts                        [Check if brochure included in response]
+```
+
+---
+
+### ACCEPTANCE CRITERIA
+
+- [ ] Brochure image displays correctly in Presentation Preview
+- [ ] Image matches what's shown in Content tab thumbnail
+- [ ] No broken image icon or alt text visible
+- [ ] Works for both PNG/JPG uploads
+- [ ] Debug logging added to trace data flow (can remove after fix)
+- [ ] If no brochure uploaded, section shows graceful placeholder (not broken image)
+
+---
+
+### VALIDATION TEST
+```
+1. Upload a brochure image in Content tab
+2. Verify thumbnail displays in Content tab ✓
+3. Switch to Preview tab
+4. Verify same image displays in Listing Brochure section ✓
+5. Export to PDF and verify image appears ✓
+
+LOGGING
+typescript// Add temporarily for debugging:
+console.log('[Brochure Debug] CMA ID:', cmaId);
+console.log('[Brochure Debug] Raw brochure field:', cma.brochure);
+console.log('[Brochure Debug] Resolved URL:', brochureUrl);
+console.log('[Brochure Debug] Section enabled:', sections.listingBrochure);

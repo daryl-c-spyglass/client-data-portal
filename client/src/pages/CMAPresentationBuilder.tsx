@@ -215,6 +215,17 @@ function formatNumber(value: number, decimals = 0): string {
   }).format(value);
 }
 
+// Helper to construct proper brochure URL from stored path
+function getBrochureUrl(url: string): string {
+  if (!url) return "";
+  // If it's already a full URL, return it
+  if (url.startsWith("http")) return url;
+  // If it already starts with /, use it directly (don't double-prefix)
+  if (url.startsWith("/")) return url;
+  // Otherwise, add the leading slash
+  return `/${url}`;
+}
+
 export default function CMAPresentationBuilder() {
   const [, params] = useRoute("/cmas/:id/presentation");
   const [, setLocation] = useLocation();
@@ -1131,7 +1142,7 @@ export default function CMAPresentationBuilder() {
                               </div>
                             ) : (
                               <img
-                                src={brochure.url.startsWith("http") ? brochure.url : `/${brochure.url}`}
+                                src={getBrochureUrl(brochure.url)}
                                 alt="Listing Brochure"
                                 className="w-full h-full object-contain"
                               />
@@ -1608,7 +1619,7 @@ export default function CMAPresentationBuilder() {
                       </div>
                     ) : (
                       <img
-                        src={brochure.url.startsWith("http") ? brochure.url : `/${brochure.url}`}
+                        src={getBrochureUrl(brochure.url)}
                         alt="Listing Brochure"
                         className="w-full h-full object-contain"
                       />
