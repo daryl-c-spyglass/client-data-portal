@@ -1,8 +1,9 @@
-import { useRef, useEffect, useState, useCallback } from 'react';
+import { useRef, useEffect, useState, useCallback, useMemo } from 'react';
 import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
 import { Button } from '@/components/ui/button';
 import { STATUS_COLORS, getStatusHexFromMLS, MAP_STYLES } from '@/lib/statusColors';
+import { useTheme } from '@/contexts/ThemeContext';
 
 interface PropertyLocation {
   id: string;
@@ -17,9 +18,9 @@ interface PropertyLocation {
 interface MapboxCMAMapProps {
   properties: PropertyLocation[];
   subjectProperty?: PropertyLocation | null;
-  style?: 'streets' | 'satellite' | 'dark';
+  style?: 'streets' | 'satellite';
   showPolygon?: boolean;
-  onStyleChange?: (style: 'streets' | 'satellite' | 'dark') => void;
+  onStyleChange?: (style: 'streets' | 'satellite') => void;
   onPolygonChange?: (show: boolean) => void;
   height?: string;
   interactive?: boolean;
@@ -39,11 +40,21 @@ export function MapboxCMAMap({
   height = '400px',
   interactive = true
 }: MapboxCMAMapProps) {
+  const { theme } = useTheme();
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<mapboxgl.Map | null>(null);
   const markersRef = useRef<mapboxgl.Marker[]>([]);
   const [mapLoaded, setMapLoaded] = useState(false);
   const [mapError, setMapError] = useState<string | null>(null);
+  
+  // Compute effective map style: satellite stays satellite, streets respects theme
+  const effectiveMapStyle = useMemo(() => {
+    if (style === 'satellite') {
+      return 'satellite';
+    }
+    // Streets mode respects dark/light theme
+    return theme === 'dark' ? 'dark' : 'streets';
+  }, [style, theme]);
 
   const getCenterPoint = useCallback((): [number, number] => {
     if (subjectProperty?.lat && subjectProperty?.lng) {
@@ -77,7 +88,7 @@ export function MapboxCMAMap({
     try {
       map.current = new mapboxgl.Map({
         container: mapContainer.current,
-        style: MAP_STYLES[style],
+        style: MAP_STYLES[effectiveMapStyle],
         center: getCenterPoint(),
         zoom: 12,
         interactive
@@ -110,9 +121,9 @@ export function MapboxCMAMap({
 
   useEffect(() => {
     if (map.current && mapLoaded) {
-      map.current.setStyle(MAP_STYLES[style]);
+      map.current.setStyle(MAP_STYLES[effectiveMapStyle]);
     }
-  }, [style, mapLoaded]);
+  }, [effectiveMapStyle, mapLoaded]);
 
   useEffect(() => {
     if (!map.current || !mapLoaded) return;
@@ -192,7 +203,7 @@ export function MapboxCMAMap({
       
       {onStyleChange && (
         <div className="absolute top-3 left-3 bg-background/90 backdrop-blur-sm rounded-lg shadow-md p-1 flex gap-1">
-          {(['streets', 'satellite', 'dark'] as const).map((s) => (
+          {(['streets', 'satellite'] as const).map((s) => (
             <Button
               key={s}
               size="sm"
@@ -201,7 +212,7 @@ export function MapboxCMAMap({
               className="capitalize text-xs h-7"
               data-testid={`button-map-style-${s}`}
             >
-              {s}
+              {s === 'streets' ? 'Streets' : 'Satellite'}
             </Button>
           ))}
         </div>

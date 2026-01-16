@@ -92,7 +92,7 @@ interface ReportConfigResponse {
   template?: string;
   theme?: string;
   photoLayout?: string;
-  mapStyle?: 'streets' | 'satellite' | 'dark';
+  mapStyle?: 'streets' | 'satellite';
   showMapPolygon?: boolean;
   includeAgentFooter?: boolean;
   customPhotoSelections?: Record<string, string[]>;
@@ -233,7 +233,7 @@ export default function CMAPresentationBuilder() {
   const [coverLetterOverride, setCoverLetterOverride] = useState("");
   const [layout, setLayout] = useState("two_photos");
   const [photoLayout, setPhotoLayout] = useState("first_dozen");
-  const [mapStyle, setMapStyle] = useState<'streets' | 'satellite' | 'dark'>("streets");
+  const [mapStyle, setMapStyle] = useState<'streets' | 'satellite'>("streets");
   const [showMapPolygon, setShowMapPolygon] = useState(true);
   const [includeAgentFooter, setIncludeAgentFooter] = useState(true);
   const [expandedCategories, setExpandedCategories] = useState<Record<string, boolean>>({
