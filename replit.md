@@ -5,6 +5,7 @@ This project is a professional real estate IDX (Internet Data Exchange) platform
 
 ## User Preferences
 Preferred communication style: Simple, everyday language.
+**Mapping Solution**: Mapbox is the standard mapping library for all features across the application. All interactive maps, property visualizations, and location-based features should use Mapbox GL JS. Requires VITE_MAPBOX_TOKEN secret.
 
 ## System Architecture
 
@@ -75,7 +76,7 @@ The UI incorporates Spyglass Realty branding with an orange primary color scheme
 - **Resend**: Email services for seller update notifications.
 - **FEMA NFHL API**: National Flood Hazard Layer data for flood zone overlays.
 - **City of Austin ArcGIS**: School district boundary data for map layers.
-- **Mapbox GL JS**: Interactive maps for CMA presentations with multi-style support.
+- **Mapbox GL JS**: Standard mapping library for all application features including CMA presentations, property detail pages, and location-based visualizations. Supports multiple styles (streets/satellite/dark), property markers with status color-coding, and interactive overlays.
 
 ### WordPress Integration API
 A dedicated API at `/api/wordpress/*` with CORS enabled for `spyglassrealty.org` provides endpoints for listing properties, retrieving single property details, advanced search, and managing user favorites.
