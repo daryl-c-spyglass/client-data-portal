@@ -340,7 +340,7 @@ export default function CMAPresentationBuilder() {
     setIsPreviewUpdating(true);
     const timer = setTimeout(() => setIsPreviewUpdating(false), 300);
     return () => clearTimeout(timer);
-  }, [includedSections, layout, photoLayout, includeAgentFooter, coverLetterOverride]);
+  }, [includedSections, sectionOrder, layout, photoLayout, includeAgentFooter, coverLetterOverride, brochure]);
 
   // Handle section click from preview to jump to settings
   const handlePreviewSectionClick = (sectionId: string) => {
@@ -1023,6 +1023,14 @@ export default function CMAPresentationBuilder() {
                     </PreviewSection>
                   )}
 
+                  {includedSections.includes("listings_header") && (
+                    <PreviewSection title="Listings Chapter Header" icon={FileText} sectionId="listings_header" onClick={handlePreviewSectionClick}>
+                      <div className="text-center py-4 bg-muted/30 rounded-md border-l-4 border-primary">
+                        <span className="text-lg font-semibold">Comparable Properties</span>
+                      </div>
+                    </PreviewSection>
+                  )}
+
                   {includedSections.includes("summary_comparables") && (
                     <PreviewSection title="Summary of Comparable Properties" icon={Table} sectionId="summary_comparables" onClick={handlePreviewSectionClick}>
                       {statistics.propertyCount > 0 ? (
@@ -1071,6 +1079,24 @@ export default function CMAPresentationBuilder() {
                         <span className="text-muted-foreground text-sm">
                           Photo gallery ({photoLayout === "all" ? "All" : "First 12"} photos)
                         </span>
+                      </div>
+                    </PreviewSection>
+                  )}
+
+                  {includedSections.includes("adjustments") && (
+                    <PreviewSection title="Adjustments" icon={Table} sectionId="adjustments" onClick={handlePreviewSectionClick}>
+                      <div className="h-24 bg-muted rounded-md flex items-center justify-center">
+                        <span className="text-muted-foreground text-sm">
+                          Property value adjustments comparison table
+                        </span>
+                      </div>
+                    </PreviewSection>
+                  )}
+
+                  {includedSections.includes("analysis_header") && (
+                    <PreviewSection title="Analysis Chapter Header" icon={FileText} sectionId="analysis_header" onClick={handlePreviewSectionClick}>
+                      <div className="text-center py-4 bg-muted/30 rounded-md border-l-4 border-primary">
+                        <span className="text-lg font-semibold">Market Analysis</span>
                       </div>
                     </PreviewSection>
                   )}
@@ -1312,6 +1338,51 @@ export default function CMAPresentationBuilder() {
             </PreviewSection>
           )}
 
+          {includedSections.includes("our_company") && (
+            <PreviewSection title="Our Company" icon={Building2} sectionId="our_company" onClick={handlePreviewSectionClick}>
+              <div className="space-y-2">
+                <div className="font-semibold">
+                  {companySettings?.companyName || "Spyglass Realty"}
+                </div>
+                <p className="text-sm text-muted-foreground">Company profile and information</p>
+              </div>
+            </PreviewSection>
+          )}
+
+          {includedSections.includes("what_is_cma") && (
+            <PreviewSection title="What is a CMA?" icon={FileText} sectionId="what_is_cma" onClick={handlePreviewSectionClick}>
+              <p className="text-sm text-muted-foreground">
+                A Comparative Market Analysis (CMA) is a detailed report that helps determine the value of a property.
+              </p>
+            </PreviewSection>
+          )}
+
+          {includedSections.includes("contact_me") && (
+            <PreviewSection title="Contact Me" icon={Phone} sectionId="contact_me" onClick={handlePreviewSectionClick}>
+              <div className="text-sm text-muted-foreground">
+                Agent contact information
+              </div>
+            </PreviewSection>
+          )}
+
+          {includedSections.includes("map_all_listings") && (
+            <PreviewSection title="Map of All Listings" icon={Map} sectionId="map_all_listings" onClick={handlePreviewSectionClick}>
+              <div className="h-32 bg-muted rounded-md flex items-center justify-center">
+                <span className="text-muted-foreground text-sm">
+                  Interactive map with {cma?.propertiesData?.length || 0} properties
+                </span>
+              </div>
+            </PreviewSection>
+          )}
+
+          {includedSections.includes("listings_header") && (
+            <PreviewSection title="Listings Chapter Header" icon={FileText} sectionId="listings_header" onClick={handlePreviewSectionClick}>
+              <div className="text-center py-4 bg-muted/30 rounded-md border-l-4 border-primary">
+                <span className="text-lg font-semibold">Comparable Properties</span>
+              </div>
+            </PreviewSection>
+          )}
+
           {includedSections.includes("summary_comparables") && (
             <PreviewSection title="Summary of Comparable Properties" icon={Table} sectionId="summary_comparables" onClick={handlePreviewSectionClick}>
               {statistics.propertyCount > 0 ? (
@@ -1336,6 +1407,66 @@ export default function CMAPresentationBuilder() {
                   <span className="text-muted-foreground text-sm">No comparable properties</span>
                 </div>
               )}
+            </PreviewSection>
+          )}
+
+          {includedSections.includes("property_details") && (
+            <PreviewSection title="Property Details" icon={Home} sectionId="property_details" onClick={handlePreviewSectionClick}>
+              <div className="h-24 bg-muted rounded-md flex items-center justify-center">
+                <span className="text-muted-foreground text-sm">
+                  Detailed property information pages
+                </span>
+              </div>
+            </PreviewSection>
+          )}
+
+          {includedSections.includes("property_photos") && (
+            <PreviewSection title="Property Photos" icon={ImageIcon} sectionId="property_photos" onClick={handlePreviewSectionClick}>
+              <div className="h-24 bg-muted rounded-md flex items-center justify-center">
+                <span className="text-muted-foreground text-sm">
+                  Photo gallery ({photoLayout === "all" ? "All" : "First 12"} photos)
+                </span>
+              </div>
+            </PreviewSection>
+          )}
+
+          {includedSections.includes("adjustments") && (
+            <PreviewSection title="Adjustments" icon={Table} sectionId="adjustments" onClick={handlePreviewSectionClick}>
+              <div className="h-24 bg-muted rounded-md flex items-center justify-center">
+                <span className="text-muted-foreground text-sm">
+                  Property value adjustments comparison table
+                </span>
+              </div>
+            </PreviewSection>
+          )}
+
+          {includedSections.includes("analysis_header") && (
+            <PreviewSection title="Analysis Chapter Header" icon={FileText} sectionId="analysis_header" onClick={handlePreviewSectionClick}>
+              <div className="text-center py-4 bg-muted/30 rounded-md border-l-4 border-primary">
+                <span className="text-lg font-semibold">Market Analysis</span>
+              </div>
+            </PreviewSection>
+          )}
+
+          {includedSections.includes("online_valuation") && (
+            <PreviewSection title="Online Valuation Analysis" icon={BarChart3} sectionId="online_valuation" onClick={handlePreviewSectionClick}>
+              <div className="p-3 bg-muted/50 rounded-md border border-dashed">
+                <div className="flex items-center gap-2 mb-2">
+                  <TrendingUp className="w-4 h-4 text-primary" />
+                  <span className="text-sm font-medium">Online Valuations vs. Actual Sale Prices</span>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Comparison of automated valuation models against actual closed sale prices.
+                </p>
+              </div>
+            </PreviewSection>
+          )}
+
+          {includedSections.includes("price_per_sqft") && (
+            <PreviewSection title="Average Price Per Sq. Ft." icon={BarChart3} sectionId="price_per_sqft" onClick={handlePreviewSectionClick}>
+              <div className="h-32 bg-muted rounded-md flex items-center justify-center">
+                <span className="text-muted-foreground text-sm">Price per square foot chart</span>
+              </div>
             </PreviewSection>
           )}
 
