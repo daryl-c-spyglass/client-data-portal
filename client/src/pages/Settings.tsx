@@ -169,7 +169,8 @@ export default function Settings() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          filename: `profile_photo_${Date.now()}.${file.name.split(".").pop()}`,
+          name: `profile_photo_${Date.now()}.${file.name.split(".").pop()}`,
+          size: file.size,
           contentType: file.type,
         }),
       });
@@ -662,15 +663,18 @@ export default function Settings() {
                       <div>
                         <Label className="text-sm font-medium">Profile Photo</Label>
                         <p className="text-xs text-muted-foreground mt-1">
-                          Upload a professional headshot photo. Max 5MB, JPG or PNG recommended.
+                          Upload a professional headshot photo (max 5MB, JPG or PNG) or paste an image URL.
                         </p>
                       </div>
-                      {profileForm.headshotUrl && (
-                        <div className="flex items-center gap-2 p-2 bg-muted rounded-md">
-                          <Check className="h-4 w-4 text-green-600" />
-                          <span className="text-sm text-muted-foreground">Photo uploaded</span>
-                        </div>
-                      )}
+                      <div className="space-y-2">
+                        <Input 
+                          id="headshotUrl"
+                          placeholder="Or paste an image URL..." 
+                          value={profileForm.headshotUrl}
+                          onChange={(e) => setProfileForm(prev => ({ ...prev, headshotUrl: e.target.value }))}
+                          data-testid="input-headshot-url" 
+                        />
+                      </div>
                     </div>
                   </div>
 
