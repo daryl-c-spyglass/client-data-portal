@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -44,7 +44,9 @@ import {
   Briefcase,
   FileText,
   Globe,
-  Loader2
+  Loader2,
+  Upload,
+  Trash2
 } from "lucide-react";
 import { SiFacebook, SiInstagram, SiLinkedin, SiX } from "react-icons/si";
 
@@ -135,6 +137,84 @@ export default function Settings() {
   });
   const [originalProfile, setOriginalProfile] = useState(profileForm);
   const [hasProfileChanges, setHasProfileChanges] = useState(false);
+  const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
+  const photoInputRef = useRef<HTMLInputElement>(null);
+
+  const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith("image/")) {
+      toast({
+        title: "Invalid file type",
+        description: "Please select an image file (JPG, PNG).",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (file.size > 5 * 1024 * 1024) {
+      toast({
+        title: "File too large",
+        description: "Please select an image smaller than 5MB.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsUploadingPhoto(true);
+
+    try {
+      const urlResponse = await fetch("/api/uploads/request-url", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          filename: `profile_photo_${Date.now()}.${file.name.split(".").pop()}`,
+          contentType: file.type,
+        }),
+      });
+
+      if (!urlResponse.ok) {
+        throw new Error("Failed to get upload URL");
+      }
+
+      const { signedUrl, objectPath } = await urlResponse.json();
+
+      const uploadResponse = await fetch(signedUrl, {
+        method: "PUT",
+        body: file,
+        headers: { "Content-Type": file.type },
+      });
+
+      if (!uploadResponse.ok) {
+        throw new Error("Failed to upload photo");
+      }
+
+      const photoUrl = objectPath.startsWith("/") ? objectPath : `/${objectPath}`;
+      setProfileForm(prev => ({ ...prev, headshotUrl: photoUrl }));
+      
+      toast({
+        title: "Photo uploaded",
+        description: "Your profile photo has been uploaded. Don't forget to save your changes.",
+      });
+    } catch (error) {
+      console.error("Photo upload error:", error);
+      toast({
+        title: "Upload failed",
+        description: "Failed to upload photo. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsUploadingPhoto(false);
+      if (photoInputRef.current) {
+        photoInputRef.current.value = "";
+      }
+    }
+  };
+
+  const handleDeletePhoto = () => {
+    setProfileForm(prev => ({ ...prev, headshotUrl: '' }));
+  };
 
   // Fetch agent profile
   const { data: agentProfileData, isLoading: isLoadingProfile } = useQuery<AgentProfileResponse>({
@@ -535,25 +615,62 @@ export default function Settings() {
                 </CardHeader>
                 <CardContent className="space-y-6">
                   <div className="flex items-start gap-6">
-                    <div className="flex flex-col items-center gap-2">
-                      <Avatar className="w-24 h-24">
-                        <AvatarImage src={profileForm.headshotUrl} alt="Profile" />
-                        <AvatarFallback className="text-2xl">
-                          {profileForm.firstName?.[0]}{profileForm.lastName?.[0]}
-                        </AvatarFallback>
-                      </Avatar>
-                      <Label className="text-xs text-muted-foreground">Headshot</Label>
-                    </div>
-                    <div className="flex-1 space-y-2">
-                      <Label htmlFor="headshotUrl">Headshot URL</Label>
-                      <Input 
-                        id="headshotUrl"
-                        placeholder="https://example.com/your-photo.jpg" 
-                        value={profileForm.headshotUrl}
-                        onChange={(e) => setProfileForm(prev => ({ ...prev, headshotUrl: e.target.value }))}
-                        data-testid="input-headshot-url" 
+                    <div className="flex flex-col items-center gap-3">
+                      <div className="relative group">
+                        <Avatar className="w-24 h-24">
+                          <AvatarImage src={profileForm.headshotUrl} alt="Profile" />
+                          <AvatarFallback className="text-2xl">
+                            {profileForm.firstName?.[0]}{profileForm.lastName?.[0]}
+                          </AvatarFallback>
+                        </Avatar>
+                        {profileForm.headshotUrl && (
+                          <Button
+                            variant="destructive"
+                            size="icon"
+                            className="absolute -top-1 -right-1 h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
+                            onClick={handleDeletePhoto}
+                            data-testid="button-delete-photo"
+                          >
+                            <Trash2 className="h-3 w-3" />
+                          </Button>
+                        )}
+                      </div>
+                      <input
+                        ref={photoInputRef}
+                        type="file"
+                        accept="image/*"
+                        onChange={handlePhotoUpload}
+                        className="hidden"
+                        data-testid="input-photo-upload"
                       />
-                      <p className="text-xs text-muted-foreground">Paste a URL to your professional headshot photo</p>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => photoInputRef.current?.click()}
+                        disabled={isUploadingPhoto}
+                        data-testid="button-upload-photo"
+                      >
+                        {isUploadingPhoto ? (
+                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        ) : (
+                          <Upload className="h-4 w-4 mr-2" />
+                        )}
+                        {profileForm.headshotUrl ? "Change" : "Upload"}
+                      </Button>
+                    </div>
+                    <div className="flex-1 space-y-4">
+                      <div>
+                        <Label className="text-sm font-medium">Profile Photo</Label>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          Upload a professional headshot photo. Max 5MB, JPG or PNG recommended.
+                        </p>
+                      </div>
+                      {profileForm.headshotUrl && (
+                        <div className="flex items-center gap-2 p-2 bg-muted rounded-md">
+                          <Check className="h-4 w-4 text-green-600" />
+                          <span className="text-sm text-muted-foreground">Photo uploaded</span>
+                        </div>
+                      )}
                     </div>
                   </div>
 
