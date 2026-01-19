@@ -1,0 +1,270 @@
+# CMA Presentation Builder — Architecture & Code Extraction
+
+## PURPOSE
+Extract complete architecture documentation, code snippets, and configuration details for the CMA Presentation Builder to replicate in another project (Contract Conduit CMA). This is NOT a feature request — it's a code/documentation extraction task.
+
+## CONTEXT
+The Presentation Builder at `/cmas/:id/presentation` is a mature feature with:
+- 3 tabs: Sections, Content, Layout
+- 17 configurable sections
+- Live Preview panel with real-time updates
+- PDF export capability
+- Template save/load functionality
+- AI-powered cover letter generation
+- Photo selection with AI suggestions
+- Adjustments comparison table
+- Mapbox integration for property maps
+
+---
+
+## EXTRACTION TASKS
+
+### TASK 1: List All Related Files
+Provide a complete file tree of all components, hooks, types, and utilities related to the Presentation Builder:
+```bash
+# Expected output format:
+client/src/
+├── pages/
+│   └── CMAPresentationBuilder.tsx      # Main page component
+├── components/
+│   └── cma/
+│       └── presentation/
+│           ├── SectionsTab.tsx
+│           ├── ContentTab.tsx
+│           ├── LayoutTab.tsx
+│           ├── LivePreview.tsx
+│           ├── PreviewModal.tsx
+│           ├── CoverPageEditor.tsx
+│           ├── CoverLetterEditor.tsx
+│           ├── ListingBrochureUpload.tsx
+│           ├── AdjustmentsTable.tsx
+│           ├── PhotoSelector.tsx
+│           └── [... list ALL files]
+├── hooks/
+│   └── usePresentationBuilder.ts       # If exists
+├── types/
+│   └── presentation.ts                 # Type definitions
+└── lib/
+    └── pdf/
+        └── cma-pdf-generator.ts        # PDF generation logic
+
+server/
+├── routes/
+│   └── cma-presentation.ts             # API routes
+└── services/
+    └── pdf-generator.ts                # Server-side PDF
+```
+
+Run this command and provide the actual file list:
+```bash
+find . -type f \( -name "*.tsx" -o -name "*.ts" \) | xargs grep -l -i "presentation\|CMAPresentation\|LivePreview" | head -50
+```
+
+---
+
+### TASK 2: Extract Schema / Type Definitions
+
+Provide the complete TypeScript types for:
+
+1. **Presentation Configuration**
+```typescript
+// What does the presentation config object look like?
+interface PresentationConfig {
+  sections: {...};
+  content: {...};
+  layout: {...};
+}
+```
+
+2. **Section Definition**
+```typescript
+// How are sections defined?
+interface Section {
+  id: string;
+  name: string;
+  enabled: boolean;
+  order: number;
+  category: 'introduction' | 'listings' | 'analysis';
+}
+```
+
+3. **Database Schema**
+```sql
+-- What columns in the `cmas` table store presentation data?
+-- e.g., presentation_config JSONB, brochure JSONB, etc.
+```
+
+---
+
+### TASK 3: Extract Section Configuration
+
+Provide the complete default section configuration:
+```typescript
+// EXACT list of all 17 sections with their default state
+const DEFAULT_SECTIONS = {
+  introduction: [
+    { id: 'cover-page', name: 'Cover Page', enabled: true, order: 0 },
+    { id: 'listing-brochure', name: 'Listing Brochure', enabled: true, order: 1 },
+    // ... continue for all 7 introduction sections
+  ],
+  listings: [
+    // ... all 8 listings sections
+  ],
+  analysis: [
+    // ... all 4 analysis sections
+  ]
+};
+```
+
+---
+
+### TASK 4: Extract Content Tab Configuration
+
+For each editable content section, provide:
+
+1. **Cover Page Editor**
+   - Fields: title, subtitle, showDate, showAgentPhoto, coverBackground
+   - Cover background options: plainWhite, gradient, propertyPhoto
+   - How is the preview rendered?
+
+2. **Cover Letter Editor**
+   - Client name field
+   - AI generation: What API endpoint? What prompt template?
+   - Tone options: Professional, Friendly, etc.
+
+3. **Listing Brochure**
+   - Upload flow (what storage? presigned URLs?)
+   - Supported file types (PDF, PNG, JPG)
+   - Max file size
+   - How is it stored in DB?
+
+4. **Adjustment Rates**
+   - Default values for each adjustment type
+   - Formula for calculating adjusted prices
+   - How is the comparison table rendered?
+
+---
+
+### TASK 5: Extract Layout Tab Configuration
+
+1. **Photos per Property**
+   - Options: Two Photos, Single Photo, No Photos
+   - How does this affect the preview/PDF?
+
+2. **Photo Selection**
+   - Options: First 12, All Photos, AI Suggested, Custom Selection
+   - How does "AI Suggested" work? (Repliers integration?)
+   - Custom selection modal implementation
+
+---
+
+### TASK 6: Extract Live Preview Implementation
+
+1. **Component Structure**
+   - How is each section rendered in preview?
+   - Real-time update mechanism (state? context? zustand?)
+   - Scroll synchronization with sections
+
+2. **Full-Screen Preview Modal**
+   - Trigger mechanism
+   - Zoom controls (50%, 100%, 150%)
+   - How many sections shown indicator
+
+3. **Map Component**
+   - Mapbox integration
+   - Legend (Subject Property, Active, Under Contract, Closed)
+   - Streets/Satellite toggle
+   - "Show All" checkbox
+
+---
+
+### TASK 7: Extract PDF Export Implementation
+
+1. **PDF Generation Library**
+   - What library? (react-pdf, pdfmake, puppeteer, pdf-lib?)
+   - Client-side or server-side generation?
+
+2. **Page Layout**
+   - Page size (Letter? A4?)
+   - Margins
+   - Header/footer template
+
+3. **Section Rendering**
+   - How is each section converted to PDF?
+   - Image handling (base64? URLs?)
+   - Map rendering in PDF
+
+4. **Export Flow**
+   - API endpoint
+   - Progress indication
+   - Download mechanism
+
+---
+
+### TASK 8: Extract Template Save/Load
+
+1. **Save as Template**
+   - What data is saved?
+   - Where is it stored? (user-specific? global?)
+   - Naming convention
+
+2. **Load Template**
+   - Template selection UI
+   - How is it applied to current CMA?
+
+---
+
+### TASK 9: Extract API Endpoints
+
+List all API routes related to presentation:
+```typescript
+// Expected format
+POST   /api/cmas/:id/presentation/save
+GET    /api/cmas/:id/presentation
+POST   /api/cmas/:id/presentation/export-pdf
+POST   /api/cmas/:id/presentation/brochure/upload
+DELETE /api/cmas/:id/presentation/brochure
+POST   /api/cmas/:id/presentation/generate-cover-letter
+POST   /api/cmas/:id/presentation/templates
+GET    /api/cmas/:id/presentation/templates
+```
+
+---
+
+### TASK 10: Extract Component Code
+
+For each major component, provide the FULL implementation:
+
+1. `CMAPresentationBuilder.tsx` — Main page
+2. `SectionsTab.tsx` — Section toggles and reordering
+3. `ContentTab.tsx` — Content editing panels
+4. `LayoutTab.tsx` — Layout options
+5. `LivePreview.tsx` — Preview panel
+6. `AdjustmentsTable.tsx` — Comparison table
+7. `PhotoSelector.tsx` — Photo selection modal
+8. `CMAMapSection.tsx` — Mapbox map with legend
+
+---
+
+## OUTPUT FORMAT
+
+Provide a structured response with:
+
+1. **File Tree** — Complete list of related files
+2. **Types** — All TypeScript interfaces/types
+3. **Schema** — Database schema for presentation data
+4. **Configuration** — Default configs and constants
+5. **Component Code** — Full implementation of key components
+6. **API Routes** — All endpoints with request/response formats
+7. **Dependencies** — NPM packages used (mapbox, pdf-lib, etc.)
+
+---
+
+## IMPORTANT NOTES
+
+- Do NOT modify any code — this is READ-ONLY extraction
+- Include ALL imports at the top of each code file
+- Include any environment variables needed (MAPBOX_TOKEN, etc.)
+- Note any Repliers API integration points
+- Note any OpenAI API integration points
+- Include CSS/Tailwind classes used for styling
