@@ -1,0 +1,242 @@
+Extract CMA Feature Documentation for Replication
+SCOPE
+READ-ONLY TASK - Do NOT modify any code.
+Extract and document all code, schema, APIs, components, and configurations related to the CMA (Comparative Market Analysis) feature. This documentation will be used to replicate the feature in a separate project.
+
+TASK: Create a comprehensive reference document
+Output file: /home/claude/CMA_FEATURE_REFERENCE.md
+
+EXTRACTION TASKS
+Task 1: Find all CMA-related files
+bash# List all files containing "cma" or "CMA"
+find . -type f \( -name "*.ts" -o -name "*.tsx" -o -name "*.sql" \) | xargs grep -li "cma" 2>/dev/null
+
+# List all files in CMA directories
+find . -type d -iname "*cma*" -exec ls -la {} \;
+
+# Search for related terms
+grep -ri "comparable" --include="*.ts" --include="*.tsx" -l
+grep -ri "market analysis" --include="*.ts" --include="*.tsx" -l
+Task 2: Extract Database Schema
+bash# Find schema definitions
+grep -ri "cmas" --include="*.ts" shared/schema.ts
+cat shared/schema.ts | grep -A 50 "cmas = pgTable"
+
+# Find any migrations
+find . -name "*.sql" -path "*migration*" | xargs grep -l "cma"
+Document in reference file:
+
+Table name and all columns
+Column types and defaults
+Foreign key relationships
+JSONB field structures (comparablesData, statistics, searchCriteria, etc.)
+
+Task 3: Extract API Endpoints
+bash# Find CMA routes
+grep -ri "\/api\/cma" --include="*.ts" server/
+cat server/routes/cmas.ts
+
+# Find all endpoint definitions
+grep -E "(router\.(get|post|put|delete|patch))" server/routes/cmas.ts
+Document in reference file:
+
+All endpoints (method, path, description)
+Request body schemas
+Response formats
+Authentication requirements
+
+Task 4: Extract Frontend Components
+bash# Find CMA pages
+ls -la client/src/pages/ | grep -i cma
+
+# Find CMA components
+find client/src/components -iname "*cma*" -type f
+find client/src/components -ipath "*cma*" -type f
+
+# List component contents
+cat client/src/pages/CMAs.tsx
+cat client/src/pages/CMADetail.tsx
+Document in reference file:
+
+Page components and their routes
+Child components used
+Props and interfaces
+State management approach
+Key UI patterns
+
+Task 5: Extract View Components
+bash# Find the 4 view components (Compare, Map, Stats, List)
+find client/src -name "*Compare*" -o -name "*MapView*" -o -name "*Stats*" -o -name "*ListView*" | grep -i cma
+
+# Get contents of each view
+cat client/src/components/CMA/views/CompareView.tsx
+cat client/src/components/CMA/views/MapView.tsx
+cat client/src/components/CMA/views/StatsView.tsx
+cat client/src/components/CMA/views/ListView.tsx
+Task 6: Extract Utility Functions
+bash# Find statistics calculation
+grep -ri "calculateStatistics\|cmaStatistics" --include="*.ts" -l
+cat server/utils/cmaStatistics.ts
+
+# Find any CMA-related utilities
+find . -path "./node_modules" -prune -o -name "*.ts" -print | xargs grep -l "CMA" 2>/dev/null
+Task 7: Extract TypeScript Interfaces/Types
+bash# Find CMA-related types
+grep -ri "interface.*CMA\|type.*CMA\|ComparableProperty\|CMAStatistics" --include="*.ts" --include="*.tsx" -A 20
+
+# Check shared types
+cat shared/types/cma.ts 2>/dev/null || echo "No separate CMA types file"
+Task 8: Extract Repliers API Integration
+bash# Find how properties are fetched
+grep -ri "repliers\|fetchPropert" --include="*.ts" server/
+cat server/services/repliers.ts
+
+# Find the specific calls for CMA data
+grep -ri "comparables\|listings" --include="*.ts" server/routes/cmas.ts
+Task 9: Extract Dependencies
+bash# Check package.json for relevant dependencies
+cat package.json | grep -E "(mapbox|chart|recharts|react-map)"
+
+# Check for Mapbox token usage
+grep -ri "MAPBOX\|mapbox" --include="*.ts" --include="*.tsx" -l
+Task 10: Extract Environment Variables
+bash# Find CMA-related env vars
+grep -ri "process.env\|import.meta.env" --include="*.ts" --include="*.tsx" | grep -i "map\|repliers\|cma"
+
+OUTPUT FORMAT
+Create /home/claude/CMA_FEATURE_REFERENCE.md with this structure:
+markdown# CMA Feature Reference Documentation
+Generated from Client Data Portal for replication
+
+## 1. Database Schema
+
+### Table: cmas
+| Column | Type | Default | Description |
+|--------|------|---------|-------------|
+| ... | ... | ... | ... |
+
+### JSONB Structures
+#### comparablesData
+```typescript
+// Full interface here
+```
+
+#### statistics
+```typescript
+// Full interface here
+```
+
+## 2. API Endpoints
+
+### GET /api/cmas
+- Description: List all CMAs for user
+- Auth: Required
+- Response:
+```json
+{ ... }
+```
+
+### GET /api/cmas/:id
+...
+
+### POST /api/cmas
+...
+
+## 3. TypeScript Interfaces
+```typescript
+// All CMA-related interfaces
+```
+
+## 4. Frontend Components
+
+### Pages
+- `/cmas` → CMAs.tsx
+- `/cmas/:id` → CMADetail.tsx
+
+### Component Tree
+```
+CMAs.tsx
+├── CMACard
+└── ...
+
+CMADetail.tsx
+├── CMACompareView
+├── CMAMapView
+├── CMAStatsView
+└── CMAListView
+```
+
+## 5. View Components Code
+
+### CompareView.tsx
+```typescript
+// Full component code
+```
+
+### MapView.tsx
+```typescript
+// Full component code
+```
+
+### StatsView.tsx
+```typescript
+// Full component code
+```
+
+### ListView.tsx
+```typescript
+// Full component code
+```
+
+## 6. Utility Functions
+
+### calculateCMAStatistics
+```typescript
+// Full function code
+```
+
+## 7. Repliers Integration
+
+### Property Fetch Function
+```typescript
+// Code for fetching from Repliers
+```
+
+## 8. Dependencies Required
+- react-map-gl: ^x.x.x
+- mapbox-gl: ^x.x.x
+- chart.js: ^x.x.x
+- ...
+
+## 9. Environment Variables
+- VITE_MAPBOX_TOKEN
+- REPLIERS_API_KEY
+- ...
+
+## 10. Status Color Scheme
+| Status | Color | Hex |
+|--------|-------|-----|
+| Subject Property | Blue | #3B82F6 |
+| Active | Green | #22C55E |
+| Under Contract | Orange | #F97316 |
+| Closed | Red | #EF4444 |
+| Pending | Gray | #6B7280 |
+
+ACCEPTANCE CRITERIA
+
+ Reference document created at /home/claude/CMA_FEATURE_REFERENCE.md
+ All database schema fields documented
+ All API endpoints documented with request/response formats
+ All TypeScript interfaces extracted
+ All view components (Compare, Map, Stats, List) code captured
+ Statistics calculation logic documented
+ Repliers integration code documented
+ Dependencies listed with versions
+ Environment variables identified
+ NO CODE MODIFIED - read-only extraction only
+
+
+DELIVERABLE
+Once complete, present the file using:
+bashcat /home/claude/CMA_FEATURE_REFERENCE.md
+This document will be used as the specification to implement the CMA feature in a separate Replit project.
