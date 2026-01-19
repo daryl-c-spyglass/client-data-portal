@@ -27,6 +27,14 @@ The UI incorporates Spyglass Realty branding with an orange primary color scheme
 - **Google OAuth**: Team-only authentication via Google OAuth (passport-google-oauth20) with domain restriction to @spyglassrealty.com emails or explicitly allowed emails.
 - **Session Management**: PostgreSQL-backed sessions via connect-pg-simple.
 - **Security**: Return URL sanitization prevents open redirect vulnerabilities.
+- **3-Tier Role System**: Role-based access control with Super Admin > Admin > Agent hierarchy.
+  - **Super Admin**: Full platform access including user management, presentation library management, company settings. Hardcoded emails: ryan@, daryl@, caleb@ @spyglassrealty.com
+  - **Admin**: Template creation, presentation library viewing, display settings management
+  - **Agent**: CMA creation, presentations, global slides access, analytics viewing
+  - **Permission Utilities**: `shared/permissions.ts` exports `hasPermission()`, `isAtLeast()`, `normalizeRole()` helpers
+  - **Frontend Hook**: `usePermissions()` hook provides `can()`, `isAtLeast()`, role flags
+  - **Backend Middleware**: `requireMinimumRole()` and `requirePermission()` in `server/auth.ts`
+  - **Protected Routes**: `ProtectedRoute` component wraps pages requiring specific roles/permissions
 
 ### Technical Implementations
 - **Data Sourcing**: Primary property data from Repliers API (active, pending, closed listings) and MLS Grid API. Repliers API stores MLS SubdivisionName data in `address.neighborhood`.

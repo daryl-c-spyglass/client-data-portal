@@ -7336,7 +7336,7 @@ OUTPUT JSON:
     }
   });
 
-  app.put("/api/admin/company-settings", requireAuth, requireRole("admin"), async (req, res) => {
+  app.put("/api/admin/company-settings", requireAuth, requireMinimumRole("admin"), async (req, res) => {
     try {
       const { updateCompanySettingsSchema } = await import("@shared/schema");
       const parsed = updateCompanySettingsSchema.safeParse(req.body);
@@ -7364,7 +7364,7 @@ OUTPUT JSON:
     }
   });
 
-  app.post("/api/admin/custom-pages", requireAuth, requireRole("admin"), async (req, res) => {
+  app.post("/api/admin/custom-pages", requireAuth, requireMinimumRole("admin"), async (req, res) => {
     try {
       const { insertCustomReportPageSchema } = await import("@shared/schema");
       const parsed = insertCustomReportPageSchema.safeParse(req.body);
@@ -7381,7 +7381,7 @@ OUTPUT JSON:
     }
   });
 
-  app.put("/api/admin/custom-pages/:id", requireAuth, requireRole("admin"), async (req, res) => {
+  app.put("/api/admin/custom-pages/:id", requireAuth, requireMinimumRole("admin"), async (req, res) => {
     try {
       const { id } = req.params;
       const { updateCustomReportPageSchema } = await import("@shared/schema");
@@ -7403,7 +7403,7 @@ OUTPUT JSON:
     }
   });
 
-  app.delete("/api/admin/custom-pages/:id", requireAuth, requireRole("admin"), async (req, res) => {
+  app.delete("/api/admin/custom-pages/:id", requireAuth, requireMinimumRole("admin"), async (req, res) => {
     try {
       const { id } = req.params;
       const deleted = await storage.deleteCustomReportPage(id);

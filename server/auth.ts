@@ -163,14 +163,20 @@ export function requireAuth(req: Request, res: Response, next: NextFunction) {
   next();
 }
 
+/**
+ * @deprecated Use requireMinimumRole() or requirePermission() instead.
+ * This function is kept for backwards compatibility but should not be used.
+ */
 export function requireRole(roles: string[]) {
+  console.warn('[Auth] DEPRECATED: requireRole() is deprecated. Use requireMinimumRole() or requirePermission() instead.');
   return (req: Request, res: Response, next: NextFunction) => {
     if (!req.isAuthenticated()) {
       return res.status(401).json({ error: "Authentication required" });
     }
 
     const user = req.user as User;
-    if (!roles.includes(user.role)) {
+    const userRole = normalizeRole(user.role);
+    if (!roles.includes(userRole)) {
       return res.status(403).json({ error: "Insufficient permissions" });
     }
 
