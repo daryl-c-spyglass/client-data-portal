@@ -5,6 +5,14 @@ import bcrypt from "bcryptjs";
 import { storage } from "./storage";
 import type { User } from "@shared/schema";
 import type { Request, Response, NextFunction } from "express";
+import { 
+  UserRole, 
+  Permission, 
+  hasPermission, 
+  isAtLeast, 
+  normalizeRole,
+  isSuperAdminEmail 
+} from "@shared/permissions";
 
 const ALLOWED_EMAIL_DOMAIN = process.env.ALLOWED_EMAIL_DOMAIN || "spyglassrealty.com";
 const ALLOWED_EMAILS = process.env.ALLOWED_EMAILS?.split(",").map(e => e.trim().toLowerCase()) || [];
@@ -163,6 +171,50 @@ export function requireRole(roles: string[]) {
     const user = req.user as User;
     if (!roles.includes(user.role)) {
       return res.status(403).json({ error: "Insufficient permissions" });
+    }
+
+    next();
+  };
+}
+
+export function requireMinimumRole(minimumRole: UserRole) {
+  return (req: Request, res: Response, next: NextFunction) => {
+    if (!req.isAuthenticated()) {
+      return res.status(401).json({ error: "Authentication required" });
+    }
+
+    const user = req.user as User;
+    const userRole = normalizeRole(user.role);
+
+    if (!isAtLeast(userRole, minimumRole)) {
+      console.log('[Auth] Access denied:', { 
+        userId: user.id, 
+        userRole, 
+        requiredRole: minimumRole 
+      });
+      return res.status(403).json({ error: "Insufficient permissions" });
+    }
+
+    next();
+  };
+}
+
+export function requirePermission(permission: Permission) {
+  return (req: Request, res: Response, next: NextFunction) => {
+    if (!req.isAuthenticated()) {
+      return res.status(401).json({ error: "Authentication required" });
+    }
+
+    const user = req.user as User;
+    const userRole = normalizeRole(user.role);
+
+    if (!hasPermission(userRole, permission)) {
+      console.log('[Auth] Permission denied:', { 
+        userId: user.id, 
+        userRole, 
+        requiredPermission: permission 
+      });
+      return res.status(403).json({ error: "Permission denied" });
     }
 
     next();

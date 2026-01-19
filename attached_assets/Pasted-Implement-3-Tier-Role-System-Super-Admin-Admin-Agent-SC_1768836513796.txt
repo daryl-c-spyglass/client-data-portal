@@ -1,0 +1,477 @@
+Implement 3-Tier Role System (Super Admin → Admin → Agent)
+SCOPE
+Implement a 3-tier role-based access control system for the Client Data Portal. This enables the Presentation Library feature where Super Admins manage global slides.
+
+ROLE HIERARCHY
+┌─────────────────────────────────────────────────────────────────┐
+│                    USER ROLE HIERARCHY                          │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                 │
+│  SUPER_ADMIN (Ryan, Daryl, Caleb)                               │
+│     ├── Full access to everything                               │
+│     ├── Settings > Presentation Library (upload/edit/delete)    │
+│     ├── Settings > User Management (assign roles)               │
+│     ├── Create/manage global templates                          │
+│     └── All Admin + Agent permissions                           │
+│                                                                 │
+│  ADMIN (Team leads, managers)                                   │
+│     ├── Can manage some settings                                │
+│     ├── Can view Presentation Library (read-only)               │
+│     ├── CANNOT modify global slides                             │
+│     ├── CANNOT assign roles                                     │
+│     └── All Agent permissions                                   │
+│                                                                 │
+│  AGENT (All agents - default role)                              │
+│     ├── Create CMAs, Presentations                              │
+│     ├── Use global slides (read-only)                           │
+│     ├── Toggle/reorder slides in their presentations            │
+│     ├── Upload custom slides (per-presentation only)            │
+│     └── CANNOT access Presentation Library                      │
+│                                                                 │
+└─────────────────────────────────────────────────────────────────┘
+
+PERMISSION MATRIX
+FeatureSuper AdminAdminAgentPresentation LibraryView Slide LibraryYesRead-onlyNoUpload Global SlidesYesNoNoEdit/Delete Global SlidesYesNoNoCreate Global TemplatesYesNoNoUser ManagementView UsersYesNoNoAssign RolesYesNoNoCMA & PresentationsCreate/Edit Own CMAsYesYesYesUse Global SlidesYesYesYesToggle Slides On/OffYesYesYesReorder SlidesYesYesYesUpload Per-Presentation SlidesYesYesYesExport PDFYesYesYesSettingsProfile SettingsYesYesYesBio & Cover LetterYesYesYes
+
+ENGINEERING TASKS
+Task 1: Update User Schema with New Role
+typescript// shared/schema.ts
+
+// Update the role enum to include super_admin
+export const userRoleEnum = pgEnum('user_role', ['super_admin', 'admin', 'agent']);
+
+// Or if using text field, update the type
+export const users = pgTable('users', {
+  id: varchar('id').primaryKey(),
+  email: text('email').notNull(),
+  name: text('name'),
+  // ... other fields
+  role: text('role').default('agent').notNull(), // 'super_admin' | 'admin' | 'agent'
+  // ... rest of fields
+});
+
+// TypeScript type
+export type UserRole = 'super_admin' | 'admin' | 'agent';
+
+Task 2: Create Permissions Utility
+typescript// shared/permissions.ts
+
+export type UserRole = 'super_admin' | 'admin' | 'agent';
+
+export type Permission = 
+  | 'presentation_library.view'
+  | 'presentation_library.manage'
+  | 'user_management.view'
+  | 'user_management.manage'
+  | 'templates.create'
+  | 'templates.manage'
+  | 'cma.create'
+  | 'cma.edit_own'
+  | 'presentations.create'
+  | 'presentations.use_global_slides';
+
+const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
+  super_admin: [
+    'presentation_library.view',
+    'presentation_library.manage',
+    'user_management.view',
+    'user_management.manage',
+    'templates.create',
+    'templates.manage',
+    'cma.create',
+    'cma.edit_own',
+    'presentations.create',
+    'presentations.use_global_slides',
+  ],
+  admin: [
+    'presentation_library.view', // Read-only
+    'cma.create',
+    'cma.edit_own',
+    'presentations.create',
+    'presentations.use_global_slides',
+  ],
+  agent: [
+    'cma.create',
+    'cma.edit_own',
+    'presentations.create',
+    'presentations.use_global_slides',
+  ],
+};
+
+export function hasPermission(role: UserRole, permission: Permission): boolean {
+  return ROLE_PERMISSIONS[role]?.includes(permission) ?? false;
+}
+
+export function hasAnyPermission(role: UserRole, permissions: Permission[]): boolean {
+  return permissions.some(p => hasPermission(role, p));
+}
+
+export function isAtLeast(role: UserRole, requiredRole: UserRole): boolean {
+  const hierarchy: UserRole[] = ['agent', 'admin', 'super_admin'];
+  return hierarchy.indexOf(role) >= hierarchy.indexOf(requiredRole);
+}
+
+Task 3: Update Server Middleware
+typescript// server/auth.ts
+
+import { UserRole, hasPermission, Permission, isAtLeast } from '../shared/permissions';
+
+// Existing requireAuth middleware...
+
+// Update or add role-based middleware
+export function requireRole(minimumRole: UserRole) {
+  return (req: Request, res: Response, next: NextFunction) => {
+    const user = req.user;
+    
+    if (!user) {
+      return res.status(401).json({ error: 'Authentication required' });
+    }
+    
+    const userRole = (user.role as UserRole) || 'agent';
+    
+    if (!isAtLeast(userRole, minimumRole)) {
+      console.log('[Auth] Access denied:', { 
+        userId: user.id, 
+        userRole, 
+        requiredRole: minimumRole 
+      });
+      return res.status(403).json({ error: 'Insufficient permissions' });
+    }
+    
+    next();
+  };
+}
+
+export function requirePermission(permission: Permission) {
+  return (req: Request, res: Response, next: NextFunction) => {
+    const user = req.user;
+    
+    if (!user) {
+      return res.status(401).json({ error: 'Authentication required' });
+    }
+    
+    const userRole = (user.role as UserRole) || 'agent';
+    
+    if (!hasPermission(userRole, permission)) {
+      console.log('[Auth] Permission denied:', { 
+        userId: user.id, 
+        userRole, 
+        requiredPermission: permission 
+      });
+      return res.status(403).json({ error: 'Permission denied' });
+    }
+    
+    next();
+  };
+}
+
+Task 4: Create Frontend Permission Hook
+typescript// client/src/hooks/usePermissions.ts
+
+import { useAuth } from './useAuth';
+import { UserRole, Permission, hasPermission, isAtLeast } from '@/shared/permissions';
+
+export function usePermissions() {
+  const { user } = useAuth();
+  const role: UserRole = (user?.role as UserRole) || 'agent';
+  
+  return {
+    role,
+    isSuperAdmin: role === 'super_admin',
+    isAdmin: role === 'admin' || role === 'super_admin',
+    isAgent: true, // Everyone is at least an agent
+    
+    hasPermission: (permission: Permission) => hasPermission(role, permission),
+    isAtLeast: (requiredRole: UserRole) => isAtLeast(role, requiredRole),
+    
+    // Convenience methods
+    canManagePresentationLibrary: hasPermission(role, 'presentation_library.manage'),
+    canViewPresentationLibrary: hasPermission(role, 'presentation_library.view'),
+    canManageUsers: hasPermission(role, 'user_management.manage'),
+    canCreateTemplates: hasPermission(role, 'templates.manage'),
+  };
+}
+
+Task 5: Create Protected Route Component
+typescript// client/src/components/ProtectedRoute.tsx
+
+import { usePermissions } from '@/hooks/usePermissions';
+import { UserRole, Permission } from '@/shared/permissions';
+import { Redirect } from 'wouter';
+
+interface ProtectedRouteProps {
+  children: React.ReactNode;
+  requiredRole?: UserRole;
+  requiredPermission?: Permission;
+  fallback?: React.ReactNode;
+}
+
+export function ProtectedRoute({ 
+  children, 
+  requiredRole, 
+  requiredPermission,
+  fallback 
+}: ProtectedRouteProps) {
+  const { isAtLeast, hasPermission } = usePermissions();
+  
+  const hasAccess = requiredRole 
+    ? isAtLeast(requiredRole) 
+    : requiredPermission 
+      ? hasPermission(requiredPermission) 
+      : true;
+  
+  if (!hasAccess) {
+    if (fallback) return <>{fallback}</>;
+    return <Redirect to="/dashboard" />;
+  }
+  
+  return <>{children}</>;
+}
+
+Task 6: Update Navigation to Show/Hide Based on Role
+typescript// client/src/components/Sidebar.tsx (or Navigation component)
+
+import { usePermissions } from '@/hooks/usePermissions';
+
+export function Sidebar() {
+  const { canViewPresentationLibrary, canManageUsers, isSuperAdmin } = usePermissions();
+  
+  return (
+    <nav>
+      {/* Always visible */}
+      <NavItem href="/dashboard" icon={Home}>Dashboard</NavItem>
+      <NavItem href="/properties" icon={Search}>Properties</NavItem>
+      <NavItem href="/cmas" icon={FileText}>CMAs</NavItem>
+      <NavItem href="/clients" icon={Users}>Clients</NavItem>
+      
+      {/* Settings section */}
+      <NavItem href="/settings" icon={Settings}>Settings</NavItem>
+      
+      {/* Super Admin only */}
+      {canViewPresentationLibrary && (
+        <NavItem href="/settings/presentation-library" icon={Presentation}>
+          Presentation Library
+        </NavItem>
+      )}
+      
+      {canManageUsers && (
+        <NavItem href="/settings/users" icon={UserCog}>
+          User Management
+        </NavItem>
+      )}
+    </nav>
+  );
+}
+
+Task 7: Protect API Routes
+typescript// server/routes/admin.ts
+
+import { Router } from 'express';
+import { requireRole, requirePermission } from '../auth';
+
+const router = Router();
+
+// Presentation Library - Super Admin only for manage, Admin can view
+router.get('/presentation-library/slides', 
+  requirePermission('presentation_library.view'),
+  async (req, res) => { /* ... */ }
+);
+
+router.post('/presentation-library/slides', 
+  requirePermission('presentation_library.manage'),
+  async (req, res) => { /* ... */ }
+);
+
+router.put('/presentation-library/slides/:id', 
+  requirePermission('presentation_library.manage'),
+  async (req, res) => { /* ... */ }
+);
+
+router.delete('/presentation-library/slides/:id', 
+  requirePermission('presentation_library.manage'),
+  async (req, res) => { /* ... */ }
+);
+
+// User Management - Super Admin only
+router.get('/users', 
+  requirePermission('user_management.view'),
+  async (req, res) => { /* ... */ }
+);
+
+router.put('/users/:id/role', 
+  requirePermission('user_management.manage'),
+  async (req, res) => { /* ... */ }
+);
+
+export default router;
+
+Task 8: Set Default Super Admins (Database)
+sql-- Set all 3 founding Super Admins
+UPDATE users 
+SET role = 'super_admin' 
+WHERE email IN (
+  'ryan@spyglassrealty.com',
+  'daryl@spyglassrealty.com',
+  'caleb@spyglassrealty.com'
+);
+
+-- Verify the update
+SELECT id, email, name, role 
+FROM users 
+WHERE role = 'super_admin';
+Or via server seed script:
+typescript// server/scripts/seedSuperAdmins.ts
+
+import { db } from '../db';
+import { users } from '../../shared/schema';
+import { inArray } from 'drizzle-orm';
+
+const SUPER_ADMIN_EMAILS = [
+  'ryan@spyglassrealty.com',
+  'daryl@spyglassrealty.com',
+  'caleb@spyglassrealty.com',
+];
+
+async function seedSuperAdmins() {
+  console.log('[Seed] Setting Super Admins:', SUPER_ADMIN_EMAILS);
+  
+  const result = await db
+    .update(users)
+    .set({ role: 'super_admin' })
+    .where(inArray(users.email, SUPER_ADMIN_EMAILS))
+    .returning({ id: users.id, email: users.email, role: users.role });
+  
+  console.log('[Seed] Super Admins updated:', result);
+  
+  return result;
+}
+
+seedSuperAdmins()
+  .then(() => process.exit(0))
+  .catch((err) => {
+    console.error('[Seed] Error:', err);
+    process.exit(1);
+  });
+Run with:
+bashnpx tsx server/scripts/seedSuperAdmins.ts
+```
+
+---
+
+### DEFAULT SUPER ADMINS
+
+| Name | Email | Role |
+|------|-------|------|
+| Ryan Rodenbeck | ryan@spyglassrealty.com | super_admin |
+| Daryl Camingao | daryl@spyglassrealty.com | super_admin |
+| Caleb Nelson | caleb@spyglassrealty.com | super_admin |
+
+---
+
+### FILES TO CREATE/MODIFY
+```
+shared/
+├── schema.ts                    [MODIFY - ensure role field exists]
+└── permissions.ts               [CREATE - permission constants & helpers]
+
+server/
+├── auth.ts                      [MODIFY - add requireRole, requirePermission]
+├── routes/
+│   └── admin.ts                 [CREATE - protected admin routes]
+└── scripts/
+    └── seedSuperAdmins.ts       [CREATE - seed script for super admins]
+
+client/src/
+├── hooks/
+│   └── usePermissions.ts        [CREATE - permission hook]
+├── components/
+│   ├── ProtectedRoute.tsx       [CREATE - route protection]
+│   └── Sidebar.tsx              [MODIFY - conditional nav items]
+└── pages/
+    └── settings/
+        ├── presentation-library.tsx  [CREATE - Super Admin only]
+        └── users.tsx                 [CREATE - Super Admin only]
+
+ACCEPTANCE CRITERIA
+Role System:
+
+ 3 roles exist: super_admin, admin, agent
+ New users default to agent role
+ Ryan, Daryl, and Caleb set to super_admin
+
+Super Admin Access:
+
+ Can see "Presentation Library" in navigation
+ Can see "User Management" in navigation
+ Can upload/edit/delete global slides
+ Can assign roles to other users
+
+Admin Access:
+
+ Can see "Presentation Library" (read-only)
+ CANNOT see "User Management"
+ CANNOT upload/edit/delete global slides
+ CAN use global slides in presentations
+
+Agent Access:
+
+ CANNOT see "Presentation Library" in navigation
+ CANNOT see "User Management"
+ CAN create CMAs and presentations
+ CAN use global slides (read-only)
+
+API Protection:
+
+ Admin routes return 403 for unauthorized roles
+ Logs show access denied attempts
+
+
+LOGGING
+typescript// Server-side
+console.log('[Auth] Role check:', { userId, userRole, requiredRole, granted: true/false });
+console.log('[Auth] Permission check:', { userId, permission, granted: true/false });
+console.log('[Admin] Role updated:', { targetUserId, oldRole, newRole, updatedBy });
+
+// Client-side
+console.log('[Permissions] User role:', role);
+console.log('[Permissions] Access check:', { permission, hasAccess });
+```
+
+---
+
+### VALIDATION TEST
+```
+1. Log in as Ryan (ryan@spyglassrealty.com)
+   - Verify: role = super_admin
+   - Verify: See "Presentation Library" and "User Management"
+   - Verify: Can upload a slide
+   - Verify: Can change another user's role
+
+2. Log in as Daryl (daryl@spyglassrealty.com)
+   - Verify: role = super_admin
+   - Verify: See "Presentation Library" and "User Management"
+   - Verify: Can upload a slide
+   - Verify: Can change another user's role
+
+3. Log in as Caleb (caleb@spyglassrealty.com)
+   - Verify: role = super_admin
+   - Verify: See "Presentation Library" and "User Management"
+   - Verify: Can upload a slide
+   - Verify: Can change another user's role
+
+4. Log in as an Admin user (if any exist)
+   - Verify: See "Presentation Library" in nav (read-only)
+   - Verify: Do NOT see "User Management"
+   - Verify: Cannot upload slides (button hidden or disabled)
+   - Verify: Can create CMA and use global slides
+
+5. Log in as an Agent user (any other user)
+   - Verify: role = agent
+   - Verify: Do NOT see "Presentation Library"
+   - Verify: Do NOT see "User Management"
+   - Verify: Can create CMA and use global slides
+   - Verify: Directly visiting /settings/presentation-library redirects to dashboard
+
+6. Test API directly (curl/Postman)
+   - Verify: POST /api/admin/presentation-library/slides returns 403 for agent
+   - Verify: PUT /api/admin/users/:id/role returns 403 for admin
