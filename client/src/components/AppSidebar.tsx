@@ -1,6 +1,5 @@
-import { Home, Search, FileText, Users, Settings, BarChart3, Mail, Filter, Calendar, UserCircle, MessageCircle, Shield } from "lucide-react";
+import { Home, Search, FileText, Users, Settings, BarChart3, Mail, Filter, Calendar, UserCircle, MessageCircle, Shield, UsersRound } from "lucide-react";
 import { Link, useLocation } from "wouter";
-import { useQuery } from "@tanstack/react-query";
 import {
   Sidebar,
   SidebarContent,
@@ -15,13 +14,8 @@ import {
 } from "@/components/ui/sidebar";
 import { Button } from "@/components/ui/button";
 import { useChat } from "@/contexts/ChatContext";
+import { usePermissions } from "@/hooks/use-permissions";
 import spyglassLogo from "@assets/Large_Logo_1765233192587.jpeg";
-
-interface UserData {
-  id: string;
-  email: string;
-  role?: string;
-}
 
 const menuItems = [
   {
@@ -74,12 +68,22 @@ const menuItems = [
   },
 ];
 
-const adminItem = {
-  title: "Admin",
-  url: "/admin",
-  icon: Shield,
-  testId: "link-admin",
-};
+const adminItems = [
+  {
+    title: "Admin",
+    url: "/admin",
+    icon: Shield,
+    testId: "link-admin",
+    requiredRole: "admin" as const,
+  },
+  {
+    title: "User Management",
+    url: "/admin/users",
+    icon: UsersRound,
+    testId: "link-user-management",
+    requiredRole: "super_admin" as const,
+  },
+];
 
 const calendarItems = [
   {
@@ -100,12 +104,7 @@ const calendarItems = [
 export function AppSidebar() {
   const [location] = useLocation();
   const { openChat } = useChat();
-
-  const { data: user } = useQuery<UserData>({
-    queryKey: ["/api/auth/me"],
-  });
-
-  const isAdmin = user?.role === "admin";
+  const { isAtLeast } = usePermissions();
 
   return (
     <Sidebar>
@@ -137,18 +136,20 @@ export function AppSidebar() {
                   </SidebarMenuButton>
                 </SidebarMenuItem>
               ))}
-              {isAdmin && (
-                <SidebarMenuItem key={adminItem.title}>
-                  <SidebarMenuButton 
-                    asChild
-                    className={location === adminItem.url ? "bg-sidebar-accent" : ""}
-                  >
-                    <Link href={adminItem.url} data-testid={adminItem.testId}>
-                      <adminItem.icon className="w-4 h-4" />
-                      <span>{adminItem.title}</span>
-                    </Link>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
+              {adminItems.map((item) => 
+                isAtLeast(item.requiredRole) && (
+                  <SidebarMenuItem key={item.title}>
+                    <SidebarMenuButton 
+                      asChild
+                      className={location === item.url ? "bg-sidebar-accent" : ""}
+                    >
+                      <Link href={item.url} data-testid={item.testId}>
+                        <item.icon className="w-4 h-4" />
+                        <span>{item.title}</span>
+                      </Link>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                )
               )}
             </SidebarMenu>
           </SidebarGroupContent>
