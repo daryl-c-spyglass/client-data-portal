@@ -1,0 +1,229 @@
+ Extract CMA Action Buttons & Preview Banner Reference
+SCOPE
+READ-ONLY TASK - Do NOT modify any code.
+Extract and document all code related to the two highlighted UI sections on the CMA Detail page:
+
+Top Action Buttons Bar: Copy Email, Produce URL, Print, Presentation, Share
+Yellow Preview Banner: Save, Copy Live URL, Share CMA, Modify Search, Notes
+
+
+OUTPUT FILE
+Create: /home/claude/CMA_ACTION_BUTTONS_REFERENCE.md
+
+EXTRACTION TASKS
+Task 1: Find the CMA Detail Page component
+bash# Find the main CMA detail page
+grep -ri "Back to CMAs" --include="*.tsx" client/src/
+grep -ri "Copy Email\|Produce URL\|Print\|Presentation\|Share" --include="*.tsx" client/src/
+
+# List the file
+cat client/src/pages/CMADetailPage.tsx
+Task 2: Extract Top Action Buttons implementation
+bash# Find each button's functionality
+grep -ri "Copy Email" --include="*.tsx" -A 10 client/src/
+grep -ri "Produce URL" --include="*.tsx" -A 10 client/src/
+grep -ri "Print" --include="*.tsx" -A 10 client/src/
+grep -ri "Presentation" --include="*.tsx" -A 10 client/src/
+
+# Find share functionality
+grep -ri "share" --include="*.tsx" client/src/pages/CMADetailPage.tsx
+Task 3: Extract Yellow Preview Banner implementation
+bash# Find preview banner
+grep -ri "preview of the report\|You are seeing" --include="*.tsx" client/src/
+grep -ri "Copy Live URL\|Share CMA\|Modify Search\|Notes" --include="*.tsx" client/src/
+Task 4: Find related API endpoints
+bash# Share endpoints
+grep -ri "/share\|/email\|publicLink\|shareToken" --include="*.ts" server/
+
+# Find the share routes
+cat server/routes.ts | grep -A 20 "share"
+Task 5: Extract Share Dialog/Modal components
+bash# Find share dialogs
+find client/src -name "*Share*" -o -name "*share*" | grep -i ".tsx"
+grep -ri "ShareDialog\|ShareModal\|ShareCMA" --include="*.tsx" -l client/src/
+Task 6: Extract Print functionality
+bash# Find print implementation
+grep -ri "window.print\|print\(\)\|@media print" --include="*.tsx" --include="*.css" client/src/
+Task 7: Extract Notes functionality
+bash# Find notes feature
+grep -ri "notes" --include="*.tsx" client/src/pages/CMADetailPage.tsx
+grep -ri "notes" --include="*.ts" server/routes.ts
+Task 8: Extract email sharing (Resend integration)
+bash# Find email implementation
+grep -ri "resend\|email-share\|sendEmail" --include="*.ts" server/
+cat server/routes.ts | grep -A 30 "email-share"
+
+OUTPUT FORMAT
+Create /home/claude/CMA_ACTION_BUTTONS_REFERENCE.md with this structure:
+markdown# CMA Action Buttons & Preview Banner Reference
+Extracted from Client Data Portal for replication
+
+## 1. Component Structure
+
+### Top Action Buttons Bar
+Location: [file path]
+```tsx
+// Full component code for action buttons
+```
+
+### Preview Banner
+Location: [file path]
+```tsx
+// Full component code for preview banner
+```
+
+## 2. Button Functionality
+
+### Copy Email Button
+- Purpose: [description]
+- Implementation:
+```tsx
+// Code
+```
+
+### Produce URL Button
+- Purpose: [description]
+- Implementation:
+```tsx
+// Code
+```
+
+### Print Button
+- Purpose: [description]
+- Implementation:
+```tsx
+// Code
+```
+
+### Presentation Button
+- Purpose: [description]
+- Navigation: [route]
+- Implementation:
+```tsx
+// Code
+```
+
+### Share Button
+- Purpose: [description]
+- Opens: [dialog/modal name]
+- Implementation:
+```tsx
+// Code
+```
+
+## 3. Preview Banner Buttons
+
+### Save Button
+- Purpose: [description]
+- API: [endpoint]
+- Implementation:
+```tsx
+// Code
+```
+
+### Copy Live URL Button
+- Purpose: [description]
+- Implementation:
+```tsx
+// Code
+```
+
+### Share CMA Button
+- Purpose: [description]
+- Implementation:
+```tsx
+// Code
+```
+
+### Modify Search Button
+- Purpose: [description]
+- Navigation: [route]
+- Implementation:
+```tsx
+// Code
+```
+
+### Notes Button
+- Purpose: [description]
+- Implementation:
+```tsx
+// Code
+```
+
+## 4. API Endpoints
+
+### POST /api/cmas/:id/share
+- Request: [body schema]
+- Response: [response schema]
+```typescript
+// Route implementation
+```
+
+### POST /api/cmas/:id/email-share
+- Request: [body schema]
+- Response: [response schema]
+```typescript
+// Route implementation
+```
+
+### PATCH /api/cmas/:id (for notes)
+- Request: [body schema]
+- Response: [response schema]
+
+## 5. Share Dialog Component
+
+Location: [file path]
+```tsx
+// Full share dialog component
+```
+
+## 6. Email Share Component
+
+Location: [file path]
+```tsx
+// Full email share component
+```
+
+## 7. Notes Modal/Panel Component
+
+Location: [file path]
+```tsx
+// Full notes component
+```
+
+## 8. Styling
+
+### Action Buttons Bar
+```css
+/* Styles for top action bar */
+```
+
+### Preview Banner
+```css
+/* Yellow banner styles */
+```
+
+## 9. Dependencies Used
+- [list of packages for clipboard, email, etc.]
+
+## 10. State Management
+- How share status is tracked
+- How notes are stored/updated
+- How preview mode is determined
+
+ACCEPTANCE CRITERIA
+
+ Reference document created at /home/claude/CMA_ACTION_BUTTONS_REFERENCE.md
+ All 5 top action buttons documented (Copy Email, Produce URL, Print, Presentation, Share)
+ All 5 preview banner buttons documented (Save, Copy Live URL, Share CMA, Modify Search, Notes)
+ Share dialog component code captured
+ Email share API endpoint documented
+ Notes functionality documented
+ Print implementation captured
+ Clipboard copy functionality captured
+ NO CODE MODIFIED - read-only extraction only
+
+
+DELIVERABLE
+Once complete, present the file:
+bashcat /home/claude/CMA_ACTION_BUTTONS_REFERENCE.md
