@@ -103,16 +103,17 @@ export function setupAuth() {
             let user = await storage.getUserByEmail(email);
             
             if (!user) {
+              const assignedRole = isSuperAdminEmail(email) ? "super_admin" : "agent";
               user = await storage.createUser({
                 email,
                 firstName: profile.name?.givenName || null,
                 lastName: profile.name?.familyName || null,
                 googleId: profile.id,
                 picture: profile.photos?.[0]?.value || null,
-                role: "agent",
+                role: assignedRole,
                 passwordHash: null,
               });
-              console.log(`👤 Created new user: ${email}`);
+              console.log(`👤 Created new user: ${email} with role: ${assignedRole}`);
             } else {
               user = await storage.updateUser(user.id, {
                 googleId: profile.id,
