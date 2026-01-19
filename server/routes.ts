@@ -13,7 +13,8 @@ import { findMatchingProperties, calculateMarketSummary } from "./seller-update-
 import { z } from "zod";
 import bcrypt from "bcryptjs";
 import passport from "passport";
-import { requireAuth, requireRole } from "./auth";
+import { requireAuth, requireRole, requireMinimumRole, requirePermission } from "./auth";
+import { isSuperAdminEmail } from "@shared/permissions";
 import { fetchExternalUsers, fetchFromExternalApi } from "./external-api";
 import type { PropertyStatistics, TimelineDataPoint } from "@shared/schema";
 import { neighborhoodService } from "./neighborhood-service";
@@ -7623,11 +7624,9 @@ OUTPUT JSON:
   });
 
   // Get all users (Admin only)
-  app.get("/api/admin/users", requireAuth, requireRole("admin"), async (req, res) => {
+  app.get("/api/admin/users", requireAuth, requireMinimumRole("super_admin"), async (req, res) => {
     try {
-      // Get all users - we'll need to add this to storage interface
       const result = await import("@shared/schema").then(async (schema) => {
-        // Direct query since we don't have getAllUsers in interface
         const { drizzle } = await import("drizzle-orm/neon-serverless");
         const { Pool } = await import("@neondatabase/serverless");
         const pool = new Pool({ connectionString: process.env.DATABASE_URL });
@@ -7654,13 +7653,27 @@ OUTPUT JSON:
     }
   });
 
-  app.put("/api/admin/users/:id", requireAuth, requireRole("admin"), async (req, res) => {
+  app.put("/api/admin/users/:id/role", requireAuth, requireMinimumRole("super_admin"), async (req, res) => {
     try {
       const { id } = req.params;
       const { role } = req.body;
+      const currentUser = req.user as any;
       
-      if (role && !["admin", "agent"].includes(role)) {
-        return res.status(400).json({ error: "Invalid role. Must be 'admin' or 'agent'" });
+      if (!role || !["super_admin", "admin", "agent"].includes(role)) {
+        return res.status(400).json({ error: "Invalid role. Must be 'super_admin', 'admin', or 'agent'" });
+      }
+      
+      const targetUser = await storage.getUser(id);
+      if (!targetUser) {
+        return res.status(404).json({ error: "User not found" });
+      }
+      
+      if (targetUser.id === currentUser.id) {
+        return res.status(400).json({ error: "Cannot change your own role" });
+      }
+      
+      if (isSuperAdminEmail(targetUser.email) && role !== "super_admin") {
+        return res.status(400).json({ error: "Cannot demote hardcoded super admin" });
       }
       
       const updatedUser = await storage.updateUser(id, { role });
@@ -7668,6 +7681,7 @@ OUTPUT JSON:
         return res.status(404).json({ error: "User not found" });
       }
       
+      console.log(`[Admin Users] Role updated: ${targetUser.email} from ${targetUser.role} to ${role} by ${currentUser.email}`);
       res.json({ success: true, user: updatedUser });
     } catch (error: any) {
       console.error("[Admin Users] Error updating:", error.message);
