@@ -1,0 +1,140 @@
+### Apply Popup OAuth Fix for Iframe Embedding
+
+**Problem:**
+This app shows Google 403 error when embedded as iframe in Mission Control (Agent Hub Portal). Google blocks OAuth redirects inside iframes for security reasons.
+
+**Goal:**
+Allow this app to work when embedded as an iframe, using popup-based Google authentication.
+
+---
+
+### Changes Required
+
+#### 1. Server: Add CSP Headers for Iframe Embedding
+
+Add middleware to allow embedding from Replit and Render domains:
+```typescript
+// In server/Express configuration - add BEFORE routes
+app.use((req, res, next) => {
+  res.setHeader(
+    'Content-Security-Policy',
+    "frame-ancestors 'self' https://*.replit.dev https://*.replit.app https://*.onrender.com"
+  );
+  res.setHeader('X-Frame-Options', 'ALLOWALL');
+  next();
+});
+```
+
+#### 2. Server: Update Session/Cookie Configuration
+
+Update cookies to work cross-origin in iframe:
+```typescript
+// Cookie/session configuration
+{
+  sameSite: 'none',
+  secure: true,
+  httpOnly: true
+}
+```
+
+#### 3. Frontend: Add Iframe Detection
+
+Create a utility to detect if running inside iframe:
+```typescript
+// utils/iframe.ts or similar
+export const isInIframe = (): boolean => {
+  try {
+    return window.self !== window.top;
+  } catch (e) {
+    return true; // If access denied, we're in iframe
+  }
+};
+```
+
+#### 4. Frontend: Change OAuth to Popup Mode When in Iframe
+
+Update the Google sign-in handler:
+```typescript
+import { signInWithPopup, signInWithRedirect, GoogleAuthProvider } from 'firebase/auth';
+// OR if using a different OAuth library, adjust accordingly
+
+const handleGoogleSignIn = async () => {
+  const provider = new GoogleAuthProvider();
+  
+  if (isInIframe()) {
+    // Use popup for iframe - redirects are blocked by Google
+    try {
+      await signInWithPopup(auth, provider);
+      // Reload the page after successful auth so iframe shows dashboard
+      window.location.reload();
+    } catch (error) {
+      console.error('Popup auth failed:', error);
+    }
+  } else {
+    // Use redirect for direct access (non-iframe)
+    await signInWithRedirect(auth, provider);
+  }
+};
+```
+
+#### 5. Frontend: Handle Popup Auth Result (if needed)
+
+If using Firebase, handle the popup result:
+```typescript
+import { getRedirectResult } from 'firebase/auth';
+
+useEffect(() => {
+  // Handle redirect result for non-iframe access
+  if (!isInIframe()) {
+    getRedirectResult(auth).then((result) => {
+      if (result) {
+        // User signed in via redirect
+      }
+    });
+  }
+}, []);
+```
+
+#### 6. Optional: Dark Theme Sync for Iframe Mode
+
+Match Mission Control's dark theme when embedded:
+```typescript
+useEffect(() => {
+  if (isInIframe()) {
+    document.documentElement.classList.add('dark');
+  }
+}, []);
+```
+
+---
+
+### Files to Update
+
+1. **Server configuration** (Express app.js/server.js or equivalent)
+   - Add CSP headers middleware
+   - Update cookie settings
+
+2. **Authentication component/page**
+   - Add iframe detection
+   - Switch to popup auth when in iframe
+   - Add reload after popup auth
+
+3. **Optional: Theme/styling**
+   - Dark mode sync for iframe
+
+---
+
+### Testing Checklist
+
+- [ ] App loads directly (not in iframe) - should work normally with redirect auth
+- [ ] App loads in Mission Control iframe - should show login page (no 403)
+- [ ] Click "Sign in with Google" in iframe - popup opens
+- [ ] Complete Google sign-in in popup - popup closes
+- [ ] After popup closes - iframe refreshes and shows dashboard
+- [ ] Session persists - refreshing iframe keeps user logged in
+
+---
+
+### Reference
+
+Contract Conduit (`mission-control-contract-conduit.onrender.com`) has this exact fix working. Use that implementation as reference if needed.

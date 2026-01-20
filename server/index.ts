@@ -20,6 +20,18 @@ const app = express();
 // Trust proxy - required for secure cookies behind Replit's reverse proxy
 app.set('trust proxy', 1);
 
+// CSP Headers for iframe embedding (Mission Control / Agent Hub Portal)
+// Must be added BEFORE routes to allow embedding from Replit and Render domains
+app.use((req, res, next) => {
+  res.setHeader(
+    'Content-Security-Policy',
+    "frame-ancestors 'self' https://*.replit.dev https://*.replit.app https://*.onrender.com https://*.spyglassrealty.com"
+  );
+  // X-Frame-Options for older browsers (ALLOWALL is not standard, but we handle via CSP)
+  res.removeHeader('X-Frame-Options');
+  next();
+});
+
 // Serve static files from public folder (logos, widget JS, etc.)
 app.use(express.static(path.join(process.cwd(), 'public')));
 
@@ -60,9 +72,11 @@ app.use(
     resave: false,
     saveUninitialized: false,
     cookie: {
-      secure: process.env.NODE_ENV === "production",
+      // For iframe embedding: sameSite must be 'none' with secure: true
+      // This allows cookies to be sent in cross-origin iframe contexts
+      secure: true, // Required for sameSite: 'none'
       httpOnly: true,
-      sameSite: "lax",
+      sameSite: "none", // Required for iframe cross-origin cookie support
       maxAge: 1000 * 60 * 60 * 24 * 7,
     },
   })
