@@ -1,0 +1,126 @@
+### CLARIFICATION: Implement the Iframe Popup Auth - Not Just Document It
+
+**I don't need documentation. I need you to IMPLEMENT these changes in Client Data Portal.**
+
+Client Data Portal needs to be embedded as an iframe inside Mission Control (Agent Hub Portal). Currently it fails with Google 403 error because it uses redirect auth instead of popup auth.
+
+**Please IMPLEMENT these changes now:**
+
+### 1. Update the Login/Auth Handler (CLIENT SIDE)
+
+Find the Google login button handler and replace it with popup-based auth when in iframe:
+```typescript
+const handleGoogleSignIn = () => {
+  const isInIframe = window.self !== window.top;
+  
+  if (isInIframe) {
+    // Use popup auth when embedded in iframe
+    const width = 500;
+    const height = 600;
+    const left = window.screenX + (window.outerWidth - width) / 2;
+    const top = window.screenY + (window.outerHeight - height) / 2;
+    
+    const popup = window.open(
+      '/api/auth/google/popup',
+      'googleAuth',
+      `width=${width},height=${height},left=${left},top=${top},popup=true`
+    );
+    
+    const handleMessage = (event: MessageEvent) => {
+      if (event.origin !== window.location.origin) return;
+      if (event.data?.type === 'AUTH_SUCCESS') {
+        window.removeEventListener('message', handleMessage);
+        window.location.reload();
+      }
+    };
+    window.addEventListener('message', handleMessage);
+    
+    const checkPopup = setInterval(() => {
+      if (popup?.closed) {
+        clearInterval(checkPopup);
+        window.removeEventListener('message', handleMessage);
+      }
+    }, 500);
+  } else {
+    window.location.href = "/api/auth/google";
+  }
+};
+```
+
+### 2. Create Popup Auth Endpoint (SERVER SIDE)
+
+Add this route:
+```typescript
+app.get("/api/auth/google/popup", (req, res, next) => {
+  if (req.session) {
+    (req.session as any).authPopup = true;
+  }
+  passport.authenticate("google", {
+    scope: ["profile", "email"],
+    prompt: "select_account",
+    state: "popup=true",
+  })(req, res, next);
+});
+```
+
+### 3. Update OAuth Callback (SERVER SIDE)
+
+In the Google OAuth callback, detect popup and return HTML with postMessage:
+```typescript
+const isPopup = req.query.state?.includes('popup=true') || req.session?.authPopup;
+
+if (isPopup) {
+  if (req.session) delete (req.session as any).authPopup;
+  
+  res.send(`
+    <!DOCTYPE html>
+    <html>
+      <head><title>Authentication Complete</title></head>
+      <body>
+        <script>
+          if (window.opener) {
+            window.opener.postMessage({ type: 'AUTH_SUCCESS' }, '*');
+            setTimeout(() => window.close(), 100);
+          } else {
+            window.location.href = '/';
+          }
+        </script>
+        <p>Authentication successful. This window will close automatically.</p>
+      </body>
+    </html>
+  `);
+} else {
+  res.redirect('/');
+}
+```
+
+### 4. Add CSP Headers (SERVER SIDE - EARLY IN MIDDLEWARE)
+```typescript
+app.use((req, res, next) => {
+  const frameAncestors = "'self' https://*.replit.dev https://*.replit.app https://*.onrender.com";
+  res.removeHeader('X-Frame-Options');
+  res.setHeader('Content-Security-Policy', `frame-ancestors ${frameAncestors}`);
+  next();
+});
+```
+
+### 5. Update Cookie Config (SERVER SIDE)
+```typescript
+cookie: {
+  httpOnly: true,
+  secure: true,
+  sameSite: "none",  // Required for cross-origin iframe
+  maxAge: 7 * 24 * 60 * 60 * 1000,
+}
+```
+
+---
+
+**DO NOT create more documentation. IMPLEMENT these changes in the actual codebase now.**
+
+**After implementing, confirm:**
+- [ ] Login handler updated with popup logic
+- [ ] `/api/auth/google/popup` route created
+- [ ] OAuth callback handles popup flow with postMessage
+- [ ] CSP headers set to allow iframe embedding
+- [ ] Cookies configured with sameSite: "none"
