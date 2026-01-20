@@ -248,9 +248,23 @@ function sanitizeRedirectUrl(url: string | undefined): string {
 }
 
 export function setupAuthRoutes(app: any) {
+  // Standard OAuth flow (redirect-based) for direct access
   app.get("/auth/google", (req: Request, res: Response, next: NextFunction) => {
     const nextUrl = sanitizeRedirectUrl(req.query.next as string);
     (req.session as any).returnTo = nextUrl;
+    (req.session as any).isPopupAuth = false;
+    next();
+  }, passport.authenticate("google", { 
+    scope: ["email", "profile"],
+    prompt: "select_account"
+  }));
+
+  // Popup OAuth flow for iframe embedding
+  // When app is embedded in iframe (e.g., Mission Control), Google blocks redirects
+  // This route opens in a popup window instead
+  app.get("/auth/google/popup", (req: Request, res: Response, next: NextFunction) => {
+    (req.session as any).isPopupAuth = true;
+    (req.session as any).returnTo = null;
     next();
   }, passport.authenticate("google", { 
     scope: ["email", "profile"],
@@ -262,11 +276,59 @@ export function setupAuthRoutes(app: any) {
       failureRedirect: "/login?error=access_denied"
     }),
     (req: Request, res: Response) => {
-      const redirectTo = (req.session as any)?.returnTo || "/";
-      delete (req.session as any)?.returnTo;
-      res.redirect(redirectTo);
+      const isPopupAuth = (req.session as any)?.isPopupAuth;
+      delete (req.session as any)?.isPopupAuth;
+
+      if (isPopupAuth) {
+        // For popup auth: send postMessage to parent window and close
+        res.send(`
+          <!DOCTYPE html>
+          <html>
+          <head><title>Authentication Successful</title></head>
+          <body>
+            <script>
+              if (window.opener) {
+                window.opener.postMessage({ type: 'oauth_success' }, '*');
+                window.close();
+              } else {
+                window.location.href = '/';
+              }
+            </script>
+            <p>Authentication successful! This window should close automatically.</p>
+            <p>If it doesn't, <a href="/" onclick="window.close(); return false;">click here</a>.</p>
+          </body>
+          </html>
+        `);
+      } else {
+        // Standard redirect flow
+        const redirectTo = (req.session as any)?.returnTo || "/";
+        delete (req.session as any)?.returnTo;
+        res.redirect(redirectTo);
+      }
     }
   );
+
+  // Popup auth error handler
+  app.get("/auth/google/popup/error", (req: Request, res: Response) => {
+    const error = req.query.error || "access_denied";
+    res.send(`
+      <!DOCTYPE html>
+      <html>
+      <head><title>Authentication Failed</title></head>
+      <body>
+        <script>
+          if (window.opener) {
+            window.opener.postMessage({ type: 'oauth_error', error: '${error}' }, '*');
+            window.close();
+          } else {
+            window.location.href = '/login?error=${error}';
+          }
+        </script>
+        <p>Authentication failed. This window should close automatically.</p>
+      </body>
+      </html>
+    `);
+  });
 
   app.post("/auth/logout", (req: Request, res: Response) => {
     req.logout((err) => {
