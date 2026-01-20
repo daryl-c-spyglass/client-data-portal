@@ -1,0 +1,53 @@
+### CRITICAL: Detection Logs Still Not Appearing - Force Popup for Testing
+
+**Problem:**
+- Login page loads in iframe ✓
+- But clicking "Continue with Google" still redirects (causes 403)
+- NO [isInIframe] logs appear in console despite filtering
+- The detection/popup code is NOT being executed
+
+**Immediate Fix: Force popup mode when ?theme= parameter exists**
+
+In the Google login handler, bypass the isInIframe() check entirely and use the URL parameter directly:
+```typescript
+const handleGoogleLogin = async () => {
+  // Check URL parameter directly - Mission Control always passes ?theme=
+  const urlParams = new URLSearchParams(window.location.search);
+  const isEmbedded = urlParams.has('theme') || urlParams.has('embedded');
+  
+  console.log('[Auth] URL:', window.location.href);
+  console.log('[Auth] Has theme param:', urlParams.has('theme'));
+  console.log('[Auth] isEmbedded:', isEmbedded);
+  
+  if (isEmbedded) {
+    console.log('[Auth] FORCING POPUP - theme param detected');
+    try {
+      const result = await signInWithPopup(auth, googleProvider);
+      console.log('[Auth] Popup success:', result.user.email);
+      window.location.reload();
+    } catch (error) {
+      console.error('[Auth] Popup failed:', error);
+      // Fallback: try redirect
+      alert('Popup blocked. Please allow popups and try again.');
+    }
+  } else {
+    console.log('[Auth] Using redirect - no embed param');
+    await signInWithRedirect(auth, googleProvider);
+  }
+};
+```
+
+**Key Change:**
+Instead of relying on `isInIframe()` which may have issues, directly check for `?theme=` in the URL. This is 100% reliable since Mission Control always adds it.
+
+**Also verify:**
+1. Is `handleGoogleLogin` actually attached to the button's onClick?
+2. Is there another event handler intercepting the click?
+3. Is there a form submission happening instead of onClick?
+
+**Test after changes:**
+1. Open in Mission Control iframe
+2. URL should have `?theme=dark`
+3. Click "Continue with Google"
+4. Console should show: `[Auth] FORCING POPUP - theme param detected`
+5. Popup should open
