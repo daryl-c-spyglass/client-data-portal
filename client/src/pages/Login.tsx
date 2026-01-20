@@ -13,6 +13,7 @@ export default function Login() {
   const next = urlParams.get("next") || "/";
   const [isAuthenticating, setIsAuthenticating] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
+  const [embeddedMode] = useState(() => isInIframe());
 
   const { data: user, isSuccess, refetch } = useQuery({
     queryKey: ["/api/auth/me"],
@@ -116,6 +117,12 @@ export default function Login() {
           <p className="text-xs text-muted-foreground text-center">
             Spyglass team access only
           </p>
+          
+          {embeddedMode && (
+            <p className="text-xs text-muted-foreground text-center mt-2">
+              Embedded mode - popup authentication enabled
+            </p>
+          )}
         </CardContent>
       </Card>
     </div>
