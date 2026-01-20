@@ -25,8 +25,9 @@ The UI incorporates Spyglass Realty branding with an orange primary color scheme
 
 ### Authentication
 - **Google OAuth**: Team-only authentication via Google OAuth (passport-google-oauth20) with domain restriction to @spyglassrealty.com emails or explicitly allowed emails.
-- **Session Management**: PostgreSQL-backed sessions via connect-pg-simple.
-- **Security**: Return URL sanitization prevents open redirect vulnerabilities.
+- **Session Management**: PostgreSQL-backed sessions via connect-pg-simple. Cookies configured with `sameSite: 'none'` and `secure: true` for cross-origin iframe support.
+- **Security**: Return URL sanitization prevents open redirect vulnerabilities. CSP headers allow iframe embedding from `*.replit.dev`, `*.replit.app`, `*.onrender.com`, `*.spyglassrealty.com`.
+- **Iframe Embedding (Popup OAuth)**: When embedded in an iframe (e.g., Mission Control / Agent Hub Portal), authentication uses popup-based OAuth flow since Google blocks OAuth redirects in iframes. Implementation in `client/src/lib/iframe.ts` with `isInIframe()` detection and `openAuthPopup()` helper. Server routes: `/auth/google/popup` initiates popup flow, callback uses postMessage to communicate success/error to parent window. Auto dark theme sync when embedded.
 - **3-Tier Role System**: Role-based access control with Super Admin > Admin > Agent hierarchy.
   - **Super Admin**: Full platform access including user management, presentation library management, company settings. Hardcoded emails: ryan@, daryl@, caleb@ @spyglassrealty.com
   - **Admin**: Template creation, presentation library viewing, display settings management
