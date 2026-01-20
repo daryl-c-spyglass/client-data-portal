@@ -1,0 +1,70 @@
+### CRITICAL: Server-Side Redirect Blocking Popup Auth Fix
+
+**Problem:**
+The popup auth code in the frontend NEVER runs because the server redirects unauthenticated users to Google OAuth BEFORE the React app loads.
+
+**Evidence:**
+- No `[isInIframe]` console logs appear
+- Google 403 error shows immediately
+- The redirect happens before login page renders
+
+**Root Cause:**
+There's likely server middleware that does this:
+```typescript
+// PROBLEM: This redirects before React app loads
+app.use((req, res, next) => {
+  if (!req.isAuthenticated()) {
+    return res.redirect('/auth/google');  // ← This is the problem
+  }
+  next();
+});
+```
+
+**Fix Required:**
+
+#### 1. Remove or modify server-side auth redirect
+
+The server should SERVE the login page, not redirect to Google. Let the frontend handle the auth flow:
+```typescript
+// BEFORE (wrong):
+app.use((req, res, next) => {
+  if (!req.isAuthenticated()) {
+    return res.redirect('/auth/google');
+  }
+  next();
+});
+
+// AFTER (correct):
+app.use((req, res, next) => {
+  // Don't redirect - let React app handle login
+  // Only protect API routes, not the main app
+  if (req.path.startsWith('/api/') && !req.isAuthenticated()) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+  next();
+});
+```
+
+#### 2. Ensure index.html is served for unauthenticated users
+```typescript
+// Serve React app for all non-API routes (let React handle auth)
+app.get('*', (req, res) => {
+  res.sendFile(path.join(__dirname, 'dist', 'index.html'));
+});
+```
+
+#### 3. Check for Passport.js or auth middleware
+
+Look for these patterns and remove/modify them:
+- `ensureAuthenticated` middleware on the root route
+- `passport.authenticate('google')` on the main route
+- Any redirect to `/auth/google` for unauthenticated users
+
+**The flow should be:**
+1. User visits app → Server serves React app (index.html)
+2. React app loads → Detects not logged in → Shows login page
+3. User clicks "Continue with Google" → Frontend triggers popup (if in iframe) or redirect
+4. Auth completes → User sees dashboard
+
+**NOT:**
+1. User visits app → Server redirects to Google OAuth (❌ blocks iframe)
