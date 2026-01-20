@@ -1,0 +1,218 @@
+### Implement Iframe Embedding Support (Copy Contract Conduit's Working Approach)
+
+**Problem:**
+Client Data Portal doesn't work when embedded in Mission Control iframe. Contract Conduit works. Here's exactly what Contract Conduit does that we need to replicate.
+
+---
+
+### 1. Iframe Detection (Simple Check)
+
+Use this simple check (NOT the multi-method approach):
+```typescript
+// In your login/landing component
+const isInIframe = window.self !== window.top;
+```
+
+---
+
+### 2. Google OAuth - Popup-Based Auth Handler
+
+**In the Login component, replace redirect auth with popup auth when in iframe:**
+```typescript
+const handleGoogleSignIn = () => {
+  const isInIframe = window.self !== window.top;
+  
+  if (isInIframe) {
+    // Use popup auth when embedded in iframe
+    setIsSigningIn(true);
+    
+    const width = 500;
+    const height = 600;
+    const left = window.screenX + (window.outerWidth - width) / 2;
+    const top = window.screenY + (window.outerHeight - height) / 2;
+    
+    const popup = window.open(
+      '/api/auth/google/popup',  // Special popup endpoint
+      'googleAuth',
+      `width=${width},height=${height},left=${left},top=${top},popup=true`
+    );
+    
+    // Listen for auth success message from popup
+    const handleMessage = (event: MessageEvent) => {
+      if (event.origin !== window.location.origin) return;
+      if (event.data?.type === 'AUTH_SUCCESS') {
+        window.removeEventListener('message', handleMessage);
+        setIsSigningIn(false);
+        window.location.reload();
+      }
+    };
+    window.addEventListener('message', handleMessage);
+    
+    // Check if popup was closed without auth
+    const checkPopup = setInterval(() => {
+      if (popup?.closed) {
+        clearInterval(checkPopup);
+        window.removeEventListener('message', handleMessage);
+        setIsSigningIn(false);
+      }
+    }, 500);
+  } else {
+    // Direct redirect when not in iframe
+    window.location.href = "/api/auth/google";
+  }
+};
+```
+
+---
+
+### 3. Server - Create Popup Auth Endpoint
+
+**Add this route for popup-based OAuth:**
+```typescript
+// Popup-specific Google auth route
+app.get("/api/auth/google/popup", (req, res, next) => {
+  if (req.session) {
+    (req.session as any).authPopup = true;
+  }
+  passport.authenticate("google", {
+    scope: ["profile", "email"],
+    prompt: "select_account",
+    state: "popup=true",
+  })(req, res, next);
+});
+```
+
+---
+
+### 4. Server - Update OAuth Callback to Handle Popup
+
+**In your Google OAuth callback, detect popup flow and return HTML that posts message:**
+```typescript
+// In your callback handler, after successful auth:
+const isPopup = req.query.state?.includes('popup=true') || req.session?.authPopup;
+
+if (isPopup) {
+  // Clear the popup flag
+  if (req.session) {
+    delete (req.session as any).authPopup;
+  }
+  
+  // Return HTML that posts message to opener and closes
+  res.send(`
+    <!DOCTYPE html>
+    <html>
+      <head><title>Authentication Complete</title></head>
+      <body>
+        <script>
+          (function() {
+            if (window.opener) {
+              window.opener.postMessage({ type: 'AUTH_SUCCESS' }, '*');
+              setTimeout(function() { window.close(); }, 100);
+            } else {
+              window.location.href = '/';
+            }
+          })();
+        </script>
+        <p>Authentication successful. This window will close automatically.</p>
+      </body>
+    </html>
+  `);
+} else {
+  // Normal redirect
+  res.redirect('/');
+}
+```
+
+---
+
+### 5. Server - CSP Headers for Iframe Embedding
+
+**Add this middleware EARLY in your Express app (before other middleware):**
+```typescript
+// Allow iframe embedding from trusted domains
+app.use((req, res, next) => {
+  const frameAncestors = "'self' https://*.replit.dev https://*.replit.app https://*.onrender.com";
+  
+  // Override res.setHeader to merge CSP if another middleware sets it
+  const originalSetHeader = res.setHeader.bind(res);
+  res.setHeader = function(name: string, value: any) {
+    if (name.toLowerCase() === 'content-security-policy') {
+      const valueStr = String(value);
+      if (!valueStr.includes('frame-ancestors')) {
+        value = `${valueStr}; frame-ancestors ${frameAncestors}`;
+      }
+    }
+    return originalSetHeader(name, value);
+  };
+  
+  // Remove X-Frame-Options if set elsewhere (conflicts with CSP frame-ancestors)
+  res.removeHeader('X-Frame-Options');
+  
+  // Set initial frame-ancestors CSP
+  originalSetHeader('Content-Security-Policy', `frame-ancestors ${frameAncestors}`);
+  
+  next();
+});
+```
+
+---
+
+### 6. Server - Cookie Configuration for Cross-Origin
+
+**Update session/cookie configuration:**
+```typescript
+const isProduction = process.env.NODE_ENV === "production";
+const isSecure = isProduction || process.env.REPL_ID;
+
+app.use(session({
+  secret: process.env.SESSION_SECRET!,
+  resave: false,
+  saveUninitialized: false,
+  cookie: {
+    httpOnly: true,
+    secure: isSecure ? true : false,
+    sameSite: isSecure ? "none" : "lax",  // 'none' required for cross-origin iframe
+    maxAge: 7 * 24 * 60 * 60 * 1000,  // 7 days
+  },
+}));
+```
+
+**CRITICAL:** `sameSite: "none"` requires `secure: true`
+
+---
+
+### 7. Auto Dark Theme When Embedded (Optional)
+```typescript
+// In App.tsx or main component
+useEffect(() => {
+  if (window.self !== window.top) {
+    document.documentElement.classList.add('dark');
+    document.documentElement.setAttribute('data-theme', 'dark');
+  }
+}, []);
+```
+
+---
+
+### Summary Checklist
+
+| Item | What to Do |
+|------|------------|
+| Iframe detection | `window.self !== window.top` |
+| Auth in iframe | Use `window.open()` popup to `/api/auth/google/popup` |
+| Auth not in iframe | Normal redirect to `/api/auth/google` |
+| Server popup route | Create `/api/auth/google/popup` endpoint |
+| Callback handling | Return HTML with postMessage for popup flow |
+| CSP headers | `frame-ancestors 'self' https://*.replit.dev https://*.replit.app https://*.onrender.com` |
+| X-Frame-Options | Remove it (conflicts with CSP) |
+| Cookie sameSite | `"none"` when secure |
+| Cookie secure | `true` in production/Replit |
+| PostMessage | `{ type: 'AUTH_SUCCESS' }` from popup to opener |
+
+---
+
+### Test After Implementation
+
+1. Open Client Data Portal directly → should use redirect auth
+2. Open in Mission Control iframe → should use popup auth
+3. Popup should open, complete auth, close, and iframe should reload with authenticated session
