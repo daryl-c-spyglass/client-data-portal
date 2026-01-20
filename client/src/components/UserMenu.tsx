@@ -32,7 +32,7 @@ export function UserMenu() {
 
   const logoutMutation = useMutation({
     mutationFn: async () => {
-      await apiRequest("POST", "/auth/logout");
+      await apiRequest("/auth/logout", "POST");
     },
     onSuccess: () => {
       queryClient.clear();
