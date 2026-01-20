@@ -28,19 +28,19 @@ export default function Login() {
     }
   }, [user, isSuccess, next, setLocation]);
 
-  const handleGoogleLogin = () => {
+  const handleGoogleLogin = (e: React.MouseEvent) => {
     setAuthError(null);
     
-    // Direct URL parameter check - Mission Control always passes ?theme=
-    // This is more reliable than window.self !== window.top checks
+    // Must check URL params fresh on every click, not cached
     const urlParams = new URLSearchParams(window.location.search);
     const hasThemeParam = urlParams.has('theme');
     const hasEmbeddedParam = urlParams.has('embedded');
     const isEmbedded = hasThemeParam || hasEmbeddedParam || isInIframe();
     
-    // Force logging to console - this MUST appear
+    // Debug logging
     console.log('=== AUTH CLICK DEBUG ===');
     console.log('[Auth] URL:', window.location.href);
+    console.log('[Auth] search params:', window.location.search);
     console.log('[Auth] Has ?theme param:', hasThemeParam);
     console.log('[Auth] Has ?embedded param:', hasEmbeddedParam);
     console.log('[Auth] isInIframe():', isInIframe());
@@ -48,14 +48,17 @@ export default function Login() {
     console.log('========================');
     
     if (isEmbedded) {
+      // CRITICAL: Prevent any default navigation when embedded
+      e.preventDefault();
+      e.stopPropagation();
+      
       console.log('[Auth] USING POPUP AUTH - embedded mode detected');
-      // Use popup auth for iframe embedding (Google blocks OAuth redirects in iframes)
       setIsAuthenticating(true);
+      
       const popup = openAuthPopup(
         '/auth/google/popup',
         () => {
           console.log('[Auth] Popup auth SUCCESS');
-          // On success: refetch user and reload to show authenticated state
           setIsAuthenticating(false);
           queryClient.invalidateQueries({ queryKey: ["/api/auth/me"] });
           refetch().then(() => {
@@ -71,7 +74,6 @@ export default function Login() {
       console.log('[Auth] Popup window result:', popup ? 'OPENED' : 'BLOCKED/FAILED');
     } else {
       console.log('[Auth] USING REDIRECT AUTH - direct access mode');
-      // Standard redirect flow for direct access (not in iframe)
       const loginUrl = next !== "/" 
         ? `/auth/google?next=${encodeURIComponent(next)}`
         : "/auth/google";
