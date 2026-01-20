@@ -1,0 +1,79 @@
+### Debug Logs Not Appearing - Verify Implementation
+
+**Problem:**
+When accessing https://idx-grid-data-ryan1648.replit.app/?theme=dark directly:
+- Login page shows ✓
+- "Continue with Google" works ✓
+- But NO [isInIframe] logs appear in console
+
+**The debug logging code is either not deployed or not running.**
+
+**Please verify and add this code:**
+
+#### 1. In the isInIframe utility function (create if doesn't exist):
+```typescript
+// src/utils/iframeDetection.ts (or wherever utilities are)
+export const isInIframe = (): boolean => {
+  const method1 = window.self !== window.top;
+  const method2 = window.parent !== window.self;
+  
+  let method3 = false;
+  try {
+    method3 = window.frameElement !== null;
+  } catch (e) {
+    method3 = true;
+  }
+  
+  const urlParams = new URLSearchParams(window.location.search);
+  const method4 = urlParams.has('theme') || urlParams.has('embedded');
+  
+  console.log('[isInIframe] Detection methods:');
+  console.log('  method1 (self !== top):', method1);
+  console.log('  method2 (parent !== self):', method2);
+  console.log('  method3 (frameElement):', method3);
+  console.log('  method4 (URL params):', method4);
+  
+  const result = method1 || method2 || method3 || method4;
+  console.log('  Final result:', result);
+  
+  return result;
+};
+```
+
+#### 2. In Login.tsx - Add logging when component mounts AND when button is clicked:
+```typescript
+// At the TOP of the Login component
+useEffect(() => {
+  console.log('[Login] Component mounted');
+  console.log('[Login] URL:', window.location.href);
+  console.log('[Login] isInIframe:', isInIframe());
+}, []);
+
+// In the Google login handler
+const handleGoogleLogin = async () => {
+  console.log('[Login] Button clicked');
+  const inIframe = isInIframe();
+  console.log('[Login] isInIframe result:', inIframe);
+  
+  if (inIframe) {
+    console.log('[Login] Using POPUP auth');
+    try {
+      await signInWithPopup(auth, provider);
+      window.location.reload();
+    } catch (error) {
+      console.error('[Login] Popup error:', error);
+    }
+  } else {
+    console.log('[Login] Using REDIRECT auth');
+    await signInWithRedirect(auth, provider);
+  }
+};
+```
+
+#### 3. Verify the code is actually being used
+
+- Is Login.tsx importing isInIframe?
+- Is handleGoogleLogin using the isInIframe check?
+- Run the app and confirm logs appear
+
+**After adding, test again and share console output.**
