@@ -1,0 +1,80 @@
+### Fix Iframe Detection When Embedded in Mission Control
+
+**Problem:**
+Popup OAuth works when accessing this app directly, but when embedded as iframe in Mission Control (Agent Hub Portal), the `isInIframe()` function returns FALSE, causing it to use redirect auth instead of popup. This results in Google 403 error.
+
+**Root Cause:**
+The standard `window.self !== window.top` check may fail due to:
+- Sandbox attributes on the iframe
+- Cross-origin restrictions
+- Browser security policies
+
+**Solution: Use Multiple Detection Methods + URL Parameter Fallback**
+
+Mission Control passes `?theme=dark` or `?theme=light` to the iframe URL. Use this as a reliable fallback.
+
+#### Update the `isInIframe()` function:
+```typescript
+export const isInIframe = (): boolean => {
+  // Method 1: Standard check
+  const method1 = window.self !== window.top;
+  
+  // Method 2: Check if parent exists and is different
+  const method2 = window.parent !== window.self;
+  
+  // Method 3: Check frameElement (may be null due to cross-origin)
+  let method3 = false;
+  try {
+    method3 = window.frameElement !== null;
+  } catch (e) {
+    method3 = true; // If error, likely cross-origin iframe
+  }
+  
+  // Method 4: URL parameter fallback - Mission Control passes ?theme=dark/light
+  const urlParams = new URLSearchParams(window.location.search);
+  const method4 = urlParams.has('theme');
+  
+  console.log('[isInIframe] Detection methods:');
+  console.log('  method1 (self !== top):', method1);
+  console.log('  method2 (parent !== self):', method2);
+  console.log('  method3 (frameElement):', method3);
+  console.log('  method4 (URL ?theme param):', method4);
+  
+  const result = method1 || method2 || method3 || method4;
+  console.log('  Final result:', result);
+  
+  return result;
+};
+```
+
+#### Update the login handler to use this detection:
+```typescript
+const handleGoogleLogin = async () => {
+  const inIframe = isInIframe();
+  console.log('[Auth] isInIframe result:', inIframe);
+  
+  if (inIframe) {
+    console.log('[Auth] Using POPUP auth flow');
+    try {
+      await signInWithPopup(auth, provider);
+      console.log('[Auth] Popup auth successful, reloading...');
+      window.location.reload();
+    } catch (error) {
+      console.error('[Auth] Popup auth failed:', error);
+    }
+  } else {
+    console.log('[Auth] Using REDIRECT auth flow');
+    await signInWithRedirect(auth, provider);
+  }
+};
+```
+
+**Key Point:**
+The `?theme=dark` parameter from Mission Control guarantees iframe detection even if browser security blocks other methods.
+
+**Test after changes:**
+1. Embed in Mission Control (URL will have `?theme=dark`)
+2. Open DevTools Console (select iframe context)
+3. Should see: `method4 (URL ?theme param): true`
+4. Should see: `Final result: true`
+5. Click "Continue with Google" → popup should open
