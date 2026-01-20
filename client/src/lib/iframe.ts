@@ -44,36 +44,48 @@ export function openAuthPopup(
     return null;
   }
 
+  // Track whether auth completed (success or error)
+  let authCompleted = false;
+
   // Listen for messages from the popup
   const handleMessage = (event: MessageEvent) => {
     // Verify the message origin matches our expected domain
-    const expectedOrigins = [
-      window.location.origin,
-      // Add any additional trusted origins if needed
-    ];
-
-    if (!expectedOrigins.includes(event.origin)) {
+    if (event.origin !== window.location.origin) {
       return;
     }
 
     if (event.data?.type === 'oauth_success') {
-      window.removeEventListener('message', handleMessage);
-      popup.close();
+      authCompleted = true;
+      cleanup();
       onSuccess?.();
     } else if (event.data?.type === 'oauth_error') {
-      window.removeEventListener('message', handleMessage);
-      popup.close();
+      authCompleted = true;
+      cleanup();
       onError?.(event.data.error || 'Authentication failed');
+    }
+  };
+
+  // Cleanup function to remove listeners and close popup
+  const cleanup = () => {
+    window.removeEventListener('message', handleMessage);
+    clearInterval(pollClosedInterval);
+    if (popup && !popup.closed) {
+      popup.close();
     }
   };
 
   window.addEventListener('message', handleMessage);
 
-  // Also poll to check if popup was closed without completing auth
-  const pollClosed = setInterval(() => {
+  // Poll to check if popup was closed without completing auth
+  // If closed without a success/error message, treat as user cancellation
+  const pollClosedInterval = setInterval(() => {
     if (popup.closed) {
-      clearInterval(pollClosed);
+      clearInterval(pollClosedInterval);
       window.removeEventListener('message', handleMessage);
+      // If popup closed without auth completing, treat as cancellation
+      if (!authCompleted) {
+        onError?.('Authentication cancelled');
+      }
     }
   }, 500);
 

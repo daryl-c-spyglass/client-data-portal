@@ -268,45 +268,101 @@ export function setupAuthRoutes(app: any) {
     next();
   }, passport.authenticate("google", { 
     scope: ["email", "profile"],
-    prompt: "select_account"
+    prompt: "select_account",
+    failureRedirect: "/auth/google/popup/error?error=access_denied"
   }));
 
-  app.get("/auth/google/callback", 
-    passport.authenticate("google", { 
-      failureRedirect: "/login?error=access_denied"
-    }),
-    (req: Request, res: Response) => {
-      const isPopupAuth = (req.session as any)?.isPopupAuth;
+  // Custom callback handler that supports both popup and redirect auth flows
+  app.get("/auth/google/callback", (req: Request, res: Response, next: NextFunction) => {
+    const isPopupAuth = (req.session as any)?.isPopupAuth;
+    
+    passport.authenticate("google", (err: Error | null, user: User | false, info: any) => {
+      // Clean up session flags
       delete (req.session as any)?.isPopupAuth;
-
-      if (isPopupAuth) {
-        // For popup auth: send postMessage to parent window and close
-        res.send(`
-          <!DOCTYPE html>
-          <html>
-          <head><title>Authentication Successful</title></head>
-          <body>
-            <script>
-              if (window.opener) {
-                window.opener.postMessage({ type: 'oauth_success' }, '*');
-                window.close();
-              } else {
-                window.location.href = '/';
-              }
-            </script>
-            <p>Authentication successful! This window should close automatically.</p>
-            <p>If it doesn't, <a href="/" onclick="window.close(); return false;">click here</a>.</p>
-          </body>
-          </html>
-        `);
-      } else {
-        // Standard redirect flow
-        const redirectTo = (req.session as any)?.returnTo || "/";
-        delete (req.session as any)?.returnTo;
-        res.redirect(redirectTo);
+      
+      // Handle authentication failure
+      if (err || !user) {
+        const errorMessage = info?.message || "access_denied";
+        
+        if (isPopupAuth) {
+          // For popup: send error message to parent window and close
+          return res.send(`
+            <!DOCTYPE html>
+            <html>
+            <head><title>Authentication Failed</title></head>
+            <body>
+              <script>
+                if (window.opener) {
+                  window.opener.postMessage({ type: 'oauth_error', error: '${errorMessage.replace(/'/g, "\\'")}' }, '*');
+                  window.close();
+                } else {
+                  window.location.href = '/login?error=access_denied';
+                }
+              </script>
+              <p>Authentication failed. This window should close automatically.</p>
+            </body>
+            </html>
+          `);
+        } else {
+          // Standard redirect flow
+          return res.redirect("/login?error=access_denied");
+        }
       }
-    }
-  );
+      
+      // Log in the user
+      req.logIn(user, (loginErr) => {
+        if (loginErr) {
+          if (isPopupAuth) {
+            return res.send(`
+              <!DOCTYPE html>
+              <html>
+              <head><title>Login Failed</title></head>
+              <body>
+                <script>
+                  if (window.opener) {
+                    window.opener.postMessage({ type: 'oauth_error', error: 'Login failed' }, '*');
+                    window.close();
+                  } else {
+                    window.location.href = '/login?error=login_failed';
+                  }
+                </script>
+                <p>Login failed. This window should close automatically.</p>
+              </body>
+              </html>
+            `);
+          }
+          return res.redirect("/login?error=login_failed");
+        }
+        
+        if (isPopupAuth) {
+          // For popup auth: send postMessage to parent window and close
+          return res.send(`
+            <!DOCTYPE html>
+            <html>
+            <head><title>Authentication Successful</title></head>
+            <body>
+              <script>
+                if (window.opener) {
+                  window.opener.postMessage({ type: 'oauth_success' }, '*');
+                  window.close();
+                } else {
+                  window.location.href = '/';
+                }
+              </script>
+              <p>Authentication successful! This window should close automatically.</p>
+              <p>If it doesn't, <a href="/" onclick="window.close(); return false;">click here</a>.</p>
+            </body>
+            </html>
+          `);
+        } else {
+          // Standard redirect flow
+          const redirectTo = (req.session as any)?.returnTo || "/";
+          delete (req.session as any)?.returnTo;
+          return res.redirect(redirectTo);
+        }
+      });
+    })(req, res, next);
+  });
 
   // Popup auth error handler
   app.get("/auth/google/popup/error", (req: Request, res: Response) => {
