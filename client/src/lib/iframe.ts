@@ -94,11 +94,11 @@ export function openAuthPopup(
       return;
     }
 
-    if (event.data?.type === 'oauth_success') {
+    if (event.data?.type === 'AUTH_SUCCESS') {
       authCompleted = true;
       cleanup();
       onSuccess?.();
-    } else if (event.data?.type === 'oauth_error') {
+    } else if (event.data?.type === 'AUTH_FAILURE') {
       authCompleted = true;
       cleanup();
       onError?.(event.data.error || 'Authentication failed');
