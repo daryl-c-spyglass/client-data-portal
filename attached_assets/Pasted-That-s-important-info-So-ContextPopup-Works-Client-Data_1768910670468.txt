@@ -1,0 +1,108 @@
+That's important info! So:
+ContextPopup Works?Client Data Portal (direct access)✅ YesClient Data Portal (in Mission Control iframe)❌ No - redirects
+
+This means the isInIframe() detection is failing when embedded in Mission Control, OR something about the Mission Control iframe context is different.
+
+Updated Prompt for Client Data Portal
+### Popup Works Directly But NOT Inside Mission Control Iframe
+
+**Confirmed:**
+- Opening Client Data Portal directly → Popup auth WORKS ✅
+- Opening Client Data Portal inside Mission Control iframe → Redirects (403) ❌
+
+**This means `isInIframe()` is returning FALSE when embedded in Mission Control.**
+
+### Debug Step 1: Check isInIframe() implementation
+```typescript
+// Current implementation - what does it look like?
+export const isInIframe = (): boolean => {
+  try {
+    return window.self !== window.top;
+  } catch (e) {
+    return true;
+  }
+};
+```
+
+### Debug Step 2: Add detailed logging on page load
+
+In Login.tsx, add this at the TOP of the component:
+```typescript
+useEffect(() => {
+  console.log('=== IFRAME DETECTION DEBUG ===');
+  console.log('window.self:', window.self);
+  console.log('window.top:', window.top);
+  console.log('window.parent:', window.parent);
+  console.log('window.self === window.top:', window.self === window.top);
+  console.log('window.self !== window.top:', window.self !== window.top);
+  
+  try {
+    // Try to access parent - this might throw if cross-origin
+    console.log('window.top.location:', window.top?.location?.href);
+  } catch (e) {
+    console.log('Cannot access window.top.location (cross-origin):', e);
+  }
+  
+  console.log('isInIframe() returns:', isInIframe());
+  console.log('=== END DEBUG ===');
+}, []);
+```
+
+### Debug Step 3: Check if sandbox is blocking iframe detection
+
+The Mission Control iframe has `sandbox="allow-same-origin ..."`. 
+
+When `allow-same-origin` is set, the iframe CAN access `window.top`, which might make `window.self === window.top` return `true` incorrectly.
+
+**Try alternative iframe detection:**
+```typescript
+export const isInIframe = (): boolean => {
+  // Method 1: Standard check
+  const method1 = window.self !== window.top;
+  
+  // Method 2: Check if parent exists and is different
+  const method2 = window.parent !== window.self;
+  
+  // Method 3: Check frameElement
+  const method3 = window.frameElement !== null;
+  
+  // Method 4: Try to access top and catch error
+  let method4 = false;
+  try {
+    method4 = window.top?.location?.href !== window.location.href;
+  } catch (e) {
+    method4 = true; // If we can't access, we're in cross-origin iframe
+  }
+  
+  console.log('[isInIframe] method1 (self !== top):', method1);
+  console.log('[isInIframe] method2 (parent !== self):', method2);
+  console.log('[isInIframe] method3 (frameElement):', method3);
+  console.log('[isInIframe] method4 (location compare):', method4);
+  
+  // Return true if ANY method detects iframe
+  return method1 || method2 || method3 || method4;
+};
+```
+
+### Debug Step 4: Check for URL parameter fallback
+
+Mission Control passes `?theme=dark` to the iframe. We can use this as a fallback:
+```typescript
+export const isInIframe = (): boolean => {
+  // Standard checks
+  const standardCheck = window.self !== window.top || window.parent !== window.self;
+  
+  // Fallback: Check if theme parameter exists (set by Mission Control)
+  const urlParams = new URLSearchParams(window.location.search);
+  const hasThemeParam = urlParams.has('theme');
+  
+  console.log('[isInIframe] standardCheck:', standardCheck);
+  console.log('[isInIframe] hasThemeParam:', hasThemeParam);
+  
+  return standardCheck || hasThemeParam;
+};
+```
+
+**Test and share:**
+1. What do the debug logs show when loaded in Mission Control iframe?
+2. Which detection method returns true/false?

@@ -8,15 +8,58 @@
 /**
  * Check if the current window is running inside an iframe
  * Returns true if embedded, false if running directly
+ * 
+ * Uses multiple detection methods to handle edge cases:
+ * - Standard self !== top check
+ * - Parent !== self check
+ * - frameElement check
+ * - URL parameter fallback (Mission Control passes ?theme=dark)
  */
 export function isInIframe(): boolean {
+  // Method 1: Standard check - window.self !== window.top
+  let method1 = false;
   try {
-    return window.self !== window.top;
+    method1 = window.self !== window.top;
   } catch (e) {
     // If access to window.top is denied due to cross-origin restrictions,
     // we're definitely in a cross-origin iframe
-    return true;
+    method1 = true;
   }
+  
+  // Method 2: Check if parent exists and is different from self
+  let method2 = false;
+  try {
+    method2 = window.parent !== window.self;
+  } catch (e) {
+    method2 = true;
+  }
+  
+  // Method 3: Check frameElement (null if not in iframe or cross-origin)
+  let method3 = false;
+  try {
+    method3 = window.frameElement !== null;
+  } catch (e) {
+    // frameElement access denied means we're in cross-origin iframe
+    method3 = true;
+  }
+  
+  // Method 4: Check for Mission Control URL parameters (theme=dark is passed by MC)
+  const urlParams = new URLSearchParams(window.location.search);
+  const hasEmbedIndicator = urlParams.has('theme') || urlParams.has('embedded');
+  
+  // Debug logging - only log once per page load
+  if (typeof window !== 'undefined' && !(window as any).__iframeDebugLogged) {
+    console.log('[isInIframe] Detection methods:');
+    console.log('  method1 (self !== top):', method1);
+    console.log('  method2 (parent !== self):', method2);
+    console.log('  method3 (frameElement):', method3);
+    console.log('  method4 (URL params):', hasEmbedIndicator);
+    console.log('  Final result:', method1 || method2 || method3 || hasEmbedIndicator);
+    (window as any).__iframeDebugLogged = true;
+  }
+  
+  // Return true if ANY method detects iframe
+  return method1 || method2 || method3 || hasEmbedIndicator;
 }
 
 /**
