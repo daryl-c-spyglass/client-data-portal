@@ -1,0 +1,153 @@
+Here's the complete implementation for popup OAuth in the Client Data Portal. Apply these changes to that project:
+
+1. Create a Popup Auth Utility (client side)
+Create a new file client/src/lib/popupAuth.ts:
+
+// client/src/lib/popupAuth.ts
+export function isEmbedded(): boolean {
+  const urlParams = new URLSearchParams(window.location.search);
+  return urlParams.get('embedded') === 'true' || urlParams.has('theme');
+}
+export function openAuthPopup(authUrl: string): Promise<boolean> {
+  return new Promise((resolve) => {
+    const width = 500;
+    const height = 600;
+    const left = window.screenX + (window.outerWidth - width) / 2;
+    const top = window.screenY + (window.outerHeight - height) / 2;
+    
+    const popup = window.open(
+      authUrl,
+      'google-auth-popup',
+      `width=${width},height=${height},left=${left},top=${top},scrollbars=yes,resizable=yes`
+    );
+    if (!popup) {
+      alert('Please allow popups for this site to sign in with Google.');
+      resolve(false);
+      return;
+    }
+    // Listen for messages from the popup
+    const messageHandler = (event: MessageEvent) => {
+      if (event.data?.type === 'AUTH_SUCCESS') {
+        window.removeEventListener('message', messageHandler);
+        popup.close();
+        resolve(true);
+      } else if (event.data?.type === 'AUTH_FAILURE') {
+        window.removeEventListener('message', messageHandler);
+        popup.close();
+        resolve(false);
+      }
+    };
+    window.addEventListener('message', messageHandler);
+    // Check if popup was closed without completing auth
+    const checkClosed = setInterval(() => {
+      if (popup.closed) {
+        clearInterval(checkClosed);
+        window.removeEventListener('message', messageHandler);
+        // Give a moment for the message to arrive before resolving
+        setTimeout(() => resolve(false), 100);
+      }
+    }, 500);
+  });
+}
+2. Update the Sign-In Button/Component
+Find your Google sign-in button component and update it:
+
+// In your login component (e.g., client/src/components/GoogleSignIn.tsx or similar)
+import { isEmbedded, openAuthPopup } from '@/lib/popupAuth';
+export function GoogleSignInButton() {
+  const handleGoogleSignIn = async () => {
+    if (isEmbedded()) {
+      // Use popup for embedded mode
+      const success = await openAuthPopup('/api/auth/google?popup=true');
+      if (success) {
+        window.location.reload();
+      }
+    } else {
+      // Normal redirect for standalone mode
+      window.location.href = '/api/auth/google';
+    }
+  };
+  return (
+    <button onClick={handleGoogleSignIn} className="...your-styles...">
+      Continue with Google
+    </button>
+  );
+}
+3. Create a Popup Callback Page (client side)
+Create client/src/pages/auth-callback.tsx:
+
+// client/src/pages/auth-callback.tsx
+import { useEffect } from 'react';
+import { useLocation } from 'wouter';
+export default function AuthCallback() {
+  const [, setLocation] = useLocation();
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const success = urlParams.get('success') === 'true';
+    const isPopup = urlParams.get('popup') === 'true';
+    if (isPopup && window.opener) {
+      // We're in a popup, send message to parent
+      window.opener.postMessage(
+        { type: success ? 'AUTH_SUCCESS' : 'AUTH_FAILURE' },
+        window.location.origin
+      );
+      window.close();
+    } else {
+      // Normal redirect flow
+      setLocation(success ? '/' : '/login?error=auth_failed');
+    }
+  }, [setLocation]);
+  return (
+    <div className="flex items-center justify-center min-h-screen">
+      <div className="text-center">
+        <div className="animate-spin w-8 h-8 border-4 border-primary border-t-transparent rounded-full mx-auto mb-4" />
+        <p>Completing sign in...</p>
+      </div>
+    </div>
+  );
+}
+4. Add the Route for Auth Callback
+In your App.tsx or router config, add:
+
+import AuthCallback from './pages/auth-callback';
+// In your routes:
+<Route path="/auth/callback" component={AuthCallback} />
+5. Update Server OAuth Callback (server side)
+In your server's Google OAuth callback handler (e.g., server/routes.ts), update the redirect logic:
+
+// In your Google OAuth callback route (after successful authentication)
+app.get('/api/auth/google/callback', passport.authenticate('google', { 
+  failureRedirect: '/auth/callback?success=false&popup=true' 
+}), (req, res) => {
+  // Check if this was a popup request
+  const isPopup = req.query.state?.includes('popup=true') || req.session?.isPopup;
+  
+  if (isPopup) {
+    // Redirect to callback page that will message the parent window
+    res.redirect('/auth/callback?success=true&popup=true');
+  } else {
+    // Normal redirect
+    res.redirect('/');
+  }
+});
+// Also update the initial Google auth route to track popup mode
+app.get('/api/auth/google', (req, res, next) => {
+  const isPopup = req.query.popup === 'true';
+  
+  // Store in session or pass via state parameter
+  if (req.session) {
+    req.session.isPopup = isPopup;
+  }
+  
+  passport.authenticate('google', {
+    scope: ['profile', 'email'],
+    state: isPopup ? 'popup=true' : undefined
+  })(req, res, next);
+});
+Summary of Changes
+File	Purpose
+client/src/lib/popupAuth.ts	Utility to detect embedded mode and open auth popup
+client/src/components/GoogleSignIn.tsx	Update sign-in button to use popup when embedded
+client/src/pages/auth-callback.tsx	New page that handles popup message passing
+client/src/App.tsx	Add route for /auth/callback
+server/routes.ts	Update OAuth routes to support popup mode
