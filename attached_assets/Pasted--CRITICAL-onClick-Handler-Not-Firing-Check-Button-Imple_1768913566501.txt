@@ -1,0 +1,85 @@
+### CRITICAL: onClick Handler Not Firing - Check Button Implementation
+
+**Problem:**
+When clicking "Continue with Google" in the iframe:
+- NO console logs appear (not even `=== AUTH CLICK DEBUG ===`)
+- Google 403 error appears immediately
+- The onClick handler is NOT being executed
+
+**This means the button is NOT using onClick - something else is causing navigation.**
+
+**Check the Login component for these issues:**
+
+#### 1. Is the button inside a form?
+```tsx
+// WRONG - form submission bypasses onClick
+<form action="/auth/google" method="GET">
+  <button type="submit" onClick={handleGoogleLogin}>
+    Continue with Google
+  </button>
+</form>
+
+// FIX - remove the form or prevent default
+<button type="button" onClick={handleGoogleLogin}>
+  Continue with Google
+</button>
+```
+
+#### 2. Is the button wrapped in an anchor tag?
+```tsx
+// WRONG - anchor navigates before onClick fires
+<a href="/auth/google">
+  <button onClick={handleGoogleLogin}>Continue with Google</button>
+</a>
+
+// FIX - remove the anchor
+<button type="button" onClick={handleGoogleLogin}>
+  Continue with Google
+</button>
+```
+
+#### 3. Is it using a Link component?
+```tsx
+// WRONG - Link navigates
+<Link to="/auth/google">
+  <button>Continue with Google</button>
+</Link>
+
+// FIX - just use button with onClick
+<button type="button" onClick={handleGoogleLogin}>
+  Continue with Google
+</button>
+```
+
+#### 4. Is there an href on the button itself?
+```tsx
+// WRONG - some UI libraries support href on buttons
+<Button href="/auth/google" onClick={handleGoogleLogin}>
+  Continue with Google
+</Button>
+
+// FIX - remove href
+<Button onClick={handleGoogleLogin}>
+  Continue with Google
+</Button>
+```
+
+#### 5. Check the EXACT JSX for the Google login button
+
+Find the "Continue with Google" button and share:
+- The complete JSX element
+- Any parent elements (form, anchor, Link)
+- The button's type attribute
+- Any href or action attributes
+
+**Quick Debug:**
+Add this at the VERY START of handleGoogleLogin:
+```typescript
+const handleGoogleLogin = async () => {
+  alert('HANDLER FIRED!');  // This should show BEFORE anything else
+  console.log('=== HANDLER FIRED ===');
+  // ... rest of code
+};
+```
+
+If the alert doesn't show, the handler is definitely not connected to the button.
