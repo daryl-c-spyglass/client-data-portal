@@ -31,12 +31,20 @@ export default function Login() {
   const handleGoogleLogin = () => {
     setAuthError(null);
     
-    if (isInIframe()) {
+    // Debug logging for iframe detection
+    const inIframe = isInIframe();
+    console.log('[Auth Debug] isInIframe:', inIframe);
+    console.log('[Auth Debug] window.self === window.top:', window.self === window.top);
+    console.log('[Auth Debug] embeddedMode state:', embeddedMode);
+    
+    if (inIframe) {
+      console.log('[Auth Debug] Using POPUP auth flow');
       // Use popup auth for iframe embedding (Google blocks OAuth redirects in iframes)
       setIsAuthenticating(true);
-      openAuthPopup(
+      const popup = openAuthPopup(
         '/auth/google/popup',
         () => {
+          console.log('[Auth Debug] Popup auth SUCCESS');
           // On success: refetch user and reload to show authenticated state
           setIsAuthenticating(false);
           queryClient.invalidateQueries({ queryKey: ["/api/auth/me"] });
@@ -45,11 +53,14 @@ export default function Login() {
           });
         },
         (error) => {
+          console.log('[Auth Debug] Popup auth ERROR:', error);
           setIsAuthenticating(false);
           setAuthError(error);
         }
       );
+      console.log('[Auth Debug] Popup window opened:', popup ? 'yes' : 'no (blocked or failed)');
     } else {
+      console.log('[Auth Debug] Using REDIRECT auth flow');
       // Standard redirect flow for direct access (not in iframe)
       const loginUrl = next !== "/" 
         ? `/auth/google?next=${encodeURIComponent(next)}`
@@ -59,8 +70,12 @@ export default function Login() {
   };
 
   // Auto-enable dark theme when embedded in iframe (Mission Control uses dark theme)
+  // Also log iframe detection on mount for debugging
   useEffect(() => {
-    if (isInIframe()) {
+    const inIframe = isInIframe();
+    console.log('[Auth Debug] Page loaded - isInIframe:', inIframe);
+    console.log('[Auth Debug] Page loaded - window.self === window.top:', window.self === window.top);
+    if (inIframe) {
       document.documentElement.classList.add('dark');
     }
   }, []);

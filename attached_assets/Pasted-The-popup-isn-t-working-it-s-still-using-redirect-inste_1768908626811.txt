@@ -1,0 +1,89 @@
+The popup isn't working — it's still using redirect instead of popup. The isInIframe() detection or the popup auth flow isn't triggering correctly.
+
+Prompt for Client Data Portal (Send This)
+### Fix: Popup Auth Not Triggering - Still Using Redirect
+
+**Problem:**
+When clicking "Continue with Google" inside the iframe, it still redirects (causing 403) instead of opening a popup window.
+
+**What Should Happen:**
+1. User clicks "Continue with Google"
+2. Popup window opens for Google sign-in
+3. User completes auth in popup
+4. Popup closes, iframe refreshes
+
+**What Actually Happens:**
+1. User clicks "Continue with Google"
+2. Iframe redirects to Google OAuth
+3. 403 error appears
+
+**Debug Steps:**
+
+1. Add console logging to verify iframe detection:
+```typescript
+const handleGoogleSignIn = async () => {
+  const inIframe = isInIframe();
+  console.log('isInIframe:', inIframe);
+  console.log('window.self:', window.self);
+  console.log('window.top:', window.top);
+  
+  if (inIframe) {
+    console.log('Using POPUP auth');
+    // popup auth code
+  } else {
+    console.log('Using REDIRECT auth');
+    // redirect auth code
+  }
+};
+```
+
+2. Check `isInIframe()` function:
+```typescript
+export const isInIframe = (): boolean => {
+  try {
+    return window.self !== window.top;
+  } catch (e) {
+    // If access is denied, we're definitely in an iframe
+    return true;
+  }
+};
+```
+
+3. Ensure the click handler is actually using popup:
+```typescript
+const handleGoogleSignIn = async () => {
+  if (isInIframe()) {
+    // MUST use popup, NOT redirect
+    try {
+      const result = await signInWithPopup(auth, provider);
+      // OR if using custom popup:
+      await openAuthPopup('/auth/google/popup');
+      window.location.reload();
+    } catch (error) {
+      console.error('Popup auth error:', error);
+    }
+  } else {
+    // Only use redirect when NOT in iframe
+    signInWithRedirect(auth, provider);
+  }
+};
+```
+
+**Verify These:**
+1. Is `isInIframe()` returning `true` when embedded?
+2. Is the button's onClick handler calling the popup path?
+3. Is `signInWithPopup` or `openAuthPopup` actually being called?
+4. Check browser console for any errors when clicking the button
+
+**Quick Test:**
+Force popup mode temporarily to confirm popup works:
+```typescript
+const handleGoogleSignIn = async () => {
+  // TEMPORARY: Force popup mode for testing
+  console.log('Forcing popup auth');
+  await openAuthPopup('/auth/google/popup');
+  window.location.reload();
+};
+```
+
+**Check the Login.tsx file** and ensure the onClick handler for "Continue with Google" button is correctly checking iframe status and using popup auth.
