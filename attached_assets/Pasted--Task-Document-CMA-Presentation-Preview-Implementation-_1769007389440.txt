@@ -1,0 +1,187 @@
+## Task: Document CMA Presentation Preview Implementation
+
+I need to understand how the CMA Presentation Preview feature is built so I can replicate it in another project (Contract Conduit / Mission Control).
+
+Please analyze and document the following:
+
+---
+
+## PART 1: Find All Related Files
+
+Search for files related to:
+- "CMA Presentation Preview"
+- "Live Preview"
+- "Preview Modal"
+- "Section" renderers for CMA
+
+List all files found with their paths:
+- Components
+- Hooks
+- Types/Interfaces
+- Utilities
+- API endpoints
+
+---
+
+## PART 2: Component Architecture
+
+For each component found, document:
+
+### 2.1 Main Preview Component
+- File path
+- Props interface (copy the full TypeScript interface)
+- State management (useState, useContext, etc.)
+- How it receives data from parent
+
+### 2.2 Preview Modal/Expanded View
+- File path
+- How expand/collapse works
+- Zoom controls implementation
+- Scroll behavior
+
+### 2.3 Section Renderers
+For each section type (Cover Page, Listing Brochure, Map, Adjustments, etc.):
+- File path
+- Props interface
+- How it renders in compact vs expanded mode
+- Data dependencies
+
+---
+
+## PART 3: Data Flow
+
+Document how data flows:
+
+### 3.1 From Builder Tabs to Preview
+- How Sections tab toggles sync to preview
+- How Content tab changes sync to preview
+- How Layout tab settings sync to preview
+- Is it real-time or on-save?
+
+### 3.2 Data Sources
+- Where does comparable property data come from?
+- Where does agent profile data come from?
+- Where does subject property data come from?
+- How is MLS data fetched?
+
+### 3.3 State Management
+- Is state lifted to parent?
+- Is there a context provider?
+- How is section order maintained?
+
+---
+
+## PART 4: Section Configuration
+
+### 4.1 Section Types
+List all section types with their:
+- ID/key
+- Label
+- Category (Introduction, Listings, Analysis)
+- Default enabled/disabled
+- Order/position
+
+### 4.2 Section Toggle Logic
+- How are sections enabled/disabled?
+- How is section order changed (drag-drop)?
+- How are section counts calculated?
+
+---
+
+## PART 5: Key UI Patterns
+
+### 5.1 Adjustments Table
+- How are color-coded values implemented (green for negative, red for positive)?
+- What's the calculation logic?
+- Copy the relevant code snippet
+
+### 5.2 Bar Chart (Price Per Sq Ft)
+- What charting library is used (Recharts, Chart.js, custom)?
+- How is data formatted?
+- Copy the relevant code snippet
+
+### 5.3 Map Preview
+- What mapping library (Mapbox, Leaflet, Google Maps)?
+- How are markers rendered?
+- How does the legend work?
+- How does "Show All" checkbox work?
+
+### 5.4 Photo Grid
+- How are photos loaded?
+- How does "+X more photos" work?
+- Is there lazy loading?
+
+---
+
+## PART 6: Export/PDF Generation
+
+### 6.1 Export PDF Button
+- What library is used for PDF generation?
+- How are sections rendered to PDF?
+- Is there a separate PDF template?
+
+### 6.2 Save as Template
+- How does template saving work?
+- What data is saved?
+- Where is it stored?
+
+---
+
+## PART 7: Code Snippets
+
+Please provide the actual code for these key components:
+
+### 7.1 Main Preview Panel Component
+```tsx
+// Copy the full component code here
+```
+
+### 7.2 Preview Modal Component
+```tsx
+// Copy the full component code here
+```
+
+### 7.3 Section Router/Renderer
+```tsx
+// Copy the code that routes to different section renderers
+```
+
+### 7.4 Adjustments Section
+```tsx
+// Copy the adjustments table component
+```
+
+### 7.5 Price Chart Section
+```tsx
+// Copy the bar chart component
+```
+
+### 7.6 Section Configuration/Types
+```tsx
+// Copy the section types and default configuration
+```
+
+---
+
+## PART 8: API Endpoints
+
+List any API endpoints used by the preview:
+- Endpoint URL
+- Method (GET/POST)
+- Request params
+- Response structure
+
+---
+
+## OUTPUT FORMAT
+
+Please organize your findings as:
+
+1. **File List** - All related files with paths
+2. **Architecture Diagram** (text-based)
+3. **Props/Interfaces** - Copy all TypeScript interfaces
+4. **Data Flow** - How data moves through components
+5. **Code Snippets** - Key implementation code
+6. **Dependencies** - Libraries used (charting, PDF, etc.)
+
+This documentation will be used to replicate the feature in Contract Conduit.
