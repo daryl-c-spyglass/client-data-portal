@@ -1,0 +1,145 @@
+Spyglass Branding Compliance Report
+Generated: January 23, 2026
+Application: Mission Control - Spyglass Realty Agent Portal
+
+Summary
+Category	Count
+Total Issues Found	12
+Critical (Wrong Colors)	8
+Warning (Logo Issues)	1
+Info (Minor Inconsistencies)	3
+Color Compliance
+✅ COMPLIANT - Primary Brand Color (hsl(28, 94%, 54%) = #EF4923)
+The primary brand color is correctly defined in CSS variables:
+
+Location	Color Used	Purpose
+client/src/index.css:23	28 94% 54%	--primary (light mode)
+client/src/index.css:32	28 94% 54%	--accent (light mode)
+client/src/index.css:40	28 94% 54%	--ring (light mode)
+client/src/index.css:42	28 94% 54%	--chart-1
+client/src/index.css:50	28 94% 54%	--sidebar-primary
+client/src/index.css:55	28 94% 54%	--sidebar-ring
+Dark mode variants	28 94% 54%	Same HSL values
+Components using correct brand HSL:
+
+suggestion-card.tsx - Deal summary styling
+onboarding-modal.tsx - Button, indicators
+market-pulse.tsx - Icons, loading spinner
+TransactionDetailsModal.tsx - Stats, buttons
+FubNotLinkedBanner.tsx - CTA button
+layout.tsx - Notification badge
+reports.tsx - Cards, buttons
+leads.tsx - Icons
+marketing.tsx - Cards, badges
+settings.tsx - Icons, avatars
+dashboard.tsx - Badges, cards
+app-view.tsx - Primary buttons
+App.tsx - Loading spinner
+❌ NON-COMPLIANT - Tailwind Orange Classes
+Critical Issue: Tailwind's orange-500 (#F97316) ≠ Spyglass Orange (#EF4923)
+
+Location	Color Used	Should Be	Purpose
+training-videos-modal.tsx	bg-orange-500	bg-[hsl(28,94%,54%)]	Icon background, buttons
+training-videos-modal.tsx	hover:bg-orange-600	hover:bg-[hsl(28,94%,45%)]	Button hover
+training.tsx	bg-orange-500	bg-[hsl(28,94%,54%)]	Progress bar, badges, buttons
+training.tsx	text-orange-500	text-[hsl(28,94%,54%)]	Icons
+training.tsx	hover:bg-orange-600	hover:bg-[hsl(28,94%,45%)]	Button hover states
+training.tsx	focus:ring-orange-500	focus:ring-[hsl(28,94%,54%)]	Input focus ring
+dashboard.tsx	text-orange-500	text-[hsl(28,94%,54%)]	Links, badges, icons
+dashboard.tsx	hover:text-orange-600	hover:text-[hsl(28,94%,45%)]	Link hover
+dashboard.tsx	bg-orange-500	bg-[hsl(28,94%,54%)]	Play button, badges
+company-updates.tsx	text-orange-500	text-[hsl(28,94%,54%)]	Links, icons, text
+company-updates.tsx	bg-orange-500	bg-[hsl(28,94%,54%)]	Play button, badges
+FubNotLinkedBanner.tsx	bg-orange-50/100	bg-[hsl(28,94%,95%)]	Banner backgrounds
+FubNotLinkedBanner.tsx	text-orange-500/400	text-[hsl(28,94%,54%)]	Icon colors
+apps.ts	bg-orange-100 text-orange-700	Brand HSL variants	App card colors
+❌ NON-COMPLIANT - Spyglass Black (#222222) Not Defined
+Warning: No explicit Spyglass Black (#222222, rgb(34,34,34)) defined. Using various grays instead:
+
+Location	Color Used	Should Be	Purpose
+Multiple files	text-gray-900	text-[#222222]	Primary text (light mode)
+layout.tsx	bg-gray-900	bg-[#222222]	Dark mode background
+dashboard.tsx	bg-gray-900/50	bg-[#222222]/50	Dark cards
+⚠️ ACCEPTABLE - Overlay/Modal Backgrounds
+These use standard overlay patterns and are acceptable:
+
+Location	Color Used	Purpose	Status
+sheet.tsx	bg-black/80	Overlay backdrop	✅ OK (standard pattern)
+dialog.tsx	bg-black/80	Overlay backdrop	✅ OK
+drawer.tsx	bg-black/80	Overlay backdrop	✅ OK
+alert-dialog.tsx	bg-black/80	Overlay backdrop	✅ OK
+training.tsx	from-black/80	Gradient overlay	✅ OK
+Logo Compliance
+✅ COMPLIANT
+Location	Logo Type	Background	Notes
+layout.tsx	/spyglass-logo.png	Dark sidebar	White/Red version expected
+landing.tsx	/spyglass-logo.png	Dark header	White/Red version expected
+landing.tsx (footer)	/spyglass-logo.png	Light	Should verify correct version
+⚠️ WARNING - Text Fallbacks
+Location	Issue	Recommendation
+dashboard.tsx	"S" text used as fallback	Use actual logo image
+layout.tsx	"Spyglass Realty" text label	OK as supplementary
+Logo Files Available:
+attached_assets/SpyglassRealty_Logo_Black_(1)_*.png - For light backgrounds
+attached_assets/SpyglassRealty_Logo_White_(1)_*.png - For dark backgrounds
+attached_assets/White-Orange_*.png - White + Red variant
+Section-by-Section Findings
+Dashboard
+✅ Brand HSL used in suggestion cards and badges
+❌ orange-500 used in Company Updates widget (links, play button, badges)
+❌ text-gray-900 used instead of #222222
+⚠️ "S" text fallback instead of logo image
+Training Page
+✅ Search focus ring uses brand HSL
+❌ bg-orange-500 used for progress bars, badges, buttons
+❌ text-orange-500 used for icons
+❌ hover:bg-orange-600 used for button hovers
+Training Videos Modal
+✅ Header styling consistent
+❌ bg-orange-500 used for icon background
+❌ hover:bg-orange-600 used for play button
+Layout/Sidebar
+✅ Logo image properly referenced
+✅ Notification badge uses correct hsl(28,94%,54%)
+⚠️ Dark mode background is gray-900 not #222222
+Settings Page
+✅ Icons use correct hsl(28,94%,54%)
+✅ Avatar fallback uses brand color
+Reports Page
+✅ Cards, buttons, borders use correct HSL
+Leads Page
+❌ FubNotLinkedBanner.tsx uses orange-50, orange-100, orange-500
+Marketing Page
+✅ Cards and badges use correct HSL
+Files Requiring Updates
+High Priority (Wrong Orange Color)
+client/src/pages/training.tsx - ~15 instances of orange-500/600
+client/src/pages/dashboard.tsx - ~10 instances of orange-500/600
+client/src/components/training-videos-modal.tsx - ~4 instances
+client/src/components/dashboard/company-updates.tsx - ~8 instances
+client/src/components/leads/FubNotLinkedBanner.tsx - ~4 instances
+client/src/lib/apps.ts - 1 instance
+Medium Priority (Black Color)
+client/src/components/layout.tsx - gray-900 backgrounds
+client/src/pages/dashboard.tsx - gray-900 references
+client/src/pages/training.tsx - gray-900 references
+Recommendations
+Critical (Priority 1)
+Replace all Tailwind orange-500 with [hsl(28,94%,54%)] or CSS variable var(--primary)
+Replace all orange-600 with [hsl(28,94%,45%)] for hover states
+Replace all orange-50/100/200 with appropriate HSL tints
+High (Priority 2)
+Define Spyglass Black as CSS variable: --spyglass-black: 0 0% 13.3%; (equivalent to #222222)
+Replace gray-900 text colors with [#222222] for brand consistency
+Medium (Priority 3)
+Audit logo versions - Ensure white logo on dark backgrounds, black logo on light backgrounds
+Replace "S" text fallback with actual logo image in dashboard
+Color Reference Quick Guide
+Purpose	Correct Value	Tailwind Equivalent
+Brand Orange	hsl(28, 94%, 54%) / #EF4923	Use [hsl(28,94%,54%)]
+Brand Orange Hover	hsl(28, 94%, 45%)	Use [hsl(28,94%,45%)]
+Brand Orange Light	hsl(28, 94%, 95%)	Use [hsl(28,94%,95%)]
+Brand Black	#222222 / rgb(34,34,34)	Use [#222222]
+END OF AUDIT REPORT
+
+This is an audit-only report. No changes have been made to the codebase.
