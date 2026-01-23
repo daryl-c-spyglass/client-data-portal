@@ -25,6 +25,7 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Label } from "@/components/ui/label";
+import { useTheme } from "@/contexts/ThemeContext";
 import { 
   Settings as SettingsIcon, 
   User, 
@@ -47,7 +48,10 @@ import {
   Loader2,
   Upload,
   Trash2,
-  Sparkles
+  Sparkles,
+  Sun,
+  Moon,
+  Monitor
 } from "lucide-react";
 import { SiFacebook, SiInstagram, SiLinkedin, SiX } from "react-icons/si";
 
@@ -114,6 +118,7 @@ interface AgentProfileResponse {
 export default function Settings() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const { theme, setTheme } = useTheme();
   const [activeTab, setActiveTab] = useState("profile");
   const [copied, setCopied] = useState(false);
   const [embedWidth, setEmbedWidth] = useState("600");
@@ -1102,6 +1107,59 @@ Thank you for the opportunity to prepare this Comparative Market Analysis for yo
 
         {/* Display Preferences Tab */}
         <TabsContent value="display" className="space-y-6">
+          {/* Appearance / Theme Section */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Sun className="w-5 h-5" />
+                Appearance
+              </CardTitle>
+              <CardDescription>
+                Choose how the application looks
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="flex items-center justify-between p-4 border rounded-lg flex-wrap gap-2">
+                <div>
+                  <p className="font-medium">Theme</p>
+                  <p className="text-sm text-muted-foreground">Select light, dark, or follow your system preference</p>
+                </div>
+                <div className="flex gap-2">
+                  <Button
+                    variant={theme === 'light' ? 'default' : 'outline'}
+                    size="sm"
+                    onClick={() => setTheme('light')}
+                    className="flex items-center gap-2"
+                    data-testid="button-theme-light"
+                  >
+                    <Sun className="h-4 w-4" />
+                    Light
+                  </Button>
+                  <Button
+                    variant={theme === 'dark' ? 'default' : 'outline'}
+                    size="sm"
+                    onClick={() => setTheme('dark')}
+                    className="flex items-center gap-2"
+                    data-testid="button-theme-dark"
+                  >
+                    <Moon className="h-4 w-4" />
+                    Dark
+                  </Button>
+                  <Button
+                    variant={theme === 'system' ? 'default' : 'outline'}
+                    size="sm"
+                    onClick={() => setTheme('system')}
+                    className="flex items-center gap-2"
+                    data-testid="button-theme-system"
+                  >
+                    <Monitor className="h-4 w-4" />
+                    System
+                  </Button>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">

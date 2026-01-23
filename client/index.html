@@ -12,7 +12,18 @@
   </head>
   <body>
     <script>
-      // Very early debug - runs before any modules load
+      // Flash prevention - apply theme before React loads to prevent flash of wrong theme
+      (function() {
+        var saved = localStorage.getItem('cdp-theme');
+        var prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+        
+        // Apply dark class if: explicitly set to dark, OR set to system and system prefers dark
+        if (saved === 'dark' || (saved === 'system' && prefersDark) || (!saved && prefersDark)) {
+          document.documentElement.classList.add('dark');
+        }
+      })();
+      
+      // Debug logging
       console.log('[HTML Debug] index.html loaded');
       console.log('[HTML Debug] In iframe:', window.self !== window.top);
       console.log('[HTML Debug] URL:', window.location.href);

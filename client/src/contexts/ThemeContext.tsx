@@ -1,44 +1,85 @@
-import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
 
-type Theme = 'light' | 'dark';
+export type Theme = 'light' | 'dark' | 'system';
+type ResolvedTheme = 'light' | 'dark';
 
 interface ThemeContextType {
   theme: Theme;
+  resolvedTheme: ResolvedTheme;
   setTheme: (theme: Theme) => void;
   toggleTheme: () => void;
 }
 
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 
+function getSystemTheme(): ResolvedTheme {
+  if (typeof window === 'undefined') return 'light';
+  return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+}
+
+function resolveTheme(theme: Theme): ResolvedTheme {
+  if (theme === 'system') {
+    return getSystemTheme();
+  }
+  return theme;
+}
+
 export function ThemeProvider({ children }: { children: ReactNode }) {
-  const [theme, setTheme] = useState<Theme>(() => {
-    if (typeof window === 'undefined') return 'light';
+  const [theme, setThemeState] = useState<Theme>(() => {
+    if (typeof window === 'undefined') return 'system';
     
-    const saved = localStorage.getItem('cdp-theme') as Theme;
-    if (saved === 'light' || saved === 'dark') return saved;
-    
-    if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
-      return 'dark';
+    const saved = localStorage.getItem('cdp-theme');
+    if (saved === 'light' || saved === 'dark' || saved === 'system') {
+      return saved;
     }
-    return 'light';
+    
+    // Default to system if nothing saved
+    return 'system';
   });
 
-  useEffect(() => {
-    localStorage.setItem('cdp-theme', theme);
-    
-    if (theme === 'dark') {
+  const [resolvedTheme, setResolvedTheme] = useState<ResolvedTheme>(() => resolveTheme(theme));
+
+  const applyTheme = useCallback((resolved: ResolvedTheme) => {
+    setResolvedTheme(resolved);
+    if (resolved === 'dark') {
       document.documentElement.classList.add('dark');
     } else {
       document.documentElement.classList.remove('dark');
     }
-  }, [theme]);
+  }, []);
 
-  const toggleTheme = () => {
-    setTheme(prev => prev === 'light' ? 'dark' : 'light');
-  };
+  const setTheme = useCallback((newTheme: Theme) => {
+    setThemeState(newTheme);
+    localStorage.setItem('cdp-theme', newTheme);
+    applyTheme(resolveTheme(newTheme));
+  }, [applyTheme]);
+
+  // Apply theme on mount and when theme changes
+  useEffect(() => {
+    applyTheme(resolveTheme(theme));
+  }, [theme, applyTheme]);
+
+  // Listen for system preference changes when in 'system' mode
+  useEffect(() => {
+    if (theme !== 'system') return;
+
+    const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+    
+    const handleChange = (e: MediaQueryListEvent) => {
+      applyTheme(e.matches ? 'dark' : 'light');
+    };
+
+    mediaQuery.addEventListener('change', handleChange);
+    return () => mediaQuery.removeEventListener('change', handleChange);
+  }, [theme, applyTheme]);
+
+  const toggleTheme = useCallback(() => {
+    // Cycle through: light -> dark -> system -> light
+    setTheme(theme === 'light' ? 'dark' : theme === 'dark' ? 'system' : 'light');
+  }, [theme, setTheme]);
 
   return (
-    <ThemeContext.Provider value={{ theme, setTheme, toggleTheme }}>
+    <ThemeContext.Provider value={{ theme, resolvedTheme, setTheme, toggleTheme }}>
       {children}
     </ThemeContext.Provider>
   );
