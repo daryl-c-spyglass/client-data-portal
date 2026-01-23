@@ -32,13 +32,13 @@ export const STATUS_COLORS = {
   },
   underContract: {
     name: 'Under Contract',
-    hex: '#f97316',        // Orange
-    bg: 'bg-orange-500',
-    bgLight: 'bg-orange-100',
-    text: 'text-orange-500',
-    textDark: 'text-orange-400',
-    border: 'border-orange-500',
-    ring: 'ring-orange-500',
+    hex: '#EF4923',        // Spyglass Red-Orange (Brand Color)
+    bg: 'bg-[#EF4923]',
+    bgLight: 'bg-[#FEF2EF]',
+    text: 'text-[#EF4923]',
+    textDark: 'text-[#F97B5C]',
+    border: 'border-[#EF4923]',
+    ring: 'ring-[#EF4923]',
   },
   closed: {
     name: 'Closed',

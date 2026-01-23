@@ -66,7 +66,7 @@ function StatCard({ icon: Icon, label, value, subValue }: {
 }
 
 export function NeighborhoodReview({ neighborhoodName, city, months = 6 }: NeighborhoodReviewProps) {
-  const { theme } = useTheme();
+  const { resolvedTheme } = useTheme();
   const { data, isLoading, error } = useQuery<NeighborhoodStats>({
     queryKey: ['/api/neighborhoods/review', neighborhoodName, city, months],
     queryFn: async () => {
@@ -214,9 +214,9 @@ export function NeighborhoodReview({ neighborhoodName, city, months = 6 }: Neigh
               interactive={true}
               polygon={boundary || undefined}
               showPolygon={!!boundary}
-              polygonColor="#ea580c"
+              polygonColor="#EF4923"
               syncWithTheme={true}
-              currentTheme={theme}
+              currentTheme={resolvedTheme}
             />
           </div>
         )}
@@ -237,7 +237,7 @@ export function NeighborhoodReview({ neighborhoodName, city, months = 6 }: Neigh
               <span>Active ({listings.active.length})</span>
             </div>
             <div className="flex items-center gap-1">
-              <div className="w-3 h-3 rounded-full bg-orange-500"></div>
+              <div className="w-3 h-3 rounded-full bg-[#EF4923]"></div>
               <span>Pending ({listings.underContract.length})</span>
             </div>
             <div className="flex items-center gap-1">

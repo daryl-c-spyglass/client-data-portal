@@ -1,7 +1,7 @@
 export const PDF_COLORS = {
-  primary: '#F97316',
-  primaryDark: '#EA580C',
-  primaryLight: '#FB923C',
+  primary: '#EF4923',
+  primaryDark: '#C93B1C',
+  primaryLight: '#F97A5A',
   text: '#1F2937',
   textLight: '#6B7280',
   textMuted: '#9CA3AF',
@@ -14,7 +14,7 @@ export const PDF_COLORS = {
   borderLight: '#F3F4F6',
   
   statusActive: '#22C55E',
-  statusUnderContract: '#F97316',
+  statusUnderContract: '#EF4923',
   statusClosed: '#EF4444',
   statusSubject: '#3B82F6',
   statusPending: '#6B7280',

@@ -1,0 +1,456 @@
+# 🎨 REPLIT PROMPT: Spyglass Branding Compliance Fix
+
+## SCOPE
+
+Fix all branding color inconsistencies in the Contract Conduit CMA application to comply with official Spyglass Realty Brand Guidelines.
+
+**Source of Truth:** Spyglass Realty Branding Guidelines PDF
+
+---
+
+## OFFICIAL SPYGLASS BRAND COLORS
+
+### Primary Colors (From Official Guidelines)
+
+| Color Name | Hex | RGB | HSL | CSS Variable |
+|------------|-----|-----|-----|--------------|
+| **Spyglass Red-Orange** | `#EF4923` | `rgb(239, 73, 35)` | `hsl(11, 85%, 54%)` | `--primary` |
+| **Spyglass Black** | `#222222` | `rgb(34, 34, 34)` | `hsl(0, 0%, 13%)` | `--spyglass-black` |
+
+### Derived Tints (For UI Elements)
+
+| Purpose | HSL Value | Hex Equivalent | Use Case |
+|---------|-----------|----------------|----------|
+| Primary | `11 85% 54%` | `#EF4923` | Buttons, links, accents |
+| Primary Hover | `11 85% 45%` | `#C93B1C` | Hover states |
+| Primary Light (50) | `11 85% 95%` | `#FEF2EF` | Light backgrounds |
+| Primary Light (100) | `11 85% 90%` | `#FDE5DF` | Selected states |
+| Primary Light (200) | `11 85% 80%` | `#FABCAB` | Borders, dividers |
+| Primary Dark | `11 85% 40%` | `#A83218` | Dark mode accents |
+
+---
+
+## PHASE 1: Update CSS Variables (CRITICAL)
+
+### Task 1.1: Fix Primary Color in index.css
+
+**File:** `client/src/index.css`
+
+Find and replace the `--primary` variable in BOTH `:root` and `.dark` sections:
+
+```css
+/* BEFORE (Wrong) */
+:root {
+  --primary: 25 90% 52%;              /* ❌ Wrong HSL */
+}
+
+.dark {
+  --primary: 25 90% 55%;              /* ❌ Wrong HSL */
+}
+
+/* AFTER (Correct - Spyglass Red-Orange #EF4923) */
+:root {
+  --primary: 11 85% 54%;              /* ✅ Spyglass Red-Orange */
+  --primary-foreground: 0 0% 100%;
+  
+  /* NEW: Add Spyglass Black */
+  --spyglass-black: 0 0% 13%;         /* ✅ #222222 */
+  
+  /* NEW: Add brand tints for UI */
+  --primary-50: 11 85% 95%;           /* Light background */
+  --primary-100: 11 85% 90%;          /* Selected state */
+  --primary-200: 11 85% 80%;          /* Borders */
+}
+
+.dark {
+  --primary: 11 85% 58%;              /* ✅ Slightly brighter for dark mode */
+  --primary-foreground: 0 0% 100%;
+  
+  --spyglass-black: 0 0% 13%;
+  --primary-50: 11 85% 15%;           /* Dark mode light bg */
+  --primary-100: 11 85% 20%;          /* Dark mode selected */
+  --primary-200: 11 85% 30%;          /* Dark mode borders */
+}
+```
+
+### Task 1.2: Update Ring Color
+
+Also in `index.css`, update the `--ring` variable:
+
+```css
+:root {
+  --ring: 11 85% 54%;                 /* Match primary */
+}
+
+.dark {
+  --ring: 11 85% 58%;
+}
+```
+
+---
+
+## PHASE 2: Fix Status Colors (CRITICAL)
+
+### Task 2.1: Update statusColors.ts
+
+**File:** `client/src/lib/statusColors.ts`
+
+**IMPORTANT:** The "Under Contract" status currently uses Tailwind's `orange-500` (#F97316) which is NOT the Spyglass brand color. Update to use the official brand color.
+
+```typescript
+// client/src/lib/statusColors.ts
+
+/**
+ * OFFICIAL STATUS COLOR SCHEME
+ * 
+ * These colors are used consistently across:
+ * - Maps (markers, legends)
+ * - Property cards (badges, borders)
+ * - Tables (status badges)
+ * - Charts (bar colors)
+ * - PDF exports
+ * 
+ * SPYGLASS BRAND: #EF4923 (Red-Orange) is used for "Under Contract"
+ */
+
+export const STATUS_COLORS = {
+  // Subject Property - Blue (distinct from all statuses)
+  subject: '#3b82f6',
+  
+  // Active - Green (available on market)
+  active: '#22c55e',
+  
+  // Under Contract - SPYGLASS RED-ORANGE (brand color!)
+  underContract: '#EF4923',  // ✅ CHANGED from #f97316
+  
+  // Closed/Sold - Red
+  closed: '#ef4444',
+  
+  // Pending - Gray
+  pending: '#6b7280',
+} as const;
+
+// Tailwind background classes
+export const STATUS_BG_CLASSES = {
+  subject: 'bg-blue-500',
+  active: 'bg-green-500',
+  underContract: 'bg-[#EF4923]',      // ✅ CHANGED from bg-orange-500
+  closed: 'bg-red-500',
+  pending: 'bg-gray-500',
+} as const;
+
+// Tailwind text classes (for use on light backgrounds)
+export const STATUS_TEXT_CLASSES = {
+  subject: 'text-blue-700 dark:text-blue-400',
+  active: 'text-green-700 dark:text-green-400',
+  underContract: 'text-[#EF4923] dark:text-[#F97B5C]',  // ✅ CHANGED
+  closed: 'text-red-700 dark:text-red-400',
+  pending: 'text-gray-700 dark:text-gray-400',
+} as const;
+
+// Badge classes (subtle background + text)
+export const STATUS_BADGE_CLASSES = {
+  subject: 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400',
+  active: 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400',
+  underContract: 'bg-[#FEF2EF] dark:bg-[#EF4923]/20 text-[#EF4923] dark:text-[#F97B5C]',  // ✅ CHANGED
+  closed: 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400',
+  pending: 'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-400',
+} as const;
+
+// Border classes
+export const STATUS_BORDER_CLASSES = {
+  subject: 'border-blue-500',
+  active: 'border-green-500',
+  underContract: 'border-[#EF4923]',  // ✅ CHANGED
+  closed: 'border-red-500',
+  pending: 'border-gray-500',
+} as const;
+
+// Type for status keys
+export type StatusKey = keyof typeof STATUS_COLORS;
+
+// Helper function to get status color by MLS status string
+export function getStatusColor(status: string): string {
+  const normalized = status.toLowerCase().trim();
+  
+  if (normalized.includes('active') && !normalized.includes('contract')) {
+    return STATUS_COLORS.active;
+  }
+  if (normalized.includes('contract') || normalized.includes('pending')) {
+    return STATUS_COLORS.underContract;
+  }
+  if (normalized.includes('sold') || normalized.includes('closed')) {
+    return STATUS_COLORS.closed;
+  }
+  
+  return STATUS_COLORS.pending;
+}
+
+// Helper to get Tailwind classes for a status
+export function getStatusClasses(status: StatusKey) {
+  return {
+    bg: STATUS_BG_CLASSES[status],
+    text: STATUS_TEXT_CLASSES[status],
+    badge: STATUS_BADGE_CLASSES[status],
+    border: STATUS_BORDER_CLASSES[status],
+  };
+}
+```
+
+---
+
+## PHASE 3: Replace Tailwind Orange Classes
+
+### Task 3.1: Global Search and Replace
+
+Search for ALL instances of Tailwind orange classes and replace with brand-compliant alternatives:
+
+| Find | Replace With | Notes |
+|------|--------------|-------|
+| `bg-orange-500` | `bg-[#EF4923]` or `bg-primary` | Solid background |
+| `bg-orange-100` | `bg-[#FDE5DF]` or `bg-primary/10` | Light background |
+| `bg-orange-50` | `bg-[#FEF2EF]` or `bg-primary/5` | Very light background |
+| `text-orange-500` | `text-[#EF4923]` or `text-primary` | Text color |
+| `text-orange-600` | `text-[#D9421F]` | Darker text |
+| `text-orange-700` | `text-[#C93B1C]` | Even darker text |
+| `border-orange-500` | `border-[#EF4923]` or `border-primary` | Borders |
+| `from-orange-50` | `from-[#FEF2EF]` | Gradient start |
+| `to-orange-100` | `to-[#FDE5DF]` | Gradient end |
+| `dark:bg-orange-900/30` | `dark:bg-[#EF4923]/20` | Dark mode background |
+
+### Task 3.2: Files to Update
+
+Run these commands to find all files needing updates:
+
+```bash
+# Find all orange class usage
+grep -r "orange-" --include="*.tsx" --include="*.ts" client/src/ | grep -v node_modules
+```
+
+**Priority files identified in audit:**
+
+1. **`client/src/components/CMAReport.tsx`** (~10 instances)
+   - Lines: 1008, 2015, 2367-2375, 2803, 3564
+   
+2. **`client/src/pages/CMAPresentationBuilder.tsx`**
+   - Lines: 1218, 1730 (gradients)
+   
+3. **`client/src/components/presentation/CoverPageEditor.tsx`**
+   - Line: 134
+   
+4. **`client/src/pages/Analytics.tsx`**
+   - Lines: 89-90
+   
+5. **`client/src/pages/Clients.tsx`**
+   - Lines: 89-90
+   
+6. **`client/src/components/SearchCriteria.tsx`**
+   - Line: 589
+   
+7. **`client/src/components/MapLayersControl.tsx`**
+   - Line: 563
+   
+8. **`client/src/components/NeighborhoodReview.tsx`**
+   - Line: 240
+   
+9. **`client/src/components/StatusFilterTabs.tsx`**
+   - Line: 46
+
+---
+
+## PHASE 4: Example Component Updates
+
+### Task 4.1: CMAReport.tsx Updates
+
+```typescript
+// BEFORE
+<span className="text-orange-600">Pending</span>
+<div className="bg-orange-500 w-3 h-3 rounded-full" />
+<div className="bg-orange-50 text-orange-700 px-2 py-1 rounded">Maximum Value</div>
+
+// AFTER
+<span className="text-[#EF4923]">Pending</span>
+<div className="bg-[#EF4923] w-3 h-3 rounded-full" />
+<div className="bg-[#FEF2EF] text-[#C93B1C] px-2 py-1 rounded">Maximum Value</div>
+```
+
+### Task 4.2: CMAPresentationBuilder.tsx Gradient Updates
+
+```typescript
+// BEFORE
+className={`... ${isSelected ? 'from-orange-50 to-orange-100' : ''}`}
+
+// AFTER
+className={`... ${isSelected ? 'from-[#FEF2EF] to-[#FDE5DF]' : ''}`}
+```
+
+### Task 4.3: SearchCriteria.tsx AI Button
+
+```typescript
+// BEFORE
+<button className="border-orange-500 text-orange-500 hover:bg-orange-50">
+  AI Search
+</button>
+
+// AFTER
+<button className="border-[#EF4923] text-[#EF4923] hover:bg-[#FEF2EF]">
+  AI Search
+</button>
+```
+
+---
+
+## PHASE 5: Add Spyglass Black (Optional but Recommended)
+
+### Task 5.1: Replace gray-900 with Spyglass Black
+
+For dark backgrounds that should use the official Spyglass Black (#222222):
+
+```typescript
+// BEFORE
+<div className="bg-gray-900">...</div>
+<h1 className="text-gray-900">...</h1>
+
+// AFTER (where brand black is needed)
+<div className="bg-[#222222]">...</div>
+<h1 className="text-[#222222]">...</h1>
+```
+
+**Note:** Not all `gray-900` needs to change. Only update where the official Spyglass Black is semantically appropriate (e.g., headings, important text, branded dark sections).
+
+---
+
+## PHASE 6: Update Tailwind Config (Optional Enhancement)
+
+### Task 6.1: Add Brand Colors to Tailwind Config
+
+**File:** `tailwind.config.ts`
+
+```typescript
+import type { Config } from "tailwindcss";
+
+export default {
+  darkMode: ["class"],
+  content: ["./client/index.html", "./client/src/**/*.{js,jsx,ts,tsx}"],
+  theme: {
+    extend: {
+      colors: {
+        // Spyglass Brand Colors
+        spyglass: {
+          orange: '#EF4923',
+          'orange-hover': '#C93B1C',
+          'orange-light': '#FEF2EF',
+          'orange-100': '#FDE5DF',
+          'orange-200': '#FABCAB',
+          black: '#222222',
+        },
+        
+        // Existing CSS variable colors...
+        background: "hsl(var(--background) / <alpha-value>)",
+        foreground: "hsl(var(--foreground) / <alpha-value>)",
+        primary: {
+          DEFAULT: "hsl(var(--primary) / <alpha-value>)",
+          foreground: "hsl(var(--primary-foreground) / <alpha-value>)",
+        },
+        // ... rest of config
+      },
+    },
+  },
+  plugins: [require("tailwindcss-animate"), require("@tailwindcss/typography")],
+} satisfies Config;
+```
+
+**After this, you can use:**
+- `bg-spyglass-orange` instead of `bg-[#EF4923]`
+- `text-spyglass-black` instead of `text-[#222222]`
+- `bg-spyglass-orange-light` instead of `bg-[#FEF2EF]`
+
+---
+
+## ACCEPTANCE CRITERIA
+
+### Color Compliance
+- [ ] `--primary` CSS variable equals `11 85% 54%` (converts to #EF4923)
+- [ ] No Tailwind `orange-*` classes remain in codebase (except intentional non-brand usage)
+- [ ] `statusColors.ts` uses `#EF4923` for Under Contract
+- [ ] All brand color references match official guidelines
+
+### Visual Verification
+- [ ] Primary buttons render as Spyglass Red-Orange (#EF4923)
+- [ ] Under Contract badges/markers are visually distinct from Tailwind orange
+- [ ] Hover states are slightly darker (#C93B1C)
+- [ ] Light backgrounds use correct tint (#FEF2EF)
+- [ ] Dark mode variants maintain brand identity
+
+### Files Updated
+- [ ] `client/src/index.css` - CSS variables
+- [ ] `client/src/lib/statusColors.ts` - Status hex values and classes
+- [ ] `client/src/components/CMAReport.tsx` - ~10 orange class replacements
+- [ ] `client/src/pages/CMAPresentationBuilder.tsx` - Gradient fixes
+- [ ] `client/src/components/presentation/CoverPageEditor.tsx`
+- [ ] `client/src/pages/Analytics.tsx`
+- [ ] `client/src/pages/Clients.tsx`
+- [ ] `client/src/components/SearchCriteria.tsx`
+- [ ] `client/src/components/MapLayersControl.tsx`
+- [ ] `client/src/components/NeighborhoodReview.tsx`
+- [ ] `client/src/components/StatusFilterTabs.tsx`
+
+---
+
+## VALIDATION TESTS
+
+```typescript
+// Test 1: Primary color renders correctly
+const primaryColor = getComputedStyle(document.documentElement)
+  .getPropertyValue('--primary');
+console.log('Primary HSL:', primaryColor); // Should be "11 85% 54%"
+
+// Test 2: Status colors use brand color
+import { STATUS_COLORS } from '@/lib/statusColors';
+console.log('Under Contract:', STATUS_COLORS.underContract); // Should be "#EF4923"
+
+// Test 3: No orange-500 classes in DOM
+const orangeElements = document.querySelectorAll('[class*="orange-500"]');
+console.log('Orange-500 elements:', orangeElements.length); // Should be 0
+```
+
+---
+
+## LOGGING
+
+```javascript
+console.log('[BRANDING] Primary color updated to Spyglass Red-Orange #EF4923');
+console.log('[BRANDING] Under Contract status color:', STATUS_COLORS.underContract);
+console.log('[BRANDING] CSS --primary variable:', 
+  getComputedStyle(document.documentElement).getPropertyValue('--primary')
+);
+```
+
+---
+
+## COLOR REFERENCE QUICK GUIDE
+
+| Purpose | Correct Value | Tailwind Class |
+|---------|---------------|----------------|
+| **Brand Primary** | `#EF4923` | `bg-[#EF4923]` or `bg-primary` |
+| **Brand Primary Hover** | `#C93B1C` | `hover:bg-[#C93B1C]` |
+| **Brand Light (bg)** | `#FEF2EF` | `bg-[#FEF2EF]` |
+| **Brand Light (100)** | `#FDE5DF` | `bg-[#FDE5DF]` |
+| **Brand Text** | `#EF4923` | `text-[#EF4923]` or `text-primary` |
+| **Brand Text Dark** | `#C93B1C` | `text-[#C93B1C]` |
+| **Brand Black** | `#222222` | `text-[#222222]` |
+| **Under Contract Status** | `#EF4923` | Use `STATUS_COLORS.underContract` |
+
+---
+
+## IMPORTANT NOTES
+
+1. **Logo colors are fixed** - Do not alter logo colors per brand guidelines
+2. **Status colors are semantic** - Subject (blue), Active (green), Closed (red), Pending (gray) remain unchanged
+3. **Only "Under Contract" uses brand orange** - This is intentional to highlight Spyglass branding
+4. **CSS variables preferred** - Use `bg-primary` over `bg-[#EF4923]` where possible for consistency
+
+---
+
+*Based on Official Spyglass Realty Branding Guidelines*
+*Hex: #EF4923 | RGB: rgb(239, 73, 35) | HSL: hsl(11, 85%, 54%)*

@@ -131,7 +131,7 @@ export function CoverPageEditor({
           <div 
             className={`rounded shadow-sm p-4 text-center ${
               config.background === "gradient" 
-                ? "bg-gradient-to-br from-orange-50 to-orange-100" 
+                ? "bg-gradient-to-br from-[#FEF2EF] to-[#FDE5DF]" 
                 : config.background === "property"
                 ? "bg-gray-200"
                 : "bg-white"

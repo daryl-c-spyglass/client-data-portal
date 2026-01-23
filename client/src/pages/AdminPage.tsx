@@ -144,7 +144,7 @@ export default function AdminPage() {
   // Company settings state
   const [companyForm, setCompanyForm] = useState<CompanySettings>({
     companyName: "Spyglass Realty",
-    primaryColor: "#F97316",
+    primaryColor: "#EF4923",
     secondaryColor: "#1E3A5F",
     accentColor: "#FFFFFF",
   });
@@ -186,7 +186,7 @@ export default function AdminPage() {
         description: companySettings.description || '',
         whatIsCmaContent: companySettings.whatIsCmaContent || '',
         ourCompanyContent: companySettings.ourCompanyContent || '',
-        primaryColor: companySettings.primaryColor || "#F97316",
+        primaryColor: companySettings.primaryColor || "#EF4923",
         secondaryColor: companySettings.secondaryColor || "#1E3A5F",
         accentColor: companySettings.accentColor || "#FFFFFF",
       };
@@ -482,11 +482,11 @@ export default function AdminPage() {
                       <div className="flex gap-2">
                         <div 
                           className="w-10 h-10 rounded border" 
-                          style={{ backgroundColor: companyForm.primaryColor || '#F97316' }}
+                          style={{ backgroundColor: companyForm.primaryColor || '#EF4923' }}
                         />
                         <Input 
                           id="primaryColor"
-                          placeholder="#F97316" 
+                          placeholder="#EF4923" 
                           value={companyForm.primaryColor || ''}
                           onChange={(e) => setCompanyForm(prev => ({ ...prev, primaryColor: e.target.value }))}
                           data-testid="input-primary-color" 

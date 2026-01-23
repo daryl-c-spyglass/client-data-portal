@@ -86,8 +86,8 @@ export default function Analytics() {
 
         <Card className="opacity-75">
           <CardHeader className="flex flex-row items-center gap-3 space-y-0 pb-2">
-            <div className="p-2 bg-orange-100 dark:bg-orange-900/30 rounded-lg">
-              <DollarSign className="h-5 w-5 text-orange-600 dark:text-orange-400" />
+            <div className="p-2 bg-[#FEF2EF] dark:bg-[#EF4923]/20 rounded-lg">
+              <DollarSign className="h-5 w-5 text-[#EF4923] dark:text-[#F97B5C]" />
             </div>
             <div>
               <CardTitle className="text-base">Commission Tracker</CardTitle>

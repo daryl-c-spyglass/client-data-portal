@@ -283,7 +283,7 @@ function createPopup(property: PropertyLocation, isSubject: boolean): mapboxgl.P
       <div style="font-size: 12px; color: #6b7280; margin-bottom: 4px;">
         ${isSubject ? 'Subject Property' : property.status}
       </div>
-      <div style="font-size: 14px; font-weight: 500; color: #ea580c;">
+      <div style="font-size: 14px; font-weight: 500; color: #EF4923;">
         ${formattedPrice}
       </div>
     </div>

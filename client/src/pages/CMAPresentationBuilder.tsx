@@ -323,7 +323,7 @@ export default function CMAPresentationBuilder() {
       if (response.status === 403 || response.status === 404) {
         return {
           companyName: "Spyglass Realty",
-          primaryColor: "#F97316",
+          primaryColor: "#EF4923",
           secondaryColor: "#1E3A5F",
           accentColor: "#FFFFFF",
         } as CompanySettings;
@@ -1215,7 +1215,7 @@ export default function CMAPresentationBuilder() {
                       <div 
                         className={`text-center space-y-4 p-4 rounded-md ${
                           coverPageConfig.background === "gradient" 
-                            ? "bg-gradient-to-br from-orange-50 to-orange-100" 
+                            ? "bg-gradient-to-br from-[#FEF2EF] to-[#FDE5DF]" 
                             : coverPageConfig.background === "property"
                             ? "bg-gray-200"
                             : ""
@@ -1727,7 +1727,7 @@ export default function CMAPresentationBuilder() {
               <div 
                 className={`text-center space-y-4 p-4 rounded-md ${
                   coverPageConfig.background === "gradient" 
-                    ? "bg-gradient-to-br from-orange-50 to-orange-100" 
+                    ? "bg-gradient-to-br from-[#FEF2EF] to-[#FDE5DF]" 
                     : coverPageConfig.background === "property"
                     ? "bg-gray-200"
                     : ""
