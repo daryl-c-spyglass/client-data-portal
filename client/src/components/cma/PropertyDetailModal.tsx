@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
 import { ChevronLeft, ChevronRight, Home } from 'lucide-react';
-import { Dialog, DialogContent } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
+import { VisuallyHidden } from '@radix-ui/react-visually-hidden';
 import { cn } from '@/lib/utils';
 import { formatPrice, normalizeStatus } from '@/lib/cma-data-utils';
 import type { Property } from '@shared/schema';
@@ -71,7 +72,10 @@ export function PropertyDetailModal({
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="max-w-md p-0 overflow-hidden rounded-xl gap-0" data-testid="modal-property-detail">
+      <DialogContent className="max-w-md p-0 overflow-hidden rounded-xl gap-0" data-testid="modal-property-detail" aria-describedby={undefined}>
+        <VisuallyHidden>
+          <DialogTitle>Property Details</DialogTitle>
+        </VisuallyHidden>
         <div className="p-4 pb-2">
           <div className="flex items-start justify-between gap-2">
             <div className="flex-1 min-w-0">
@@ -120,26 +124,61 @@ export function PropertyDetailModal({
               </div>
             )}
 
-            {/* Navigation Arrows - z-20 ensures visibility above image */}
+            {/* Navigation Arrows - using inline styles to guarantee visibility */}
             {photos.length > 1 && (
               <>
+                {/* LEFT ARROW - Previous Photo */}
                 <button 
                   type="button"
                   onClick={(e) => { e.preventDefault(); e.stopPropagation(); prevPhoto(); }}
-                  className="absolute left-2 top-1/2 -translate-y-1/2 z-20 bg-black/50 hover:bg-black/70 text-white p-2 rounded-full transition-colors"
+                  style={{
+                    position: 'absolute',
+                    left: '8px',
+                    top: '50%',
+                    transform: 'translateY(-50%)',
+                    zIndex: 50,
+                    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+                    borderRadius: '9999px',
+                    padding: '8px',
+                    cursor: 'pointer',
+                    border: 'none',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                  onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = 'rgba(0, 0, 0, 0.7)')}
+                  onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'rgba(0, 0, 0, 0.5)')}
                   aria-label="Previous photo"
                   data-testid="button-photo-prev"
                 >
-                  <ChevronLeft className="w-5 h-5" />
+                  <ChevronLeft style={{ width: '20px', height: '20px', color: 'white' }} />
                 </button>
+                
+                {/* RIGHT ARROW - Next Photo */}
                 <button 
                   type="button"
                   onClick={(e) => { e.preventDefault(); e.stopPropagation(); nextPhoto(); }}
-                  className="absolute right-2 top-1/2 -translate-y-1/2 z-20 bg-black/50 hover:bg-black/70 text-white p-2 rounded-full transition-colors"
+                  style={{
+                    position: 'absolute',
+                    right: '8px',
+                    top: '50%',
+                    transform: 'translateY(-50%)',
+                    zIndex: 50,
+                    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+                    borderRadius: '9999px',
+                    padding: '8px',
+                    cursor: 'pointer',
+                    border: 'none',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                  onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = 'rgba(0, 0, 0, 0.7)')}
+                  onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'rgba(0, 0, 0, 0.5)')}
                   aria-label="Next photo"
                   data-testid="button-photo-next"
                 >
-                  <ChevronRight className="w-5 h-5" />
+                  <ChevronRight style={{ width: '20px', height: '20px', color: 'white' }} />
                 </button>
               </>
             )}

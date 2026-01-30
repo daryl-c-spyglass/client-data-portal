@@ -1,0 +1,341 @@
+# Property Modal Photo Navigation Fix - COMPLETE
+
+## ⚠️ CRITICAL: TESTING REQUIREMENT
+
+**Before declaring this fix complete, you MUST:**
+
+1. Test the modal from **Grid view** - click a property WITH photos
+2. Test the modal from **List view** - click a property WITH photos
+3. Test the modal from **Table view** - click a property WITH photos
+4. Test the modal from **Map view** - click a marker
+5. **Visually confirm BOTH left AND right arrows are visible**
+6. **Click both arrows and confirm they work**
+7. Take a screenshot or describe what you see
+
+**DO NOT declare "fixed" or "updated" without completing these tests.**
+
+---
+
+## ISSUE
+
+Navigation arrows (left/right) for photo carousel are NOT displaying in the Property Detail Modal across all views (Grid, List, Table).
+
+---
+
+## ROOT CAUSE ANALYSIS
+
+Possible reasons arrows aren't showing:
+
+1. **CSS z-index conflict** - Arrows behind the image
+2. **Positioning issue** - `absolute` positioning not relative to correct parent
+3. **Conditional rendering bug** - `photos.length > 1` may be failing
+4. **Import missing** - ChevronLeft/ChevronRight not imported
+5. **Button styling conflict** - Tailwind classes being overridden
+
+---
+
+## FIX: Complete Photo Carousel Component
+
+### File: `client/src/components/cma/PropertyDetailModal.tsx`
+
+**Step 1: Verify imports at top of file:**
+
+```tsx
+import { useState, useEffect } from 'react';
+import { X, ChevronLeft, ChevronRight, Home } from 'lucide-react';
+import { Dialog, DialogContent } from '@/components/ui/dialog';
+import { Badge } from '@/components/ui/badge';
+import { cn } from '@/lib/utils';
+```
+
+**Step 2: Replace the ENTIRE photo carousel section with this:**
+
+```tsx
+{/* ========================================== */}
+{/* PHOTO CAROUSEL - COMPLETE REPLACEMENT      */}
+{/* ========================================== */}
+<div className="relative bg-muted">
+  {/* Main Photo Container */}
+  <div 
+    className="relative w-full"
+    style={{ aspectRatio: '4/3' }}
+  >
+    {photos.length > 0 ? (
+      <>
+        {/* Main Image */}
+        <img 
+          src={photos[currentPhotoIndex]} 
+          alt={`Property photo ${currentPhotoIndex + 1}`}
+          className="absolute inset-0 w-full h-full object-cover"
+        />
+        
+        {/* Photo Counter Badge */}
+        <div className="absolute bottom-3 left-1/2 transform -translate-x-1/2 bg-black bg-opacity-60 text-white text-sm px-3 py-1 rounded-full z-10">
+          {currentPhotoIndex + 1} / {photos.length}
+        </div>
+
+        {/* ====== NAVIGATION ARROWS ====== */}
+        {photos.length > 1 && (
+          <>
+            {/* LEFT ARROW - Previous */}
+            <button 
+              type="button"
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                setCurrentPhotoIndex((prev) => 
+                  prev === 0 ? photos.length - 1 : prev - 1
+                );
+              }}
+              style={{
+                position: 'absolute',
+                left: '8px',
+                top: '50%',
+                transform: 'translateY(-50%)',
+                zIndex: 50,
+                backgroundColor: 'rgba(0, 0, 0, 0.5)',
+                borderRadius: '9999px',
+                padding: '8px',
+                cursor: 'pointer',
+                border: 'none',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+              onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'rgba(0, 0, 0, 0.7)'}
+              onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'rgba(0, 0, 0, 0.5)'}
+              aria-label="Previous photo"
+            >
+              <ChevronLeft style={{ width: '20px', height: '20px', color: 'white' }} />
+            </button>
+            
+            {/* RIGHT ARROW - Next */}
+            <button 
+              type="button"
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                setCurrentPhotoIndex((prev) => 
+                  prev === photos.length - 1 ? 0 : prev + 1
+                );
+              }}
+              style={{
+                position: 'absolute',
+                right: '8px',
+                top: '50%',
+                transform: 'translateY(-50%)',
+                zIndex: 50,
+                backgroundColor: 'rgba(0, 0, 0, 0.5)',
+                borderRadius: '9999px',
+                padding: '8px',
+                cursor: 'pointer',
+                border: 'none',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+              onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'rgba(0, 0, 0, 0.7)'}
+              onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'rgba(0, 0, 0, 0.5)'}
+              aria-label="Next photo"
+            >
+              <ChevronRight style={{ width: '20px', height: '20px', color: 'white' }} />
+            </button>
+          </>
+        )}
+      </>
+    ) : (
+      /* No Photos Placeholder */
+      <div className="absolute inset-0 w-full h-full flex items-center justify-center bg-muted">
+        <Home className="w-16 h-16 text-muted-foreground opacity-30" />
+      </div>
+    )}
+  </div>
+
+  {/* Thumbnail Strip */}
+  {photos.length > 1 && (
+    <div className="flex gap-1 p-2 overflow-x-auto">
+      {photos.slice(0, 12).map((photo: string, idx: number) => (
+        <button
+          key={idx}
+          type="button"
+          onClick={() => setCurrentPhotoIndex(idx)}
+          className={cn(
+            "flex-shrink-0 w-12 h-12 rounded overflow-hidden border-2 transition-all",
+            currentPhotoIndex === idx 
+              ? "border-blue-500 opacity-100" 
+              : "border-transparent opacity-60 hover:opacity-100"
+          )}
+        >
+          <img 
+            src={photo} 
+            alt={`Thumbnail ${idx + 1}`} 
+            className="w-full h-full object-cover" 
+          />
+        </button>
+      ))}
+    </div>
+  )}
+</div>
+```
+
+---
+
+## WHY INLINE STYLES?
+
+Using inline `style={}` instead of Tailwind classes because:
+
+1. **Guarantees rendering** - No CSS specificity conflicts
+2. **z-index: 50** - Ensures arrows are ABOVE everything
+3. **Explicit positioning** - No ambiguity about where arrows appear
+4. **Easy to debug** - Can see exact styles in DevTools
+
+Once confirmed working, can convert back to Tailwind if preferred.
+
+---
+
+## DEBUG LOGGING (Add Temporarily)
+
+Add this inside the component to debug:
+
+```tsx
+// Add at start of component, after photos variable
+useEffect(() => {
+  console.log('[PropertyModal] Photos array:', photos);
+  console.log('[PropertyModal] Photos count:', photos.length);
+  console.log('[PropertyModal] Should show arrows:', photos.length > 1);
+}, [photos]);
+```
+
+Check browser console when opening modal:
+- If photos.length is 0 or 1, arrows won't show (correct behavior)
+- If photos.length > 1 and arrows don't show, there's a rendering issue
+
+---
+
+## ALTERNATIVE: Use Native HTML/CSS
+
+If React/Tailwind issues persist, use pure HTML approach:
+
+```tsx
+{photos.length > 1 && (
+  <div 
+    dangerouslySetInnerHTML={{
+      __html: `
+        <button 
+          id="prev-photo-btn"
+          style="
+            position: absolute;
+            left: 8px;
+            top: 50%;
+            transform: translateY(-50%);
+            z-index: 9999;
+            background: rgba(0,0,0,0.5);
+            border: none;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 24px;
+          "
+        >‹</button>
+        <button 
+          id="next-photo-btn"
+          style="
+            position: absolute;
+            right: 8px;
+            top: 50%;
+            transform: translateY(-50%);
+            z-index: 9999;
+            background: rgba(0,0,0,0.5);
+            border: none;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 24px;
+          "
+        >›</button>
+      `
+    }}
+  />
+)}
+```
+
+(Note: This is a last resort - event handlers would need to be attached via useEffect)
+
+---
+
+## TESTING CHECKLIST (MANDATORY)
+
+### Before declaring complete, verify ALL of the following:
+
+**Grid View Test:**
+- [ ] Open Grid view
+- [ ] Click a property that HAS photos (not the subject without photos)
+- [ ] Modal opens
+- [ ] LEFT arrow visible on left side of photo
+- [ ] RIGHT arrow visible on right side of photo
+- [ ] Click LEFT arrow - photo changes to previous
+- [ ] Click RIGHT arrow - photo changes to next
+- [ ] Photo counter updates (e.g., "2 / 10")
+
+**List View Test:**
+- [ ] Switch to List view
+- [ ] Click a property with photos
+- [ ] Modal opens
+- [ ] BOTH arrows visible
+- [ ] BOTH arrows functional
+
+**Table View Test:**
+- [ ] Switch to Table view
+- [ ] Click a property row with photos
+- [ ] Modal opens
+- [ ] BOTH arrows visible
+- [ ] BOTH arrows functional
+
+**Edge Cases:**
+- [ ] Property with 1 photo - NO arrows (correct)
+- [ ] Property with 0 photos - Home icon placeholder shown
+- [ ] Subject property (may have no photos) - handled gracefully
+
+---
+
+## VERIFICATION SCREENSHOTS REQUIRED
+
+After implementing, provide:
+
+1. Screenshot of modal showing BOTH arrows visible
+2. Confirmation that clicking arrows changes photos
+
+---
+
+## FILES TO MODIFY
+
+```
+client/src/components/cma/PropertyDetailModal.tsx
+```
+
+---
+
+## ACCEPTANCE CRITERIA
+
+- [ ] Left arrow visible on modal (for properties with 2+ photos)
+- [ ] Right arrow visible on modal (for properties with 2+ photos)
+- [ ] Left arrow navigates to previous photo
+- [ ] Right arrow navigates to next photo
+- [ ] Arrows work from Grid, List, Table, and Map views
+- [ ] Photo counter updates when navigating
+- [ ] Thumbnails still work
+- [ ] No console errors
+
+---
+
+**⚠️ REMINDER: Test all views before declaring fix complete!**
