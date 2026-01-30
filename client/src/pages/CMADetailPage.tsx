@@ -205,6 +205,26 @@ function PropertyList({ properties, subjectPropertyId }: { properties: Property[
   );
 }
 
+// Helper function to get coordinates from property (tries multiple field paths)
+function getPropertyCoordinates(property: any): [number, number] | null {
+  // Try multiple possible coordinate sources
+  const lat = property?.latitude 
+    || property?.map?.latitude 
+    || property?.coordinates?.latitude 
+    || property?.address?.latitude
+    || (property?.geo?.lat);
+  const lng = property?.longitude 
+    || property?.map?.longitude 
+    || property?.coordinates?.longitude 
+    || property?.address?.longitude
+    || (property?.geo?.lng);
+  
+  if (lat && lng && !isNaN(Number(lat)) && !isNaN(Number(lng))) {
+    return [Number(lng), Number(lat)]; // Mapbox uses [lng, lat]
+  }
+  return null;
+}
+
 // Map View Component
 function CMAMapView({ 
   properties, 
@@ -221,11 +241,36 @@ function CMAMapView({
   const subjectProperty = properties.find(p => p.id === subjectPropertyId);
   const comparables = properties.filter(p => p.id !== subjectPropertyId);
   
+  // Debug logging for coordinates
+  useEffect(() => {
+    console.log('[CMAMap] Properties count:', properties.length);
+    console.log('[CMAMap] Subject property:', subjectProperty?.id, getPropertyCoordinates(subjectProperty));
+    properties.forEach((p, i) => {
+      const coords = getPropertyCoordinates(p);
+      console.log(`[CMAMap] Property ${i}:`, p.id, coords, getPropertyAddress(p));
+    });
+  }, [properties, subjectProperty]);
+  
   useEffect(() => {
     if (!mapContainer.current || map.current) return;
     
-    const centerLat = subjectProperty?.latitude ? Number(subjectProperty.latitude) : 30.2672;
-    const centerLng = subjectProperty?.longitude ? Number(subjectProperty.longitude) : -97.7431;
+    // Try to get center from subject property or first property with coordinates
+    const subjectCoords = getPropertyCoordinates(subjectProperty);
+    let centerLng = -97.7431; // Default to Austin
+    let centerLat = 30.2672;
+    
+    if (subjectCoords) {
+      [centerLng, centerLat] = subjectCoords;
+    } else {
+      // Find first property with coordinates
+      for (const p of properties) {
+        const coords = getPropertyCoordinates(p);
+        if (coords) {
+          [centerLng, centerLat] = coords;
+          break;
+        }
+      }
+    }
     
     map.current = new mapboxgl.Map({
       container: mapContainer.current,
@@ -286,11 +331,16 @@ function CMAMapView({
     markersRef.current.forEach(m => m.remove());
     markersRef.current = [];
     
-    if (subjectProperty && subjectProperty.latitude && subjectProperty.longitude) {
+    const bounds = new mapboxgl.LngLatBounds();
+    let hasMarkers = false;
+    
+    // Add subject property marker
+    const subjectCoords = getPropertyCoordinates(subjectProperty);
+    if (subjectProperty && subjectCoords) {
       const price = getPropertyPrice(subjectProperty);
       const subjectEl = createMarkerElement(subjectProperty.standardStatus || 'Active', price, true);
       const marker = new mapboxgl.Marker({ element: subjectEl })
-        .setLngLat([Number(subjectProperty.longitude), Number(subjectProperty.latitude)])
+        .setLngLat(subjectCoords)
         .setPopup(new mapboxgl.Popup({ offset: 25 }).setHTML(`
           <div class="p-2">
             <p class="font-bold" style="color: ${STATUS_COLORS.subject.hex}">SUBJECT PROPERTY</p>
@@ -301,15 +351,23 @@ function CMAMapView({
         `))
         .addTo(map.current);
       markersRef.current.push(marker);
+      bounds.extend(subjectCoords);
+      hasMarkers = true;
+      console.log('[CMAMap] Added subject marker at:', subjectCoords);
     }
     
-    comparables.forEach((property) => {
-      if (!property.latitude || !property.longitude) return;
+    // Add comparable property markers
+    comparables.forEach((property, index) => {
+      const coords = getPropertyCoordinates(property);
+      if (!coords) {
+        console.log(`[CMAMap] Property ${index} missing coordinates:`, getPropertyAddress(property));
+        return;
+      }
       
       const price = getPropertyPrice(property);
       const markerEl = createMarkerElement(property.standardStatus || 'Active', price, false);
       const marker = new mapboxgl.Marker({ element: markerEl })
-        .setLngLat([Number(property.longitude), Number(property.latitude)])
+        .setLngLat(coords)
         .setPopup(new mapboxgl.Popup({ offset: 25 }).setHTML(`
           <div class="p-2">
             <p class="font-semibold">${formatCurrency(price)}</p>
@@ -319,19 +377,51 @@ function CMAMapView({
         `))
         .addTo(map.current!);
       markersRef.current.push(marker);
+      bounds.extend(coords);
+      hasMarkers = true;
+      console.log(`[CMAMap] Added marker ${index} at:`, coords);
     });
+    
+    // Fit bounds if we have markers
+    if (hasMarkers && !bounds.isEmpty()) {
+      map.current.fitBounds(bounds, {
+        padding: { top: 50, bottom: 50, left: 50, right: 50 },
+        maxZoom: 14
+      });
+    }
+    
+    console.log('[CMAMap] Total markers added:', markersRef.current.length);
   };
+  
+  // Count properties with valid coordinates
+  const propertiesWithCoords = properties.filter(p => getPropertyCoordinates(p) !== null).length;
+  const missingCoordsCount = properties.length - propertiesWithCoords;
   
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <p className="text-sm text-muted-foreground">
-          {comparables.length} comparables + Subject Property
+          {propertiesWithCoords} of {properties.length} properties with map coordinates
         </p>
+        {missingCoordsCount > 0 && (
+          <p className="text-sm text-amber-600 dark:text-amber-400">
+            {missingCoordsCount} properties missing coordinates
+          </p>
+        )}
       </div>
       
       <div className="relative rounded-lg overflow-hidden border">
         <div ref={mapContainer} className="h-[500px] w-full" data-testid="cma-map-container" />
+        
+        {propertiesWithCoords === 0 && (
+          <div className="absolute inset-0 flex items-center justify-center bg-black/50">
+            <div className="bg-white dark:bg-gray-800 rounded-lg p-4 text-center shadow-lg">
+              <Map className="w-8 h-8 mx-auto mb-2 text-muted-foreground" />
+              <p className="font-medium">No coordinates available</p>
+              <p className="text-sm text-muted-foreground">Properties in this CMA don't have location data</p>
+            </div>
+          </div>
+        )}
         
         <div className="absolute bottom-4 left-4 bg-white dark:bg-gray-900 rounded-lg shadow-lg p-3 text-sm">
           <p className="font-medium mb-2">Legend</p>
@@ -1269,64 +1359,47 @@ Best regards`;
       {/* Comparable Properties Card - Clean Design */}
       <Card className="overflow-hidden print:hidden">
         <CardContent className="p-6">
-          {/* Header with title, count, nearby indicator, and toggles */}
-          <div className="flex flex-col gap-4 mb-4">
-            <div className="flex items-center justify-between flex-wrap gap-4">
-              <div className="flex items-center gap-3 flex-wrap">
-                <h2 className="text-lg font-semibold" data-testid="text-comparable-title">Comparable Properties</h2>
-                <span className="text-muted-foreground">·</span>
-                <span className="text-muted-foreground" data-testid="text-property-count">{properties.length} properties</span>
-              </div>
-              
-              {/* Action buttons */}
-              <div className="flex items-center gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={handleRefreshMLS}
-                  disabled={isRefreshing}
-                  data-testid="button-refresh-mls"
-                >
-                  <RefreshCw className={`w-4 h-4 mr-2 ${isRefreshing ? 'animate-spin' : ''}`} />
-                  Refresh MLS Data
-                </Button>
-              </div>
+          {/* Header with title, count, and view toggle on the right */}
+          <div className="flex items-center justify-between flex-wrap gap-4 mb-4">
+            {/* Left side - Title and count */}
+            <div className="flex items-center gap-3 flex-wrap">
+              <h2 className="text-lg font-semibold" data-testid="text-comparable-title">Comparable Properties</h2>
+              <span className="text-muted-foreground">·</span>
+              <span className="text-muted-foreground" data-testid="text-property-count">{properties.length} properties</span>
             </div>
             
-            {/* View Toggle - pill style using Button components */}
-            <div className="flex items-center justify-between flex-wrap gap-4">
-              <div className="flex items-center gap-1 bg-muted rounded-lg p-1">
-                <Button
-                  variant={comparableView === 'compare' ? 'secondary' : 'ghost'}
-                  size="sm"
-                  onClick={() => setComparableView('compare')}
-                  className={comparableView === 'compare' ? 'shadow-sm' : ''}
-                  data-testid="button-view-compare"
-                >
-                  <BarChart3 className="w-4 h-4 mr-1" />
-                  Compare
-                </Button>
-                <Button
-                  variant={comparableView === 'map' ? 'secondary' : 'ghost'}
-                  size="sm"
-                  onClick={() => setComparableView('map')}
-                  className={comparableView === 'map' ? 'shadow-sm' : ''}
-                  data-testid="button-view-map"
-                >
-                  <Map className="w-4 h-4 mr-1" />
-                  Map
-                </Button>
-                <Button
-                  variant={comparableView === 'stats' ? 'secondary' : 'ghost'}
-                  size="sm"
-                  onClick={() => setComparableView('stats')}
-                  className={comparableView === 'stats' ? 'shadow-sm' : ''}
-                  data-testid="button-view-stats"
-                >
-                  <TrendingUp className="w-4 h-4 mr-1" />
-                  Stats
-                </Button>
-              </div>
+            {/* Right side - View Mode Toggle */}
+            <div className="flex items-center gap-1 bg-muted rounded-lg p-1">
+              <Button
+                variant={comparableView === 'compare' ? 'secondary' : 'ghost'}
+                size="sm"
+                onClick={() => setComparableView('compare')}
+                className={comparableView === 'compare' ? 'shadow-sm' : ''}
+                data-testid="button-view-compare"
+              >
+                <BarChart3 className="w-4 h-4 mr-1" />
+                Compare
+              </Button>
+              <Button
+                variant={comparableView === 'map' ? 'secondary' : 'ghost'}
+                size="sm"
+                onClick={() => setComparableView('map')}
+                className={comparableView === 'map' ? 'shadow-sm' : ''}
+                data-testid="button-view-map"
+              >
+                <Map className="w-4 h-4 mr-1" />
+                Map
+              </Button>
+              <Button
+                variant={comparableView === 'stats' ? 'secondary' : 'ghost'}
+                size="sm"
+                onClick={() => setComparableView('stats')}
+                className={comparableView === 'stats' ? 'shadow-sm' : ''}
+                data-testid="button-view-stats"
+              >
+                <TrendingUp className="w-4 h-4 mr-1" />
+                Stats
+              </Button>
             </div>
           </div>
           
