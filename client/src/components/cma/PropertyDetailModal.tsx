@@ -130,7 +130,19 @@ export function PropertyDetailModal({
                 <button
                   type="button"
                   onClick={(e) => { e.preventDefault(); e.stopPropagation(); prevPhoto(); }}
-                  className="absolute left-2 top-1/2 -translate-y-1/2 z-20 bg-black/60 hover:bg-black/80 text-white p-2 rounded-full transition-colors"
+                  style={{
+                    position: 'absolute',
+                    left: '8px',
+                    top: '50%',
+                    transform: 'translateY(-50%)',
+                    zIndex: 50,
+                    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+                    color: 'white',
+                    padding: '8px',
+                    borderRadius: '9999px',
+                    border: 'none',
+                    cursor: 'pointer',
+                  }}
                   data-testid="button-photo-prev"
                   aria-label="Previous photo"
                 >
@@ -139,7 +151,19 @@ export function PropertyDetailModal({
                 <button
                   type="button"
                   onClick={(e) => { e.preventDefault(); e.stopPropagation(); nextPhoto(); }}
-                  className="absolute right-2 top-1/2 -translate-y-1/2 z-20 bg-black/60 hover:bg-black/80 text-white p-2 rounded-full transition-colors"
+                  style={{
+                    position: 'absolute',
+                    right: '8px',
+                    top: '50%',
+                    transform: 'translateY(-50%)',
+                    zIndex: 50,
+                    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+                    color: 'white',
+                    padding: '8px',
+                    borderRadius: '9999px',
+                    border: 'none',
+                    cursor: 'pointer',
+                  }}
                   data-testid="button-photo-next"
                   aria-label="Next photo"
                 >
