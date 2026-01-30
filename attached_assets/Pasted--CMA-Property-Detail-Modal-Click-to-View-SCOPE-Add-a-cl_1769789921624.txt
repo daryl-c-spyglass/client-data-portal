@@ -1,0 +1,535 @@
+# CMA Property Detail Modal - Click to View
+
+## SCOPE
+
+Add a clickable property detail modal that opens when any property is clicked in Grid, List, or Table view. The modal displays comprehensive property information with a photo carousel.
+
+---
+
+## MODAL DESIGN (From Screenshot)
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│ 461 Leaning Rock RDG, Austin, TX            [1.0 mi away]✕ │
+│ MLS# ACT3266501                                             │
+├─────────────────────────────────────────────────────────────┤
+│ ┌─────────────────────────────────────────────────────────┐ │
+│ │                    [Main Photo]                         │ │
+│ │                       1 / 10                            │ │
+│ └─────────────────────────────────────────────────────────┘ │
+│ [thumb1] [thumb2] [thumb3] [thumb4] [thumb5] [thumb6] ...   │
+├─────────────────────────────────────────────────────────────┤
+│ Price              Price/SqFt                               │
+│ $872,900           $283                                     │
+│                                                             │
+│ Bedrooms           Bathrooms                                │
+│ 4                  5                                        │
+│                                                             │
+│ Square Feet        Days on Market                           │
+│ 3,080              199                                      │
+│                                                             │
+│ Status             List Date                                │
+│ [Closed]           Jun 10, 2025                             │
+└─────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## TASK 1: Create Property Detail Modal Component
+
+### File: `client/src/components/cma/PropertyDetailModal.tsx`
+
+```tsx
+import { useState, useEffect } from 'react';
+import { X, ChevronLeft, ChevronRight, Home } from 'lucide-react';
+import { Dialog, DialogContent } from '@/components/ui/dialog';
+import { Badge } from '@/components/ui/badge';
+import { cn } from '@/lib/utils';
+import { formatPrice, normalizeStatus } from '@/lib/cma-data-utils';
+
+interface PropertyDetailModalProps {
+  property: any;
+  subjectProperty?: any;
+  isOpen: boolean;
+  onClose: () => void;
+}
+
+export function PropertyDetailModal({ 
+  property, 
+  subjectProperty,
+  isOpen, 
+  onClose 
+}: PropertyDetailModalProps) {
+  const [currentPhotoIndex, setCurrentPhotoIndex] = useState(0);
+  
+  // Reset photo index when property changes
+  useEffect(() => {
+    setCurrentPhotoIndex(0);
+  }, [property?.mlsNumber]);
+
+  if (!property) return null;
+
+  const photos = property.photos || [];
+  const status = normalizeStatus(property.status);
+  const price = property.soldPrice || property.closePrice || property.price || property.listPrice;
+  const sqft = property.sqft || property.livingArea;
+  const pricePerSqft = sqft ? Math.round(price / sqft) : null;
+  
+  // Calculate distance from subject
+  const distance = calculateDistance(property, subjectProperty);
+
+  // Status badge styling
+  const getStatusStyle = (status: string) => {
+    const s = status.toUpperCase();
+    switch (s) {
+      case 'ACTIVE': return 'bg-green-500 text-white';
+      case 'UNDER_CONTRACT': return 'bg-orange-500 text-white';
+      case 'PENDING': return 'bg-gray-500 text-white';
+      case 'SOLD': return 'bg-red-500 text-white';
+      case 'LEASING': return 'bg-purple-500 text-white';
+      default: return 'bg-gray-400 text-white';
+    }
+  };
+
+  const getStatusLabel = (status: string) => {
+    const s = status.toUpperCase();
+    switch (s) {
+      case 'ACTIVE': return 'Active';
+      case 'UNDER_CONTRACT': return 'Active Under Contract';
+      case 'PENDING': return 'Pending';
+      case 'SOLD': return 'Closed';
+      case 'LEASING': return 'Leasing';
+      default: return status;
+    }
+  };
+
+  // Photo navigation
+  const nextPhoto = () => setCurrentPhotoIndex((prev) => (prev + 1) % photos.length);
+  const prevPhoto = () => setCurrentPhotoIndex((prev) => (prev - 1 + photos.length) % photos.length);
+
+  return (
+    <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
+      <DialogContent className="max-w-md p-0 overflow-hidden rounded-xl gap-0">
+        {/* Header */}
+        <div className="p-4 pb-2">
+          <div className="flex items-start justify-between gap-2">
+            <div className="flex-1 min-w-0">
+              <h2 className="text-lg font-semibold leading-tight">
+                {property.address?.split(',')[0] || 'Unknown Address'}
+                {property.address?.includes(',') && (
+                  <span className="text-muted-foreground font-normal">
+                    , {property.address.split(',').slice(1, 3).join(',').trim()}
+                  </span>
+                )}
+              </h2>
+              <p className="text-sm text-muted-foreground mt-0.5">
+                MLS# {property.mlsNumber || 'N/A'}
+              </p>
+            </div>
+            
+            {/* Distance Badge */}
+            {distance && (
+              <Badge variant="outline" className="flex-shrink-0 text-xs whitespace-nowrap">
+                {distance} mi away
+              </Badge>
+            )}
+          </div>
+        </div>
+
+        {/* Photo Carousel */}
+        <div className="relative bg-muted">
+          {/* Main Photo */}
+          <div className="aspect-[4/3] relative">
+            {photos.length > 0 ? (
+              <img 
+                src={photos[currentPhotoIndex]} 
+                alt={`Photo ${currentPhotoIndex + 1}`}
+                className="w-full h-full object-cover"
+              />
+            ) : (
+              <div className="w-full h-full flex items-center justify-center bg-muted">
+                <Home className="w-16 h-16 text-muted-foreground/30" />
+              </div>
+            )}
+            
+            {/* Photo Counter */}
+            {photos.length > 1 && (
+              <div className="absolute bottom-3 left-1/2 -translate-x-1/2 bg-black/60 text-white text-sm px-3 py-1 rounded-full">
+                {currentPhotoIndex + 1} / {photos.length}
+              </div>
+            )}
+
+            {/* Navigation Arrows */}
+            {photos.length > 1 && (
+              <>
+                <button 
+                  onClick={(e) => { e.stopPropagation(); prevPhoto(); }}
+                  className="absolute left-2 top-1/2 -translate-y-1/2 bg-black/50 hover:bg-black/70 text-white p-1.5 rounded-full transition-colors"
+                >
+                  <ChevronLeft className="w-5 h-5" />
+                </button>
+                <button 
+                  onClick={(e) => { e.stopPropagation(); nextPhoto(); }}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 bg-black/50 hover:bg-black/70 text-white p-1.5 rounded-full transition-colors"
+                >
+                  <ChevronRight className="w-5 h-5" />
+                </button>
+              </>
+            )}
+          </div>
+
+          {/* Thumbnail Strip */}
+          {photos.length > 1 && (
+            <div className="flex gap-1 p-2 overflow-x-auto">
+              {photos.slice(0, 12).map((photo: string, idx: number) => (
+                <button
+                  key={idx}
+                  onClick={() => setCurrentPhotoIndex(idx)}
+                  className={cn(
+                    "flex-shrink-0 w-12 h-12 rounded overflow-hidden border-2 transition-all",
+                    currentPhotoIndex === idx 
+                      ? "border-primary opacity-100" 
+                      : "border-transparent opacity-60 hover:opacity-100"
+                  )}
+                >
+                  <img src={photo} alt="" className="w-full h-full object-cover" />
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Property Details */}
+        <div className="p-4 space-y-3">
+          {/* Price Row */}
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <p className="text-xs text-muted-foreground">Price</p>
+              <p className="text-xl font-bold">{formatPrice(price)}</p>
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground">Price/SqFt</p>
+              <p className="text-xl font-bold">{pricePerSqft ? `$${pricePerSqft}` : 'N/A'}</p>
+            </div>
+          </div>
+
+          {/* Beds/Baths Row */}
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <p className="text-xs text-muted-foreground">Bedrooms</p>
+              <p className="text-lg font-semibold">{property.bedrooms || property.beds || 'N/A'}</p>
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground">Bathrooms</p>
+              <p className="text-lg font-semibold">{property.bathrooms || property.baths || 'N/A'}</p>
+            </div>
+          </div>
+
+          {/* Sqft/DOM Row */}
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <p className="text-xs text-muted-foreground">Square Feet</p>
+              <p className="text-lg font-semibold">{sqft?.toLocaleString() || 'N/A'}</p>
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground">Days on Market</p>
+              <p className="text-lg font-semibold">{property.daysOnMarket ?? 'N/A'}</p>
+            </div>
+          </div>
+
+          {/* Status/Date Row */}
+          <div className="grid grid-cols-2 gap-4 pt-2 border-t">
+            <div>
+              <p className="text-xs text-muted-foreground mb-1">Status</p>
+              <Badge className={getStatusStyle(status)}>{getStatusLabel(status)}</Badge>
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground">List Date</p>
+              <p className="text-sm font-medium">
+                {property.listDate 
+                  ? new Date(property.listDate).toLocaleDateString('en-US', { 
+                      month: 'short', day: 'numeric', year: 'numeric' 
+                    })
+                  : 'N/A'
+                }
+              </p>
+            </div>
+          </div>
+
+          {/* Sold Info (if closed) */}
+          {status.toUpperCase() === 'SOLD' && (property.soldDate || property.closeDate) && (
+            <div className="grid grid-cols-2 gap-4 pt-2 border-t">
+              <div>
+                <p className="text-xs text-muted-foreground">Sold Date</p>
+                <p className="text-sm font-medium">
+                  {new Date(property.soldDate || property.closeDate).toLocaleDateString('en-US', { 
+                    month: 'short', day: 'numeric', year: 'numeric' 
+                  })}
+                </p>
+              </div>
+              {property.soldPrice && (
+                <div>
+                  <p className="text-xs text-muted-foreground">Sold Price</p>
+                  <p className="text-sm font-medium">{formatPrice(property.soldPrice)}</p>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// Calculate distance between two properties (Haversine formula)
+function calculateDistance(property: any, subjectProperty: any): string | null {
+  if (!property || !subjectProperty) return null;
+  
+  const getCoords = (p: any) => {
+    if (p.map?.latitude && p.map?.longitude) return { lat: p.map.latitude, lng: p.map.longitude };
+    if (p.latitude && p.longitude) return { lat: p.latitude, lng: p.longitude };
+    if (p.coordinates?.latitude && p.coordinates?.longitude) return { lat: p.coordinates.latitude, lng: p.coordinates.longitude };
+    return null;
+  };
+
+  const propCoords = getCoords(property);
+  const subjectCoords = getCoords(subjectProperty);
+  if (!propCoords || !subjectCoords) return null;
+
+  const R = 3959; // Earth's radius in miles
+  const dLat = (propCoords.lat - subjectCoords.lat) * Math.PI / 180;
+  const dLon = (propCoords.lng - subjectCoords.lng) * Math.PI / 180;
+  const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+    Math.cos(subjectCoords.lat * Math.PI / 180) * Math.cos(propCoords.lat * Math.PI / 180) * 
+    Math.sin(dLon/2) * Math.sin(dLon/2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+  return (R * c).toFixed(1);
+}
+
+export default PropertyDetailModal;
+```
+
+---
+
+## TASK 2: Make Grid View Cards Clickable
+
+Update `PropertyGrid` to accept `onPropertyClick` prop:
+
+```tsx
+interface PropertyGridProps {
+  properties: any[];
+  subjectProperty?: any;
+  onPropertyClick: (property: any) => void;
+}
+
+export function PropertyGrid({ properties, subjectProperty, onPropertyClick }: PropertyGridProps) {
+  // ... existing code ...
+  
+  return (
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+      {/* Subject Property */}
+      {subjectProperty && (
+        <Card 
+          onClick={() => onPropertyClick(subjectProperty)}
+          className="overflow-hidden cursor-pointer hover:shadow-lg hover:scale-[1.02] transition-all ring-2 ring-blue-500"
+        >
+          {/* ... card content ... */}
+        </Card>
+      )}
+      
+      {/* Comparable Properties */}
+      {properties.map((property) => (
+        <Card 
+          key={property.mlsNumber}
+          onClick={() => onPropertyClick(property)}
+          className="overflow-hidden cursor-pointer hover:shadow-lg hover:scale-[1.02] transition-all"
+        >
+          {/* ... card content ... */}
+        </Card>
+      ))}
+    </div>
+  );
+}
+```
+
+---
+
+## TASK 3: Make List View Items Clickable
+
+Update `PropertyList` to accept `onPropertyClick` prop:
+
+```tsx
+interface PropertyListProps {
+  properties: any[];
+  subjectProperty?: any;
+  onPropertyClick: (property: any) => void;
+}
+
+export function PropertyList({ properties, subjectProperty, onPropertyClick }: PropertyListProps) {
+  return (
+    <div className="space-y-3">
+      {properties.map((property) => (
+        <div 
+          key={property.mlsNumber}
+          onClick={() => onPropertyClick(property)}
+          className="flex gap-4 p-4 border rounded-lg cursor-pointer hover:bg-muted/50 hover:shadow-md transition-all"
+        >
+          {/* ... list item content ... */}
+        </div>
+      ))}
+    </div>
+  );
+}
+```
+
+---
+
+## TASK 4: Make Table View Rows Clickable
+
+Update table rows to accept click handler:
+
+```tsx
+interface PropertyTableProps {
+  properties: any[];
+  subjectProperty?: any;
+  onPropertyClick: (property: any) => void;
+}
+
+// In table body:
+<tr 
+  key={property.mlsNumber}
+  onClick={() => onPropertyClick(property)}
+  className="border-b cursor-pointer hover:bg-muted/50 transition-colors"
+>
+  {/* ... row cells ... */}
+</tr>
+```
+
+---
+
+## TASK 5: Integrate Modal in Parent Component
+
+### Update `CMADetailPage.tsx`:
+
+```tsx
+import { useState } from 'react';
+import { PropertyDetailModal } from '@/components/cma/PropertyDetailModal';
+
+export default function CMADetailPage() {
+  // ... existing state ...
+  
+  // Modal state
+  const [selectedProperty, setSelectedProperty] = useState<any>(null);
+
+  const handlePropertyClick = (property: any) => {
+    setSelectedProperty(property);
+  };
+
+  const handleCloseModal = () => {
+    setSelectedProperty(null);
+  };
+
+  return (
+    <div>
+      {/* ... header, filters, stats bar ... */}
+
+      {/* Property Views */}
+      {viewMode === 'compare' && (
+        <>
+          {displayType === 'grid' && (
+            <PropertyGrid 
+              properties={filteredProperties}
+              subjectProperty={cma?.subjectPropertyData}
+              onPropertyClick={handlePropertyClick}
+            />
+          )}
+          {displayType === 'list' && (
+            <PropertyList 
+              properties={filteredProperties}
+              subjectProperty={cma?.subjectPropertyData}
+              onPropertyClick={handlePropertyClick}
+            />
+          )}
+          {displayType === 'table' && (
+            <PropertyTable 
+              properties={filteredProperties}
+              subjectProperty={cma?.subjectPropertyData}
+              onPropertyClick={handlePropertyClick}
+            />
+          )}
+        </>
+      )}
+
+      {viewMode === 'map' && (
+        <CMAMapView 
+          properties={filteredProperties}
+          subjectProperty={cma?.subjectPropertyData}
+          onPropertyClick={handlePropertyClick}
+        />
+      )}
+
+      {/* Property Detail Modal */}
+      <PropertyDetailModal 
+        property={selectedProperty}
+        subjectProperty={cma?.subjectPropertyData}
+        isOpen={!!selectedProperty}
+        onClose={handleCloseModal}
+      />
+    </div>
+  );
+}
+```
+
+---
+
+## ACCEPTANCE CRITERIA
+
+### Modal:
+- [ ] Opens when clicking any property (Grid, List, Table, Map)
+- [ ] Displays full address with city, state
+- [ ] Displays MLS number
+- [ ] Displays "X.X mi away" distance badge
+- [ ] Photo carousel with main image
+- [ ] Photo counter shows "X / Y"
+- [ ] Left/Right arrows navigate photos
+- [ ] Thumbnail strip below main photo (scrollable)
+- [ ] Click thumbnail to jump to that photo
+- [ ] Displays Price and Price/SqFt
+- [ ] Displays Bedrooms and Bathrooms
+- [ ] Displays Square Feet and Days on Market
+- [ ] Displays Status badge (color-coded)
+- [ ] Displays List Date
+- [ ] Displays Sold Date/Price if closed
+- [ ] Click outside or press Escape closes modal
+- [ ] Dark mode compatible
+
+### Grid View:
+- [ ] Cards are clickable (cursor: pointer)
+- [ ] Hover effect: shadow + slight scale
+- [ ] Subject property has blue ring border
+
+### List View:
+- [ ] Rows are clickable
+- [ ] Hover effect: background change
+
+### Table View:
+- [ ] Rows are clickable
+- [ ] Hover effect: background change
+
+---
+
+## FILES TO CREATE/MODIFY
+
+```
+client/src/components/cma/
+├── PropertyDetailModal.tsx    [CREATE]
+├── PropertyGrid.tsx           [MODIFY - add onPropertyClick]
+├── PropertyList.tsx           [MODIFY - add onPropertyClick]
+├── PropertyTable.tsx          [MODIFY - add onPropertyClick]
+client/src/pages/
+└── CMADetailPage.tsx          [MODIFY - add modal state]
+```
+
+---
+
+Ready to implement!
