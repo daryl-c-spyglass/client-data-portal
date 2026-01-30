@@ -124,7 +124,7 @@ function PropertyGrid({ properties, subjectPropertyId, onPropertyClick }: { prop
           <Card 
             key={property.id} 
             className={cn(
-              "overflow-hidden cursor-pointer hover:shadow-lg hover:scale-[1.02] transition-all",
+              "overflow-hidden overflow-visible cursor-pointer hover-elevate active-elevate-2 transition-colors",
               isSubject && "ring-2 ring-blue-500"
             )}
             onClick={() => onPropertyClick?.(property)}
@@ -182,7 +182,7 @@ function PropertyList({ properties, subjectPropertyId, onPropertyClick }: { prop
           <div 
             key={property.id}
             className={cn(
-              "flex gap-4 p-4 border rounded-lg cursor-pointer hover:bg-muted/50 hover:shadow-md transition-all",
+              "flex gap-4 p-4 border rounded-lg cursor-pointer hover-elevate active-elevate-2 transition-colors",
               isSubject && "ring-2 ring-blue-500"
             )}
             onClick={() => onPropertyClick?.(property)}
@@ -1217,6 +1217,7 @@ Best regards`;
                     onModifyStats={handleModifyStats}
                     onAddNotes={handleOpenNotesDialog}
                     onPrint={handlePrint}
+                    onPropertyClick={handlePropertyClick}
                   />
                 )}
               </>

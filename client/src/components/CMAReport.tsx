@@ -60,6 +60,7 @@ interface CMAReportProps {
   onModifyStats?: () => void;
   onAddNotes?: () => void;
   onPrint?: () => void;
+  onPropertyClick?: (property: Property) => void;
 }
 
 const ALL_METRICS: StatMetricKey[] = ['price', 'pricePerSqFt', 'daysOnMarket', 'livingArea', 'lotSize', 'acres', 'bedrooms', 'bathrooms', 'yearBuilt'];
@@ -80,7 +81,8 @@ export function CMAReport({
   onModifySearch,
   onModifyStats,
   onAddNotes,
-  onPrint
+  onPrint,
+  onPropertyClick
 }: CMAReportProps) {
   const { theme, resolvedTheme } = useTheme();
   const [activeTab, setActiveTab] = useState("compare");
@@ -232,11 +234,15 @@ export function CMAReport({
     return [];
   };
   
-  // Handle property click to open floating card
+  // Handle property click - use external handler if provided, otherwise open internal floating card
   const handlePropertyClick = (property: Property) => {
-    setFloatingCardProperty(property);
-    setCarouselIndex(0);
-    setFloatingCardOpen(true);
+    if (onPropertyClick) {
+      onPropertyClick(property);
+    } else {
+      setFloatingCardProperty(property);
+      setCarouselIndex(0);
+      setFloatingCardOpen(true);
+    }
   };
   
   // Carousel auto-advance
