@@ -12,6 +12,7 @@ import { Link } from "wouter";
 import { CMAReport } from "@/components/CMAReport";
 import { CMAMapView } from "@/components/cma/CMAMapView";
 import { CMAStatsView } from "@/components/cma/CMAStatsView";
+import { PropertyDetailModal } from "@/components/cma/PropertyDetailModal";
 import { useToast } from "@/hooks/use-toast";
 import { 
   Dialog, 
@@ -109,7 +110,7 @@ function getPropertyAddress(property: Property): string {
 }
 
 // Grid View Component
-function PropertyGrid({ properties, subjectPropertyId }: { properties: Property[]; subjectPropertyId?: string | null }) {
+function PropertyGrid({ properties, subjectPropertyId, onPropertyClick }: { properties: Property[]; subjectPropertyId?: string | null; onPropertyClick?: (property: Property) => void }) {
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
       {properties.map((property) => {
@@ -120,7 +121,15 @@ function PropertyGrid({ properties, subjectPropertyId }: { properties: Property[
         const statusColors = STATUS_COLORS[statusKey];
         
         return (
-          <Card key={property.id} className={cn("overflow-hidden", isSubject && "ring-2 ring-blue-500")}>
+          <Card 
+            key={property.id} 
+            className={cn(
+              "overflow-hidden cursor-pointer hover:shadow-lg hover:scale-[1.02] transition-all",
+              isSubject && "ring-2 ring-blue-500"
+            )}
+            onClick={() => onPropertyClick?.(property)}
+            data-testid={`card-property-${property.id}`}
+          >
             <div className="aspect-video bg-muted relative">
               {photos[0] ? (
                 <img 
@@ -159,7 +168,7 @@ function PropertyGrid({ properties, subjectPropertyId }: { properties: Property[
 }
 
 // List View Component
-function PropertyList({ properties, subjectPropertyId }: { properties: Property[]; subjectPropertyId?: string | null }) {
+function PropertyList({ properties, subjectPropertyId, onPropertyClick }: { properties: Property[]; subjectPropertyId?: string | null; onPropertyClick?: (property: Property) => void }) {
   return (
     <div className="space-y-3">
       {properties.map((property) => {
@@ -173,9 +182,11 @@ function PropertyList({ properties, subjectPropertyId }: { properties: Property[
           <div 
             key={property.id}
             className={cn(
-              "flex gap-4 p-4 border rounded-lg hover-elevate transition-colors",
+              "flex gap-4 p-4 border rounded-lg cursor-pointer hover:bg-muted/50 hover:shadow-md transition-all",
               isSubject && "ring-2 ring-blue-500"
             )}
+            onClick={() => onPropertyClick?.(property)}
+            data-testid={`list-property-${property.id}`}
           >
             <div className="w-32 h-24 bg-muted rounded overflow-hidden flex-shrink-0">
               {photos[0] ? (
@@ -269,6 +280,17 @@ export default function CMADetailPage() {
   const [listView, setListView] = useState<'grid' | 'list' | 'table'>('table');
   const [statusFilter, setStatusFilter] = useState<string>('All');
   const [isRefreshing, setIsRefreshing] = useState(false);
+  
+  // Property detail modal state
+  const [selectedProperty, setSelectedProperty] = useState<Property | null>(null);
+  
+  const handlePropertyClick = (property: Property) => {
+    setSelectedProperty(property);
+  };
+  
+  const handleClosePropertyModal = () => {
+    setSelectedProperty(null);
+  };
   
   const toggleMetric = (key: StatMetricKey) => {
     setVisibleMetrics(prev => 
@@ -1145,13 +1167,15 @@ Best regards`;
                 {listView === 'grid' && (
                   <PropertyGrid 
                     properties={statusFilter === 'All' ? properties : properties.filter(p => p.standardStatus === statusFilter)} 
-                    subjectPropertyId={cma.subjectPropertyId} 
+                    subjectPropertyId={cma.subjectPropertyId}
+                    onPropertyClick={handlePropertyClick}
                   />
                 )}
                 {listView === 'list' && (
                   <PropertyList 
                     properties={statusFilter === 'All' ? properties : properties.filter(p => p.standardStatus === statusFilter)} 
-                    subjectPropertyId={cma.subjectPropertyId} 
+                    subjectPropertyId={cma.subjectPropertyId}
+                    onPropertyClick={handlePropertyClick}
                   />
                 )}
                 {listView === 'table' && (
@@ -1202,7 +1226,8 @@ Best regards`;
             {comparableView === 'map' && (
               <CMAMapView 
                 properties={statusFilter === 'All' ? properties : properties.filter(p => p.standardStatus === statusFilter)} 
-                subjectProperty={subjectProperty} 
+                subjectProperty={subjectProperty}
+                onPropertyClick={handlePropertyClick}
               />
             )}
             
@@ -1406,6 +1431,14 @@ Best regards`;
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Property Detail Modal */}
+      <PropertyDetailModal 
+        property={selectedProperty}
+        subjectProperty={subjectProperty}
+        isOpen={!!selectedProperty}
+        onClose={handleClosePropertyModal}
+      />
     </div>
   );
 }
