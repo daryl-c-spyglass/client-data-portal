@@ -279,7 +279,7 @@ export default function CMADetailPage() {
   
   // View state for comparables section
   const [comparableView, setComparableView] = useState<'compare' | 'map' | 'stats'>('compare');
-  const [listView, setListView] = useState<'grid' | 'list' | 'table'>('table');
+  const [listView, setListView] = useState<'grid' | 'list' | 'table'>('grid');
   const [statusFilter, setStatusFilter] = useState<string>('All');
   const [isRefreshing, setIsRefreshing] = useState(false);
   
