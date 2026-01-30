@@ -100,100 +100,76 @@ export function PropertyDetailModal({
           </div>
         </div>
 
-        <div className="relative bg-muted">
-          <div className="aspect-[4/3] relative">
-            {photos.length > 0 ? (
+        {/* Image Carousel - matching CMAReport pattern exactly */}
+        <div className="relative aspect-[4/3] bg-muted overflow-hidden">
+          {photos.length > 0 ? (
+            <>
               <img 
                 src={photos[currentPhotoIndex]} 
                 alt={`Photo ${currentPhotoIndex + 1}`}
                 className="w-full h-full object-cover"
                 data-testid="img-property-photo"
               />
-            ) : (
-              <div className="w-full h-full flex items-center justify-center bg-muted">
-                <Home className="w-16 h-16 text-muted-foreground/30" />
-              </div>
-            )}
-            
-            {photos.length > 1 && (
-              <div 
-                className="absolute bottom-3 left-1/2 -translate-x-1/2 bg-black/60 text-white text-sm px-3 py-1 rounded-full"
-                data-testid="text-photo-counter"
-              >
-                {currentPhotoIndex + 1} / {photos.length}
-              </div>
-            )}
-
-            {/* Navigation Arrows */}
-            {photos.length > 1 && (
-              <>
-                <button
-                  type="button"
-                  onClick={(e) => { e.preventDefault(); e.stopPropagation(); prevPhoto(); }}
-                  style={{
-                    position: 'absolute',
-                    left: '8px',
-                    top: '50%',
-                    transform: 'translateY(-50%)',
-                    zIndex: 50,
-                    backgroundColor: 'rgba(0, 0, 0, 0.6)',
-                    color: 'white',
-                    padding: '8px',
-                    borderRadius: '9999px',
-                    border: 'none',
-                    cursor: 'pointer',
-                  }}
-                  data-testid="button-photo-prev"
-                  aria-label="Previous photo"
-                >
-                  <ChevronLeft className="w-5 h-5" />
-                </button>
-                <button
-                  type="button"
-                  onClick={(e) => { e.preventDefault(); e.stopPropagation(); nextPhoto(); }}
-                  style={{
-                    position: 'absolute',
-                    right: '8px',
-                    top: '50%',
-                    transform: 'translateY(-50%)',
-                    zIndex: 50,
-                    backgroundColor: 'rgba(0, 0, 0, 0.6)',
-                    color: 'white',
-                    padding: '8px',
-                    borderRadius: '9999px',
-                    border: 'none',
-                    cursor: 'pointer',
-                  }}
-                  data-testid="button-photo-next"
-                  aria-label="Next photo"
-                >
-                  <ChevronRight className="w-5 h-5" />
-                </button>
-              </>
-            )}
-          </div>
-
-          {photos.length > 1 && (
-            <div className="flex gap-1 p-2 overflow-x-auto bg-muted/30">
-              {photos.slice(0, 12).map((photo: string, idx: number) => (
-                <button
-                  key={idx}
-                  type="button"
-                  onClick={() => setCurrentPhotoIndex(idx)}
-                  className={cn(
-                    "flex-shrink-0 w-12 h-12 rounded overflow-hidden border-2 transition-all",
-                    currentPhotoIndex === idx 
-                      ? "border-primary opacity-100" 
-                      : "border-transparent opacity-60 hover:opacity-100"
-                  )}
-                  data-testid={`button-thumbnail-${idx}`}
-                >
-                  <img src={photo} alt="" className="w-full h-full object-cover" />
-                </button>
-              ))}
+              {/* Carousel Controls - Click zones for navigation (full height, invisible background) */}
+              {photos.length > 1 && (
+                <>
+                  {/* Left click zone - covers left half */}
+                  <div 
+                    className="absolute left-0 top-0 w-1/2 h-full cursor-pointer z-10 group"
+                    onClick={(e) => { e.stopPropagation(); prevPhoto(); }}
+                    data-testid="zone-photo-prev"
+                  >
+                    <div className="absolute left-3 top-1/2 -translate-y-1/2 bg-black/50 hover:bg-black/70 text-white p-2 rounded-full transition-all opacity-70 group-hover:opacity-100">
+                      <ChevronLeft className="w-5 h-5" />
+                    </div>
+                  </div>
+                  {/* Right click zone - covers right half */}
+                  <div 
+                    className="absolute right-0 top-0 w-1/2 h-full cursor-pointer z-10 group"
+                    onClick={(e) => { e.stopPropagation(); nextPhoto(); }}
+                    data-testid="zone-photo-next"
+                  >
+                    <div className="absolute right-3 top-1/2 -translate-y-1/2 bg-black/50 hover:bg-black/70 text-white p-2 rounded-full transition-all opacity-70 group-hover:opacity-100">
+                      <ChevronRight className="w-5 h-5" />
+                    </div>
+                  </div>
+                </>
+              )}
+              {/* Photo Count - centered at bottom */}
+              {photos.length > 1 && (
+                <div className="absolute bottom-3 left-1/2 -translate-x-1/2 bg-black/60 text-white text-sm px-3 py-1 rounded-full">
+                  {currentPhotoIndex + 1} / {photos.length}
+                </div>
+              )}
+            </>
+          ) : (
+            <div className="w-full h-full flex items-center justify-center bg-muted">
+              <Home className="w-16 h-16 text-muted-foreground/30" />
             </div>
           )}
         </div>
+
+        {/* Thumbnail Strip */}
+        {photos.length > 1 && (
+          <div className="flex gap-1 p-2 overflow-x-auto bg-muted/30">
+            {photos.slice(0, 12).map((photo: string, idx: number) => (
+              <button
+                key={idx}
+                type="button"
+                onClick={() => setCurrentPhotoIndex(idx)}
+                className={cn(
+                  "flex-shrink-0 w-12 h-12 rounded overflow-hidden border-2 transition-all",
+                  currentPhotoIndex === idx 
+                    ? "border-primary opacity-100" 
+                    : "border-transparent opacity-60 hover:opacity-100"
+                )}
+                data-testid={`button-thumbnail-${idx}`}
+              >
+                <img src={photo} alt="" className="w-full h-full object-cover" />
+              </button>
+            ))}
+          </div>
+        )}
 
         <div className="p-4 space-y-3">
           <div className="grid grid-cols-2 gap-4">
