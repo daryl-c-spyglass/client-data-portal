@@ -1,0 +1,1500 @@
+# CMA Map & Stats Implementation - Client Data Portal
+
+## SCOPE
+
+Implement the CMA Map and Stats views in Client Data Portal, replicating the functionality from Contract Conduit.
+
+**Source:** Contract Conduit CMA implementation (extracted)
+**Target:** Client Data Portal
+
+---
+
+## PART 1: SHARED UTILITIES
+
+### File: `client/src/lib/cma-data-utils.ts`
+
+Create shared utility functions used by both Map and Stats views:
+
+```typescript
+// ============================================
+// CMA DATA UTILITIES
+// ============================================
+
+// Status types
+export type NormalizedStatus = 'ACTIVE' | 'UNDER_CONTRACT' | 'PENDING' | 'SOLD' | 'LEASING' | 'UNKNOWN';
+
+// Status colors (consistent across map and stats)
+export const STATUS_COLORS: Record<NormalizedStatus, string> = {
+  ACTIVE: '#22c55e',        // Green - For Sale listings
+  UNDER_CONTRACT: '#f97316', // Orange - Has accepted offer
+  PENDING: '#6b7280',        // Gray - Sale pending
+  SOLD: '#ef4444',          // Red - Sale completed
+  LEASING: '#a855f7',       // Purple - Rental/For Rent property
+  UNKNOWN: '#9ca3af',       // Light Gray
+};
+
+export const SUBJECT_COLOR = '#3b82f6'; // Blue
+
+export const STATUS_LABELS: Record<NormalizedStatus, string> = {
+  ACTIVE: 'Active',
+  UNDER_CONTRACT: 'Under Contract',
+  PENDING: 'Pending',
+  SOLD: 'Closed',
+  LEASING: 'Leasing',
+  UNKNOWN: 'Unknown',
+};
+
+// ============================================
+// PRICE EXTRACTION
+// ============================================
+export function extractPrice(comp: any): number | null {
+  const fields = ['soldPrice', 'closePrice', 'price', 'listPrice'];
+  for (const field of fields) {
+    const value = comp?.[field];
+    if (value != null) {
+      const num = typeof value === 'string' 
+        ? parseFloat(value.replace(/[,$]/g, '')) 
+        : Number(value);
+      if (!isNaN(num) && num > 0) return num;
+    }
+  }
+  return null;
+}
+
+// ============================================
+// SQUARE FOOTAGE EXTRACTION
+// ============================================
+export function extractSqft(comp: any): number | null {
+  const fields = ['sqft', 'livingArea', 'squareFeet', 'sqFt', 'size'];
+  for (const field of fields) {
+    const value = comp?.[field];
+    if (value != null) {
+      const cleaned = typeof value === 'string' 
+        ? value.replace(/^["']|["']$/g, '').replace(/,/g, '') 
+        : value;
+      const num = parseFloat(cleaned);
+      if (!isNaN(num) && num > 0) return num;
+    }
+  }
+  return null;
+}
+
+// ============================================
+// COORDINATE EXTRACTION
+// ============================================
+export function getCoordinates(comp: any): { lat: number; lng: number } | null {
+  // Check map object first (Repliers format)
+  if (comp.map?.latitude && comp.map?.longitude) {
+    return { lat: comp.map.latitude, lng: comp.map.longitude };
+  }
+  // Check coordinates object
+  if (comp.coordinates?.latitude && comp.coordinates?.longitude) {
+    return { lat: comp.coordinates.latitude, lng: comp.coordinates.longitude };
+  }
+  // Check direct properties
+  if (comp.latitude && comp.longitude) {
+    return { lat: comp.latitude, lng: comp.longitude };
+  }
+  // Check address object
+  if (comp.address?.latitude && comp.address?.longitude) {
+    return { lat: comp.address.latitude, lng: comp.address.longitude };
+  }
+  return null;
+}
+
+// ============================================
+// STATUS NORMALIZATION
+// ============================================
+export function normalizeStatus(status: string | undefined | null): NormalizedStatus {
+  const statusLower = (status || '').toLowerCase().trim();
+  if (!statusLower) return 'UNKNOWN';
+  
+  // Leasing/Rental FIRST (important for filtering)
+  if (statusLower === 'lsd' || statusLower.includes('leasing') || statusLower.includes('for rent')) {
+    return 'LEASING';
+  }
+  // Closed/Sold
+  if (statusLower === 'sld' || statusLower === 'sold' || statusLower.includes('closed')) {
+    return 'SOLD';
+  }
+  // Pending/Under Contract
+  if (statusLower === 'sc' || statusLower.includes('pending')) {
+    return 'PENDING';
+  }
+  if (statusLower.includes('under contract') || statusLower.includes('active under')) {
+    return 'UNDER_CONTRACT';
+  }
+  // Active
+  if (statusLower === 'a' || statusLower.includes('active')) {
+    return 'ACTIVE';
+  }
+  return 'UNKNOWN';
+}
+
+// ============================================
+// FORMATTING FUNCTIONS
+// ============================================
+export function formatPrice(value: number | null | undefined): string {
+  if (value == null || isNaN(value)) return 'N/A';
+  return new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: 'USD',
+    maximumFractionDigits: 0,
+  }).format(value);
+}
+
+export function formatPriceShort(value: number | null | undefined): string {
+  if (value == null || isNaN(value)) return 'N/A';
+  if (value >= 1000000) return `$${(value / 1000000).toFixed(2)}M`;
+  return `$${Math.round(value / 1000)}K`;
+}
+
+export function formatYAxisPrice(value: number): string {
+  if (value >= 1000000) return `$${(value / 1000000).toFixed(1)}M`;
+  return `$${(value / 1000).toFixed(0)}K`;
+}
+
+// ============================================
+// STATISTICS CALCULATION
+// ============================================
+export interface PropertyStatistics {
+  price: {
+    average: number;
+    median: number;
+    range: { min: number; max: number };
+  };
+  pricePerSqFt: {
+    average: number;
+    median: number;
+    range: { min: number; max: number };
+  };
+  livingArea: {
+    average: number;
+    median: number;
+    range: { min: number; max: number };
+  };
+  daysOnMarket: {
+    average: number;
+    median: number;
+    range: { min: number; max: number };
+  };
+  bedrooms: { average: number };
+  bathrooms: { average: number };
+}
+
+export function calculateStatistics(properties: any[]): PropertyStatistics {
+  const prices = properties.map(p => extractPrice(p)).filter((p): p is number => p !== null);
+  const sqfts = properties.map(p => extractSqft(p)).filter((s): s is number => s !== null);
+  const pricesPerSqft = properties
+    .map(p => {
+      const price = extractPrice(p);
+      const sqft = extractSqft(p);
+      return price && sqft ? price / sqft : null;
+    })
+    .filter((p): p is number => p !== null);
+  const doms = properties.map(p => p.daysOnMarket).filter((d): d is number => d != null && !isNaN(d));
+  const beds = properties.map(p => p.bedrooms || p.beds).filter((b): b is number => b != null);
+  const baths = properties.map(p => p.bathrooms || p.baths).filter((b): b is number => b != null);
+
+  const calcStats = (arr: number[]) => {
+    if (arr.length === 0) return { average: 0, median: 0, range: { min: 0, max: 0 } };
+    const sorted = [...arr].sort((a, b) => a - b);
+    const sum = arr.reduce((a, b) => a + b, 0);
+    const mid = Math.floor(sorted.length / 2);
+    return {
+      average: sum / arr.length,
+      median: sorted.length % 2 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2,
+      range: { min: sorted[0], max: sorted[sorted.length - 1] },
+    };
+  };
+
+  const avg = (arr: number[]) => arr.length ? arr.reduce((a, b) => a + b, 0) / arr.length : 0;
+
+  return {
+    price: calcStats(prices),
+    pricePerSqFt: calcStats(pricesPerSqft),
+    livingArea: calcStats(sqfts),
+    daysOnMarket: calcStats(doms),
+    bedrooms: { average: avg(beds) },
+    bathrooms: { average: avg(baths) },
+  };
+}
+```
+
+---
+
+## PART 2: MAP VIEW
+
+### File: `client/src/components/cma/CMAMapView.tsx`
+
+```typescript
+import { useRef, useEffect, useState, useMemo } from 'react';
+import mapboxgl from 'mapbox-gl';
+import 'mapbox-gl/dist/mapbox-gl.css';
+import * as turf from '@turf/turf';
+import { 
+  STATUS_COLORS, 
+  SUBJECT_COLOR, 
+  STATUS_LABELS, 
+  normalizeStatus, 
+  getCoordinates,
+  extractPrice,
+  formatPriceShort,
+  type NormalizedStatus 
+} from '@/lib/cma-data-utils';
+
+// ============================================
+// INTERFACES
+// ============================================
+interface CMAMapViewProps {
+  properties: any[];
+  subjectProperty: any;
+  onPropertyClick?: (property: any) => void;
+  showPolygon?: boolean;
+  className?: string;
+}
+
+interface CmaPointProperties {
+  id: string;
+  type: 'subject' | 'comp';
+  status: NormalizedStatus;
+  price: number;
+  priceFormatted: string;
+  beds: number | null;
+  baths: number | null;
+  sqft: number | null;
+  address: string;
+  dom: number | null;
+  mlsNumber: string | null;
+  photos: string[];
+}
+
+type CmaPointFeature = GeoJSON.Feature<GeoJSON.Point, CmaPointProperties>;
+
+// ============================================
+// CONSTANTS
+// ============================================
+const MAPBOX_STYLES = {
+  STREETS: 'mapbox://styles/mapbox/streets-v11',
+  SATELLITE: 'mapbox://styles/mapbox/satellite-streets-v11',
+  DARK: 'mapbox://styles/mapbox/dark-v10',
+} as const;
+
+const SOURCE_IDS = {
+  comps: 'cma-comps-source',
+  subject: 'cma-subject-source',
+};
+
+const LAYER_IDS = {
+  clusterCircle: 'cma-cluster-circle',
+  clusterCount: 'cma-cluster-count',
+  compPoints: 'cma-comp-points',
+  compLabels: 'cma-comp-labels',
+  subjectPoint: 'cma-subject-point',
+  subjectLabel: 'cma-subject-label',
+};
+
+// ============================================
+// HELPER FUNCTIONS
+// ============================================
+function buildPropertyFeature(property: any, isSubject: boolean): CmaPointFeature | null {
+  const coords = getCoordinates(property);
+  if (!coords) return null;
+
+  const price = extractPrice(property);
+  const status = normalizeStatus(property.status);
+
+  return {
+    type: 'Feature',
+    geometry: {
+      type: 'Point',
+      coordinates: [coords.lng, coords.lat],
+    },
+    properties: {
+      id: property.mlsNumber || property.id || Math.random().toString(),
+      type: isSubject ? 'subject' : 'comp',
+      status: isSubject ? 'ACTIVE' : status,
+      price: price || 0,
+      priceFormatted: formatPriceShort(price),
+      beds: property.bedrooms || property.beds || null,
+      baths: property.bathrooms || property.baths || null,
+      sqft: property.sqft || property.livingArea || null,
+      address: property.address || 'Unknown Address',
+      dom: property.daysOnMarket || null,
+      mlsNumber: property.mlsNumber || null,
+      photos: property.photos || [],
+    },
+  };
+}
+
+function buildBounds(
+  subjectFeature: CmaPointFeature | null,
+  compFeatures: CmaPointFeature[]
+): [[number, number], [number, number]] | null {
+  const allFeatures = [
+    ...(subjectFeature ? [subjectFeature] : []),
+    ...compFeatures,
+  ];
+  if (allFeatures.length === 0) return null;
+  const collection = turf.featureCollection(allFeatures);
+  const bbox = turf.bbox(collection);
+  return [
+    [bbox[0], bbox[1]],
+    [bbox[2], bbox[3]],
+  ];
+}
+
+// ============================================
+// MAIN COMPONENT
+// ============================================
+export function CMAMapView({ 
+  properties, 
+  subjectProperty, 
+  onPropertyClick,
+  className = '',
+}: CMAMapViewProps) {
+  const mapContainer = useRef<HTMLDivElement>(null);
+  const map = useRef<mapboxgl.Map | null>(null);
+  const [mapLoaded, setMapLoaded] = useState(false);
+  const [mapToken, setMapToken] = useState<string | null>(null);
+  const [mapStyle, setMapStyle] = useState<string>(MAPBOX_STYLES.STREETS);
+
+  // Fetch Mapbox token
+  useEffect(() => {
+    fetch('/api/mapbox-token')
+      .then((res) => res.json())
+      .then((data) => setMapToken(data.token))
+      .catch((err) => console.error('[CMAMap] Error fetching token:', err));
+  }, []);
+
+  // Build GeoJSON data
+  const mapModel = useMemo(() => {
+    const subjectFeature = subjectProperty 
+      ? buildPropertyFeature(subjectProperty, true) 
+      : null;
+    
+    const compFeatures = properties
+      .map(p => buildPropertyFeature(p, false))
+      .filter((f): f is CmaPointFeature => f !== null);
+
+    const bounds = buildBounds(subjectFeature, compFeatures);
+
+    return {
+      subjectFeature,
+      compFeatures,
+      compsCollection: turf.featureCollection(compFeatures),
+      subjectCollection: subjectFeature 
+        ? turf.featureCollection([subjectFeature]) 
+        : turf.featureCollection([]),
+      bounds,
+      propertiesWithCoords: compFeatures.length,
+      propertiesMissingCoords: properties.length - compFeatures.length,
+    };
+  }, [properties, subjectProperty]);
+
+  // Initialize map
+  useEffect(() => {
+    if (!mapContainer.current || !mapToken || map.current) return;
+
+    // Set token
+    mapboxgl.accessToken = mapToken;
+
+    // Determine initial center
+    let initialCenter: [number, number] = [-97.7431, 30.2672]; // Austin default
+    if (mapModel.subjectFeature) {
+      initialCenter = mapModel.subjectFeature.geometry.coordinates as [number, number];
+    } else if (mapModel.compFeatures.length > 0) {
+      initialCenter = mapModel.compFeatures[0].geometry.coordinates as [number, number];
+    }
+
+    // Create map
+    map.current = new mapboxgl.Map({
+      container: mapContainer.current,
+      style: mapStyle,
+      center: initialCenter,
+      zoom: 11,
+    });
+
+    map.current.addControl(new mapboxgl.NavigationControl(), 'top-right');
+
+    map.current.on('load', () => {
+      console.log('[CMAMap] Map loaded');
+      setMapLoaded(true);
+    });
+
+    return () => {
+      map.current?.remove();
+      map.current = null;
+    };
+  }, [mapToken]);
+
+  // Add sources and layers when map is loaded
+  useEffect(() => {
+    if (!map.current || !mapLoaded) return;
+
+    // Remove existing sources/layers if they exist
+    [SOURCE_IDS.comps, SOURCE_IDS.subject].forEach(sourceId => {
+      if (map.current?.getSource(sourceId)) {
+        Object.values(LAYER_IDS).forEach(layerId => {
+          if (map.current?.getLayer(layerId)) {
+            map.current.removeLayer(layerId);
+          }
+        });
+        map.current.removeSource(sourceId);
+      }
+    });
+
+    // Add comparables source with clustering
+    map.current.addSource(SOURCE_IDS.comps, {
+      type: 'geojson',
+      data: mapModel.compsCollection,
+      cluster: true,
+      clusterMaxZoom: 14,
+      clusterRadius: 50,
+      promoteId: 'id',
+    });
+
+    // Add subject source
+    map.current.addSource(SOURCE_IDS.subject, {
+      type: 'geojson',
+      data: mapModel.subjectCollection,
+    });
+
+    // Cluster circles
+    map.current.addLayer({
+      id: LAYER_IDS.clusterCircle,
+      type: 'circle',
+      source: SOURCE_IDS.comps,
+      filter: ['has', 'point_count'],
+      paint: {
+        'circle-color': '#6366f1',
+        'circle-radius': ['step', ['get', 'point_count'], 20, 10, 30, 50, 40],
+        'circle-stroke-width': 2,
+        'circle-stroke-color': '#ffffff',
+      },
+    });
+
+    // Cluster count labels
+    map.current.addLayer({
+      id: LAYER_IDS.clusterCount,
+      type: 'symbol',
+      source: SOURCE_IDS.comps,
+      filter: ['has', 'point_count'],
+      layout: {
+        'text-field': ['get', 'point_count_abbreviated'],
+        'text-font': ['DIN Pro Medium', 'Arial Unicode MS Bold'],
+        'text-size': 12,
+      },
+      paint: {
+        'text-color': '#ffffff',
+      },
+    });
+
+    // Comparable points (status-colored circles)
+    map.current.addLayer({
+      id: LAYER_IDS.compPoints,
+      type: 'circle',
+      source: SOURCE_IDS.comps,
+      filter: ['!', ['has', 'point_count']],
+      paint: {
+        'circle-radius': [
+          'case',
+          ['boolean', ['feature-state', 'hover'], false], 10, 8,
+        ],
+        'circle-color': [
+          'match',
+          ['get', 'status'],
+          'ACTIVE', STATUS_COLORS.ACTIVE,
+          'UNDER_CONTRACT', STATUS_COLORS.UNDER_CONTRACT,
+          'PENDING', STATUS_COLORS.PENDING,
+          'SOLD', STATUS_COLORS.SOLD,
+          'LEASING', STATUS_COLORS.LEASING,
+          STATUS_COLORS.UNKNOWN,
+        ],
+        'circle-stroke-width': 2,
+        'circle-stroke-color': '#ffffff',
+      },
+    });
+
+    // Comparable labels (price + address)
+    map.current.addLayer({
+      id: LAYER_IDS.compLabels,
+      type: 'symbol',
+      source: SOURCE_IDS.comps,
+      filter: ['!', ['has', 'point_count']],
+      layout: {
+        'text-field': [
+          'format',
+          ['get', 'priceFormatted'], { 'font-scale': 1.0 },
+          '\n', {},
+          ['slice', ['get', 'address'], 0, 18], { 'font-scale': 0.85 },
+        ],
+        'text-font': ['DIN Pro Medium', 'Arial Unicode MS Bold'],
+        'text-size': 11,
+        'text-offset': [0, -2.2],
+        'text-anchor': 'bottom',
+        'text-allow-overlap': false,
+      },
+      paint: {
+        'text-color': '#333333',
+        'text-halo-color': '#ffffff',
+        'text-halo-width': 1.5,
+      },
+    });
+
+    // Subject property point (larger, blue)
+    map.current.addLayer({
+      id: LAYER_IDS.subjectPoint,
+      type: 'circle',
+      source: SOURCE_IDS.subject,
+      paint: {
+        'circle-radius': 12,
+        'circle-color': SUBJECT_COLOR,
+        'circle-stroke-width': 3,
+        'circle-stroke-color': '#ffffff',
+      },
+    });
+
+    // Subject label
+    map.current.addLayer({
+      id: LAYER_IDS.subjectLabel,
+      type: 'symbol',
+      source: SOURCE_IDS.subject,
+      layout: {
+        'text-field': [
+          'format',
+          'SUBJECT', { 'font-scale': 0.9 },
+          '\n', {},
+          ['get', 'priceFormatted'], { 'font-scale': 1.0 },
+        ],
+        'text-font': ['DIN Pro Bold', 'Arial Unicode MS Bold'],
+        'text-size': 12,
+        'text-offset': [0, -2.5],
+        'text-anchor': 'bottom',
+      },
+      paint: {
+        'text-color': SUBJECT_COLOR,
+        'text-halo-color': '#ffffff',
+        'text-halo-width': 2,
+      },
+    });
+
+    // Click handlers
+    map.current.on('click', LAYER_IDS.compPoints, (e) => {
+      if (e.features?.[0]?.properties && onPropertyClick) {
+        const props = e.features[0].properties;
+        const property = properties.find(p => 
+          p.mlsNumber === props.mlsNumber || p.id === props.id
+        );
+        if (property) onPropertyClick(property);
+      }
+    });
+
+    // Cursor changes
+    map.current.on('mouseenter', LAYER_IDS.compPoints, () => {
+      if (map.current) map.current.getCanvas().style.cursor = 'pointer';
+    });
+    map.current.on('mouseleave', LAYER_IDS.compPoints, () => {
+      if (map.current) map.current.getCanvas().style.cursor = '';
+    });
+
+    // Fit bounds
+    if (mapModel.bounds) {
+      map.current.fitBounds(mapModel.bounds, {
+        padding: { top: 60, right: 60, bottom: 60, left: 60 },
+        maxZoom: 15,
+        duration: 600,
+      });
+    }
+
+    console.log(`[CMAMap] Added ${mapModel.propertiesWithCoords} markers`);
+
+  }, [mapLoaded, mapModel, properties, onPropertyClick]);
+
+  return (
+    <div className={`space-y-2 ${className}`}>
+      {/* Map info */}
+      <div className="flex items-center justify-between text-sm text-muted-foreground px-1">
+        <span>{mapModel.propertiesWithCoords} comparables + Subject</span>
+        {mapModel.propertiesMissingCoords > 0 && (
+          <span className="text-amber-600">
+            {mapModel.propertiesMissingCoords} properties missing coordinates
+          </span>
+        )}
+      </div>
+
+      {/* Map container */}
+      <div className="relative w-full h-[550px] rounded-lg overflow-hidden border">
+        <div ref={mapContainer} className="w-full h-full touch-manipulation" />
+
+        {/* Legend */}
+        <div className="absolute bottom-4 left-4 bg-background/90 dark:bg-background/95 backdrop-blur rounded-lg p-3 shadow-md border">
+          <p className="text-xs font-medium mb-2">Legend</p>
+          <div className="flex flex-col gap-1.5">
+            <div className="flex items-center gap-2">
+              <div className="w-3 h-3 rounded-full" style={{ backgroundColor: SUBJECT_COLOR }} />
+              <span className="text-xs">Subject Property</span>
+            </div>
+            {Object.entries(STATUS_COLORS).map(([status, color]) => (
+              status !== 'UNKNOWN' && (
+                <div key={status} className="flex items-center gap-2">
+                  <div className="w-3 h-3 rounded-full" style={{ backgroundColor: color }} />
+                  <span className="text-xs">{STATUS_LABELS[status as NormalizedStatus]}</span>
+                </div>
+              )
+            ))}
+          </div>
+        </div>
+
+        {/* Map style toggle (optional) */}
+        <div className="absolute top-4 left-4 flex gap-1 bg-background/90 rounded-lg p-1 shadow-md border">
+          <button
+            onClick={() => {
+              setMapStyle(MAPBOX_STYLES.STREETS);
+              map.current?.setStyle(MAPBOX_STYLES.STREETS);
+            }}
+            className={`px-2 py-1 text-xs rounded ${mapStyle === MAPBOX_STYLES.STREETS ? 'bg-primary text-primary-foreground' : ''}`}
+          >
+            Map
+          </button>
+          <button
+            onClick={() => {
+              setMapStyle(MAPBOX_STYLES.SATELLITE);
+              map.current?.setStyle(MAPBOX_STYLES.SATELLITE);
+            }}
+            className={`px-2 py-1 text-xs rounded ${mapStyle === MAPBOX_STYLES.SATELLITE ? 'bg-primary text-primary-foreground' : ''}`}
+          >
+            Satellite
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+```
+
+---
+
+## PART 3: STATS VIEW
+
+### File: `client/src/components/cma/CMAStatsView.tsx`
+
+```typescript
+import { useMemo, useState } from 'react';
+import { 
+  BarChart, Bar, ScatterChart, Scatter, 
+  XAxis, YAxis, Tooltip, ResponsiveContainer, 
+  CartesianGrid, Cell 
+} from 'recharts';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Home } from 'lucide-react';
+import {
+  calculateStatistics,
+  formatPrice,
+  formatPriceShort,
+  formatYAxisPrice,
+  normalizeStatus,
+  extractPrice,
+  extractSqft,
+  type PropertyStatistics,
+} from '@/lib/cma-data-utils';
+
+// ============================================
+// INTERFACES
+// ============================================
+interface CMAStatsViewProps {
+  properties: any[];
+  subjectProperty: any;
+}
+
+// ============================================
+// MAIN COMPONENT
+// ============================================
+export function CMAStatsView({ properties, subjectProperty }: CMAStatsViewProps) {
+  const statistics = useMemo(() => calculateStatistics(properties), [properties]);
+  
+  const closedProperties = useMemo(() => 
+    properties.filter(p => normalizeStatus(p.status) === 'SOLD'),
+    [properties]
+  );
+
+  return (
+    <div className="space-y-4 pb-4" data-testid="cma-stats-view">
+      {/* Summary Cards */}
+      <SummaryCards statistics={statistics} />
+      
+      {/* Statistics Summary Table */}
+      <StatisticsSummaryTable statistics={statistics} propertyCount={properties.length} />
+      
+      {/* Price Comparison Bar Chart */}
+      <PriceComparisonChart properties={properties} />
+      
+      {/* CMA Market Review */}
+      <CMAMarketReview statistics={statistics} properties={properties} />
+      
+      {/* Days on Market Section (closed only) */}
+      {closedProperties.length > 0 && (
+        <DaysOnMarketSection closedProperties={closedProperties} />
+      )}
+      
+      {/* Average Price/Sq.Ft. Section */}
+      {closedProperties.length > 0 && (
+        <AveragePricePerSqftSection 
+          closedProperties={closedProperties} 
+          subjectProperty={subjectProperty} 
+        />
+      )}
+    </div>
+  );
+}
+
+// ============================================
+// SUMMARY CARDS
+// ============================================
+function SummaryCards({ statistics }: { statistics: PropertyStatistics }) {
+  return (
+    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 px-4">
+      <Card>
+        <CardContent className="pt-4">
+          <div className="text-sm text-muted-foreground">Average Price</div>
+          <div className="text-2xl sm:text-3xl font-bold text-[#EF4923]">
+            {formatPrice(Math.round(statistics.price.average))}
+          </div>
+          <div className="text-sm text-muted-foreground mt-1">
+            Range: {formatPrice(statistics.price.range.min)} - {formatPrice(statistics.price.range.max)}
+          </div>
+        </CardContent>
+      </Card>
+      
+      <Card>
+        <CardContent className="pt-4">
+          <div className="text-sm text-muted-foreground">Price Per Sqft</div>
+          <div className="text-2xl sm:text-3xl font-bold text-[#EF4923]">
+            ${Math.round(statistics.pricePerSqFt.average)}
+            <span className="text-lg text-muted-foreground">/sqft</span>
+          </div>
+          <div className="text-sm text-muted-foreground mt-1">
+            Range: ${Math.round(statistics.pricePerSqFt.range.min)} - ${Math.round(statistics.pricePerSqFt.range.max)}
+          </div>
+        </CardContent>
+      </Card>
+      
+      <Card>
+        <CardContent className="pt-4">
+          <div className="text-sm text-muted-foreground">Avg Living Area</div>
+          <div className="text-2xl sm:text-3xl font-bold">
+            {Math.round(statistics.livingArea.average).toLocaleString()}
+            <span className="text-lg text-muted-foreground"> sqft</span>
+          </div>
+          <div className="text-sm text-muted-foreground mt-1">
+            {statistics.bedrooms.average.toFixed(1)} beds / {statistics.bathrooms.average.toFixed(1)} baths avg
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+// ============================================
+// STATISTICS SUMMARY TABLE
+// ============================================
+function StatisticsSummaryTable({ 
+  statistics, 
+  propertyCount 
+}: { 
+  statistics: PropertyStatistics; 
+  propertyCount: number;
+}) {
+  return (
+    <Card className="mx-4">
+      <CardHeader className="pb-2">
+        <CardTitle className="text-lg">Statistics Summary ({propertyCount} Properties)</CardTitle>
+      </CardHeader>
+      <CardContent>
+        <div className="overflow-x-auto">
+          <table className="w-full">
+            <thead>
+              <tr className="border-b text-left">
+                <th className="py-2 font-medium">Metric</th>
+                <th className="py-2 font-medium">Range</th>
+                <th className="py-2 font-medium">Average</th>
+                <th className="py-2 font-medium">Median</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr className="border-b">
+                <td className="py-3">Price</td>
+                <td>{formatPrice(statistics.price.range.min)} - {formatPrice(statistics.price.range.max)}</td>
+                <td className="font-semibold">{formatPrice(Math.round(statistics.price.average))}</td>
+                <td>{formatPrice(Math.round(statistics.price.median))}</td>
+              </tr>
+              <tr className="border-b">
+                <td className="py-3">Price/SqFt</td>
+                <td>${Math.round(statistics.pricePerSqFt.range.min)} - ${Math.round(statistics.pricePerSqFt.range.max)}</td>
+                <td className="font-semibold">${Math.round(statistics.pricePerSqFt.average)}</td>
+                <td>${Math.round(statistics.pricePerSqFt.median)}</td>
+              </tr>
+              <tr className="border-b">
+                <td className="py-3">Living Area</td>
+                <td>{statistics.livingArea.range.min.toLocaleString()} - {statistics.livingArea.range.max.toLocaleString()} sqft</td>
+                <td className="font-semibold">{Math.round(statistics.livingArea.average).toLocaleString()} sqft</td>
+                <td>{Math.round(statistics.livingArea.median).toLocaleString()} sqft</td>
+              </tr>
+              <tr>
+                <td className="py-3">Days on Market</td>
+                <td>{statistics.daysOnMarket.range.min} - {statistics.daysOnMarket.range.max} days</td>
+                <td className="font-semibold">{Math.round(statistics.daysOnMarket.average)} days</td>
+                <td>{Math.round(statistics.daysOnMarket.median)} days</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+// ============================================
+// PRICE COMPARISON CHART
+// ============================================
+function PriceComparisonChart({ properties }: { properties: any[] }) {
+  const chartData = useMemo(() => {
+    return properties.slice(0, 12).map(p => ({
+      name: p.address?.split(' ').slice(0, 3).join(' ') || 'Unknown',
+      price: extractPrice(p) || 0,
+      fullAddress: p.address || 'Unknown Address',
+    }));
+  }, [properties]);
+
+  return (
+    <Card className="mx-4">
+      <CardHeader className="pb-2">
+        <CardTitle className="text-lg">Price Comparison</CardTitle>
+      </CardHeader>
+      <CardContent>
+        <div className="h-[300px]">
+          <ResponsiveContainer width="100%" height="100%">
+            <BarChart data={chartData} margin={{ bottom: 80 }}>
+              <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+              <XAxis 
+                dataKey="name" 
+                angle={-45} 
+                textAnchor="end" 
+                height={80}
+                tick={{ fontSize: 11 }}
+                interval={0}
+              />
+              <YAxis tickFormatter={formatYAxisPrice} tick={{ fontSize: 11 }} />
+              <Tooltip 
+                formatter={(value: number) => [formatPrice(value), 'Price']}
+                labelFormatter={(label, payload) => payload?.[0]?.payload?.fullAddress || label}
+                contentStyle={{ 
+                  backgroundColor: 'hsl(var(--background))', 
+                  border: '1px solid hsl(var(--border))',
+                  borderRadius: '8px',
+                }}
+              />
+              <Bar 
+                dataKey="price" 
+                fill="#EF4923"
+                radius={[4, 4, 0, 0]} 
+              />
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+// ============================================
+// CMA MARKET REVIEW
+// ============================================
+function CMAMarketReview({ 
+  statistics, 
+  properties 
+}: { 
+  statistics: PropertyStatistics; 
+  properties: any[];
+}) {
+  const closedCount = properties.filter(p => normalizeStatus(p.status) === 'SOLD').length;
+  const activeCount = properties.filter(p => normalizeStatus(p.status) === 'ACTIVE').length;
+  const pendingCount = properties.filter(p => 
+    normalizeStatus(p.status) === 'PENDING' || normalizeStatus(p.status) === 'UNDER_CONTRACT'
+  ).length;
+
+  return (
+    <Card className="mx-4">
+      <CardHeader className="pb-2">
+        <CardTitle className="text-lg">CMA Market Review</CardTitle>
+      </CardHeader>
+      <CardContent>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div>
+            <h4 className="font-medium mb-2">Market Overview</h4>
+            <p className="text-sm text-muted-foreground">
+              Based on {properties.length} comparable properties, the average price is{' '}
+              <span className="font-semibold text-foreground">{formatPrice(Math.round(statistics.price.average))}</span>{' '}
+              with a median of{' '}
+              <span className="font-semibold text-foreground">{formatPrice(Math.round(statistics.price.median))}</span>.
+              Prices range from {formatPrice(statistics.price.range.min)} to {formatPrice(statistics.price.range.max)}.
+            </p>
+          </div>
+          <div>
+            <h4 className="font-medium mb-2">Price Per Square Foot</h4>
+            <p className="text-sm text-muted-foreground">
+              Average price per square foot is{' '}
+              <span className="font-semibold text-foreground">${Math.round(statistics.pricePerSqFt.average)}</span>{' '}
+              across comparable properties. This ranges from ${Math.round(statistics.pricePerSqFt.range.min)} to ${Math.round(statistics.pricePerSqFt.range.max)}/sqft.
+            </p>
+          </div>
+          <div>
+            <h4 className="font-medium mb-2">Days on Market</h4>
+            <p className="text-sm text-muted-foreground">
+              Average: <span className="font-semibold text-foreground">{Math.round(statistics.daysOnMarket.average)} days</span>
+            </p>
+          </div>
+          <div>
+            <h4 className="font-medium mb-2">Property Size</h4>
+            <p className="text-sm text-muted-foreground">
+              Avg: <span className="font-semibold text-foreground">{Math.round(statistics.livingArea.average).toLocaleString()} sqft</span>
+            </p>
+          </div>
+          <div>
+            <h4 className="font-medium mb-2">Bed/Bath</h4>
+            <p className="text-sm text-muted-foreground">
+              Avg: <span className="font-semibold text-foreground">
+                {statistics.bedrooms.average.toFixed(1)} beds / {statistics.bathrooms.average.toFixed(1)} baths
+              </span>
+            </p>
+          </div>
+        </div>
+        
+        <p className="text-sm text-muted-foreground mt-4 pt-4 border-t italic">
+          This analysis is based on {closedCount} Closed, {activeCount} Active, {pendingCount} Pending properties in your selection.
+        </p>
+      </CardContent>
+    </Card>
+  );
+}
+
+// ============================================
+// DAYS ON MARKET SECTION
+// ============================================
+function DaysOnMarketSection({ closedProperties }: { closedProperties: any[] }) {
+  // Calculate averages
+  const avgDOM = closedProperties.length > 0
+    ? Math.round(closedProperties.reduce((sum, p) => sum + (p.daysOnMarket || 0), 0) / closedProperties.length)
+    : 0;
+
+  const avgListPricePercent = useMemo(() => {
+    const withRatio = closedProperties.filter(p => {
+      const soldPrice = p.soldPrice || p.closePrice || p.price;
+      const listPrice = p.listPrice;
+      return soldPrice && listPrice && listPrice > 0;
+    });
+    if (withRatio.length === 0) return 100;
+    const sum = withRatio.reduce((acc, p) => {
+      const soldPrice = p.soldPrice || p.closePrice || p.price;
+      return acc + (soldPrice / p.listPrice) * 100;
+    }, 0);
+    return sum / withRatio.length;
+  }, [closedProperties]);
+
+  // Color based on list price ratio
+  const getColor = (percent: number) => {
+    if (percent >= 100) return '#22c55e';  // Green
+    if (percent >= 95) return '#eab308';   // Yellow
+    return '#ef4444';                       // Red
+  };
+
+  // Chart data
+  const chartData = useMemo(() => {
+    return closedProperties.map(p => {
+      const soldPrice = p.soldPrice || p.closePrice || p.price;
+      const listPrice = p.listPrice || soldPrice;
+      const percent = listPrice > 0 ? (soldPrice / listPrice) * 100 : 100;
+      return {
+        dom: p.daysOnMarket || 0,
+        price: soldPrice,
+        percent,
+        fill: getColor(percent),
+        address: p.address?.split(',')[0] || 'Unknown',
+        photo: p.photos?.[0] || null,
+      };
+    });
+  }, [closedProperties]);
+
+  return (
+    <Card className="mx-4">
+      <CardContent className="pt-4">
+        {/* Header Stats */}
+        <div className="flex flex-wrap items-center gap-4 mb-2">
+          <div>
+            <span className="text-3xl font-bold">{avgDOM}</span>
+            <span className="text-sm font-normal text-muted-foreground ml-2">DAYS ON MARKET</span>
+          </div>
+          <div>
+            <span className="text-3xl font-bold text-[#EF4923]">{avgListPricePercent.toFixed(2)}%</span>
+            <span className="text-sm font-normal text-muted-foreground ml-2">OF LIST PRICE</span>
+          </div>
+        </div>
+        <p className="text-sm text-muted-foreground mb-4">
+          Sold homes were on the market for an average of{' '}
+          <span className="font-semibold text-foreground">{avgDOM} days</span>{' '}
+          before they accepted an offer. These homes sold for an average of{' '}
+          <span className="font-semibold text-foreground">{avgListPricePercent.toFixed(2)}%</span>{' '}
+          of list price.
+        </p>
+
+        <div className="flex flex-col lg:flex-row gap-6">
+          {/* LEFT: Property List */}
+          <div className="lg:w-1/3 flex-shrink-0">
+            <div className="flex items-center gap-2 mb-3">
+              <span className="bg-red-500 text-white text-xs font-medium px-2 py-0.5 rounded">
+                {closedProperties.length}
+              </span>
+              <span className="font-medium">Closed</span>
+            </div>
+            
+            <div className="space-y-2 max-h-[250px] overflow-y-auto pr-2">
+              {chartData.slice(0, 10).map((data, idx) => (
+                <div 
+                  key={idx}
+                  className="flex items-center gap-3 p-2 rounded-lg hover:bg-muted/50 cursor-pointer transition-colors"
+                >
+                  <div className="w-12 h-12 bg-muted rounded overflow-hidden flex-shrink-0">
+                    {data.photo ? (
+                      <img src={data.photo} alt="" className="w-full h-full object-cover" />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center">
+                        <Home className="w-5 h-5 text-muted-foreground" />
+                      </div>
+                    )}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-medium text-sm truncate">{data.address}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {data.dom} Days • {data.percent.toFixed(2)}%
+                    </p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* RIGHT: Scatter Chart */}
+          <div className="lg:w-2/3 h-[250px]">
+            <ResponsiveContainer width="100%" height="100%">
+              <ScatterChart margin={{ top: 20, right: 20, bottom: 40, left: 60 }}>
+                <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                <XAxis 
+                  type="number" 
+                  dataKey="dom" 
+                  name="Days on Market"
+                  tick={{ fontSize: 11 }}
+                  label={{ value: 'Days on Market', position: 'bottom', offset: 20, fontSize: 12 }}
+                />
+                <YAxis 
+                  type="number" 
+                  dataKey="price" 
+                  tickFormatter={formatYAxisPrice}
+                  tick={{ fontSize: 11 }}
+                />
+                <Tooltip 
+                  content={({ payload }) => {
+                    if (!payload?.[0]) return null;
+                    const data = payload[0].payload;
+                    return (
+                      <div className="bg-background p-2 rounded-lg shadow-lg border text-sm">
+                        <p className="font-semibold">{data.address}</p>
+                        <p>Price: {formatPrice(data.price)}</p>
+                        <p>DOM: {data.dom} days</p>
+                        <p>List Ratio: {data.percent.toFixed(2)}%</p>
+                      </div>
+                    );
+                  }}
+                />
+                <Scatter data={chartData}>
+                  {chartData.map((entry, index) => (
+                    <Cell key={index} fill={entry.fill} r={8} />
+                  ))}
+                </Scatter>
+              </ScatterChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+
+        {/* Legend */}
+        <div className="flex flex-wrap justify-center gap-6 mt-4 pt-4 border-t">
+          <div className="flex items-center gap-2">
+            <div className="w-3 h-3 rounded-full bg-green-500" />
+            <span className="text-sm text-muted-foreground">≥100% of list</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <div className="w-3 h-3 rounded-full bg-yellow-500" />
+            <span className="text-sm text-muted-foreground">95-99% of list</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <div className="w-3 h-3 rounded-full bg-red-500" />
+            <span className="text-sm text-muted-foreground">&lt;95% of list</span>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+// ============================================
+// AVERAGE PRICE/SQ.FT. SECTION
+// ============================================
+function AveragePricePerSqftSection({ 
+  closedProperties, 
+  subjectProperty 
+}: { 
+  closedProperties: any[]; 
+  subjectProperty: any;
+}) {
+  const [showSubject, setShowSubject] = useState(true);
+  const [showClosed, setShowClosed] = useState(true);
+
+  // Calculate avg $/sqft for closed properties
+  const avgPricePerSqft = useMemo(() => {
+    const withData = closedProperties.filter(p => {
+      const price = extractPrice(p);
+      const sqft = extractSqft(p);
+      return price && sqft && sqft > 0;
+    });
+    if (withData.length === 0) return 0;
+    const sum = withData.reduce((acc, p) => {
+      const price = extractPrice(p)!;
+      const sqft = extractSqft(p)!;
+      return acc + (price / sqft);
+    }, 0);
+    return Math.round(sum / withData.length);
+  }, [closedProperties]);
+
+  // Subject $/sqft
+  const subjectPricePerSqft = useMemo(() => {
+    const price = extractPrice(subjectProperty);
+    const sqft = extractSqft(subjectProperty);
+    if (!price || !sqft || sqft === 0) return 0;
+    return Math.round(price / sqft);
+  }, [subjectProperty]);
+
+  // Scatter chart data
+  const chartData = useMemo(() => {
+    const data: any[] = [];
+    
+    if (showSubject && subjectProperty) {
+      const sqft = extractSqft(subjectProperty);
+      const price = extractPrice(subjectProperty);
+      if (sqft && price) {
+        data.push({
+          x: sqft,
+          y: price,
+          isSubject: true,
+          address: subjectProperty.address?.split(',')[0] || 'Subject',
+          pricePerSqft: subjectPricePerSqft,
+        });
+      }
+    }
+
+    if (showClosed) {
+      closedProperties.forEach(p => {
+        const sqft = extractSqft(p);
+        const price = extractPrice(p);
+        if (sqft && price) {
+          data.push({
+            x: sqft,
+            y: price,
+            isSubject: false,
+            address: p.address?.split(',')[0] || 'Unknown',
+            pricePerSqft: Math.round(price / sqft),
+          });
+        }
+      });
+    }
+
+    return data;
+  }, [showSubject, showClosed, subjectProperty, closedProperties, subjectPricePerSqft]);
+
+  return (
+    <Card className="mx-4">
+      <CardContent className="pt-4">
+        <div className="font-bold text-lg mb-1">AVERAGE PRICE/SQ. FT.</div>
+        <div className="text-sm text-muted-foreground mb-4">
+          1 Subject, {closedProperties.length} Closed
+        </div>
+
+        <div className="flex flex-col lg:flex-row gap-6">
+          {/* LEFT: Property List */}
+          <div className="lg:w-56 flex-shrink-0">
+            {/* Subject Property */}
+            {subjectProperty && (
+              <div className="flex items-center gap-3 p-2 rounded-lg border-b mb-2 pb-3 ring-2 ring-blue-500/30">
+                <div className="w-12 h-12 bg-muted rounded overflow-hidden flex-shrink-0">
+                  {subjectProperty.photos?.[0] ? (
+                    <img src={subjectProperty.photos[0]} alt="" className="w-full h-full object-cover" />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center">
+                      <Home className="w-5 h-5 text-muted-foreground" />
+                    </div>
+                  )}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs text-blue-500">
+                    Subject: {subjectProperty.address?.split(',')[0]}
+                  </p>
+                  <p className="font-semibold text-[#EF4923]">
+                    ${subjectPricePerSqft} / sq. ft.
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {/* Closed Properties */}
+            <div className="space-y-2 max-h-[300px] overflow-y-auto pr-2">
+              {closedProperties.map((property, idx) => {
+                const price = extractPrice(property);
+                const sqft = extractSqft(property);
+                const pricePerSqft = price && sqft ? Math.round(price / sqft) : 0;
+
+                return (
+                  <div 
+                    key={idx}
+                    className="flex items-center gap-3 p-2 rounded-lg hover:bg-muted/50 cursor-pointer transition-colors"
+                  >
+                    <div className="w-12 h-12 bg-muted rounded overflow-hidden flex-shrink-0">
+                      {property.photos?.[0] ? (
+                        <img src={property.photos[0]} alt="" className="w-full h-full object-cover" />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center">
+                          <Home className="w-5 h-5 text-muted-foreground" />
+                        </div>
+                      )}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-medium text-sm truncate">
+                        {property.address?.split(',')[0]}
+                      </p>
+                      <p className="font-semibold text-[#EF4923]">
+                        ${pricePerSqft} / sq. ft.
+                      </p>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* RIGHT: Stats + Chart */}
+          <div className="flex-1">
+            {/* Big Average Display */}
+            <div className="mb-4">
+              <span className="text-4xl font-bold text-[#EF4923]">${avgPricePerSqft}</span>
+              <span className="text-xl text-muted-foreground ml-1">/ Sq. Ft.</span>
+              <p className="text-sm text-muted-foreground mt-2">
+                Comparable homes sold for an average of{' '}
+                <span className="font-semibold text-[#EF4923]">${avgPricePerSqft}</span>/sq. ft. 
+                Many factors such as location, use of space, condition, quality, and amenities 
+                determine the market value per square foot.
+              </p>
+            </div>
+
+            {/* Scatter Chart */}
+            <div className="h-[250px]">
+              <ResponsiveContainer width="100%" height="100%">
+                <ScatterChart margin={{ top: 20, right: 20, bottom: 40, left: 60 }}>
+                  <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                  <XAxis 
+                    type="number" 
+                    dataKey="x" 
+                    name="Square Feet"
+                    tickFormatter={(v) => v.toLocaleString()}
+                    tick={{ fontSize: 11 }}
+                    label={{ value: 'Square feet', position: 'bottom', offset: 20, fontSize: 12 }}
+                  />
+                  <YAxis 
+                    type="number" 
+                    dataKey="y" 
+                    tickFormatter={formatYAxisPrice}
+                    tick={{ fontSize: 11 }}
+                  />
+                  <Tooltip 
+                    content={({ payload }) => {
+                      if (!payload?.[0]) return null;
+                      const data = payload[0].payload;
+                      return (
+                        <div className="bg-background p-2 rounded-lg shadow-lg border text-sm">
+                          <p className="font-semibold">{data.address}</p>
+                          <p>Price: {formatPrice(data.y)}</p>
+                          <p>Sq Ft: {data.x?.toLocaleString()}</p>
+                          <p>$/SqFt: ${data.pricePerSqft}</p>
+                        </div>
+                      );
+                    }}
+                  />
+                  <Scatter data={chartData}>
+                    {chartData.map((entry, index) => (
+                      <Cell 
+                        key={index} 
+                        fill={entry.isSubject ? '#3b82f6' : '#ef4444'}
+                        r={entry.isSubject ? 12 : 8}
+                      />
+                    ))}
+                  </Scatter>
+                </ScatterChart>
+              </ResponsiveContainer>
+            </div>
+
+            {/* Legend with Checkboxes */}
+            <div className="flex flex-wrap items-center justify-center gap-6 mt-4">
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input 
+                  type="checkbox" 
+                  checked={showSubject}
+                  onChange={(e) => setShowSubject(e.target.checked)}
+                  className="rounded"
+                />
+                <div className="w-4 h-4 rounded-full bg-blue-500" />
+                <span className="text-sm">Subject Property</span>
+              </label>
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input 
+                  type="checkbox" 
+                  checked={showClosed}
+                  onChange={(e) => setShowClosed(e.target.checked)}
+                  className="rounded"
+                />
+                <div className="w-3 h-3 rounded-full bg-red-500" />
+                <span className="text-sm">Closed Comparables</span>
+              </label>
+            </div>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+export default CMAStatsView;
+```
+
+---
+
+## PART 4: INTEGRATION
+
+### Update CMADetailPage.tsx
+
+Integrate the new Map and Stats views:
+
+```tsx
+import { CMAMapView } from '@/components/cma/CMAMapView';
+import { CMAStatsView } from '@/components/cma/CMAStatsView';
+
+// In the render section where viewMode is handled:
+{viewMode === 'map' && (
+  <CMAMapView 
+    properties={filteredProperties}
+    subjectProperty={cma?.subjectPropertyData}
+    onPropertyClick={(property) => {
+      // Handle property click (e.g., open modal)
+      console.log('Property clicked:', property);
+    }}
+  />
+)}
+
+{viewMode === 'stats' && (
+  <CMAStatsView 
+    properties={filteredProperties}
+    subjectProperty={cma?.subjectPropertyData}
+  />
+)}
+```
+
+---
+
+## PART 5: DEPENDENCIES
+
+Ensure these are installed:
+
+```bash
+npm install mapbox-gl @turf/turf recharts
+npm install -D @types/mapbox-gl
+```
+
+Add to your CSS (or ensure mapbox styles are imported):
+
+```css
+@import 'mapbox-gl/dist/mapbox-gl.css';
+```
+
+---
+
+## PART 6: API ENDPOINT
+
+### File: `server/routes.ts` (if not exists)
+
+Add Mapbox token endpoint:
+
+```typescript
+app.get('/api/mapbox-token', (req, res) => {
+  res.json({ token: process.env.MAPBOX_ACCESS_TOKEN || '' });
+});
+```
+
+---
+
+## ACCEPTANCE CRITERIA
+
+### Map View:
+- [ ] Mapbox map renders with navigation controls
+- [ ] Subject property shows as larger blue marker with "SUBJECT" label
+- [ ] Comparable properties show colored markers based on status
+- [ ] Price labels display above markers
+- [ ] Clustering works at lower zoom levels
+- [ ] Legend displays all status colors
+- [ ] Map auto-fits to show all markers
+- [ ] Click on marker triggers callback
+- [ ] Map/Satellite toggle works
+- [ ] Dark mode compatible
+
+### Stats View:
+- [ ] Summary cards display (Avg Price, $/sqft, Living Area)
+- [ ] Statistics Summary table displays with Range/Average/Median
+- [ ] Price Comparison bar chart with Spyglass orange bars
+- [ ] CMA Market Review section with text summaries
+- [ ] Days on Market section (closed properties only):
+  - [ ] Header shows avg DOM and % of list
+  - [ ] Scrollable property list with thumbnails
+  - [ ] Scatter chart with color-coded dots
+  - [ ] Legend explains colors
+- [ ] Average Price/Sq.Ft. section:
+  - [ ] Subject property highlighted at top
+  - [ ] Scrollable closed properties list
+  - [ ] Big $/sqft display
+  - [ ] Scatter chart with blue (subject) and red (closed) dots
+  - [ ] Checkbox toggles for filtering
+
+---
+
+## FILES TO CREATE/MODIFY
+
+```
+client/src/
+├── lib/
+│   └── cma-data-utils.ts           [CREATE - shared utilities]
+├── components/
+│   └── cma/
+│       ├── CMAMapView.tsx          [CREATE - map component]
+│       └── CMAStatsView.tsx        [CREATE - stats component]
+├── pages/
+│   └── CMADetailPage.tsx           [MODIFY - integrate views]
+server/
+└── routes.ts                        [MODIFY - add mapbox token endpoint]
+```
+
+---
+
+Ready to implement!
