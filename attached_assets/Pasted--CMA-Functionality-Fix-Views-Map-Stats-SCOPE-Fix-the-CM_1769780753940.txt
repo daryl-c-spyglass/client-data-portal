@@ -1,0 +1,787 @@
+# CMA Functionality Fix - Views, Map & Stats
+
+## SCOPE
+
+Fix the CMA Detail page functionality:
+1. Fix Grid/List/Table view toggle (not working)
+2. Implement Map view with property markers
+3. Implement Stats view with analytics
+4. Remove "Nearby" pill and "Clear CMA Data" button
+
+---
+
+## TASK 1: Remove UI Elements
+
+### Remove these elements:
+
+1. **"Nearby" pill** - Remove the pill with MapPin icon next to property count
+2. **"Clear CMA Data" button** - Remove the red destructive button
+
+**Before:**
+```tsx
+<span className="..."><MapPin /> Nearby</span>
+...
+<Button className="text-red-500...">Clear CMA Data</Button>
+```
+
+**After:**
+```tsx
+{/* Remove both elements entirely */}
+```
+
+---
+
+## TASK 2: Fix Grid/List/Table View Toggle
+
+The view toggle buttons exist but don't switch the display. Fix the state management:
+
+```tsx
+// State for view modes
+const [viewMode, setViewMode] = useState<'compare' | 'map' | 'stats'>('compare');
+const [displayType, setDisplayType] = useState<'grid' | 'list' | 'table'>('table');
+
+// Ensure the toggle buttons update state
+<div className="flex items-center gap-2">
+  <span className="text-sm text-muted-foreground">View:</span>
+  <div className="flex items-center border rounded-lg overflow-hidden">
+    <button
+      onClick={() => setDisplayType('grid')}
+      className={cn(
+        "px-3 py-1.5 text-sm flex items-center gap-1.5",
+        displayType === 'grid' ? "bg-muted font-medium" : "hover:bg-muted/50"
+      )}
+    >
+      <LayoutGrid className="w-4 h-4" />
+      Grid
+    </button>
+    <button
+      onClick={() => setDisplayType('list')}
+      className={cn(
+        "px-3 py-1.5 text-sm flex items-center gap-1.5 border-l",
+        displayType === 'list' ? "bg-muted font-medium" : "hover:bg-muted/50"
+      )}
+    >
+      <List className="w-4 h-4" />
+      List
+    </button>
+    <button
+      onClick={() => setDisplayType('table')}
+      className={cn(
+        "px-3 py-1.5 text-sm flex items-center gap-1.5 border-l",
+        displayType === 'table' ? "bg-muted font-medium" : "hover:bg-muted/50"
+      )}
+    >
+      <TableIcon className="w-4 h-4" />
+      Table
+    </button>
+  </div>
+</div>
+
+// Render correct view based on displayType
+{viewMode === 'compare' && (
+  <>
+    {displayType === 'grid' && <PropertyGrid properties={filteredProperties} />}
+    {displayType === 'list' && <PropertyList properties={filteredProperties} />}
+    {displayType === 'table' && <PropertyTable properties={filteredProperties} />}
+  </>
+)}
+```
+
+### Grid View Component:
+
+```tsx
+function PropertyGrid({ properties }: { properties: CMAComparable[] }) {
+  return (
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+      {properties.map((property) => (
+        <Card key={property.mlsNumber} className="overflow-hidden">
+          {/* Property Image */}
+          <div className="aspect-video bg-muted relative">
+            {property.photos?.[0] ? (
+              <img 
+                src={property.photos[0]} 
+                alt={property.address}
+                className="w-full h-full object-cover"
+              />
+            ) : (
+              <div className="w-full h-full flex items-center justify-center text-muted-foreground">
+                No Image
+              </div>
+            )}
+            {/* Status Badge */}
+            <span className={cn(
+              "absolute top-2 left-2 px-2 py-1 rounded text-xs font-medium text-white",
+              property.status === 'Active' && "bg-green-500",
+              property.status === 'Closed' && "bg-red-500",
+              property.status === 'Active Under Contract' && "bg-orange-500",
+              property.status === 'Pending' && "bg-gray-500"
+            )}>
+              {property.status}
+            </span>
+          </div>
+          
+          <CardContent className="p-4">
+            <p className="font-semibold">{formatCurrency(property.price)}</p>
+            <p className="text-sm text-muted-foreground truncate">{property.address}</p>
+            <p className="text-sm">
+              {property.bedrooms} bd • {property.bathrooms} ba • {property.sqft?.toLocaleString()} sqft
+            </p>
+            <p className="text-xs text-muted-foreground mt-1">
+              ${property.pricePerSqft}/sqft • {property.daysOnMarket} DOM
+            </p>
+          </CardContent>
+        </Card>
+      ))}
+    </div>
+  );
+}
+```
+
+### List View Component:
+
+```tsx
+function PropertyList({ properties }: { properties: CMAComparable[] }) {
+  return (
+    <div className="space-y-3">
+      {properties.map((property) => (
+        <div 
+          key={property.mlsNumber}
+          className="flex gap-4 p-4 border rounded-lg hover:bg-muted/50 transition-colors"
+        >
+          {/* Thumbnail */}
+          <div className="w-32 h-24 bg-muted rounded overflow-hidden flex-shrink-0">
+            {property.photos?.[0] ? (
+              <img 
+                src={property.photos[0]} 
+                alt={property.address}
+                className="w-full h-full object-cover"
+              />
+            ) : (
+              <div className="w-full h-full flex items-center justify-center text-muted-foreground text-xs">
+                No Image
+              </div>
+            )}
+          </div>
+          
+          {/* Details */}
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2">
+              <p className="font-semibold">{formatCurrency(property.price)}</p>
+              <span className={cn(
+                "px-2 py-0.5 rounded text-xs font-medium",
+                property.status === 'Active' && "bg-green-100 text-green-700",
+                property.status === 'Closed' && "bg-red-100 text-red-700",
+                property.status === 'Active Under Contract' && "bg-orange-100 text-orange-700",
+                property.status === 'Pending' && "bg-gray-100 text-gray-700"
+              )}>
+                {property.status}
+              </span>
+            </div>
+            <p className="text-sm truncate">{property.address}</p>
+            <p className="text-sm text-muted-foreground">
+              {property.bedrooms} bd • {property.bathrooms} ba • {property.sqft?.toLocaleString()} sqft • {property.lotSizeAcres?.toFixed(2)} acres
+            </p>
+          </div>
+          
+          {/* Stats */}
+          <div className="text-right text-sm">
+            <p>${property.pricePerSqft}/sqft</p>
+            <p className="text-muted-foreground">{property.daysOnMarket} DOM</p>
+            {property.soldDate && (
+              <p className="text-muted-foreground">Sold {property.soldDate}</p>
+            )}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+```
+
+---
+
+## TASK 3: Implement Map View
+
+When user clicks "Map" toggle, show Mapbox map with property markers:
+
+```tsx
+function CMAMapView({ 
+  properties, 
+  subjectProperty 
+}: { 
+  properties: CMAComparable[];
+  subjectProperty: PropertySnapshot;
+}) {
+  const mapContainer = useRef<HTMLDivElement>(null);
+  const map = useRef<mapboxgl.Map | null>(null);
+  
+  useEffect(() => {
+    if (!mapContainer.current || map.current) return;
+    
+    // Initialize map centered on subject property
+    map.current = new mapboxgl.Map({
+      container: mapContainer.current,
+      style: 'mapbox://styles/mapbox/streets-v12',
+      center: [
+        subjectProperty.map?.longitude || -97.7431,
+        subjectProperty.map?.latitude || 30.2672
+      ],
+      zoom: 11,
+    });
+    
+    // Add navigation controls
+    map.current.addControl(new mapboxgl.NavigationControl(), 'top-right');
+    
+    // Add markers when map loads
+    map.current.on('load', () => {
+      addMarkers();
+    });
+    
+    return () => {
+      map.current?.remove();
+      map.current = null;
+    };
+  }, []);
+  
+  const addMarkers = () => {
+    if (!map.current) return;
+    
+    // Subject property marker (Blue)
+    if (subjectProperty.map) {
+      const subjectEl = createMarkerElement('subject', subjectProperty.listPrice);
+      new mapboxgl.Marker({ element: subjectEl })
+        .setLngLat([subjectProperty.map.longitude, subjectProperty.map.latitude])
+        .setPopup(new mapboxgl.Popup().setHTML(`
+          <div class="p-2">
+            <p class="font-bold">SUBJECT</p>
+            <p class="font-semibold">${formatCurrency(subjectProperty.listPrice)}</p>
+            <p class="text-sm">${subjectProperty.address}</p>
+          </div>
+        `))
+        .addTo(map.current!);
+    }
+    
+    // Comparable markers
+    properties.forEach((property) => {
+      if (!property.map) return;
+      
+      const markerEl = createMarkerElement(property.status, property.price);
+      new mapboxgl.Marker({ element: markerEl })
+        .setLngLat([property.map.longitude, property.map.latitude])
+        .setPopup(new mapboxgl.Popup().setHTML(`
+          <div class="p-2">
+            <p class="font-semibold">${formatCurrency(property.price)}</p>
+            <p class="text-sm">${property.address}</p>
+            <p class="text-xs text-gray-500">${property.bedrooms} bd • ${property.bathrooms} ba • ${property.sqft?.toLocaleString()} sqft</p>
+          </div>
+        `))
+        .addTo(map.current!);
+    });
+  };
+  
+  return (
+    <div className="space-y-4">
+      {/* Map Header */}
+      <div className="flex items-center justify-between">
+        <p className="text-sm text-muted-foreground">
+          {properties.length} comparables + Subject
+        </p>
+      </div>
+      
+      {/* Map Container */}
+      <div className="relative rounded-lg overflow-hidden border">
+        <div ref={mapContainer} className="h-[500px] w-full" />
+        
+        {/* Legend */}
+        <div className="absolute bottom-4 left-4 bg-white dark:bg-gray-900 rounded-lg shadow-lg p-3 text-sm">
+          <p className="font-medium mb-2">Legend</p>
+          <div className="space-y-1.5">
+            <LegendItem color="#3b82f6" label="Subject Property" />
+            <LegendItem color="#22c55e" label="Active" />
+            <LegendItem color="#f97316" label="Under Contract" />
+            <LegendItem color="#6b7280" label="Pending" />
+            <LegendItem color="#ef4444" label="Closed" />
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function LegendItem({ color, label }: { color: string; label: string }) {
+  return (
+    <div className="flex items-center gap-2">
+      <div 
+        className="w-3 h-3 rounded-full" 
+        style={{ backgroundColor: color }}
+      />
+      <span>{label}</span>
+    </div>
+  );
+}
+
+function createMarkerElement(status: string, price: number): HTMLElement {
+  const el = document.createElement('div');
+  
+  const colors: Record<string, string> = {
+    'subject': '#3b82f6',      // Blue
+    'Active': '#22c55e',        // Green
+    'Active Under Contract': '#f97316', // Orange
+    'Pending': '#6b7280',       // Gray
+    'Closed': '#ef4444',        // Red
+  };
+  
+  const color = colors[status] || '#6b7280';
+  
+  el.innerHTML = `
+    <div style="
+      background-color: ${color};
+      color: white;
+      padding: 4px 8px;
+      border-radius: 4px;
+      font-size: 12px;
+      font-weight: 600;
+      white-space: nowrap;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+    ">
+      ${status === 'subject' ? 'SUBJECT' : ''} $${(price / 1000).toFixed(0)}K
+    </div>
+  `;
+  
+  return el;
+}
+```
+
+---
+
+## TASK 4: Implement Stats View
+
+When user clicks "Stats" toggle, show comprehensive analytics:
+
+```tsx
+function CMAStatsView({ 
+  properties,
+  subjectProperty 
+}: { 
+  properties: CMAComparable[];
+  subjectProperty: PropertySnapshot;
+}) {
+  // Calculate statistics from properties
+  const stats = useMemo(() => calculateDetailedStats(properties), [properties]);
+  const closedProperties = properties.filter(p => p.status === 'Closed');
+  const activeProperties = properties.filter(p => p.status === 'Active');
+  const pendingProperties = properties.filter(p => 
+    p.status === 'Pending' || p.status === 'Active Under Contract'
+  );
+  
+  return (
+    <div className="space-y-6">
+      
+      {/* Summary Cards */}
+      <div className="grid grid-cols-3 gap-4">
+        <Card className="p-4">
+          <p className="text-sm text-muted-foreground">Average Price</p>
+          <p className="text-2xl font-bold text-[#EF4923]">
+            {formatCurrency(stats.avgPrice)}
+          </p>
+          <p className="text-xs text-muted-foreground">
+            Range: {formatCurrency(stats.minPrice)} - {formatCurrency(stats.maxPrice)}
+          </p>
+        </Card>
+        
+        <Card className="p-4">
+          <p className="text-sm text-muted-foreground">Price Per Sqft</p>
+          <p className="text-2xl font-bold text-[#EF4923]">
+            ${stats.avgPricePerSqft}<span className="text-base font-normal">/sqft</span>
+          </p>
+          <p className="text-xs text-muted-foreground">
+            Range: ${stats.minPricePerSqft} - ${stats.maxPricePerSqft}
+          </p>
+        </Card>
+        
+        <Card className="p-4">
+          <p className="text-sm text-muted-foreground">Avg Living Area</p>
+          <p className="text-2xl font-bold">
+            {stats.avgSqft.toLocaleString()}<span className="text-base font-normal"> sqft</span>
+          </p>
+          <p className="text-xs text-muted-foreground">
+            {stats.avgBeds.toFixed(1)} beds / {stats.avgBaths.toFixed(1)} baths avg
+          </p>
+        </Card>
+      </div>
+      
+      {/* Statistics Summary Table */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-lg">Statistics Summary ({properties.length} Properties)</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <table className="w-full">
+            <thead>
+              <tr className="border-b">
+                <th className="text-left py-2 font-medium">Metric</th>
+                <th className="text-left py-2 font-medium">Range</th>
+                <th className="text-left py-2 font-medium">Average</th>
+                <th className="text-left py-2 font-medium">Median</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr className="border-b">
+                <td className="py-3">Price</td>
+                <td>{formatCurrency(stats.minPrice)} - {formatCurrency(stats.maxPrice)}</td>
+                <td className="font-semibold">{formatCurrency(stats.avgPrice)}</td>
+                <td>{formatCurrency(stats.medianPrice)}</td>
+              </tr>
+              <tr className="border-b">
+                <td className="py-3">Price/SqFt</td>
+                <td>${stats.minPricePerSqft} - ${stats.maxPricePerSqft}</td>
+                <td className="font-semibold">${stats.avgPricePerSqft}</td>
+                <td>${stats.medianPricePerSqft}</td>
+              </tr>
+              <tr className="border-b">
+                <td className="py-3">Living Area</td>
+                <td>{stats.minSqft.toLocaleString()} - {stats.maxSqft.toLocaleString()} sqft</td>
+                <td className="font-semibold">{stats.avgSqft.toLocaleString()} sqft</td>
+                <td>{stats.medianSqft.toLocaleString()} sqft</td>
+              </tr>
+              <tr>
+                <td className="py-3">Days on Market</td>
+                <td>{stats.minDOM} - {stats.maxDOM} days</td>
+                <td className="font-semibold">{stats.avgDOM} days</td>
+                <td>{stats.medianDOM} days</td>
+              </tr>
+            </tbody>
+          </table>
+        </CardContent>
+      </Card>
+      
+      {/* Price Comparison Chart */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-lg flex items-center gap-2">
+            <BarChart3 className="w-5 h-5" />
+            Price Comparison
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <PriceComparisonChart properties={properties} />
+        </CardContent>
+      </Card>
+      
+      {/* CMA Market Review */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-lg flex items-center gap-2">
+            <FileText className="w-5 h-5" />
+            CMA Market Review
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-2 gap-6">
+            <div>
+              <h4 className="font-medium mb-2">Market Overview</h4>
+              <p className="text-sm text-muted-foreground">
+                Based on {properties.length} comparable properties, the average price is{' '}
+                <span className="font-semibold text-foreground">{formatCurrency(stats.avgPrice)}</span>{' '}
+                with a median of{' '}
+                <span className="font-semibold text-foreground">{formatCurrency(stats.medianPrice)}</span>.
+                Prices range from {formatCurrency(stats.minPrice)} to {formatCurrency(stats.maxPrice)}.
+              </p>
+            </div>
+            <div>
+              <h4 className="font-medium mb-2">Price Per Square Foot</h4>
+              <p className="text-sm text-muted-foreground">
+                Average price per square foot is{' '}
+                <span className="font-semibold text-foreground">${stats.avgPricePerSqft.toFixed(2)}</span>{' '}
+                across comparable properties. This ranges from ${stats.minPricePerSqft.toFixed(2)} to ${stats.maxPricePerSqft.toFixed(2)}/sqft.
+              </p>
+            </div>
+            <div>
+              <h4 className="font-medium mb-2">Days on Market</h4>
+              <p className="text-sm text-muted-foreground">
+                Average: <span className="font-semibold text-foreground">{stats.avgDOM} days</span>
+              </p>
+            </div>
+            <div>
+              <h4 className="font-medium mb-2">Property Size</h4>
+              <p className="text-sm text-muted-foreground">
+                Avg: <span className="font-semibold text-foreground">{stats.avgSqft.toLocaleString()} sqft</span>
+              </p>
+            </div>
+            <div>
+              <h4 className="font-medium mb-2">Bed/Bath</h4>
+              <p className="text-sm text-muted-foreground">
+                Avg: <span className="font-semibold text-foreground">{stats.avgBeds.toFixed(1)} beds / {stats.avgBaths.toFixed(1)} baths</span>
+              </p>
+            </div>
+          </div>
+          
+          <p className="text-sm text-muted-foreground mt-4 pt-4 border-t italic">
+            This analysis is based on {closedProperties.length} Closed, {activeProperties.length} Active, {pendingProperties.length} Pending properties in your selection.
+          </p>
+        </CardContent>
+      </Card>
+      
+      {/* Closed Properties Analysis (if any closed) */}
+      {closedProperties.length > 0 && (
+        <Card>
+          <CardHeader>
+            <div className="flex items-center gap-4">
+              <div>
+                <span className="text-3xl font-bold">{stats.avgDOMClosed}</span>
+                <span className="text-muted-foreground ml-2">DAYS ON MARKET</span>
+              </div>
+              <div>
+                <span className="text-3xl font-bold text-[#EF4923]">{stats.avgListPriceRatio.toFixed(2)}%</span>
+                <span className="text-muted-foreground ml-2">OF LIST PRICE</span>
+              </div>
+            </div>
+            <p className="text-sm text-muted-foreground">
+              Sold homes were on the market for an average of <span className="font-semibold">{stats.avgDOMClosed} days</span> before they accepted an offer. 
+              These homes sold for an average of <span className="font-semibold">{stats.avgListPriceRatio.toFixed(2)}%</span> of list price.
+            </p>
+          </CardHeader>
+          <CardContent>
+            <div className="flex gap-6">
+              {/* Closed property list */}
+              <div className="w-1/3 space-y-2">
+                <div className="flex items-center gap-2 mb-3">
+                  <span className="bg-red-500 text-white text-xs px-2 py-0.5 rounded">{closedProperties.length}</span>
+                  <span className="font-medium">Closed</span>
+                </div>
+                {closedProperties.slice(0, 5).map((p) => (
+                  <div key={p.mlsNumber} className="flex items-center gap-2">
+                    <img src={p.photos?.[0]} alt="" className="w-12 h-10 object-cover rounded" />
+                    <div className="text-sm">
+                      <p className="font-medium truncate">{p.address?.split(',')[0]}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {p.daysOnMarket} Days • {((p.soldPrice || p.price) / p.listPrice * 100).toFixed(2)}%
+                      </p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              
+              {/* DOM vs Price scatter chart */}
+              <div className="flex-1">
+                <DOMvsPriceChart properties={closedProperties} />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+      
+      {/* Price per Sqft Analysis */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-lg">AVERAGE PRICE/SQ. FT.</CardTitle>
+          <p className="text-sm text-muted-foreground">
+            1 Subject, {closedProperties.length} Closed
+          </p>
+        </CardHeader>
+        <CardContent>
+          <div className="flex gap-6">
+            {/* Property list with $/sqft */}
+            <div className="w-1/3 space-y-2">
+              {/* Subject */}
+              <div className="flex items-center gap-2 pb-2 border-b">
+                <img src={subjectProperty.photos?.[0]} alt="" className="w-12 h-10 object-cover rounded" />
+                <div className="text-sm">
+                  <p className="text-xs text-blue-500">Subject: {subjectProperty.address?.split(',')[0]}</p>
+                  <p className="font-medium text-[#EF4923]">
+                    ${Math.round(subjectProperty.listPrice / subjectProperty.sqft)} / sq. ft.
+                  </p>
+                </div>
+              </div>
+              
+              {closedProperties.slice(0, 5).map((p) => (
+                <div key={p.mlsNumber} className="flex items-center gap-2">
+                  <img src={p.photos?.[0]} alt="" className="w-12 h-10 object-cover rounded" />
+                  <div className="text-sm">
+                    <p className="truncate">{p.address?.split(',')[0]}</p>
+                    <p className="font-medium text-[#EF4923]">${p.pricePerSqft} / sq. ft.</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+            
+            {/* Price display and chart */}
+            <div className="flex-1">
+              <div className="mb-4">
+                <span className="text-4xl font-bold text-[#EF4923]">${stats.avgPricePerSqft}</span>
+                <span className="text-xl text-muted-foreground"> / Sq. Ft.</span>
+                <p className="text-sm text-muted-foreground mt-2">
+                  Comparable homes sold for an average of <span className="font-semibold">${stats.avgPricePerSqft}</span>/sq. ft. 
+                  Many factors such as location, use of space, condition, quality, and amenities determine the market value per square foot.
+                </p>
+              </div>
+              
+              <PricePerSqftChart 
+                properties={closedProperties} 
+                subjectProperty={subjectProperty}
+              />
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+      
+    </div>
+  );
+}
+```
+
+---
+
+## TASK 5: Statistics Calculation Function
+
+```tsx
+function calculateDetailedStats(properties: CMAComparable[]) {
+  if (!properties.length) {
+    return {
+      avgPrice: 0, minPrice: 0, maxPrice: 0, medianPrice: 0,
+      avgPricePerSqft: 0, minPricePerSqft: 0, maxPricePerSqft: 0, medianPricePerSqft: 0,
+      avgSqft: 0, minSqft: 0, maxSqft: 0, medianSqft: 0,
+      avgDOM: 0, minDOM: 0, maxDOM: 0, medianDOM: 0,
+      avgBeds: 0, avgBaths: 0,
+      avgDOMClosed: 0, avgListPriceRatio: 100,
+    };
+  }
+  
+  const prices = properties.map(p => p.price).filter(Boolean).sort((a, b) => a - b);
+  const pricesPerSqft = properties.map(p => p.pricePerSqft).filter(Boolean).sort((a, b) => a - b);
+  const sqfts = properties.map(p => p.sqft).filter(Boolean).sort((a, b) => a - b);
+  const doms = properties.map(p => p.daysOnMarket).filter(d => d !== undefined).sort((a, b) => a - b);
+  const beds = properties.map(p => p.bedrooms).filter(Boolean);
+  const baths = properties.map(p => p.bathrooms).filter(Boolean);
+  
+  const closedProps = properties.filter(p => p.status === 'Closed');
+  const closedDOMs = closedProps.map(p => p.daysOnMarket).filter(d => d !== undefined);
+  const listPriceRatios = closedProps
+    .filter(p => p.listPrice && p.soldPrice)
+    .map(p => (p.soldPrice! / p.listPrice) * 100);
+  
+  const median = (arr: number[]) => {
+    if (!arr.length) return 0;
+    const mid = Math.floor(arr.length / 2);
+    return arr.length % 2 ? arr[mid] : (arr[mid - 1] + arr[mid]) / 2;
+  };
+  
+  const avg = (arr: number[]) => arr.length ? arr.reduce((a, b) => a + b, 0) / arr.length : 0;
+  
+  return {
+    avgPrice: Math.round(avg(prices)),
+    minPrice: prices[0] || 0,
+    maxPrice: prices[prices.length - 1] || 0,
+    medianPrice: Math.round(median(prices)),
+    
+    avgPricePerSqft: Math.round(avg(pricesPerSqft)),
+    minPricePerSqft: Math.round(pricesPerSqft[0] || 0),
+    maxPricePerSqft: Math.round(pricesPerSqft[pricesPerSqft.length - 1] || 0),
+    medianPricePerSqft: Math.round(median(pricesPerSqft)),
+    
+    avgSqft: Math.round(avg(sqfts)),
+    minSqft: sqfts[0] || 0,
+    maxSqft: sqfts[sqfts.length - 1] || 0,
+    medianSqft: Math.round(median(sqfts)),
+    
+    avgDOM: Math.round(avg(doms)),
+    minDOM: doms[0] || 0,
+    maxDOM: doms[doms.length - 1] || 0,
+    medianDOM: Math.round(median(doms)),
+    
+    avgBeds: avg(beds),
+    avgBaths: avg(baths),
+    
+    avgDOMClosed: Math.round(avg(closedDOMs)),
+    avgListPriceRatio: avg(listPriceRatios) || 100,
+  };
+}
+```
+
+---
+
+## TASK 6: Price Comparison Bar Chart
+
+```tsx
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
+
+function PriceComparisonChart({ properties }: { properties: CMAComparable[] }) {
+  const data = properties.map(p => ({
+    name: p.address?.split(',')[0] || p.mlsNumber,
+    price: p.price,
+  }));
+  
+  return (
+    <ResponsiveContainer width="100%" height={300}>
+      <BarChart data={data}>
+        <XAxis 
+          dataKey="name" 
+          angle={-45} 
+          textAnchor="end" 
+          height={100}
+          tick={{ fontSize: 11 }}
+        />
+        <YAxis 
+          tickFormatter={(v) => `$${(v / 1000000).toFixed(1)}M`}
+        />
+        <Tooltip 
+          formatter={(v: number) => formatCurrency(v)}
+          labelStyle={{ fontWeight: 'bold' }}
+        />
+        <Bar 
+          dataKey="price" 
+          fill="#EF4923"  // Spyglass Orange
+          radius={[4, 4, 0, 0]}
+        />
+      </BarChart>
+    </ResponsiveContainer>
+  );
+}
+```
+
+---
+
+## ACCEPTANCE CRITERIA
+
+- [ ] "Nearby" pill removed
+- [ ] "Clear CMA Data" button removed
+- [ ] Grid view shows property cards in 3-column grid
+- [ ] List view shows horizontal property cards
+- [ ] Table view shows data table (existing)
+- [ ] View toggle buttons correctly switch between Grid/List/Table
+- [ ] Map view shows Mapbox with property markers
+- [ ] Map has legend with status colors
+- [ ] Stats view shows summary cards (Avg Price, $/sqft, Living Area)
+- [ ] Stats view shows Statistics Summary table
+- [ ] Stats view shows Price Comparison bar chart (Spyglass orange)
+- [ ] Stats view shows CMA Market Review text
+- [ ] Stats view shows Closed properties analysis (if any)
+- [ ] Stats view shows Price/Sqft scatter chart
+- [ ] All statistics calculated from property list
+- [ ] Dark mode compatible
+
+---
+
+## FILES TO MODIFY/CREATE
+
+```
+client/src/
+├── pages/
+│   └── CMADetailPage.tsx         [MODIFY - state management, remove elements]
+├── components/
+│   └── cma/
+│       ├── PropertyGrid.tsx      [NEW - grid view]
+│       ├── PropertyList.tsx      [NEW - list view]
+│       ├── CMAMapView.tsx        [NEW - map with markers]
+│       ├── CMAStatsView.tsx      [NEW - analytics view]
+│       ├── PriceComparisonChart.tsx [NEW - bar chart]
+│       └── charts/
+│           ├── DOMvsPriceChart.tsx
+│           └── PricePerSqftChart.tsx
+└── lib/
+    └── cma-stats.ts              [NEW - statistics functions]
+```
+
+---
+
+Ready to implement!

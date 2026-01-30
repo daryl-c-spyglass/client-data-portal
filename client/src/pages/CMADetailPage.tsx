@@ -1,12 +1,12 @@
-import { useState } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { useRoute, useLocation } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Card, CardContent } from "@/components/ui/card";
-import { ArrowLeft, Share2, Link as LinkIcon, Copy, Check, Trash2, ExternalLink, Printer, Loader2, Mail, LayoutGrid, MapPin, BarChart3, Map, TrendingUp, List, Table as TableIcon, RefreshCw, Save, Edit } from "lucide-react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { ArrowLeft, Share2, Link as LinkIcon, Copy, Check, Trash2, ExternalLink, Printer, Loader2, Mail, LayoutGrid, MapPin, BarChart3, Map, TrendingUp, List, Table as TableIcon, RefreshCw, Save, Edit, FileText, DollarSign, Clock, Home } from "lucide-react";
 import { SiFacebook, SiX, SiInstagram, SiTiktok } from "react-icons/si";
 import { Link } from "wouter";
 import { CMAReport } from "@/components/CMAReport";
@@ -23,8 +23,16 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { cn } from "@/lib/utils";
+import { STATUS_COLORS, getStatusFromMLS, getStatusHexFromMLS } from "@/lib/statusColors";
+import { useTheme } from "@/contexts/ThemeContext";
+import mapboxgl from "mapbox-gl";
+import "mapbox-gl/dist/mapbox-gl.css";
 import type { Cma, Property, PropertyStatistics, TimelineDataPoint } from "@shared/schema";
 import { queryClient, apiRequest } from "@/lib/queryClient";
+
+// Initialize Mapbox access token
+mapboxgl.accessToken = import.meta.env.VITE_MAPBOX_TOKEN || '';
 
 // Available metrics for statistics display - keys must match CMAReport's StatMetricKey
 export const STAT_METRICS = [
@@ -44,6 +52,489 @@ export type StatMetricKey = typeof STAT_METRICS[number]['key'];
 interface ShareResponse {
   shareToken: string;
   shareUrl: string;
+}
+
+// Helper to format currency
+function formatCurrency(value: number): string {
+  return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(value);
+}
+
+// Helper to get photos from property
+function getPropertyPhotos(property: Property): string[] {
+  const photos = (property as any).photos as string[] | undefined;
+  const media = (property as any).media as any[] | undefined;
+  if (photos && photos.length > 0) return photos;
+  if (media && media.length > 0) {
+    return media.map((m: any) => m.mediaURL || m.mediaUrl).filter(Boolean);
+  }
+  return [];
+}
+
+// Helper to get property price
+function getPropertyPrice(property: Property): number {
+  const isClosed = property.standardStatus === 'Closed';
+  return isClosed 
+    ? (property.closePrice ? Number(property.closePrice) : Number(property.listPrice || 0))
+    : Number(property.listPrice || 0);
+}
+
+// Helper to get price per sqft
+function getPricePerSqft(property: Property): number {
+  const price = getPropertyPrice(property);
+  const sqft = property.livingArea ? Number(property.livingArea) : 0;
+  return sqft > 0 ? Math.round(price / sqft) : 0;
+}
+
+// Helper to get days on market
+function getDaysOnMarket(property: Property): number {
+  return (property as any).daysOnMarket || (property as any).cumulativeDaysOnMarket || property.daysOnMarket || 0;
+}
+
+// Helper to get address
+function getPropertyAddress(property: Property): string {
+  return property.unparsedAddress || `${property.streetNumber || ''} ${property.streetName || ''}`.trim() || 'Unknown Address';
+}
+
+// Grid View Component
+function PropertyGrid({ properties, subjectPropertyId }: { properties: Property[]; subjectPropertyId?: string | null }) {
+  return (
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+      {properties.map((property) => {
+        const photos = getPropertyPhotos(property);
+        const price = getPropertyPrice(property);
+        const isSubject = property.id === subjectPropertyId;
+        const statusKey = getStatusFromMLS(property.standardStatus || 'Active', isSubject);
+        const statusColors = STATUS_COLORS[statusKey];
+        
+        return (
+          <Card key={property.id} className={cn("overflow-hidden", isSubject && "ring-2 ring-blue-500")}>
+            <div className="aspect-video bg-muted relative">
+              {photos[0] ? (
+                <img 
+                  src={photos[0]} 
+                  alt={getPropertyAddress(property)}
+                  className="w-full h-full object-cover"
+                />
+              ) : (
+                <div className="w-full h-full flex items-center justify-center text-muted-foreground">
+                  <Home className="w-8 h-8" />
+                </div>
+              )}
+              <span 
+                className="absolute top-2 left-2 px-2 py-1 rounded text-xs font-medium text-white"
+                style={{ backgroundColor: statusColors.hex }}
+              >
+                {isSubject ? 'SUBJECT' : property.standardStatus}
+              </span>
+            </div>
+            
+            <CardContent className="p-4">
+              <p className="font-semibold text-lg">{formatCurrency(price)}</p>
+              <p className="text-sm text-muted-foreground truncate">{getPropertyAddress(property)}</p>
+              <p className="text-sm">
+                {property.bedroomsTotal || 0} bd • {property.bathroomsTotalInteger || 0} ba • {property.livingArea ? Number(property.livingArea).toLocaleString() : 0} sqft
+              </p>
+              <p className="text-xs text-muted-foreground mt-1">
+                ${getPricePerSqft(property)}/sqft • {getDaysOnMarket(property)} DOM
+              </p>
+            </CardContent>
+          </Card>
+        );
+      })}
+    </div>
+  );
+}
+
+// List View Component
+function PropertyList({ properties, subjectPropertyId }: { properties: Property[]; subjectPropertyId?: string | null }) {
+  return (
+    <div className="space-y-3">
+      {properties.map((property) => {
+        const photos = getPropertyPhotos(property);
+        const price = getPropertyPrice(property);
+        const isSubject = property.id === subjectPropertyId;
+        const statusKey = getStatusFromMLS(property.standardStatus || 'Active', isSubject);
+        const statusColors = STATUS_COLORS[statusKey];
+        
+        return (
+          <div 
+            key={property.id}
+            className={cn(
+              "flex gap-4 p-4 border rounded-lg hover-elevate transition-colors",
+              isSubject && "ring-2 ring-blue-500"
+            )}
+          >
+            <div className="w-32 h-24 bg-muted rounded overflow-hidden flex-shrink-0">
+              {photos[0] ? (
+                <img 
+                  src={photos[0]} 
+                  alt={getPropertyAddress(property)}
+                  className="w-full h-full object-cover"
+                />
+              ) : (
+                <div className="w-full h-full flex items-center justify-center text-muted-foreground">
+                  <Home className="w-6 h-6" />
+                </div>
+              )}
+            </div>
+            
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2 flex-wrap">
+                <p className="font-semibold">{formatCurrency(price)}</p>
+                <span 
+                  className="px-2 py-0.5 rounded text-xs font-medium text-white"
+                  style={{ backgroundColor: statusColors.hex }}
+                >
+                  {isSubject ? 'SUBJECT' : property.standardStatus}
+                </span>
+              </div>
+              <p className="text-sm truncate">{getPropertyAddress(property)}</p>
+              <p className="text-sm text-muted-foreground">
+                {property.bedroomsTotal || 0} bd • {property.bathroomsTotalInteger || 0} ba • {property.livingArea ? Number(property.livingArea).toLocaleString() : 0} sqft
+              </p>
+            </div>
+            
+            <div className="text-right text-sm">
+              <p>${getPricePerSqft(property)}/sqft</p>
+              <p className="text-muted-foreground">{getDaysOnMarket(property)} DOM</p>
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+// Map View Component
+function CMAMapView({ 
+  properties, 
+  subjectPropertyId 
+}: { 
+  properties: Property[];
+  subjectPropertyId?: string | null;
+}) {
+  const mapContainer = useRef<HTMLDivElement>(null);
+  const map = useRef<mapboxgl.Map | null>(null);
+  const markersRef = useRef<mapboxgl.Marker[]>([]);
+  const { resolvedTheme } = useTheme();
+  
+  const subjectProperty = properties.find(p => p.id === subjectPropertyId);
+  const comparables = properties.filter(p => p.id !== subjectPropertyId);
+  
+  useEffect(() => {
+    if (!mapContainer.current || map.current) return;
+    
+    const centerLat = subjectProperty?.latitude ? Number(subjectProperty.latitude) : 30.2672;
+    const centerLng = subjectProperty?.longitude ? Number(subjectProperty.longitude) : -97.7431;
+    
+    map.current = new mapboxgl.Map({
+      container: mapContainer.current,
+      style: resolvedTheme === 'dark' ? 'mapbox://styles/mapbox/dark-v11' : 'mapbox://styles/mapbox/streets-v12',
+      center: [centerLng, centerLat],
+      zoom: 12,
+    });
+    
+    map.current.addControl(new mapboxgl.NavigationControl(), 'top-right');
+    
+    map.current.on('load', () => {
+      addMarkers();
+    });
+    
+    return () => {
+      markersRef.current.forEach(m => m.remove());
+      markersRef.current = [];
+      map.current?.remove();
+      map.current = null;
+    };
+  }, []);
+  
+  useEffect(() => {
+    if (map.current) {
+      const style = resolvedTheme === 'dark' ? 'mapbox://styles/mapbox/dark-v11' : 'mapbox://styles/mapbox/streets-v12';
+      map.current.setStyle(style);
+      map.current.once('style.load', addMarkers);
+    }
+  }, [resolvedTheme]);
+  
+  const createMarkerElement = (status: string, price: number, isSubject: boolean): HTMLElement => {
+    const el = document.createElement('div');
+    const statusKey = getStatusFromMLS(status, isSubject);
+    const color = STATUS_COLORS[statusKey].hex;
+    
+    el.innerHTML = `
+      <div style="
+        background-color: ${color};
+        color: white;
+        padding: 4px 8px;
+        border-radius: 4px;
+        font-size: 12px;
+        font-weight: 600;
+        white-space: nowrap;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+        cursor: pointer;
+      ">
+        ${isSubject ? 'SUBJECT ' : ''}$${(price / 1000).toFixed(0)}K
+      </div>
+    `;
+    
+    return el;
+  };
+  
+  const addMarkers = () => {
+    if (!map.current) return;
+    
+    markersRef.current.forEach(m => m.remove());
+    markersRef.current = [];
+    
+    if (subjectProperty && subjectProperty.latitude && subjectProperty.longitude) {
+      const price = getPropertyPrice(subjectProperty);
+      const subjectEl = createMarkerElement(subjectProperty.standardStatus || 'Active', price, true);
+      const marker = new mapboxgl.Marker({ element: subjectEl })
+        .setLngLat([Number(subjectProperty.longitude), Number(subjectProperty.latitude)])
+        .setPopup(new mapboxgl.Popup({ offset: 25 }).setHTML(`
+          <div class="p-2">
+            <p class="font-bold" style="color: ${STATUS_COLORS.subject.hex}">SUBJECT PROPERTY</p>
+            <p class="font-semibold">${formatCurrency(price)}</p>
+            <p class="text-sm">${getPropertyAddress(subjectProperty)}</p>
+            <p class="text-xs text-gray-500">${subjectProperty.bedroomsTotal || 0} bd • ${subjectProperty.bathroomsTotalInteger || 0} ba • ${subjectProperty.livingArea ? Number(subjectProperty.livingArea).toLocaleString() : 0} sqft</p>
+          </div>
+        `))
+        .addTo(map.current);
+      markersRef.current.push(marker);
+    }
+    
+    comparables.forEach((property) => {
+      if (!property.latitude || !property.longitude) return;
+      
+      const price = getPropertyPrice(property);
+      const markerEl = createMarkerElement(property.standardStatus || 'Active', price, false);
+      const marker = new mapboxgl.Marker({ element: markerEl })
+        .setLngLat([Number(property.longitude), Number(property.latitude)])
+        .setPopup(new mapboxgl.Popup({ offset: 25 }).setHTML(`
+          <div class="p-2">
+            <p class="font-semibold">${formatCurrency(price)}</p>
+            <p class="text-sm">${getPropertyAddress(property)}</p>
+            <p class="text-xs text-gray-500">${property.bedroomsTotal || 0} bd • ${property.bathroomsTotalInteger || 0} ba • ${property.livingArea ? Number(property.livingArea).toLocaleString() : 0} sqft</p>
+          </div>
+        `))
+        .addTo(map.current!);
+      markersRef.current.push(marker);
+    });
+  };
+  
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <p className="text-sm text-muted-foreground">
+          {comparables.length} comparables + Subject Property
+        </p>
+      </div>
+      
+      <div className="relative rounded-lg overflow-hidden border">
+        <div ref={mapContainer} className="h-[500px] w-full" data-testid="cma-map-container" />
+        
+        <div className="absolute bottom-4 left-4 bg-white dark:bg-gray-900 rounded-lg shadow-lg p-3 text-sm">
+          <p className="font-medium mb-2">Legend</p>
+          <div className="space-y-1.5">
+            <LegendItem color={STATUS_COLORS.subject.hex} label="Subject Property" />
+            <LegendItem color={STATUS_COLORS.active.hex} label="Active" />
+            <LegendItem color={STATUS_COLORS.underContract.hex} label="Under Contract" />
+            <LegendItem color={STATUS_COLORS.pending.hex} label="Pending" />
+            <LegendItem color={STATUS_COLORS.closed.hex} label="Closed" />
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function LegendItem({ color, label }: { color: string; label: string }) {
+  return (
+    <div className="flex items-center gap-2">
+      <div 
+        className="w-3 h-3 rounded-full" 
+        style={{ backgroundColor: color }}
+      />
+      <span>{label}</span>
+    </div>
+  );
+}
+
+// Stats View Component
+function CMAStatsView({ 
+  properties,
+  statistics,
+  subjectPropertyId
+}: { 
+  properties: Property[];
+  statistics: PropertyStatistics;
+  subjectPropertyId?: string | null;
+}) {
+  const subjectProperty = properties.find(p => p.id === subjectPropertyId);
+  const closedProperties = properties.filter(p => p.standardStatus === 'Closed');
+  const activeProperties = properties.filter(p => p.standardStatus === 'Active');
+  const pendingProperties = properties.filter(p => 
+    p.standardStatus === 'Pending' || p.standardStatus === 'Active Under Contract'
+  );
+  
+  const avgPrice = statistics.price?.average || 0;
+  const minPrice = statistics.price?.range?.min || 0;
+  const maxPrice = statistics.price?.range?.max || 0;
+  const medianPrice = statistics.price?.median || 0;
+  
+  const avgPricePerSqft = statistics.pricePerSqFt?.average || 0;
+  const minPricePerSqft = statistics.pricePerSqFt?.range?.min || 0;
+  const maxPricePerSqft = statistics.pricePerSqFt?.range?.max || 0;
+  const medianPricePerSqft = statistics.pricePerSqFt?.median || 0;
+  
+  const avgSqft = statistics.livingArea?.average || 0;
+  const minSqft = statistics.livingArea?.range?.min || 0;
+  const maxSqft = statistics.livingArea?.range?.max || 0;
+  const medianSqft = statistics.livingArea?.median || 0;
+  
+  const avgDOM = statistics.daysOnMarket?.average || 0;
+  const minDOM = statistics.daysOnMarket?.range?.min || 0;
+  const maxDOM = statistics.daysOnMarket?.range?.max || 0;
+  const medianDOM = statistics.daysOnMarket?.median || 0;
+  
+  const avgBeds = statistics.bedrooms?.average || 0;
+  const avgBaths = statistics.bathrooms?.average || 0;
+  
+  return (
+    <div className="space-y-6">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <Card className="p-4">
+          <div className="flex items-center gap-2 mb-2">
+            <DollarSign className="w-5 h-5 text-[#EF4923]" />
+            <p className="text-sm text-muted-foreground">Average Price</p>
+          </div>
+          <p className="text-2xl font-bold text-[#EF4923]">
+            {formatCurrency(avgPrice)}
+          </p>
+          <p className="text-xs text-muted-foreground">
+            Range: {formatCurrency(minPrice)} - {formatCurrency(maxPrice)}
+          </p>
+        </Card>
+        
+        <Card className="p-4">
+          <div className="flex items-center gap-2 mb-2">
+            <LayoutGrid className="w-5 h-5 text-[#EF4923]" />
+            <p className="text-sm text-muted-foreground">Price Per Sqft</p>
+          </div>
+          <p className="text-2xl font-bold text-[#EF4923]">
+            ${Math.round(avgPricePerSqft)}<span className="text-base font-normal">/sqft</span>
+          </p>
+          <p className="text-xs text-muted-foreground">
+            Range: ${Math.round(minPricePerSqft)} - ${Math.round(maxPricePerSqft)}
+          </p>
+        </Card>
+        
+        <Card className="p-4">
+          <div className="flex items-center gap-2 mb-2">
+            <Home className="w-5 h-5 text-foreground" />
+            <p className="text-sm text-muted-foreground">Avg Living Area</p>
+          </div>
+          <p className="text-2xl font-bold">
+            {Math.round(avgSqft).toLocaleString()}<span className="text-base font-normal"> sqft</span>
+          </p>
+          <p className="text-xs text-muted-foreground">
+            {avgBeds.toFixed(1)} beds / {avgBaths.toFixed(1)} baths avg
+          </p>
+        </Card>
+      </div>
+      
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-lg">Statistics Summary ({properties.length} Properties)</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <table className="w-full">
+            <thead>
+              <tr className="border-b">
+                <th className="text-left py-2 font-medium">Metric</th>
+                <th className="text-left py-2 font-medium">Range</th>
+                <th className="text-left py-2 font-medium">Average</th>
+                <th className="text-left py-2 font-medium">Median</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr className="border-b">
+                <td className="py-3">Price</td>
+                <td>{formatCurrency(minPrice)} - {formatCurrency(maxPrice)}</td>
+                <td className="font-semibold">{formatCurrency(avgPrice)}</td>
+                <td>{formatCurrency(medianPrice)}</td>
+              </tr>
+              <tr className="border-b">
+                <td className="py-3">Price/SqFt</td>
+                <td>${Math.round(minPricePerSqft)} - ${Math.round(maxPricePerSqft)}</td>
+                <td className="font-semibold">${Math.round(avgPricePerSqft)}</td>
+                <td>${Math.round(medianPricePerSqft)}</td>
+              </tr>
+              <tr className="border-b">
+                <td className="py-3">Living Area</td>
+                <td>{Math.round(minSqft).toLocaleString()} - {Math.round(maxSqft).toLocaleString()} sqft</td>
+                <td className="font-semibold">{Math.round(avgSqft).toLocaleString()} sqft</td>
+                <td>{Math.round(medianSqft).toLocaleString()} sqft</td>
+              </tr>
+              <tr>
+                <td className="py-3">Days on Market</td>
+                <td>{Math.round(minDOM)} - {Math.round(maxDOM)} days</td>
+                <td className="font-semibold">{Math.round(avgDOM)} days</td>
+                <td>{Math.round(medianDOM)} days</td>
+              </tr>
+            </tbody>
+          </table>
+        </CardContent>
+      </Card>
+      
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-lg flex items-center gap-2">
+            <FileText className="w-5 h-5" />
+            CMA Market Review
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div>
+              <h4 className="font-medium mb-2">Market Overview</h4>
+              <p className="text-sm text-muted-foreground">
+                Based on {properties.length} comparable properties, the average price is{' '}
+                <span className="font-semibold text-foreground">{formatCurrency(avgPrice)}</span>{' '}
+                with a median of{' '}
+                <span className="font-semibold text-foreground">{formatCurrency(medianPrice)}</span>.
+                Prices range from {formatCurrency(minPrice)} to {formatCurrency(maxPrice)}.
+              </p>
+            </div>
+            <div>
+              <h4 className="font-medium mb-2">Price Per Square Foot</h4>
+              <p className="text-sm text-muted-foreground">
+                Average price per square foot is{' '}
+                <span className="font-semibold text-foreground">${Math.round(avgPricePerSqft)}</span>{' '}
+                across comparable properties. This ranges from ${Math.round(minPricePerSqft)} to ${Math.round(maxPricePerSqft)}/sqft.
+              </p>
+            </div>
+            <div>
+              <h4 className="font-medium mb-2">Days on Market</h4>
+              <p className="text-sm text-muted-foreground">
+                Average: <span className="font-semibold text-foreground">{Math.round(avgDOM)} days</span>
+              </p>
+            </div>
+            <div>
+              <h4 className="font-medium mb-2">Property Size</h4>
+              <p className="text-sm text-muted-foreground">
+                Avg: <span className="font-semibold text-foreground">{Math.round(avgSqft).toLocaleString()} sqft</span>
+              </p>
+            </div>
+          </div>
+          
+          <p className="text-sm text-muted-foreground mt-4 pt-4 border-t italic">
+            This analysis is based on {closedProperties.length} Closed, {activeProperties.length} Active, and {pendingProperties.length} Pending/Under Contract properties.
+          </p>
+        </CardContent>
+      </Card>
+    </div>
+  );
 }
 
 export default function CMADetailPage() {
@@ -194,7 +685,7 @@ export default function CMADetailPage() {
     },
   });
 
-  const properties = cma ? ((cma as any).propertiesData || []) : [];
+  const properties: Property[] = cma ? ((cma as any).propertiesData || []) : [];
 
   // Sync notes state when CMA loads
   const handleOpenNotesDialog = () => {
@@ -315,14 +806,6 @@ export default function CMADetailPage() {
     } finally {
       setIsRefreshing(false);
     }
-  };
-
-  const handleClearCMA = () => {
-    toast({
-      title: "Clear CMA",
-      description: "Use the CMA Builder to modify or reset this CMA.",
-    });
-    setLocation(`/cmas/new?from=${id}`);
   };
 
   const generateClientEmail = () => {
@@ -793,12 +1276,6 @@ Best regards`;
                 <h2 className="text-lg font-semibold" data-testid="text-comparable-title">Comparable Properties</h2>
                 <span className="text-muted-foreground">·</span>
                 <span className="text-muted-foreground" data-testid="text-property-count">{properties.length} properties</span>
-                
-                {/* Nearby indicator */}
-                <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-gray-100 dark:bg-gray-800 rounded-full text-xs text-muted-foreground">
-                  <MapPin className="w-3 h-3" />
-                  Nearby
-                </span>
               </div>
               
               {/* Action buttons */}
@@ -812,16 +1289,6 @@ Best regards`;
                 >
                   <RefreshCw className={`w-4 h-4 mr-2 ${isRefreshing ? 'animate-spin' : ''}`} />
                   Refresh MLS Data
-                </Button>
-                
-                <Button
-                  variant="destructive"
-                  size="sm"
-                  onClick={handleClearCMA}
-                  data-testid="button-clear-cma"
-                >
-                  <Trash2 className="w-4 h-4 mr-2" />
-                  Clear CMA Data
                 </Button>
               </div>
             </div>
@@ -944,84 +1411,122 @@ Best regards`;
             </div>
           </div>
           
-          {/* View Mode Toggle - using Button components */}
-          <div className="flex items-center gap-2 mb-4">
-            <span className="text-sm text-muted-foreground">View:</span>
-            <div className="flex items-center border rounded-lg overflow-visible">
-              <Button
-                variant={listView === 'grid' ? 'secondary' : 'ghost'}
-                size="sm"
-                onClick={() => setListView('grid')}
-                className="rounded-r-none"
-                data-testid="button-list-grid"
-              >
-                <LayoutGrid className="w-4 h-4 mr-1" />
-                Grid
-              </Button>
-              <Button
-                variant={listView === 'list' ? 'secondary' : 'ghost'}
-                size="sm"
-                onClick={() => setListView('list')}
-                className="rounded-none border-l"
-                data-testid="button-list-list"
-              >
-                <List className="w-4 h-4 mr-1" />
-                List
-              </Button>
-              <Button
-                variant={listView === 'table' ? 'secondary' : 'ghost'}
-                size="sm"
-                onClick={() => setListView('table')}
-                className="rounded-l-none border-l"
-                data-testid="button-list-table"
-              >
-                <TableIcon className="w-4 h-4 mr-1" />
-                Table
-              </Button>
+          {/* View Mode Toggle - only show for Compare view */}
+          {comparableView === 'compare' && (
+            <div className="flex items-center gap-2 mb-4">
+              <span className="text-sm text-muted-foreground">View:</span>
+              <div className="flex items-center border rounded-lg overflow-visible">
+                <Button
+                  variant={listView === 'grid' ? 'secondary' : 'ghost'}
+                  size="sm"
+                  onClick={() => setListView('grid')}
+                  className="rounded-r-none"
+                  data-testid="button-list-grid"
+                >
+                  <LayoutGrid className="w-4 h-4 mr-1" />
+                  Grid
+                </Button>
+                <Button
+                  variant={listView === 'list' ? 'secondary' : 'ghost'}
+                  size="sm"
+                  onClick={() => setListView('list')}
+                  className="rounded-none border-l"
+                  data-testid="button-list-list"
+                >
+                  <List className="w-4 h-4 mr-1" />
+                  List
+                </Button>
+                <Button
+                  variant={listView === 'table' ? 'secondary' : 'ghost'}
+                  size="sm"
+                  onClick={() => setListView('table')}
+                  className="rounded-l-none border-l"
+                  data-testid="button-list-table"
+                >
+                  <TableIcon className="w-4 h-4 mr-1" />
+                  Table
+                </Button>
+              </div>
             </div>
-          </div>
+          )}
           
-          {/* Property Display - CMAReport renders the table/map/stats views INSIDE the Card */}
+          {/* Property Display - Conditional rendering based on view mode */}
           <div className="mt-4">
-            <CMAReport
-              properties={properties}
-              statistics={statistics || mockStatistics}
-              timelineData={timelineData}
-              isPreview={true}
-              expiresAt={cma.expiresAt ? new Date(cma.expiresAt) : new Date(Date.now() + 30 * 60 * 1000)}
-              visibleMetrics={visibleMetrics}
-              notes={cma.notes}
-              reportTitle={cma.name}
-              subjectPropertyId={cma.subjectPropertyId}
-              onSave={handleSave}
-              onShareCMA={() => setEmailShareDialogOpen(true)}
-              onPublicLink={async () => {
-                try {
-                  let shareUrl: string;
-                  if (cma?.publicLink) {
-                    shareUrl = `${window.location.origin}/share/cma/${cma.publicLink}`;
-                  } else {
-                    const result = await shareMutation.mutateAsync();
-                    shareUrl = `${window.location.origin}/share/cma/${result.shareToken}`;
-                  }
-                  await navigator.clipboard.writeText(shareUrl);
-                  toast({
-                    title: "URL copied to clipboard",
-                    description: shareUrl,
-                  });
-                } catch (error) {
-                  toast({
-                    title: "Error",
-                    description: "Failed to generate or copy share URL",
-                    variant: "destructive",
-                  });
-                }
-              }}
-              onModifySearch={handleModifySearch}
-              onModifyStats={handleModifyStats}
-              onAddNotes={handleOpenNotesDialog}
-              onPrint={handlePrint}
-            />
+            {/* Compare View - Grid, List, or Table */}
+            {comparableView === 'compare' && (
+              <>
+                {listView === 'grid' && (
+                  <PropertyGrid 
+                    properties={statusFilter === 'All' ? properties : properties.filter(p => p.standardStatus === statusFilter)} 
+                    subjectPropertyId={cma.subjectPropertyId} 
+                  />
+                )}
+                {listView === 'list' && (
+                  <PropertyList 
+                    properties={statusFilter === 'All' ? properties : properties.filter(p => p.standardStatus === statusFilter)} 
+                    subjectPropertyId={cma.subjectPropertyId} 
+                  />
+                )}
+                {listView === 'table' && (
+                  <CMAReport
+                    properties={properties}
+                    statistics={statistics || mockStatistics}
+                    timelineData={timelineData}
+                    isPreview={true}
+                    expiresAt={cma.expiresAt ? new Date(cma.expiresAt) : new Date(Date.now() + 30 * 60 * 1000)}
+                    visibleMetrics={visibleMetrics}
+                    notes={cma.notes}
+                    reportTitle={cma.name}
+                    subjectPropertyId={cma.subjectPropertyId}
+                    onSave={handleSave}
+                    onShareCMA={() => setEmailShareDialogOpen(true)}
+                    onPublicLink={async () => {
+                      try {
+                        let shareUrl: string;
+                        if (cma?.publicLink) {
+                          shareUrl = `${window.location.origin}/share/cma/${cma.publicLink}`;
+                        } else {
+                          const result = await shareMutation.mutateAsync();
+                          shareUrl = `${window.location.origin}/share/cma/${result.shareToken}`;
+                        }
+                        await navigator.clipboard.writeText(shareUrl);
+                        toast({
+                          title: "URL copied to clipboard",
+                          description: shareUrl,
+                        });
+                      } catch (error) {
+                        toast({
+                          title: "Error",
+                          description: "Failed to generate or copy share URL",
+                          variant: "destructive",
+                        });
+                      }
+                    }}
+                    onModifySearch={handleModifySearch}
+                    onModifyStats={handleModifyStats}
+                    onAddNotes={handleOpenNotesDialog}
+                    onPrint={handlePrint}
+                  />
+                )}
+              </>
+            )}
+            
+            {/* Map View */}
+            {comparableView === 'map' && (
+              <CMAMapView 
+                properties={statusFilter === 'All' ? properties : properties.filter(p => p.standardStatus === statusFilter)} 
+                subjectPropertyId={cma.subjectPropertyId} 
+              />
+            )}
+            
+            {/* Stats View */}
+            {comparableView === 'stats' && (
+              <CMAStatsView 
+                properties={statusFilter === 'All' ? properties : properties.filter(p => p.standardStatus === statusFilter)} 
+                statistics={statistics || mockStatistics}
+                subjectPropertyId={cma.subjectPropertyId}
+              />
+            )}
           </div>
         </CardContent>
       </Card>
