@@ -2582,26 +2582,29 @@ export function CMABuilder({ onCreateCMA, initialData }: CMABuilderProps) {
                       data-testid="img-cma-carousel"
                     />
                     {/* Navigation Arrows */}
+                    {/* Carousel Controls - Click zones for navigation */}
                     {photos.length > 1 && (
                       <>
-                        <button
-                          type="button"
+                        {/* Left click zone - covers left half */}
+                        <div 
+                          className="absolute left-0 top-0 w-1/2 h-full cursor-pointer z-10 group"
                           onClick={(e) => { e.stopPropagation(); setCurrentPhotoIndex(prev => (prev - 1 + photos.length) % photos.length); }}
-                          className="absolute left-2 top-1/2 -translate-y-1/2 z-20 bg-black/60 hover:bg-black/80 text-white p-2 rounded-full transition-colors"
-                          data-testid="button-cma-carousel-prev"
-                          aria-label="Previous photo"
+                          data-testid="zone-cma-carousel-prev"
                         >
-                          <ChevronLeft className="w-5 h-5" />
-                        </button>
-                        <button
-                          type="button"
+                          <div className="absolute left-3 top-1/2 -translate-y-1/2 bg-black/50 hover:bg-black/70 text-white p-2 rounded-full transition-all opacity-70 group-hover:opacity-100">
+                            <ChevronLeft className="w-5 h-5" />
+                          </div>
+                        </div>
+                        {/* Right click zone - covers right half */}
+                        <div 
+                          className="absolute right-0 top-0 w-1/2 h-full cursor-pointer z-10 group"
                           onClick={(e) => { e.stopPropagation(); setCurrentPhotoIndex(prev => (prev + 1) % photos.length); }}
-                          className="absolute right-2 top-1/2 -translate-y-1/2 z-20 bg-black/60 hover:bg-black/80 text-white p-2 rounded-full transition-colors"
-                          data-testid="button-cma-carousel-next"
-                          aria-label="Next photo"
+                          data-testid="zone-cma-carousel-next"
                         >
-                          <ChevronRight className="w-5 h-5" />
-                        </button>
+                          <div className="absolute right-3 top-1/2 -translate-y-1/2 bg-black/50 hover:bg-black/70 text-white p-2 rounded-full transition-all opacity-70 group-hover:opacity-100">
+                            <ChevronRight className="w-5 h-5" />
+                          </div>
+                        </div>
                         {/* Photo counter */}
                         <div className="absolute bottom-3 left-1/2 -translate-x-1/2 bg-black/60 text-white px-3 py-1.5 rounded-full text-sm font-medium z-20">
                           {currentPhotoIndex + 1} / {photos.length}
