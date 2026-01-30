@@ -30,6 +30,17 @@ import mapboxgl from "mapbox-gl";
 import "mapbox-gl/dist/mapbox-gl.css";
 import type { Cma, Property, PropertyStatistics, TimelineDataPoint } from "@shared/schema";
 import { queryClient, apiRequest } from "@/lib/queryClient";
+import { 
+  BarChart, 
+  Bar, 
+  XAxis, 
+  YAxis, 
+  Tooltip, 
+  ResponsiveContainer,
+  ScatterChart,
+  Scatter,
+  Cell
+} from 'recharts';
 
 // Initialize Mapbox access token
 mapboxgl.accessToken = import.meta.env.VITE_MAPBOX_TOKEN || '';
@@ -490,8 +501,94 @@ function CMAStatsView({
   const avgBeds = statistics.bedrooms?.average || 0;
   const avgBaths = statistics.bathrooms?.average || 0;
   
+  // Price Comparison Bar Chart Data
+  const priceChartData = properties.map(p => {
+    const address = p.streetNumber && p.streetName 
+      ? `${p.streetNumber} ${p.streetName}`
+      : p.id?.substring(0, 10) || 'Unknown';
+    return {
+      name: address.length > 20 ? address.substring(0, 18) + '...' : address,
+      price: Number(p.closePrice) || Number(p.listPrice) || 0,
+      isSubject: p.id === subjectPropertyId,
+    };
+  });
+  
+  // Days on Market Analysis Data (closed properties only)
+  const avgListPriceRatio = closedProperties.length > 0
+    ? closedProperties
+        .filter(p => Number(p.listPrice) && (Number(p.closePrice) || Number(p.listPrice)))
+        .reduce((sum, p) => {
+          const sold = Number(p.closePrice) || Number(p.listPrice);
+          const list = Number(p.listPrice);
+          return sum + (list > 0 ? (sold / list) * 100 : 100);
+        }, 0) / 
+      Math.max(closedProperties.filter(p => Number(p.listPrice) && (Number(p.closePrice) || Number(p.listPrice))).length, 1)
+    : 100;
+  
+  const domScatterData = closedProperties.map(p => {
+    const soldPrice = Number(p.closePrice) || Number(p.listPrice) || 0;
+    const listPrice = Number(p.listPrice) || soldPrice;
+    const ratio = listPrice > 0 ? (soldPrice / listPrice) * 100 : 100;
+    const address = p.streetNumber && p.streetName 
+      ? `${p.streetNumber} ${p.streetName}`
+      : p.id?.substring(0, 10) || 'Unknown';
+    return {
+      x: Number(p.daysOnMarket) || 0,
+      y: soldPrice,
+      name: address,
+      ratio,
+      dom: Number(p.daysOnMarket) || 0,
+      photo: (p as any).photos?.[0] || null,
+      property: p,
+    };
+  });
+  
+  // Price Per Sq Ft Scatter Data
+  const sqftScatterData: { x: number; y: number; name: string; pricePerSqft: number; isSubject: boolean; photo: string | null }[] = [];
+  
+  if (subjectProperty && Number(subjectProperty.livingArea)) {
+    const sqft = Number(subjectProperty.livingArea);
+    const price = Number(subjectProperty.listPrice) || 0;
+    const address = subjectProperty.streetNumber && subjectProperty.streetName 
+      ? `${subjectProperty.streetNumber} ${subjectProperty.streetName}`
+      : 'Subject Property';
+    sqftScatterData.push({
+      x: sqft,
+      y: price,
+      name: address,
+      pricePerSqft: sqft > 0 ? Math.round(price / sqft) : 0,
+      isSubject: true,
+      photo: (subjectProperty as any).photos?.[0] || null,
+    });
+  }
+  
+  closedProperties.forEach(p => {
+    const sqft = Number(p.livingArea);
+    if (sqft > 0) {
+      const soldPrice = Number(p.closePrice) || Number(p.listPrice) || 0;
+      const address = p.streetNumber && p.streetName 
+        ? `${p.streetNumber} ${p.streetName}`
+        : p.id?.substring(0, 10) || 'Unknown';
+      sqftScatterData.push({
+        x: sqft,
+        y: soldPrice,
+        name: address,
+        pricePerSqft: Math.round(soldPrice / sqft),
+        isSubject: false,
+        photo: (p as any).photos?.[0] || null,
+      });
+    }
+  });
+  
+  const getPointColor = (ratio: number) => {
+    if (ratio >= 100) return '#22c55e'; // Green - at or above list
+    if (ratio >= 95) return '#f59e0b';  // Yellow - 95-99%
+    return '#ef4444';                    // Red - below 95%
+  };
+  
   return (
     <div className="space-y-6">
+      {/* Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <Card className="p-4">
           <div className="flex items-center gap-2 mb-2">
@@ -533,6 +630,7 @@ function CMAStatsView({
         </Card>
       </div>
       
+      {/* Statistics Summary Table */}
       <Card>
         <CardHeader>
           <CardTitle className="text-lg">Statistics Summary ({properties.length} Properties)</CardTitle>
@@ -577,6 +675,48 @@ function CMAStatsView({
         </CardContent>
       </Card>
       
+      {/* Price Comparison Bar Chart */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base flex items-center gap-2">
+            <BarChart3 className="w-4 h-4" />
+            Price Comparison
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <ResponsiveContainer width="100%" height={300}>
+            <BarChart data={priceChartData} margin={{ bottom: 80, left: 10, right: 10 }}>
+              <XAxis 
+                dataKey="name" 
+                angle={-45} 
+                textAnchor="end" 
+                height={100}
+                tick={{ fontSize: 10 }}
+                interval={0}
+              />
+              <YAxis 
+                tickFormatter={(v) => v >= 1000000 ? `$${(v / 1000000).toFixed(1)}M` : `$${(v / 1000).toFixed(0)}K`}
+                tick={{ fontSize: 11 }}
+                width={70}
+              />
+              <Tooltip 
+                formatter={(v: number) => [`$${v.toLocaleString()}`, 'Price']}
+                labelStyle={{ fontWeight: 600 }}
+              />
+              <Bar dataKey="price" radius={[4, 4, 0, 0]}>
+                {priceChartData.map((entry, index) => (
+                  <Cell 
+                    key={`cell-${index}`} 
+                    fill={entry.isSubject ? STATUS_COLORS.subject.hex : '#EF4923'} 
+                  />
+                ))}
+              </Bar>
+            </BarChart>
+          </ResponsiveContainer>
+        </CardContent>
+      </Card>
+      
+      {/* CMA Market Review */}
       <Card>
         <CardHeader>
           <CardTitle className="text-lg flex items-center gap-2">
@@ -623,6 +763,258 @@ function CMAStatsView({
           </p>
         </CardContent>
       </Card>
+      
+      {/* Days on Market Analysis */}
+      {closedProperties.length > 0 && (
+        <Card>
+          <CardHeader className="pb-2">
+            <div className="flex flex-wrap items-center gap-6">
+              <div>
+                <span className="text-3xl font-bold">{Math.round(avgDOM)}</span>
+                <span className="text-muted-foreground ml-2 text-sm">DAYS ON MARKET</span>
+              </div>
+              <div>
+                <span className="text-3xl font-bold text-[#EF4923]">{avgListPriceRatio.toFixed(2)}%</span>
+                <span className="text-muted-foreground ml-2 text-sm">OF LIST PRICE</span>
+              </div>
+            </div>
+            <p className="text-sm text-muted-foreground mt-2">
+              Sold homes were on the market for an average of{' '}
+              <span className="font-semibold text-foreground">{Math.round(avgDOM)} days</span>{' '}
+              before they accepted an offer. These homes sold for an average of{' '}
+              <span className="font-semibold text-foreground">{avgListPriceRatio.toFixed(2)}%</span>{' '}
+              of list price.
+            </p>
+          </CardHeader>
+          
+          <CardContent>
+            <div className="flex flex-col lg:flex-row gap-6">
+              {/* Left: Scrollable Property List */}
+              <div className="w-full lg:w-1/3 flex-shrink-0">
+                <div className="flex items-center gap-2 mb-3">
+                  <span className="bg-red-500 text-white text-xs font-medium px-2 py-0.5 rounded">
+                    {closedProperties.length}
+                  </span>
+                  <span className="font-medium">Closed</span>
+                </div>
+                
+                <div className="space-y-2 max-h-[300px] overflow-y-auto pr-2">
+                  {domScatterData.map((item, index) => (
+                    <div 
+                      key={index}
+                      className="flex items-center gap-3 p-2 rounded-lg hover:bg-muted cursor-pointer"
+                      data-testid={`dom-property-${index}`}
+                    >
+                      <div className="w-14 h-12 bg-muted rounded overflow-hidden flex-shrink-0">
+                        {item.photo ? (
+                          <img src={item.photo} alt="" className="w-full h-full object-cover" />
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center text-xs text-muted-foreground">
+                            No img
+                          </div>
+                        )}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="font-medium text-sm truncate">{item.name}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {item.dom} Days • {item.ratio.toFixed(2)}%
+                        </p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+              
+              {/* Right: Scatter Chart */}
+              <div className="flex-1">
+                <ResponsiveContainer width="100%" height={300}>
+                  <ScatterChart margin={{ top: 20, right: 20, bottom: 40, left: 60 }}>
+                    <XAxis 
+                      type="number" 
+                      dataKey="x" 
+                      tick={{ fontSize: 11 }}
+                      label={{ value: 'Days on Market', position: 'bottom', offset: 20, fontSize: 12 }}
+                    />
+                    <YAxis 
+                      type="number" 
+                      dataKey="y" 
+                      tickFormatter={(v) => v >= 1000000 ? `$${(v / 1000000).toFixed(1)}M` : `$${(v / 1000).toFixed(0)}K`}
+                      tick={{ fontSize: 11 }}
+                      width={70}
+                    />
+                    <Tooltip 
+                      content={({ payload }) => {
+                        if (!payload?.[0]) return null;
+                        const data = payload[0].payload;
+                        return (
+                          <div className="bg-white dark:bg-gray-800 p-2 rounded shadow-lg border text-sm">
+                            <p className="font-semibold">{data.name}</p>
+                            <p>Price: ${data.y?.toLocaleString()}</p>
+                            <p>DOM: {data.x} days</p>
+                            <p>List Ratio: {data.ratio?.toFixed(2)}%</p>
+                          </div>
+                        );
+                      }}
+                    />
+                    <Scatter data={domScatterData}>
+                      {domScatterData.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={getPointColor(entry.ratio)} />
+                      ))}
+                    </Scatter>
+                  </ScatterChart>
+                </ResponsiveContainer>
+                
+                {/* Legend */}
+                <div className="flex flex-wrap items-center justify-center gap-4 mt-2 text-sm">
+                  <div className="flex items-center gap-2">
+                    <div className="w-3 h-3 rounded-full bg-[#22c55e]" />
+                    <span>≥100% of list</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="w-3 h-3 rounded-full bg-[#f59e0b]" />
+                    <span>95-99%</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="w-3 h-3 rounded-full bg-[#ef4444]" />
+                    <span>&lt;95%</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+      
+      {/* Average Price/Sq. Ft. Analysis */}
+      {sqftScatterData.length > 0 && (
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base font-bold">AVERAGE PRICE/SQ. FT.</CardTitle>
+            <p className="text-sm text-muted-foreground">
+              {subjectProperty ? '1 Subject, ' : ''}{closedProperties.length} Closed
+            </p>
+          </CardHeader>
+          
+          <CardContent>
+            <div className="flex flex-col lg:flex-row gap-6">
+              {/* Left: Property List */}
+              <div className="w-full lg:w-1/3 flex-shrink-0">
+                {/* Subject Property */}
+                {subjectProperty && (
+                  <div 
+                    className="flex items-center gap-3 p-2 rounded-lg border-b mb-2 pb-3"
+                    data-testid="sqft-subject-property"
+                  >
+                    <div className="w-14 h-12 bg-muted rounded overflow-hidden flex-shrink-0">
+                      {(subjectProperty as any).photos?.[0] ? (
+                        <img src={(subjectProperty as any).photos[0]} alt="" className="w-full h-full object-cover" />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center text-xs text-muted-foreground">
+                          No img
+                        </div>
+                      )}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs text-blue-500">
+                        Subject: {subjectProperty.streetNumber} {subjectProperty.streetName}
+                      </p>
+                      <p className="font-semibold text-[#EF4923]">
+                        ${Number(subjectProperty.livingArea) > 0 
+                          ? Math.round(Number(subjectProperty.listPrice) / Number(subjectProperty.livingArea))
+                          : 0
+                        } / sq. ft.
+                      </p>
+                    </div>
+                  </div>
+                )}
+                
+                {/* Closed Properties */}
+                <div className="space-y-2 max-h-[250px] overflow-y-auto pr-2">
+                  {sqftScatterData.filter(d => !d.isSubject).map((item, index) => (
+                    <div 
+                      key={index}
+                      className="flex items-center gap-3 p-2 rounded-lg hover:bg-muted cursor-pointer"
+                      data-testid={`sqft-property-${index}`}
+                    >
+                      <div className="w-14 h-12 bg-muted rounded overflow-hidden flex-shrink-0">
+                        {item.photo ? (
+                          <img src={item.photo} alt="" className="w-full h-full object-cover" />
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center text-xs text-muted-foreground">
+                            No img
+                          </div>
+                        )}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="font-medium text-sm truncate">{item.name}</p>
+                        <p className="text-xs text-muted-foreground">
+                          ${item.pricePerSqft} / sq. ft.
+                        </p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+              
+              {/* Right: Scatter Chart */}
+              <div className="flex-1">
+                <ResponsiveContainer width="100%" height={300}>
+                  <ScatterChart margin={{ top: 20, right: 20, bottom: 40, left: 60 }}>
+                    <XAxis 
+                      type="number" 
+                      dataKey="x" 
+                      tick={{ fontSize: 11 }}
+                      label={{ value: 'Square Feet', position: 'bottom', offset: 20, fontSize: 12 }}
+                      tickFormatter={(v) => v.toLocaleString()}
+                    />
+                    <YAxis 
+                      type="number" 
+                      dataKey="y" 
+                      tickFormatter={(v) => v >= 1000000 ? `$${(v / 1000000).toFixed(1)}M` : `$${(v / 1000).toFixed(0)}K`}
+                      tick={{ fontSize: 11 }}
+                      width={70}
+                    />
+                    <Tooltip 
+                      content={({ payload }) => {
+                        if (!payload?.[0]) return null;
+                        const data = payload[0].payload;
+                        return (
+                          <div className="bg-white dark:bg-gray-800 p-2 rounded shadow-lg border text-sm">
+                            <p className="font-semibold">{data.name}</p>
+                            <p>Price: ${data.y?.toLocaleString()}</p>
+                            <p>Sq Ft: {data.x?.toLocaleString()}</p>
+                            <p>$/SqFt: ${data.pricePerSqft}</p>
+                          </div>
+                        );
+                      }}
+                    />
+                    <Scatter data={sqftScatterData}>
+                      {sqftScatterData.map((entry, index) => (
+                        <Cell 
+                          key={`cell-${index}`} 
+                          fill={entry.isSubject ? STATUS_COLORS.subject.hex : STATUS_COLORS.closed.hex} 
+                        />
+                      ))}
+                    </Scatter>
+                  </ScatterChart>
+                </ResponsiveContainer>
+                
+                {/* Legend */}
+                <div className="flex flex-wrap items-center justify-center gap-4 mt-2 text-sm">
+                  <div className="flex items-center gap-2">
+                    <div className="w-3 h-3 rounded-full" style={{ backgroundColor: STATUS_COLORS.subject.hex }} />
+                    <span>Subject Property</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="w-3 h-3 rounded-full" style={{ backgroundColor: STATUS_COLORS.closed.hex }} />
+                    <span>Closed Properties</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }
