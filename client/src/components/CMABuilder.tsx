@@ -21,7 +21,6 @@ import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import type { Property } from "@shared/schema";
 import { STATUS_COLORS, getStatusConfig } from "@/lib/statusColors";
-import { calculateSmartDefaults, type CMASmartDefaults } from "@/lib/cma-filter-utils";
 
 interface AutocompleteInputProps {
   placeholder?: string;
@@ -287,7 +286,7 @@ export function CMABuilder({ onCreateCMA, initialData }: CMABuilderProps) {
   const [searchStories, setSearchStories] = useState(sc.stories || "");
   const [searchMinYearBuilt, setSearchMinYearBuilt] = useState(sc.minYearBuilt || "");
   const [searchMaxYearBuilt, setSearchMaxYearBuilt] = useState(sc.maxYearBuilt || "");
-  const [searchSoldDays, setSearchSoldDays] = useState(sc.soldDays || "180");
+  const [searchSoldDays, setSearchSoldDays] = useState(sc.soldDays || "365");
   const [searchPropertyType, setSearchPropertyType] = useState(sc.propertyType || "");
   
   // Search mode state
@@ -370,7 +369,7 @@ export function CMABuilder({ onCreateCMA, initialData }: CMABuilderProps) {
     setSearchStories("");
     setSearchMinYearBuilt("");
     setSearchMaxYearBuilt("");
-    setSearchSoldDays("180");
+    setSearchSoldDays("");
     setSearchPropertyType("");
     setStatusDisplayFilter('all');
   };
@@ -400,60 +399,11 @@ export function CMABuilder({ onCreateCMA, initialData }: CMABuilderProps) {
     setSearchStories("");
     setSearchMinYearBuilt("");
     setSearchMaxYearBuilt("");
-    setSearchSoldDays("180");
+    setSearchSoldDays("");
     setSearchPropertyType("");
     setSearchEnabled(false);
     setStatusDisplayFilter('all');
   };
-
-  const applySmartDefaults = useCallback(() => {
-    if (!subjectProperty) {
-      toast({ title: "No subject property selected", variant: "destructive" });
-      return;
-    }
-    
-    const defaults = calculateSmartDefaults(subjectProperty);
-    console.log('[CMA] Applying smart defaults:', defaults);
-    
-    if (defaults.minPrice !== undefined) setSearchMinPrice(String(defaults.minPrice));
-    if (defaults.maxPrice !== undefined) setSearchMaxPrice(String(defaults.maxPrice));
-    if (defaults.minSqft !== undefined) setSearchMinSqft(String(defaults.minSqft));
-    if (defaults.maxSqft !== undefined) setSearchMaxSqft(String(defaults.maxSqft));
-    if (defaults.minYearBuilt !== undefined) setSearchMinYearBuilt(String(defaults.minYearBuilt));
-    if (defaults.maxYearBuilt !== undefined) setSearchMaxYearBuilt(String(defaults.maxYearBuilt));
-    if (defaults.minBeds !== undefined) setSearchMinBeds(String(defaults.minBeds));
-    if (defaults.maxBeds !== undefined) setSearchMaxBeds(String(defaults.maxBeds));
-    if (defaults.minBaths !== undefined) setSearchMinBaths(String(defaults.minBaths));
-    if (defaults.maxBaths !== undefined) setSearchMaxBaths(String(defaults.maxBaths));
-    if (defaults.minLotAcres !== undefined) setSearchMinLotAcres(String(defaults.minLotAcres));
-    if (defaults.maxLotAcres !== undefined) setSearchMaxLotAcres(String(defaults.maxLotAcres));
-    setSearchSoldDays("180");
-    setSearchStatuses(["active", "under_contract", "closed"]);
-    
-    toast({ title: "Smart defaults applied", description: "Search filters updated based on subject property" });
-  }, [subjectProperty, toast]);
-
-  useEffect(() => {
-    if (subjectProperty && !initialData?.searchCriteria) {
-      const defaults = calculateSmartDefaults(subjectProperty);
-      console.log('[CMA] Auto-applying smart defaults for subject:', subjectProperty.id, defaults);
-      
-      if (defaults.minPrice !== undefined) setSearchMinPrice(String(defaults.minPrice));
-      if (defaults.maxPrice !== undefined) setSearchMaxPrice(String(defaults.maxPrice));
-      if (defaults.minSqft !== undefined) setSearchMinSqft(String(defaults.minSqft));
-      if (defaults.maxSqft !== undefined) setSearchMaxSqft(String(defaults.maxSqft));
-      if (defaults.minYearBuilt !== undefined) setSearchMinYearBuilt(String(defaults.minYearBuilt));
-      if (defaults.maxYearBuilt !== undefined) setSearchMaxYearBuilt(String(defaults.maxYearBuilt));
-      if (defaults.minBeds !== undefined) setSearchMinBeds(String(defaults.minBeds));
-      if (defaults.maxBeds !== undefined) setSearchMaxBeds(String(defaults.maxBeds));
-      if (defaults.minBaths !== undefined) setSearchMinBaths(String(defaults.minBaths));
-      if (defaults.maxBaths !== undefined) setSearchMaxBaths(String(defaults.maxBaths));
-      if (defaults.minLotAcres !== undefined) setSearchMinLotAcres(String(defaults.minLotAcres));
-      if (defaults.maxLotAcres !== undefined) setSearchMaxLotAcres(String(defaults.maxLotAcres));
-      setSearchSoldDays("180");
-      setSearchStatuses(["active", "under_contract", "closed"]);
-    }
-  }, [subjectProperty?.id, initialData?.searchCriteria]);
 
   const buildSearchQuery = () => {
     const params = new URLSearchParams();
@@ -871,28 +821,15 @@ export function CMABuilder({ onCreateCMA, initialData }: CMABuilderProps) {
               <Search className="w-5 h-5" />
               Search Properties
             </CardTitle>
-            <div className="flex items-center gap-2">
-              {subjectProperty && (
-                <Button 
-                  variant="outline" 
-                  size="sm" 
-                  onClick={applySmartDefaults}
-                  data-testid="button-smart-defaults"
-                >
-                  <Sparkles className="w-4 h-4 mr-1" />
-                  Smart Defaults
-                </Button>
-              )}
-              <Button 
-                variant="ghost" 
-                size="sm" 
-                onClick={clearFilters}
-                data-testid="button-clear-filters"
-              >
-                <RotateCcw className="w-4 h-4 mr-1" />
-                Clear Filters
-              </Button>
-            </div>
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={clearFilters}
+              data-testid="button-clear-filters"
+            >
+              <RotateCcw className="w-4 h-4 mr-1" />
+              Clear Filters
+            </Button>
           </div>
           <CardDescription>
             Find comparable properties from the Repliers database (30,000+ active listings)
