@@ -1,0 +1,399 @@
+# Smart Filter Defaults - CMA Search Enhancement
+
+## SCOPE
+
+Add Smart Filter Defaults feature to the CMA search functionality. When a subject property is selected, automatically calculate and populate search filter ranges based on the subject property's attributes.
+
+---
+
+## FEATURE DESCRIPTION
+
+When a user selects a subject property, the search filters should auto-populate with calculated "smart" ranges:
+
+| Filter | Calculation | Example (Subject: $500K, 2500 sqft, 2015 built, 4 bed) |
+|--------|-------------|--------------------------------------------------------|
+| **Min Price** | Subject price × 0.80 | $400,000 |
+| **Max Price** | Subject price × 1.20 | $600,000 |
+| **Min Sq Ft** | Subject sqft × 0.75 | 1,875 |
+| **Max Sq Ft** | Subject sqft × 1.25 | 3,125 |
+| **Min Year Built** | Subject year - 10 | 2005 |
+| **Max Year Built** | Current year | 2026 |
+| **Min Beds** | Subject beds - 1 (min: 1) | 3 |
+| **Max Beds** | Subject beds + 1 | 5 |
+| **Min Baths** | Subject baths - 1 (min: 1) | (if applicable) |
+| **Radius** | Default: 2 miles | 2 mi |
+| **Sold Within** | Default: 6 months | 6 months |
+
+---
+
+## TASK 1: Create Smart Defaults Utility Function
+
+**File:** `client/src/lib/cma-filter-utils.ts` (NEW or add to existing utils)
+
+```typescript
+import type { CMAFilters } from "@/types/cma";
+
+// Default filter values (no subject property context)
+export const DEFAULT_CMA_FILTERS: CMAFilters = {
+  radius: 2,
+  statuses: ['Active', 'Active Under Contract', 'Closed'],
+  maxResults: 20,
+  soldWithinMonths: 6,
+};
+
+// Radius options for dropdown
+export const RADIUS_OPTIONS = [
+  { value: 0.5, label: '0.5 mi' },
+  { value: 1, label: '1 mi' },
+  { value: 2, label: '2 mi' },
+  { value: 5, label: '5 mi' },
+  { value: 10, label: '10 mi' },
+];
+
+// Sold within options
+export const SOLD_WITHIN_OPTIONS = [
+  { value: 3, label: '3 months' },
+  { value: 6, label: '6 months' },
+  { value: 12, label: '12 months' },
+  { value: 24, label: '24 months' },
+];
+
+/**
+ * Calculate smart default filters based on subject property attributes.
+ * Returns filter ranges that find comparable properties similar to subject.
+ * 
+ * @param subjectProperty - The subject property data
+ * @returns CMAFilters with calculated ranges
+ */
+export function calculateSmartDefaults(subjectProperty: any): Partial<CMAFilters> {
+  const defaults: Partial<CMAFilters> = {
+    ...DEFAULT_CMA_FILTERS,
+  };
+
+  if (!subjectProperty) {
+    return defaults;
+  }
+
+  // Price range: ±20%
+  const price = subjectProperty.listPrice || subjectProperty.price;
+  if (price && price > 0) {
+    defaults.minPrice = Math.round(price * 0.80);
+    defaults.maxPrice = Math.round(price * 1.20);
+  }
+
+  // Sq Ft range: ±25%
+  const sqft = subjectProperty.sqft || subjectProperty.livingArea;
+  if (sqft && sqft > 0) {
+    defaults.minSqft = Math.round(sqft * 0.75);
+    defaults.maxSqft = Math.round(sqft * 1.25);
+  }
+
+  // Year Built: -10 years to current year
+  const yearBuilt = subjectProperty.yearBuilt;
+  if (yearBuilt && yearBuilt > 1900) {
+    defaults.minYearBuilt = yearBuilt - 10;
+    defaults.maxYearBuilt = new Date().getFullYear();
+  }
+
+  // Beds: ±1 (minimum 1)
+  const beds = subjectProperty.bedrooms || subjectProperty.beds || subjectProperty.bedroomsTotal;
+  if (beds && beds > 0) {
+    defaults.minBeds = Math.max(1, beds - 1);
+    defaults.maxBeds = beds + 1;
+  }
+
+  // Baths: ±1 (minimum 1)
+  const baths = subjectProperty.bathrooms || subjectProperty.baths || subjectProperty.bathroomsTotalInteger;
+  if (baths && baths > 0) {
+    defaults.minBaths = Math.max(1, Math.floor(baths - 1));
+    defaults.maxBaths = Math.ceil(baths + 1);
+  }
+
+  // Lot size: ±50% (if available)
+  const lotAcres = subjectProperty.lotSizeAcres || subjectProperty.lotSize;
+  if (lotAcres && lotAcres > 0) {
+    defaults.minLotAcres = Math.round(lotAcres * 0.50 * 100) / 100;
+    defaults.maxLotAcres = Math.round(lotAcres * 1.50 * 100) / 100;
+  }
+
+  return defaults;
+}
+
+/**
+ * Check if current filters match the smart defaults for the subject property.
+ * Used to determine if "Reset to Defaults" button should be shown.
+ */
+export function hasCustomFilters(
+  currentFilters: Partial<CMAFilters>,
+  subjectProperty: any
+): boolean {
+  const smartDefaults = calculateSmartDefaults(subjectProperty);
+  
+  // Compare key filter values
+  const keysToCompare = [
+    'minPrice', 'maxPrice', 
+    'minSqft', 'maxSqft',
+    'minYearBuilt', 'maxYearBuilt',
+    'minBeds', 'maxBeds',
+    'radius'
+  ];
+  
+  for (const key of keysToCompare) {
+    if (currentFilters[key as keyof CMAFilters] !== smartDefaults[key as keyof CMAFilters]) {
+      return true;
+    }
+  }
+  
+  return false;
+}
+
+/**
+ * Format filter value for display
+ */
+export function formatFilterValue(value: number | undefined, type: 'price' | 'sqft' | 'year' | 'beds' | 'acres'): string {
+  if (value === undefined || value === null) return '';
+  
+  switch (type) {
+    case 'price':
+      return `$${value.toLocaleString()}`;
+    case 'sqft':
+      return `${value.toLocaleString()} sqft`;
+    case 'year':
+      return String(value);
+    case 'beds':
+      return `${value} bed${value !== 1 ? 's' : ''}`;
+    case 'acres':
+      return `${value} acres`;
+    default:
+      return String(value);
+  }
+}
+```
+
+---
+
+## TASK 2: Add "Reset to Smart Defaults" Button
+
+In the CMA search/filter component (likely `CMABuilder.tsx`, `SearchCriteria.tsx`, or similar), add:
+
+```typescript
+import { calculateSmartDefaults, hasCustomFilters, DEFAULT_CMA_FILTERS } from '@/lib/cma-filter-utils';
+
+// Inside component:
+const [filters, setFilters] = useState<CMAFilters>(DEFAULT_CMA_FILTERS);
+
+// When subject property is selected/changed, auto-apply smart defaults
+useEffect(() => {
+  if (subjectProperty) {
+    const smartDefaults = calculateSmartDefaults(subjectProperty);
+    setFilters(prev => ({ ...prev, ...smartDefaults }));
+    console.log('[CMA] Applied smart defaults:', smartDefaults);
+  }
+}, [subjectProperty?.mlsNumber]); // Trigger when subject changes
+
+// Reset handler
+const handleResetToSmartDefaults = () => {
+  if (subjectProperty) {
+    const smartDefaults = calculateSmartDefaults(subjectProperty);
+    setFilters(prev => ({ ...prev, ...smartDefaults }));
+    toast({ title: 'Filters reset to smart defaults' });
+  } else {
+    setFilters(DEFAULT_CMA_FILTERS);
+    toast({ title: 'Filters reset to defaults' });
+  }
+};
+
+// Clear all filters handler
+const handleClearFilters = () => {
+  setFilters({
+    ...DEFAULT_CMA_FILTERS,
+    minPrice: undefined,
+    maxPrice: undefined,
+    minSqft: undefined,
+    maxSqft: undefined,
+    minYearBuilt: undefined,
+    maxYearBuilt: undefined,
+    minBeds: undefined,
+    maxBeds: undefined,
+    minBaths: undefined,
+    maxBaths: undefined,
+    minLotAcres: undefined,
+    maxLotAcres: undefined,
+  });
+  toast({ title: 'All filters cleared' });
+};
+```
+
+---
+
+## TASK 3: Add UI Buttons in Filter Panel
+
+Add these buttons to the filter panel/form:
+
+```tsx
+{/* Filter Action Buttons */}
+<div className="flex items-center gap-2 pt-4 border-t">
+  {/* Reset to Smart Defaults */}
+  <Button
+    type="button"
+    variant="outline"
+    size="sm"
+    onClick={handleResetToSmartDefaults}
+    disabled={!subjectProperty}
+    className="flex items-center gap-2"
+  >
+    <Sparkles className="w-4 h-4" />
+    Smart Defaults
+  </Button>
+  
+  {/* Clear All Filters */}
+  <Button
+    type="button"
+    variant="ghost"
+    size="sm"
+    onClick={handleClearFilters}
+    className="text-muted-foreground"
+  >
+    Clear All
+  </Button>
+  
+  {/* Show indicator if using custom filters */}
+  {hasCustomFilters(filters, subjectProperty) && (
+    <span className="text-xs text-muted-foreground ml-auto">
+      Custom filters applied
+    </span>
+  )}
+</div>
+```
+
+**Import the Sparkles icon:**
+```typescript
+import { Sparkles } from 'lucide-react';
+```
+
+---
+
+## TASK 4: Show Smart Defaults Preview
+
+When subject property is selected, show what the smart defaults will be:
+
+```tsx
+{/* Smart Defaults Preview (show when subject is selected) */}
+{subjectProperty && (
+  <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-3 mb-4">
+    <div className="flex items-center gap-2 text-blue-700 dark:text-blue-400 mb-2">
+      <Sparkles className="w-4 h-4" />
+      <span className="text-sm font-medium">Smart Defaults Available</span>
+    </div>
+    <p className="text-xs text-blue-600 dark:text-blue-400">
+      Based on {subjectProperty.address}:
+    </p>
+    <div className="grid grid-cols-2 gap-x-4 gap-y-1 mt-2 text-xs text-blue-600 dark:text-blue-400">
+      <span>Price: ${(subjectProperty.listPrice * 0.8).toLocaleString()} - ${(subjectProperty.listPrice * 1.2).toLocaleString()}</span>
+      <span>Sq Ft: {Math.round(subjectProperty.sqft * 0.75).toLocaleString()} - {Math.round(subjectProperty.sqft * 1.25).toLocaleString()}</span>
+      <span>Beds: {Math.max(1, subjectProperty.bedrooms - 1)} - {subjectProperty.bedrooms + 1}</span>
+      <span>Year: {subjectProperty.yearBuilt - 10} - {new Date().getFullYear()}</span>
+    </div>
+  </div>
+)}
+```
+
+---
+
+## TASK 5: Auto-Apply on Subject Selection
+
+When the user selects a subject property (in CMANew or CMABuilder), automatically apply smart defaults:
+
+```typescript
+// In the subject property selection handler
+const handleSubjectPropertySelected = (property: any) => {
+  setSubjectProperty(property);
+  
+  // Auto-apply smart defaults
+  const smartDefaults = calculateSmartDefaults(property);
+  setFilters(prev => ({
+    ...prev,
+    ...smartDefaults,
+  }));
+  
+  toast({
+    title: 'Subject property selected',
+    description: 'Search filters updated with smart defaults',
+  });
+};
+```
+
+---
+
+## ACCEPTANCE CRITERIA
+
+- [ ] `calculateSmartDefaults()` function correctly calculates ranges from subject property
+- [ ] Smart defaults auto-apply when subject property is selected
+- [ ] "Smart Defaults" button resets filters to calculated values
+- [ ] "Clear All" button removes all filter values
+- [ ] UI shows when custom filters are applied vs smart defaults
+- [ ] Handles missing subject property data gracefully (uses standard defaults)
+- [ ] Works with both new CMA creation and existing CMA editing
+
+---
+
+## VALIDATION TESTS
+
+```
+Test 1: Subject with $500,000 price
+- Expected minPrice: $400,000
+- Expected maxPrice: $600,000
+
+Test 2: Subject with 2,500 sqft
+- Expected minSqft: 1,875
+- Expected maxSqft: 3,125
+
+Test 3: Subject with 4 bedrooms
+- Expected minBeds: 3
+- Expected maxBeds: 5
+
+Test 4: Subject with 1 bedroom (edge case)
+- Expected minBeds: 1 (not 0)
+- Expected maxBeds: 2
+
+Test 5: Subject built in 2015
+- Expected minYearBuilt: 2005
+- Expected maxYearBuilt: 2026
+
+Test 6: No subject property
+- All price/sqft/bed filters should be empty
+- Radius, statuses, soldWithinMonths use defaults
+```
+
+---
+
+## LOGGING
+
+```javascript
+console.log('[CMA] Subject property selected:', { mlsNumber, listPrice, sqft, beds, yearBuilt });
+console.log('[CMA] Calculated smart defaults:', smartDefaults);
+console.log('[CMA] Filters reset to smart defaults');
+console.log('[CMA] Filters cleared');
+```
+
+---
+
+## FILES LIKELY IMPACTED
+
+```
+client/src/
+├── lib/
+│   └── cma-filter-utils.ts      [NEW - utility functions]
+├── pages/
+│   ├── CMANew.tsx               [MODIFY - auto-apply on subject selection]
+│   └── CMADetailPage.tsx        [MODIFY - if search filters exist here]
+├── components/
+│   ├── CMABuilder.tsx           [MODIFY - add reset buttons]
+│   └── SearchCriteria.tsx       [MODIFY - if filter UI is here]
+└── types/
+    └── cma.ts                   [MODIFY - ensure CMAFilters type is complete]
+```
+
+---
+
+Ready to implement! This feature will significantly improve the CMA search UX by pre-populating relevant filter ranges.
