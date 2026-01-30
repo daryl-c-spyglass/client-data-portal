@@ -5,7 +5,8 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
-import { ArrowLeft, Share2, Link as LinkIcon, Copy, Check, Trash2, ExternalLink, Printer, Loader2, Mail, LayoutGrid } from "lucide-react";
+import { Card, CardContent } from "@/components/ui/card";
+import { ArrowLeft, Share2, Link as LinkIcon, Copy, Check, Trash2, ExternalLink, Printer, Loader2, Mail, LayoutGrid, MapPin, BarChart3, Map, TrendingUp, List, Table as TableIcon, RefreshCw } from "lucide-react";
 import { SiFacebook, SiX, SiInstagram, SiTiktok } from "react-icons/si";
 import { Link } from "wouter";
 import { CMAReport } from "@/components/CMAReport";
@@ -70,6 +71,12 @@ export default function CMADetailPage() {
   const [visibleMetrics, setVisibleMetrics] = useState<StatMetricKey[]>(
     STAT_METRICS.map(m => m.key)
   );
+  
+  // View state for comparables section
+  const [comparableView, setComparableView] = useState<'compare' | 'map' | 'stats'>('compare');
+  const [listView, setListView] = useState<'grid' | 'list' | 'table'>('table');
+  const [statusFilter, setStatusFilter] = useState<string>('All');
+  const [isRefreshing, setIsRefreshing] = useState(false);
   
   const toggleMetric = (key: StatMetricKey) => {
     setVisibleMetrics(prev => 
@@ -289,6 +296,33 @@ export default function CMADetailPage() {
 
   const handlePrint = () => {
     window.print();
+  };
+
+  const handleRefreshMLS = async () => {
+    setIsRefreshing(true);
+    try {
+      await refetchCma();
+      toast({
+        title: "MLS Data Refreshed",
+        description: "Property data has been updated.",
+      });
+    } catch (error) {
+      toast({
+        title: "Refresh Failed",
+        description: "Unable to refresh MLS data.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
+
+  const handleClearCMA = () => {
+    toast({
+      title: "Clear CMA",
+      description: "Use the CMA Builder to modify or reset this CMA.",
+    });
+    setLocation(`/cmas/new?from=${id}`);
   };
 
   const generateClientEmail = () => {
@@ -696,6 +730,206 @@ Best regards`;
         </Dialog>
         </div>
       </div>
+
+      {/* Comparable Properties Card - Clean Design */}
+      <Card className="overflow-hidden print:hidden">
+        <CardContent className="p-6">
+          {/* Header with title, count, nearby indicator, and toggles */}
+          <div className="flex flex-col gap-4 mb-4">
+            <div className="flex items-center justify-between flex-wrap gap-4">
+              <div className="flex items-center gap-3 flex-wrap">
+                <h2 className="text-lg font-semibold" data-testid="text-comparable-title">Comparable Properties</h2>
+                <span className="text-muted-foreground">·</span>
+                <span className="text-muted-foreground" data-testid="text-property-count">{properties.length} properties</span>
+                
+                {/* Nearby indicator */}
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-gray-100 dark:bg-gray-800 rounded-full text-xs text-muted-foreground">
+                  <MapPin className="w-3 h-3" />
+                  Nearby
+                </span>
+              </div>
+              
+              {/* Action buttons */}
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleRefreshMLS}
+                  disabled={isRefreshing}
+                  data-testid="button-refresh-mls"
+                >
+                  <RefreshCw className={`w-4 h-4 mr-2 ${isRefreshing ? 'animate-spin' : ''}`} />
+                  Refresh MLS Data
+                </Button>
+                
+                <Button
+                  variant="destructive"
+                  size="sm"
+                  onClick={handleClearCMA}
+                  data-testid="button-clear-cma"
+                >
+                  <Trash2 className="w-4 h-4 mr-2" />
+                  Clear CMA Data
+                </Button>
+              </div>
+            </div>
+            
+            {/* View Toggle - pill style using Button components */}
+            <div className="flex items-center justify-between flex-wrap gap-4">
+              <div className="flex items-center gap-1 bg-muted rounded-lg p-1">
+                <Button
+                  variant={comparableView === 'compare' ? 'secondary' : 'ghost'}
+                  size="sm"
+                  onClick={() => setComparableView('compare')}
+                  className={comparableView === 'compare' ? 'shadow-sm' : ''}
+                  data-testid="button-view-compare"
+                >
+                  <BarChart3 className="w-4 h-4 mr-1" />
+                  Compare
+                </Button>
+                <Button
+                  variant={comparableView === 'map' ? 'secondary' : 'ghost'}
+                  size="sm"
+                  onClick={() => setComparableView('map')}
+                  className={comparableView === 'map' ? 'shadow-sm' : ''}
+                  data-testid="button-view-map"
+                >
+                  <Map className="w-4 h-4 mr-1" />
+                  Map
+                </Button>
+                <Button
+                  variant={comparableView === 'stats' ? 'secondary' : 'ghost'}
+                  size="sm"
+                  onClick={() => setComparableView('stats')}
+                  className={comparableView === 'stats' ? 'shadow-sm' : ''}
+                  data-testid="button-view-stats"
+                >
+                  <TrendingUp className="w-4 h-4 mr-1" />
+                  Stats
+                </Button>
+              </div>
+            </div>
+          </div>
+          
+          {/* Status Filter Tabs - using Badge components */}
+          <div className="flex items-center gap-2 mb-4 flex-wrap">
+            {['All', 'Closed', 'Active Under Contract', 'Pending', 'Active'].map((status) => (
+              <Badge
+                key={status}
+                variant={statusFilter === status ? 'default' : 'secondary'}
+                className="cursor-pointer"
+                onClick={() => setStatusFilter(status)}
+                data-testid={`button-status-${status.toLowerCase().replace(/ /g, '-')}`}
+              >
+                {status}
+              </Badge>
+            ))}
+          </div>
+          
+          {/* Stats Bar */}
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-4 p-4 bg-gray-50 dark:bg-gray-800/50 rounded-lg mb-4">
+            <div>
+              <p className="text-xs text-muted-foreground uppercase tracking-wide">Low Price</p>
+              <p className="text-lg font-semibold" data-testid="stat-low-price">
+                {statistics?.price?.range?.min 
+                  ? `$${Math.round(statistics.price.range.min).toLocaleString()}`
+                  : 'N/A'}
+              </p>
+            </div>
+            
+            <div>
+              <p className="text-xs text-muted-foreground uppercase tracking-wide">High Price</p>
+              <p className="text-lg font-semibold" data-testid="stat-high-price">
+                {statistics?.price?.range?.max
+                  ? `$${Math.round(statistics.price.range.max).toLocaleString()}`
+                  : 'N/A'}
+              </p>
+            </div>
+            
+            <div>
+              <p className="text-xs text-muted-foreground uppercase tracking-wide">Avg Price</p>
+              <p className="text-lg font-semibold" data-testid="stat-avg-price">
+                {statistics?.price?.average
+                  ? `$${Math.round(statistics.price.average).toLocaleString()}`
+                  : 'N/A'}
+              </p>
+              {/* Market comparison indicator - shows when data available */}
+              {statistics?.price?.average && statistics?.price?.median && (
+                <p className={`text-xs flex items-center gap-1 ${
+                  statistics.price.average > statistics.price.median ? 'text-green-600' : 'text-red-600'
+                }`} data-testid="stat-market-comparison">
+                  {statistics.price.average > statistics.price.median ? '↗' : '↘'} 
+                  {Math.abs(((statistics.price.average - statistics.price.median) / statistics.price.median) * 100).toFixed(1)}% vs median
+                </p>
+              )}
+            </div>
+            
+            <div>
+              <p className="text-xs text-muted-foreground uppercase tracking-wide">Median</p>
+              <p className="text-lg font-semibold" data-testid="stat-median">
+                {statistics?.price?.median
+                  ? `$${Math.round(statistics.price.median).toLocaleString()}`
+                  : 'N/A'}
+              </p>
+            </div>
+            
+            <div>
+              <p className="text-xs text-muted-foreground uppercase tracking-wide">Avg $/Sqft</p>
+              <p className="text-lg font-semibold" data-testid="stat-avg-price-sqft">
+                {statistics?.pricePerSqFt?.average
+                  ? `$${Math.round(statistics.pricePerSqFt.average)}`
+                  : 'N/A'}
+              </p>
+            </div>
+            
+            <div>
+              <p className="text-xs text-muted-foreground uppercase tracking-wide">Avg DOM</p>
+              <p className="text-lg font-semibold" data-testid="stat-avg-dom">
+                {statistics?.daysOnMarket?.average
+                  ? `${Math.round(statistics.daysOnMarket.average)} Days`
+                  : 'N/A'}
+              </p>
+            </div>
+          </div>
+          
+          {/* View Mode Toggle - using Button components */}
+          <div className="flex items-center gap-2 mb-4">
+            <span className="text-sm text-muted-foreground">View:</span>
+            <div className="flex items-center border rounded-lg overflow-visible">
+              <Button
+                variant={listView === 'grid' ? 'secondary' : 'ghost'}
+                size="sm"
+                onClick={() => setListView('grid')}
+                className="rounded-r-none"
+                data-testid="button-list-grid"
+              >
+                <LayoutGrid className="w-4 h-4 mr-1" />
+                Grid
+              </Button>
+              <Button
+                variant={listView === 'list' ? 'secondary' : 'ghost'}
+                size="sm"
+                onClick={() => setListView('list')}
+                className="rounded-none border-l"
+                data-testid="button-list-list"
+              >
+                <List className="w-4 h-4 mr-1" />
+                List
+              </Button>
+              <Button
+                variant={listView === 'table' ? 'secondary' : 'ghost'}
+                size="sm"
+                onClick={() => setListView('table')}
+                className="rounded-l-none border-l"
+                data-testid="button-list-table"
+              >
+                <TableIcon className="w-4 h-4 mr-1" />
+                Table
+              </Button>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
       <CMAReport
         properties={properties}
