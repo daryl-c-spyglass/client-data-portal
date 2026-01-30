@@ -1,0 +1,1767 @@
+# CMA Implementation Prompt - Client Data Portal
+
+## SCOPE
+
+Implement standalone CMA (Comparative Market Analysis) functionality in Client Data Portal, adapted from Contract Conduit's transaction-centric approach.
+
+**Key Difference:** Client Data Portal has no Transaction context - users start from "Create CMA" and must search/select a subject property.
+
+---
+
+## PHASE 1: Database Schema
+
+### Task 1.1: Create/Update CMA Tables
+
+**File:** `shared/schema.ts`
+
+```typescript
+import { pgTable, varchar, text, jsonb, timestamp, boolean, integer } from "drizzle-orm/pg-core";
+import { sql } from "drizzle-orm";
+
+// ===========================================
+// CMA TABLE (Standalone - No Transaction)
+// ===========================================
+export const cmas = pgTable("cmas", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  
+  // User ownership
+  userId: varchar("user_id").notNull(),
+  
+  // CMA identification
+  name: text("name").notNull(),
+  
+  // Client info (for standalone CMAs)
+  clientName: text("client_name"),
+  clientEmail: text("client_email"),
+  
+  // Subject Property
+  subjectPropertyId: text("subject_property_id"),  // MLS number
+  subjectPropertyData: jsonb("subject_property_data").$type<PropertySnapshot>(), // Full snapshot
+  
+  // Comparables (denormalized for historical accuracy)
+  comparablePropertyIds: jsonb("comparable_property_ids").$type<string[]>().notNull().default([]),
+  propertiesData: jsonb("properties_data").$type<CMAComparable[]>(), // Full snapshots
+  
+  // Search criteria used
+  searchCriteria: jsonb("search_criteria").$type<CMAFilters>(),
+  
+  // Notes
+  notes: text("notes"),
+  
+  // Sharing
+  publicLink: text("public_link").unique(),
+  expiresAt: timestamp("expires_at"),
+  
+  // Presentation extras
+  brochure: jsonb("brochure").$type<CmaBrochure>(),
+  adjustments: jsonb("adjustments").$type<CmaAdjustmentsData>(),
+  
+  // Timestamps
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// ===========================================
+// CMA REPORT CONFIG (1:1 with CMA)
+// ===========================================
+export const cmaReportConfigs = pgTable("cma_report_configs", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  cmaId: varchar("cma_id").notNull().unique(),
+  
+  // Sections
+  includedSections: jsonb("included_sections").$type<string[]>(),
+  sectionOrder: jsonb("section_order").$type<string[]>(),
+  
+  // Content
+  coverLetterOverride: text("cover_letter_override"),
+  coverPageConfig: jsonb("cover_page_config").$type<CoverPageConfig>(),
+  
+  // Layout
+  layout: text("layout").default("two_photos"),
+  template: text("template").default("default"),
+  theme: text("theme").default("spyglass"),
+  photoLayout: text("photo_layout").default("first_dozen"),
+  customPhotoSelections: jsonb("custom_photo_selections").$type<Record<string, string[]>>(),
+  
+  // Map
+  mapStyle: text("map_style").default("streets"),
+  showMapPolygon: boolean("show_map_polygon").default(true),
+  
+  // Footer
+  includeAgentFooter: boolean("include_agent_footer").default(true),
+  
+  // Timestamps
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// ===========================================
+// CMA TEMPLATES (User-saved templates)
+// ===========================================
+export const cmaReportTemplates = pgTable("cma_report_templates", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull(),
+  name: text("name").notNull(),
+  isDefault: boolean("is_default").default(false),
+  
+  includedSections: jsonb("included_sections").$type<string[]>(),
+  sectionOrder: jsonb("section_order").$type<string[]>(),
+  layoutOptions: jsonb("layout_options"),
+  
+  createdAt: timestamp("created_at").defaultNow(),
+});
+```
+
+### Task 1.2: TypeScript Interfaces
+
+**File:** `shared/types/cma.ts`
+
+```typescript
+// ===========================================
+// CMA FILTERS
+// ===========================================
+export interface CMAFilters {
+  // Location
+  radius: number;              // Miles (default: 2)
+  subdivision?: string;
+  zipCode?: string;
+  city?: string;
+  
+  // Price
+  minPrice?: number;
+  maxPrice?: number;
+  
+  // Size
+  minSqft?: number;
+  maxSqft?: number;
+  minLotAcres?: number;
+  maxLotAcres?: number;
+  
+  // Features
+  minBeds?: number;
+  maxBeds?: number;
+  minBaths?: number;
+  maxBaths?: number;
+  minYearBuilt?: number;
+  maxYearBuilt?: number;
+  
+  // Status
+  statuses: string[];          // ['Active', 'Pending', 'Closed']
+  
+  // Time
+  soldWithinMonths?: number;   // Default: 6
+  
+  // Results
+  maxResults: number;          // Default: 10
+}
+
+export const DEFAULT_CMA_FILTERS: CMAFilters = {
+  radius: 2,
+  statuses: ['Closed', 'Active', 'Active Under Contract', 'Pending'],
+  maxResults: 10,
+  soldWithinMonths: 6,
+};
+
+export const RADIUS_OPTIONS = [
+  { value: 0.5, label: '0.5 mi' },
+  { value: 1, label: '1 mi' },
+  { value: 2, label: '2 mi' },
+  { value: 5, label: '5 mi' },
+  { value: 10, label: '10 mi' },
+];
+
+// ===========================================
+// CMA COMPARABLE
+// ===========================================
+export interface CMAComparable {
+  // Identification
+  mlsNumber: string;
+  listingId?: string;
+  
+  // Address
+  address: string;
+  streetAddress?: string;
+  city?: string;
+  state?: string;
+  zipCode?: string;
+  subdivision?: string;
+  
+  // Pricing
+  price: number;               // Display price (soldPrice or listPrice)
+  listPrice: number;
+  soldPrice?: number;
+  closePrice?: number;
+  pricePerSqft?: number;
+  
+  // Property Details
+  bedrooms: number;
+  bathrooms: number;
+  sqft: number;
+  lotSizeAcres?: number;
+  lotSizeSqft?: number;
+  yearBuilt?: number;
+  garageSpaces?: number;
+  poolFeatures?: string[];
+  propertyType?: string;
+  
+  // Market Data
+  status: string;              // Normalized: Active, Pending, Closed
+  lastStatus?: string;
+  daysOnMarket: number;
+  listDate?: string;
+  soldDate?: string;
+  
+  // Location
+  map?: {
+    latitude: number;
+    longitude: number;
+  };
+  distance?: number;           // Miles from subject
+  
+  // Photos
+  photos: string[];
+  imageUrl?: string;           // Primary photo
+  
+  // Metadata
+  type: 'Sale';                // Always Sale (rentals excluded)
+  isSubject?: boolean;
+}
+
+// ===========================================
+// PROPERTY SNAPSHOT (Subject Property)
+// ===========================================
+export interface PropertySnapshot {
+  mlsNumber: string;
+  address: string;
+  streetAddress?: string;
+  city?: string;
+  state?: string;
+  zipCode?: string;
+  subdivision?: string;
+  
+  listPrice: number;
+  bedrooms: number;
+  bathrooms: number;
+  sqft: number;
+  lotSizeAcres?: number;
+  yearBuilt?: number;
+  
+  status: string;
+  daysOnMarket?: number;
+  
+  map?: {
+    latitude: number;
+    longitude: number;
+  };
+  
+  photos: string[];
+  description?: string;
+  
+  fetchedAt: string;           // ISO timestamp
+}
+
+// ===========================================
+// CMA STATISTICS
+// ===========================================
+export interface CMAStatistics {
+  count: number;
+  avgPrice: number | null;
+  minPrice: number | null;
+  maxPrice: number | null;
+  medianPrice: number | null;
+  avgPricePerSqft: number | null;
+  avgDOM: number | null;
+  avgPricePerAcre: number | null;
+  priceRange: string;
+  
+  // By status breakdown
+  activeCount: number;
+  pendingCount: number;
+  closedCount: number;
+}
+
+// ===========================================
+// PRESENTATION CONFIGS
+// ===========================================
+export interface CoverPageConfig {
+  title: string;
+  subtitle: string;
+  showDate: boolean;
+  showAgentPhoto: boolean;
+  background: "none" | "gradient" | "property";
+}
+
+export interface CmaBrochure {
+  type: "pdf" | "image";
+  url: string;
+  thumbnail?: string;
+  filename: string;
+  generated: boolean;
+  uploadedAt: string;
+}
+
+export interface CmaAdjustmentRates {
+  sqftPerUnit: number;         // Default: 50
+  bedroomValue: number;        // Default: 10000
+  bathroomValue: number;       // Default: 7500
+  poolValue: number;           // Default: 25000
+  garagePerSpace: number;      // Default: 5000
+  yearBuiltPerYear: number;    // Default: 1000
+  lotSizePerSqft: number;      // Default: 2
+}
+
+export const DEFAULT_ADJUSTMENT_RATES: CmaAdjustmentRates = {
+  sqftPerUnit: 50,
+  bedroomValue: 10000,
+  bathroomValue: 7500,
+  poolValue: 25000,
+  garagePerSpace: 5000,
+  yearBuiltPerYear: 1000,
+  lotSizePerSqft: 2,
+};
+```
+
+---
+
+## PHASE 2: API Endpoints
+
+### Task 2.1: CMA CRUD Routes
+
+**File:** `server/routes/cma.ts`
+
+```typescript
+import { Router } from "express";
+import { db } from "../db";
+import { cmas, cmaReportConfigs } from "../../shared/schema";
+import { eq, desc, and } from "drizzle-orm";
+import { searchNearbyComparables, fetchMLSListing } from "../repliers";
+import { calculateCMAStats, normalizeStatus } from "../utils/cma-utils";
+import { requireAuth } from "../middleware/auth";
+
+const router = Router();
+
+// ===========================================
+// GET /api/cmas - List all CMAs for user
+// ===========================================
+router.get("/", requireAuth, async (req, res) => {
+  try {
+    const userId = req.user.id;
+    
+    const userCmas = await db
+      .select()
+      .from(cmas)
+      .where(eq(cmas.userId, userId))
+      .orderBy(desc(cmas.updatedAt));
+    
+    res.json({ cmas: userCmas });
+  } catch (error) {
+    console.error("[CMA] List error:", error);
+    res.status(500).json({ error: "Failed to fetch CMAs" });
+  }
+});
+
+// ===========================================
+// GET /api/cmas/:id - Get CMA by ID
+// ===========================================
+router.get("/:id", requireAuth, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const userId = req.user.id;
+    
+    const [cma] = await db
+      .select()
+      .from(cmas)
+      .where(and(eq(cmas.id, id), eq(cmas.userId, userId)));
+    
+    if (!cma) {
+      return res.status(404).json({ error: "CMA not found" });
+    }
+    
+    // Also fetch report config
+    const [reportConfig] = await db
+      .select()
+      .from(cmaReportConfigs)
+      .where(eq(cmaReportConfigs.cmaId, id));
+    
+    // Calculate statistics
+    const statistics = calculateCMAStats(cma.propertiesData || []);
+    
+    res.json({ 
+      cma, 
+      reportConfig,
+      statistics 
+    });
+  } catch (error) {
+    console.error("[CMA] Get error:", error);
+    res.status(500).json({ error: "Failed to fetch CMA" });
+  }
+});
+
+// ===========================================
+// POST /api/cmas - Create new CMA
+// ===========================================
+router.post("/", requireAuth, async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const { 
+      name, 
+      clientName, 
+      clientEmail,
+      subjectPropertyId,
+      subjectPropertyData,
+      searchCriteria 
+    } = req.body;
+    
+    // Validate subject property
+    if (!subjectPropertyId && !subjectPropertyData) {
+      return res.status(400).json({ error: "Subject property is required" });
+    }
+    
+    // Generate name if not provided
+    const cmaName = name || generateCMAName(subjectPropertyData, clientName);
+    
+    // Create CMA
+    const [newCma] = await db
+      .insert(cmas)
+      .values({
+        userId,
+        name: cmaName,
+        clientName,
+        clientEmail,
+        subjectPropertyId,
+        subjectPropertyData,
+        searchCriteria,
+        comparablePropertyIds: [],
+        propertiesData: subjectPropertyData ? [{ ...subjectPropertyData, isSubject: true }] : [],
+      })
+      .returning();
+    
+    // Create default report config
+    await db.insert(cmaReportConfigs).values({
+      cmaId: newCma.id,
+      includedSections: DEFAULT_ENABLED_SECTIONS,
+      sectionOrder: DEFAULT_SECTION_ORDER,
+    });
+    
+    console.log(`[CMA] Created: ${newCma.id} for user ${userId}`);
+    
+    res.status(201).json({ cma: newCma });
+  } catch (error) {
+    console.error("[CMA] Create error:", error);
+    res.status(500).json({ error: "Failed to create CMA" });
+  }
+});
+
+// ===========================================
+// PATCH /api/cmas/:id - Update CMA
+// ===========================================
+router.patch("/:id", requireAuth, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const userId = req.user.id;
+    const updates = req.body;
+    
+    // Verify ownership
+    const [existing] = await db
+      .select()
+      .from(cmas)
+      .where(and(eq(cmas.id, id), eq(cmas.userId, userId)));
+    
+    if (!existing) {
+      return res.status(404).json({ error: "CMA not found" });
+    }
+    
+    const [updated] = await db
+      .update(cmas)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(cmas.id, id))
+      .returning();
+    
+    res.json({ cma: updated });
+  } catch (error) {
+    console.error("[CMA] Update error:", error);
+    res.status(500).json({ error: "Failed to update CMA" });
+  }
+});
+
+// ===========================================
+// DELETE /api/cmas/:id - Delete CMA
+// ===========================================
+router.delete("/:id", requireAuth, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const userId = req.user.id;
+    
+    // Verify ownership
+    const [existing] = await db
+      .select()
+      .from(cmas)
+      .where(and(eq(cmas.id, id), eq(cmas.userId, userId)));
+    
+    if (!existing) {
+      return res.status(404).json({ error: "CMA not found" });
+    }
+    
+    // Delete report config first
+    await db.delete(cmaReportConfigs).where(eq(cmaReportConfigs.cmaId, id));
+    
+    // Delete CMA
+    await db.delete(cmas).where(eq(cmas.id, id));
+    
+    console.log(`[CMA] Deleted: ${id}`);
+    
+    res.json({ success: true });
+  } catch (error) {
+    console.error("[CMA] Delete error:", error);
+    res.status(500).json({ error: "Failed to delete CMA" });
+  }
+});
+
+// ===========================================
+// POST /api/cmas/search-subject - Search for subject property
+// ===========================================
+router.post("/search-subject", requireAuth, async (req, res) => {
+  try {
+    const { query, type } = req.body;  // type: "mls" | "address"
+    
+    if (!query || query.trim().length < 3) {
+      return res.status(400).json({ error: "Query must be at least 3 characters" });
+    }
+    
+    let listings = [];
+    
+    if (type === "mls") {
+      // Search by MLS number
+      const listing = await fetchMLSListing(query.trim());
+      if (listing) {
+        listings = [listing];
+      }
+    } else {
+      // Search by address
+      listings = await searchByAddress(query.trim());
+    }
+    
+    res.json({ listings });
+  } catch (error) {
+    console.error("[CMA] Subject search error:", error);
+    res.status(500).json({ error: "Failed to search properties" });
+  }
+});
+
+// ===========================================
+// POST /api/cmas/:id/search - Search for comparables
+// ===========================================
+router.post("/:id/search", requireAuth, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const userId = req.user.id;
+    const filters: CMAFilters = req.body.filters;
+    
+    // Get CMA and verify ownership
+    const [cma] = await db
+      .select()
+      .from(cmas)
+      .where(and(eq(cmas.id, id), eq(cmas.userId, userId)));
+    
+    if (!cma) {
+      return res.status(404).json({ error: "CMA not found" });
+    }
+    
+    const subject = cma.subjectPropertyData;
+    if (!subject?.map?.latitude || !subject?.map?.longitude) {
+      return res.status(400).json({ error: "Subject property missing coordinates" });
+    }
+    
+    // Search for comparables
+    const comparables = await searchNearbyComparables(
+      subject.map.latitude,
+      subject.map.longitude,
+      subject.mlsNumber,
+      filters
+    );
+    
+    // Save search criteria
+    await db
+      .update(cmas)
+      .set({ searchCriteria: filters, updatedAt: new Date() })
+      .where(eq(cmas.id, id));
+    
+    console.log(`[CMA] Search: ${id} found ${comparables.length} comparables`);
+    
+    res.json({ 
+      comparables,
+      appliedFilters: filters,
+      count: comparables.length 
+    });
+  } catch (error) {
+    console.error("[CMA] Search error:", error);
+    res.status(500).json({ error: "Failed to search comparables" });
+  }
+});
+
+// ===========================================
+// POST /api/cmas/:id/comparables - Add comparables
+// ===========================================
+router.post("/:id/comparables", requireAuth, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const userId = req.user.id;
+    const { comparables } = req.body;  // Array of CMAComparable objects
+    
+    // Get CMA and verify ownership
+    const [cma] = await db
+      .select()
+      .from(cmas)
+      .where(and(eq(cmas.id, id), eq(cmas.userId, userId)));
+    
+    if (!cma) {
+      return res.status(404).json({ error: "CMA not found" });
+    }
+    
+    // Get existing data
+    const existingIds = cma.comparablePropertyIds || [];
+    const existingData = cma.propertiesData || [];
+    
+    // Add new comparables (avoid duplicates)
+    const newIds = comparables
+      .map((c: CMAComparable) => c.mlsNumber)
+      .filter((id: string) => !existingIds.includes(id));
+    
+    const newData = comparables.filter(
+      (c: CMAComparable) => !existingIds.includes(c.mlsNumber)
+    );
+    
+    // Update CMA
+    const [updated] = await db
+      .update(cmas)
+      .set({
+        comparablePropertyIds: [...existingIds, ...newIds],
+        propertiesData: [...existingData, ...newData],
+        updatedAt: new Date(),
+      })
+      .where(eq(cmas.id, id))
+      .returning();
+    
+    console.log(`[CMA] Added ${newIds.length} comparables to ${id}`);
+    
+    res.json({ 
+      cma: updated,
+      addedCount: newIds.length 
+    });
+  } catch (error) {
+    console.error("[CMA] Add comparables error:", error);
+    res.status(500).json({ error: "Failed to add comparables" });
+  }
+});
+
+// ===========================================
+// DELETE /api/cmas/:id/comparables/:mlsNumber - Remove comparable
+// ===========================================
+router.delete("/:id/comparables/:mlsNumber", requireAuth, async (req, res) => {
+  try {
+    const { id, mlsNumber } = req.params;
+    const userId = req.user.id;
+    
+    // Get CMA and verify ownership
+    const [cma] = await db
+      .select()
+      .from(cmas)
+      .where(and(eq(cmas.id, id), eq(cmas.userId, userId)));
+    
+    if (!cma) {
+      return res.status(404).json({ error: "CMA not found" });
+    }
+    
+    // Remove from arrays
+    const updatedIds = (cma.comparablePropertyIds || [])
+      .filter((id: string) => id !== mlsNumber);
+    const updatedData = (cma.propertiesData || [])
+      .filter((p: CMAComparable) => p.mlsNumber !== mlsNumber);
+    
+    // Update CMA
+    const [updated] = await db
+      .update(cmas)
+      .set({
+        comparablePropertyIds: updatedIds,
+        propertiesData: updatedData,
+        updatedAt: new Date(),
+      })
+      .where(eq(cmas.id, id))
+      .returning();
+    
+    res.json({ cma: updated });
+  } catch (error) {
+    console.error("[CMA] Remove comparable error:", error);
+    res.status(500).json({ error: "Failed to remove comparable" });
+  }
+});
+
+// ===========================================
+// GET /api/cmas/:id/statistics - Get statistics
+// ===========================================
+router.get("/:id/statistics", requireAuth, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const userId = req.user.id;
+    
+    const [cma] = await db
+      .select()
+      .from(cmas)
+      .where(and(eq(cmas.id, id), eq(cmas.userId, userId)));
+    
+    if (!cma) {
+      return res.status(404).json({ error: "CMA not found" });
+    }
+    
+    // Exclude subject from statistics
+    const comparablesOnly = (cma.propertiesData || [])
+      .filter((p: CMAComparable) => !p.isSubject);
+    
+    const statistics = calculateCMAStats(comparablesOnly);
+    
+    res.json({ statistics });
+  } catch (error) {
+    console.error("[CMA] Statistics error:", error);
+    res.status(500).json({ error: "Failed to calculate statistics" });
+  }
+});
+
+// ===========================================
+// HELPER FUNCTIONS
+// ===========================================
+
+function generateCMAName(
+  subjectProperty: PropertySnapshot | null, 
+  clientName?: string
+): string {
+  const date = new Date().toLocaleDateString('en-US', { 
+    month: 'short', 
+    day: 'numeric' 
+  });
+  
+  if (!subjectProperty) {
+    return `New CMA - ${date}`;
+  }
+  
+  const shortAddress = subjectProperty.address?.split(",")[0] || "Property";
+  
+  if (clientName) {
+    return `${clientName} - ${shortAddress} - ${date}`;
+  }
+  
+  return `CMA - ${shortAddress} - ${date}`;
+}
+
+export default router;
+```
+
+### Task 2.2: Repliers Integration
+
+**File:** `server/repliers.ts`
+
+```typescript
+// Add these functions to existing repliers.ts
+
+import { CMAFilters, CMAComparable } from "../shared/types/cma";
+
+const REPLIERS_API_KEY = process.env.REPLIERS_API_KEY;
+const REPLIERS_BASE_URL = "https://api.repliers.io";
+
+// ===========================================
+// SEARCH NEARBY COMPARABLES
+// ===========================================
+export async function searchNearbyComparables(
+  latitude: number,
+  longitude: number,
+  excludeMlsNumber: string,
+  filters: CMAFilters
+): Promise<CMAComparable[]> {
+  console.log(`[Repliers] Searching comparables near ${latitude}, ${longitude}`);
+  
+  // Create circular polygon for radius search
+  const polygon = createCirclePolygon(latitude, longitude, filters.radius);
+  
+  // Build query params
+  const params: Record<string, string> = {
+    type: 'Sale',                    // GLOBAL RENTAL EXCLUSION
+    resultsPerPage: String(filters.maxResults || 10),
+    OriginatingSystemName: 'ACTRIS', // Austin MLS
+  };
+  
+  // Price filters
+  if (filters.minPrice) params.minPrice = String(filters.minPrice);
+  if (filters.maxPrice) params.maxPrice = String(filters.maxPrice);
+  
+  // Size filters
+  if (filters.minSqft) params.minLivingArea = String(filters.minSqft);
+  if (filters.maxSqft) params.maxLivingArea = String(filters.maxSqft);
+  
+  // Feature filters
+  if (filters.minBeds) params.minBedrooms = String(filters.minBeds);
+  if (filters.maxBeds) params.maxBedrooms = String(filters.maxBeds);
+  if (filters.minBaths) params.minBathrooms = String(filters.minBaths);
+  if (filters.minYearBuilt) params.minYearBuilt = String(filters.minYearBuilt);
+  if (filters.maxYearBuilt) params.maxYearBuilt = String(filters.maxYearBuilt);
+  
+  // Sold date filter (for Closed status)
+  if (filters.soldWithinMonths) {
+    const soldDateFrom = new Date();
+    soldDateFrom.setMonth(soldDateFrom.getMonth() - filters.soldWithinMonths);
+    params.soldDateFrom = soldDateFrom.toISOString().split('T')[0];
+  }
+  
+  // Subdivision filter
+  if (filters.subdivision) {
+    params.search = filters.subdivision;
+    params.searchFields = 'address.neighborhood';
+  }
+  
+  // ZIP code filter
+  if (filters.zipCode) {
+    params.postalCode = filters.zipCode;
+  }
+  
+  try {
+    const response = await fetch(`${REPLIERS_BASE_URL}/listings`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "REPLIERS-API-KEY": REPLIERS_API_KEY!,
+      },
+      body: JSON.stringify({
+        ...Object.fromEntries(
+          Object.entries(params).map(([k, v]) => [k, v])
+        ),
+        map: polygon,
+      }),
+    });
+    
+    if (!response.ok) {
+      console.error(`[Repliers] Search failed: ${response.status}`);
+      return [];
+    }
+    
+    const data = await response.json();
+    const listings = data.listings || [];
+    
+    // Transform and filter
+    const comparables = listings
+      .map((listing: any) => transformToComparable(listing, latitude, longitude))
+      .filter((c: CMAComparable) => c.mlsNumber !== excludeMlsNumber)
+      .filter((c: CMAComparable) => !isRentalOrLease(c));
+    
+    console.log(`[Repliers] Found ${comparables.length} comparables`);
+    
+    return comparables;
+  } catch (error) {
+    console.error("[Repliers] Search error:", error);
+    return [];
+  }
+}
+
+// ===========================================
+// FETCH SINGLE MLS LISTING
+// ===========================================
+export async function fetchMLSListing(mlsNumber: string): Promise<PropertySnapshot | null> {
+  try {
+    const response = await fetch(
+      `${REPLIERS_BASE_URL}/listings/${mlsNumber}`,
+      {
+        headers: {
+          "REPLIERS-API-KEY": REPLIERS_API_KEY!,
+        },
+      }
+    );
+    
+    if (!response.ok) {
+      console.log(`[Repliers] Listing not found: ${mlsNumber}`);
+      return null;
+    }
+    
+    const listing = await response.json();
+    return transformToPropertySnapshot(listing);
+  } catch (error) {
+    console.error(`[Repliers] Fetch listing error: ${mlsNumber}`, error);
+    return null;
+  }
+}
+
+// ===========================================
+// TRANSFORM FUNCTIONS
+// ===========================================
+
+function transformToComparable(
+  listing: any, 
+  subjectLat: number, 
+  subjectLng: number
+): CMAComparable {
+  const lat = listing.map?.latitude || listing.address?.latitude;
+  const lng = listing.map?.longitude || listing.address?.longitude;
+  
+  const distance = lat && lng 
+    ? calculateDistance(subjectLat, subjectLng, lat, lng)
+    : undefined;
+  
+  return {
+    mlsNumber: listing.mlsNumber || listing.listingId,
+    listingId: listing.listingId,
+    
+    address: buildAddress(listing.address),
+    streetAddress: listing.address?.streetAddress,
+    city: listing.address?.city,
+    state: listing.address?.state,
+    zipCode: listing.address?.postalCode,
+    subdivision: listing.address?.neighborhood,
+    
+    price: listing.soldPrice || listing.closePrice || listing.listPrice,
+    listPrice: listing.listPrice,
+    soldPrice: listing.soldPrice || listing.closePrice,
+    pricePerSqft: calculatePricePerSqft(listing),
+    
+    bedrooms: listing.bedroomsTotal || 0,
+    bathrooms: listing.bathroomsTotalInteger || listing.bathroomsFull || 0,
+    sqft: listing.livingArea || 0,
+    lotSizeAcres: extractLotAcres(listing),
+    yearBuilt: listing.yearBuilt,
+    garageSpaces: listing.garageSpaces,
+    poolFeatures: listing.poolFeatures,
+    propertyType: listing.propertyType,
+    
+    status: normalizeStatus(listing.standardStatus || listing.status),
+    lastStatus: listing.lastStatus,
+    daysOnMarket: listing.daysOnMarket || listing.simpleDaysOnMarket || 0,
+    listDate: listing.listDate,
+    soldDate: listing.soldDate || listing.closedDate,
+    
+    map: lat && lng ? { latitude: lat, longitude: lng } : undefined,
+    distance,
+    
+    photos: extractPhotos(listing),
+    imageUrl: extractPhotos(listing)[0],
+    
+    type: 'Sale',
+  };
+}
+
+function transformToPropertySnapshot(listing: any): PropertySnapshot {
+  return {
+    mlsNumber: listing.mlsNumber || listing.listingId,
+    
+    address: buildAddress(listing.address),
+    streetAddress: listing.address?.streetAddress,
+    city: listing.address?.city,
+    state: listing.address?.state,
+    zipCode: listing.address?.postalCode,
+    subdivision: listing.address?.neighborhood,
+    
+    listPrice: listing.listPrice,
+    bedrooms: listing.bedroomsTotal || 0,
+    bathrooms: listing.bathroomsTotalInteger || 0,
+    sqft: listing.livingArea || 0,
+    lotSizeAcres: extractLotAcres(listing),
+    yearBuilt: listing.yearBuilt,
+    
+    status: normalizeStatus(listing.standardStatus || listing.status),
+    daysOnMarket: listing.daysOnMarket || 0,
+    
+    map: listing.map?.latitude ? {
+      latitude: listing.map.latitude,
+      longitude: listing.map.longitude,
+    } : undefined,
+    
+    photos: extractPhotos(listing),
+    description: listing.publicRemarks,
+    
+    fetchedAt: new Date().toISOString(),
+  };
+}
+
+// ===========================================
+// UTILITY FUNCTIONS
+// ===========================================
+
+function createCirclePolygon(
+  lat: number, 
+  lng: number, 
+  radiusMiles: number
+): { type: string; coordinates: number[][][] } {
+  const radiusKm = radiusMiles * 1.60934;
+  const points = 32;
+  const coordinates: [number, number][] = [];
+  
+  for (let i = 0; i <= points; i++) {
+    const angle = (i / points) * 2 * Math.PI;
+    const dx = radiusKm * Math.cos(angle);
+    const dy = radiusKm * Math.sin(angle);
+    
+    const newLat = lat + (dy / 111.32);
+    const newLng = lng + (dx / (111.32 * Math.cos(lat * Math.PI / 180)));
+    
+    coordinates.push([newLng, newLat]);
+  }
+  
+  return {
+    type: "Polygon",
+    coordinates: [coordinates],
+  };
+}
+
+function calculateDistance(
+  lat1: number, 
+  lng1: number, 
+  lat2: number, 
+  lng2: number
+): number {
+  const R = 3959; // Earth radius in miles
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLng = (lng2 - lng1) * Math.PI / 180;
+  const a = 
+    Math.sin(dLat/2) * Math.sin(dLat/2) +
+    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+    Math.sin(dLng/2) * Math.sin(dLng/2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+  return Math.round(R * c * 10) / 10; // Round to 1 decimal
+}
+
+function normalizeStatus(status: string): string {
+  const s = (status || '').toLowerCase().trim();
+  
+  if (s === 'lsd' || s === 'leased' || s.includes('leasing')) return 'Leasing';
+  if (s === 'sld' || s === 'sold' || s === 'closed') return 'Closed';
+  if (s === 'sc' || s === 'pending' || s.includes('under contract')) return 'Pending';
+  if (s === 'a' || s === 'active') return 'Active';
+  
+  return status || 'Unknown';
+}
+
+function isRentalOrLease(comparable: CMAComparable): boolean {
+  const status = (comparable.status || '').toLowerCase();
+  const lastStatus = (comparable.lastStatus || '').toLowerCase();
+  
+  return (
+    status === 'leasing' ||
+    lastStatus === 'lsd' ||
+    lastStatus === 'leased'
+  );
+}
+
+function buildAddress(addr: any): string {
+  if (!addr) return 'Unknown Address';
+  
+  const parts = [
+    addr.streetNumber,
+    addr.streetName,
+    addr.streetSuffix,
+  ].filter(Boolean).join(' ');
+  
+  const cityState = [addr.city, addr.state].filter(Boolean).join(', ');
+  
+  return [parts, cityState, addr.postalCode].filter(Boolean).join(', ');
+}
+
+function extractPhotos(listing: any): string[] {
+  if (listing.photos && Array.isArray(listing.photos)) {
+    return listing.photos.map((p: any) => p.url || p).filter(Boolean);
+  }
+  if (listing.images && Array.isArray(listing.images)) {
+    return listing.images.map((p: any) => p.url || p).filter(Boolean);
+  }
+  if (listing.media && Array.isArray(listing.media)) {
+    return listing.media.map((p: any) => p.url || p).filter(Boolean);
+  }
+  return [];
+}
+
+function extractLotAcres(listing: any): number | undefined {
+  if (listing.lot?.acres) return listing.lot.acres;
+  if (listing.lotSizeArea) return listing.lotSizeArea;
+  if (listing.lot?.squareFeet) return listing.lot.squareFeet / 43560;
+  if (listing.lotSizeSquareFeet) return listing.lotSizeSquareFeet / 43560;
+  return undefined;
+}
+
+function calculatePricePerSqft(listing: any): number | undefined {
+  const price = listing.soldPrice || listing.closePrice || listing.listPrice;
+  const sqft = listing.livingArea;
+  
+  if (price && sqft && sqft > 0) {
+    return Math.round(price / sqft);
+  }
+  return undefined;
+}
+```
+
+---
+
+## PHASE 3: Frontend - Create CMA Flow
+
+### Task 3.1: CMA List Page
+
+**File:** `client/src/pages/CMAs.tsx`
+
+```typescript
+import { useState } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { Link, useLocation } from "wouter";
+import { Plus, Search, MoreVertical, Trash2, Share2, FileText } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Card, CardContent } from "@/components/ui/card";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { useToast } from "@/hooks/use-toast";
+import { formatCurrency, formatDate } from "@/lib/utils";
+
+export default function CMAsPage() {
+  const [, navigate] = useLocation();
+  const [searchQuery, setSearchQuery] = useState("");
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+  
+  // Fetch CMAs
+  const { data, isLoading } = useQuery({
+    queryKey: ["cmas"],
+    queryFn: async () => {
+      const res = await fetch("/api/cmas");
+      if (!res.ok) throw new Error("Failed to fetch CMAs");
+      return res.json();
+    },
+  });
+  
+  // Delete mutation
+  const deleteMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const res = await fetch(`/api/cmas/${id}`, { method: "DELETE" });
+      if (!res.ok) throw new Error("Failed to delete");
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["cmas"] });
+      toast({ title: "CMA deleted" });
+    },
+  });
+  
+  const cmas = data?.cmas || [];
+  const filteredCmas = cmas.filter((cma: any) =>
+    cma.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    cma.clientName?.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+  
+  return (
+    <div className="container mx-auto p-6 space-y-6">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold">Comparative Market Analyses</h1>
+          <p className="text-muted-foreground">
+            Create and manage your CMAs
+          </p>
+        </div>
+        <Button onClick={() => navigate("/cmas/new")}>
+          <Plus className="w-4 h-4 mr-2" />
+          Create CMA
+        </Button>
+      </div>
+      
+      {/* Search */}
+      <div className="relative max-w-md">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+        <Input
+          placeholder="Search CMAs..."
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          className="pl-10"
+        />
+      </div>
+      
+      {/* CMA Grid */}
+      {isLoading ? (
+        <div className="text-center py-12 text-muted-foreground">
+          Loading CMAs...
+        </div>
+      ) : filteredCmas.length === 0 ? (
+        <Card className="p-12 text-center">
+          <FileText className="w-12 h-12 mx-auto text-muted-foreground mb-4" />
+          <h3 className="font-semibold mb-2">No CMAs yet</h3>
+          <p className="text-muted-foreground mb-4">
+            Create your first CMA to get started
+          </p>
+          <Button onClick={() => navigate("/cmas/new")}>
+            <Plus className="w-4 h-4 mr-2" />
+            Create CMA
+          </Button>
+        </Card>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {filteredCmas.map((cma: any) => (
+            <CMACard
+              key={cma.id}
+              cma={cma}
+              onDelete={() => deleteMutation.mutate(cma.id)}
+              onClick={() => navigate(`/cmas/${cma.id}`)}
+            />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function CMACard({ 
+  cma, 
+  onDelete, 
+  onClick 
+}: { 
+  cma: any; 
+  onDelete: () => void; 
+  onClick: () => void;
+}) {
+  const subject = cma.subjectPropertyData;
+  const compCount = (cma.comparablePropertyIds || []).length;
+  
+  return (
+    <Card 
+      className="cursor-pointer hover:shadow-md transition-shadow"
+      onClick={onClick}
+    >
+      <CardContent className="p-4">
+        {/* Image */}
+        <div className="aspect-video bg-muted rounded-lg mb-3 overflow-hidden">
+          {subject?.photos?.[0] ? (
+            <img 
+              src={subject.photos[0]} 
+              alt={cma.name}
+              className="w-full h-full object-cover"
+            />
+          ) : (
+            <div className="w-full h-full flex items-center justify-center text-muted-foreground">
+              No Image
+            </div>
+          )}
+        </div>
+        
+        {/* Content */}
+        <div className="flex items-start justify-between">
+          <div className="flex-1 min-w-0">
+            <h3 className="font-semibold truncate">{cma.name}</h3>
+            {cma.clientName && (
+              <p className="text-sm text-muted-foreground truncate">
+                {cma.clientName}
+              </p>
+            )}
+            <p className="text-sm text-muted-foreground">
+              {compCount} comparable{compCount !== 1 ? 's' : ''} • {formatDate(cma.updatedAt)}
+            </p>
+          </div>
+          
+          {/* Actions */}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
+              <Button variant="ghost" size="icon">
+                <MoreVertical className="w-4 h-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={(e) => {
+                e.stopPropagation();
+                // Share logic
+              }}>
+                <Share2 className="w-4 h-4 mr-2" />
+                Share
+              </DropdownMenuItem>
+              <DropdownMenuItem 
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onDelete();
+                }}
+                className="text-destructive"
+              >
+                <Trash2 className="w-4 h-4 mr-2" />
+                Delete
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+```
+
+### Task 3.2: Create CMA Page (Subject Property Selection)
+
+**File:** `client/src/pages/CMANew.tsx`
+
+```typescript
+import { useState } from "react";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useLocation } from "wouter";
+import { ArrowLeft, Search, Home, MapPin, Loader2 } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Label } from "@/components/ui/label";
+import { useToast } from "@/hooks/use-toast";
+import { useDebounce } from "@/hooks/use-debounce";
+import { formatCurrency } from "@/lib/utils";
+
+export default function CMANewPage() {
+  const [, navigate] = useLocation();
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+  
+  const [searchType, setSearchType] = useState<"mls" | "address">("mls");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchResults, setSearchResults] = useState<any[]>([]);
+  const [isSearching, setIsSearching] = useState(false);
+  const [selectedProperty, setSelectedProperty] = useState<any>(null);
+  
+  const [clientName, setClientName] = useState("");
+  const [clientEmail, setClientEmail] = useState("");
+  
+  const debouncedQuery = useDebounce(searchQuery, 500);
+  
+  // Search for properties
+  const searchMutation = useMutation({
+    mutationFn: async ({ query, type }: { query: string; type: string }) => {
+      const res = await fetch("/api/cmas/search-subject", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ query, type }),
+      });
+      if (!res.ok) throw new Error("Search failed");
+      return res.json();
+    },
+    onSuccess: (data) => {
+      setSearchResults(data.listings || []);
+    },
+    onError: () => {
+      toast({ title: "Search failed", variant: "destructive" });
+    },
+  });
+  
+  // Create CMA
+  const createMutation = useMutation({
+    mutationFn: async () => {
+      const res = await fetch("/api/cmas", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          clientName: clientName || undefined,
+          clientEmail: clientEmail || undefined,
+          subjectPropertyId: selectedProperty.mlsNumber,
+          subjectPropertyData: selectedProperty,
+        }),
+      });
+      if (!res.ok) throw new Error("Failed to create CMA");
+      return res.json();
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["cmas"] });
+      toast({ title: "CMA created" });
+      navigate(`/cmas/${data.cma.id}`);
+    },
+    onError: () => {
+      toast({ title: "Failed to create CMA", variant: "destructive" });
+    },
+  });
+  
+  const handleSearch = () => {
+    if (searchQuery.trim().length < 3) return;
+    searchMutation.mutate({ query: searchQuery, type: searchType });
+  };
+  
+  return (
+    <div className="container mx-auto p-6 max-w-3xl">
+      {/* Back button */}
+      <Button 
+        variant="ghost" 
+        className="mb-6"
+        onClick={() => navigate("/cmas")}
+      >
+        <ArrowLeft className="w-4 h-4 mr-2" />
+        Back to CMAs
+      </Button>
+      
+      <div className="space-y-6">
+        <div>
+          <h1 className="text-2xl font-bold">Create New CMA</h1>
+          <p className="text-muted-foreground">
+            Start by selecting a subject property
+          </p>
+        </div>
+        
+        {/* Client Info (Optional) */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-lg">Client Information (Optional)</CardTitle>
+          </CardHeader>
+          <CardContent className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label>Client Name</Label>
+              <Input
+                placeholder="e.g., John Smith"
+                value={clientName}
+                onChange={(e) => setClientName(e.target.value)}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Client Email</Label>
+              <Input
+                type="email"
+                placeholder="e.g., john@example.com"
+                value={clientEmail}
+                onChange={(e) => setClientEmail(e.target.value)}
+              />
+            </div>
+          </CardContent>
+        </Card>
+        
+        {/* Subject Property Search */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-lg">Subject Property</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <Tabs value={searchType} onValueChange={(v) => setSearchType(v as any)}>
+              <TabsList className="grid w-full grid-cols-2">
+                <TabsTrigger value="mls">
+                  <Home className="w-4 h-4 mr-2" />
+                  MLS Number
+                </TabsTrigger>
+                <TabsTrigger value="address">
+                  <MapPin className="w-4 h-4 mr-2" />
+                  Address
+                </TabsTrigger>
+              </TabsList>
+              
+              <TabsContent value="mls" className="mt-4">
+                <div className="flex gap-2">
+                  <Input
+                    placeholder="Enter MLS number (e.g., ACT1234567)"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    onKeyDown={(e) => e.key === "Enter" && handleSearch()}
+                  />
+                  <Button 
+                    onClick={handleSearch}
+                    disabled={searchMutation.isPending}
+                  >
+                    {searchMutation.isPending ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <Search className="w-4 h-4" />
+                    )}
+                  </Button>
+                </div>
+              </TabsContent>
+              
+              <TabsContent value="address" className="mt-4">
+                <div className="flex gap-2">
+                  <Input
+                    placeholder="Enter property address"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    onKeyDown={(e) => e.key === "Enter" && handleSearch()}
+                  />
+                  <Button 
+                    onClick={handleSearch}
+                    disabled={searchMutation.isPending}
+                  >
+                    {searchMutation.isPending ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <Search className="w-4 h-4" />
+                    )}
+                  </Button>
+                </div>
+              </TabsContent>
+            </Tabs>
+            
+            {/* Search Results */}
+            {searchResults.length > 0 && (
+              <div className="space-y-2 mt-4">
+                <Label>Select Property</Label>
+                {searchResults.map((property) => (
+                  <PropertyResultCard
+                    key={property.mlsNumber}
+                    property={property}
+                    isSelected={selectedProperty?.mlsNumber === property.mlsNumber}
+                    onSelect={() => setSelectedProperty(property)}
+                  />
+                ))}
+              </div>
+            )}
+            
+            {/* Selected Property */}
+            {selectedProperty && (
+              <div className="mt-4 p-4 bg-primary/5 border-2 border-primary rounded-lg">
+                <div className="flex items-center gap-2 text-primary mb-2">
+                  <Home className="w-4 h-4" />
+                  <span className="font-semibold">Selected Subject Property</span>
+                </div>
+                <p className="font-medium">{selectedProperty.address}</p>
+                <p className="text-sm text-muted-foreground">
+                  {selectedProperty.bedrooms} bed • {selectedProperty.bathrooms} bath • 
+                  {selectedProperty.sqft?.toLocaleString()} sqft • 
+                  {formatCurrency(selectedProperty.listPrice)}
+                </p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+        
+        {/* Create Button */}
+        <div className="flex justify-end gap-4">
+          <Button variant="outline" onClick={() => navigate("/cmas")}>
+            Cancel
+          </Button>
+          <Button
+            onClick={() => createMutation.mutate()}
+            disabled={!selectedProperty || createMutation.isPending}
+          >
+            {createMutation.isPending ? (
+              <>
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                Creating...
+              </>
+            ) : (
+              "Create CMA"
+            )}
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function PropertyResultCard({
+  property,
+  isSelected,
+  onSelect,
+}: {
+  property: any;
+  isSelected: boolean;
+  onSelect: () => void;
+}) {
+  return (
+    <div
+      className={`p-3 border rounded-lg cursor-pointer transition-colors ${
+        isSelected 
+          ? "border-primary bg-primary/5" 
+          : "hover:border-primary/50"
+      }`}
+      onClick={onSelect}
+    >
+      <div className="flex gap-3">
+        {property.photos?.[0] && (
+          <img
+            src={property.photos[0]}
+            alt={property.address}
+            className="w-20 h-20 object-cover rounded"
+          />
+        )}
+        <div className="flex-1 min-w-0">
+          <p className="font-medium truncate">{property.address}</p>
+          <p className="text-sm text-muted-foreground">
+            MLS# {property.mlsNumber}
+          </p>
+          <p className="text-sm">
+            {property.bedrooms} bed • {property.bathrooms} bath • 
+            {property.sqft?.toLocaleString()} sqft
+          </p>
+          <p className="font-semibold text-primary">
+            {formatCurrency(property.listPrice)}
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}
+```
+
+---
+
+## PHASE 4: Smart Filter Defaults
+
+### Task 4.1: Smart Defaults Function
+
+**File:** `client/src/lib/cma-filter-utils.ts`
+
+```typescript
+import { CMAFilters, DEFAULT_CMA_FILTERS, PropertySnapshot } from "@/types/cma";
+
+/**
+ * Calculate smart default filters based on subject property
+ * ±20% for price, ±25% for sqft, ±10 years for year built
+ */
+export function calculateSmartDefaults(
+  subject: PropertySnapshot | null
+): CMAFilters {
+  const defaults = { ...DEFAULT_CMA_FILTERS };
+  
+  if (!subject) return defaults;
+  
+  // Price range: ±20%
+  if (subject.listPrice) {
+    defaults.minPrice = Math.round(subject.listPrice * 0.8);
+    defaults.maxPrice = Math.round(subject.listPrice * 1.2);
+  }
+  
+  // Sqft range: ±25%
+  if (subject.sqft) {
+    defaults.minSqft = Math.round(subject.sqft * 0.75);
+    defaults.maxSqft = Math.round(subject.sqft * 1.25);
+  }
+  
+  // Year built: -10 years to now
+  if (subject.yearBuilt) {
+    defaults.minYearBuilt = subject.yearBuilt - 10;
+    defaults.maxYearBuilt = new Date().getFullYear();
+  }
+  
+  // Beds: ±1
+  if (subject.bedrooms) {
+    defaults.minBeds = Math.max(1, subject.bedrooms - 1);
+    defaults.maxBeds = subject.bedrooms + 1;
+  }
+  
+  return defaults;
+}
+
+/**
+ * Check if filters are at default values
+ */
+export function isDefaultFilters(
+  filters: CMAFilters,
+  subject: PropertySnapshot | null
+): boolean {
+  const smart = calculateSmartDefaults(subject);
+  return JSON.stringify(filters) === JSON.stringify(smart);
+}
+```
+
+---
+
+## ACCEPTANCE CRITERIA
+
+### Database
+- [ ] `cmas` table created with all fields
+- [ ] `cma_report_configs` table created
+- [ ] `cma_report_templates` table created
+- [ ] Migration runs successfully
+
+### API
+- [ ] `GET /api/cmas` returns user's CMAs
+- [ ] `POST /api/cmas` creates CMA with subject property
+- [ ] `GET /api/cmas/:id` returns CMA with statistics
+- [ ] `POST /api/cmas/search-subject` finds properties by MLS/address
+- [ ] `POST /api/cmas/:id/search` finds comparables
+- [ ] `POST /api/cmas/:id/comparables` adds comparables
+- [ ] `DELETE /api/cmas/:id/comparables/:mls` removes comparable
+- [ ] Global rental exclusion enforced (type=Sale)
+
+### UI
+- [ ] CMA list page shows all user CMAs
+- [ ] Create CMA flow allows MLS or address search
+- [ ] Subject property selection works
+- [ ] Client name/email are optional
+- [ ] CMA auto-naming works
+- [ ] Search results display correctly
+- [ ] Smart filter defaults calculate from subject
+
+### Data Flow
+- [ ] Subject property stored as denormalized snapshot
+- [ ] Comparables stored as denormalized array
+- [ ] Statistics calculated excluding subject
+- [ ] Search criteria saved with CMA
+
+---
+
+## VALIDATION TESTS
+
+```typescript
+// Test 1: Create CMA
+POST /api/cmas
+Body: {
+  subjectPropertyId: "ACT1234567",
+  subjectPropertyData: { ... },
+  clientName: "Test Client"
+}
+Expected: 201, returns { cma: { id, name, ... } }
+
+// Test 2: Search comparables
+POST /api/cmas/:id/search
+Body: {
+  filters: {
+    radius: 2,
+    statuses: ["Active", "Closed"],
+    maxResults: 10
+  }
+}
+Expected: 200, returns { comparables: [...], count: N }
+
+// Test 3: Add comparables
+POST /api/cmas/:id/comparables
+Body: {
+  comparables: [{ mlsNumber: "ACT9999999", ... }]
+}
+Expected: 200, returns { cma: { ... }, addedCount: 1 }
+
+// Test 4: Statistics exclude subject
+GET /api/cmas/:id/statistics
+Expected: Subject property NOT included in avgPrice, etc.
+
+// Test 5: Rental exclusion
+Search results should contain ZERO rentals/leases
+```
+
+---
+
+## LOGGING
+
+```javascript
+console.log('[CMA] Created:', { id, userId, name });
+console.log('[CMA] Search:', { id, filters, resultCount });
+console.log('[CMA] Added comparables:', { id, count });
+console.log('[Repliers] Search:', { lat, lng, radius, resultCount });
+```
+
+---
+
+## FILES IMPACTED
+
+```
+shared/
+├── schema.ts                    [MODIFY - add tables]
+└── types/
+    └── cma.ts                   [NEW - TypeScript interfaces]
+
+server/
+├── routes/
+│   └── cma.ts                   [NEW - CMA API routes]
+├── repliers.ts                  [MODIFY - add search functions]
+└── utils/
+    └── cma-utils.ts             [NEW - stats calculation]
+
+client/src/
+├── pages/
+│   ├── CMAs.tsx                 [NEW - CMA list page]
+│   ├── CMANew.tsx               [NEW - Create CMA page]
+│   └── CMADetail.tsx            [NEW - CMA detail page]
+├── components/
+│   └── cma/
+│       ├── CMAFiltersPanel.tsx  [NEW - Filters UI]
+│       ├── PropertyCard.tsx     [NEW - Property card]
+│       └── StatsCard.tsx        [NEW - Statistics display]
+└── lib/
+    └── cma-filter-utils.ts      [NEW - Smart defaults]
+```
+
+---
+
+*Adapted from Contract Conduit CMA implementation for standalone use in Client Data Portal*
