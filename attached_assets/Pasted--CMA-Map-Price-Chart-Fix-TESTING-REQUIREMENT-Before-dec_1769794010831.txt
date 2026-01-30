@@ -1,0 +1,480 @@
+# CMA Map & Price Chart Fix
+
+## ⚠️ TESTING REQUIREMENT
+
+**Before declaring complete, you MUST:**
+1. Verify map loads with actual Mapbox tiles (not white/blank)
+2. Verify markers appear on map
+3. Verify Price Comparison chart has VERTICAL bars
+4. Verify chart tooltip shows address and "Price: $XXX"
+5. **DO NOT declare complete without visual confirmation**
+
+---
+
+## ISSUE 1: Map Not Loading (White Page)
+
+### Symptoms:
+- Map container shows but is completely white/blank
+- Legend displays correctly
+- "6 comparables" and "1 missing coordinates" shows
+- Map/Satellite toggle visible but map doesn't render
+
+### Possible Causes:
+1. Mapbox token not fetched or invalid
+2. Map style URL not loading
+3. Map container not properly initialized
+4. Mapbox GL JS not imported correctly
+
+### Debug Steps:
+
+**Step 1: Check browser console for errors**
+```
+- Look for "Mapbox" errors
+- Look for 401/403 errors (token issues)
+- Look for "style" loading errors
+```
+
+**Step 2: Add debug logging to CMAMapView.tsx:**
+
+```tsx
+// At the top of the component
+useEffect(() => {
+  console.log('[CMAMap] Component mounted');
+  console.log('[CMAMap] Map container ref:', mapContainer.current);
+}, []);
+
+// After fetching token
+useEffect(() => {
+  fetch('/api/mapbox-token')
+    .then((res) => res.json())
+    .then((data) => {
+      console.log('[CMAMap] Token received:', data.token ? 'YES (length: ' + data.token.length + ')' : 'NO');
+      setMapToken(data.token);
+    })
+    .catch((err) => {
+      console.error('[CMAMap] Token fetch error:', err);
+    });
+}, []);
+
+// In map initialization
+useEffect(() => {
+  if (!mapContainer.current) {
+    console.error('[CMAMap] No map container');
+    return;
+  }
+  if (!mapToken) {
+    console.log('[CMAMap] Waiting for token...');
+    return;
+  }
+  
+  console.log('[CMAMap] Initializing map with token');
+  
+  try {
+    mapboxgl.accessToken = mapToken;
+    
+    const map = new mapboxgl.Map({
+      container: mapContainer.current,
+      style: 'mapbox://styles/mapbox/streets-v11',
+      center: [-97.7431, 30.2672], // Austin default
+      zoom: 11,
+    });
+    
+    map.on('load', () => {
+      console.log('[CMAMap] Map loaded successfully');
+    });
+    
+    map.on('error', (e) => {
+      console.error('[CMAMap] Map error:', e);
+    });
+    
+  } catch (error) {
+    console.error('[CMAMap] Map init error:', error);
+  }
+}, [mapToken]);
+```
+
+### Fix: Complete Map Initialization
+
+```tsx
+import { useRef, useEffect, useState, useMemo } from 'react';
+import mapboxgl from 'mapbox-gl';
+import 'mapbox-gl/dist/mapbox-gl.css';
+
+export function CMAMapView({ properties, subjectProperty }: CMAMapViewProps) {
+  const mapContainer = useRef<HTMLDivElement>(null);
+  const map = useRef<mapboxgl.Map | null>(null);
+  const [mapToken, setMapToken] = useState<string | null>(null);
+  const [mapLoaded, setMapLoaded] = useState(false);
+  const [mapError, setMapError] = useState<string | null>(null);
+
+  // Fetch Mapbox token
+  useEffect(() => {
+    const fetchToken = async () => {
+      try {
+        const res = await fetch('/api/mapbox-token');
+        if (!res.ok) {
+          throw new Error(`Token fetch failed: ${res.status}`);
+        }
+        const data = await res.json();
+        if (!data.token) {
+          throw new Error('No token in response');
+        }
+        console.log('[CMAMap] Token received');
+        setMapToken(data.token);
+      } catch (err) {
+        console.error('[CMAMap] Token error:', err);
+        setMapError('Failed to load map token');
+      }
+    };
+    fetchToken();
+  }, []);
+
+  // Initialize map
+  useEffect(() => {
+    if (!mapContainer.current || !mapToken || map.current) return;
+
+    console.log('[CMAMap] Creating map...');
+    
+    try {
+      mapboxgl.accessToken = mapToken;
+
+      map.current = new mapboxgl.Map({
+        container: mapContainer.current,
+        style: 'mapbox://styles/mapbox/streets-v11',
+        center: [-97.7431, 30.2672],
+        zoom: 10,
+        attributionControl: true,
+      });
+
+      map.current.addControl(new mapboxgl.NavigationControl(), 'top-right');
+
+      map.current.on('load', () => {
+        console.log('[CMAMap] Map loaded!');
+        setMapLoaded(true);
+      });
+
+      map.current.on('error', (e) => {
+        console.error('[CMAMap] Map error:', e.error);
+        setMapError(e.error?.message || 'Map failed to load');
+      });
+
+    } catch (error) {
+      console.error('[CMAMap] Init error:', error);
+      setMapError('Failed to initialize map');
+    }
+
+    return () => {
+      if (map.current) {
+        map.current.remove();
+        map.current = null;
+      }
+    };
+  }, [mapToken]);
+
+  // Show error state
+  if (mapError) {
+    return (
+      <div className="h-[550px] flex items-center justify-center bg-muted rounded-lg border">
+        <div className="text-center">
+          <p className="text-red-500 font-medium">Map Error</p>
+          <p className="text-sm text-muted-foreground">{mapError}</p>
+          <p className="text-xs text-muted-foreground mt-2">Check console for details</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Show loading state
+  if (!mapToken) {
+    return (
+      <div className="h-[550px] flex items-center justify-center bg-muted rounded-lg border">
+        <p className="text-muted-foreground">Loading map...</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-2">
+      {/* Map info bar */}
+      <div className="flex items-center justify-between text-sm text-muted-foreground">
+        <span>{properties.length} comparables</span>
+        {/* Show missing coordinates count */}
+      </div>
+
+      {/* Map container - MUST have explicit height */}
+      <div className="relative rounded-lg overflow-hidden border">
+        <div 
+          ref={mapContainer} 
+          className="w-full"
+          style={{ height: '550px' }}  /* Explicit height required */
+        />
+        
+        {/* Legend */}
+        {mapLoaded && (
+          <div className="absolute bottom-4 left-4 bg-white/90 dark:bg-gray-900/90 rounded-lg p-3 shadow-md">
+            {/* Legend content */}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+```
+
+### Verify Token Endpoint:
+
+```typescript
+// server/routes.ts
+app.get('/api/mapbox-token', (req, res) => {
+  const token = process.env.MAPBOX_ACCESS_TOKEN;
+  
+  if (!token) {
+    console.error('MAPBOX_ACCESS_TOKEN not set');
+    return res.status(500).json({ error: 'Mapbox token not configured' });
+  }
+  
+  console.log('[API] Mapbox token requested, length:', token.length);
+  res.json({ token });
+});
+```
+
+### Check Environment Variable:
+```
+# .env file
+MAPBOX_ACCESS_TOKEN=pk.eyJ1Ijoi...your-token-here
+```
+
+---
+
+## ISSUE 2: Chart Orientation (Horizontal vs Vertical)
+
+### Current (WRONG):
+- Horizontal bars (left to right)
+- Property names on Y-axis
+- Prices on X-axis
+
+### Target (CORRECT like Contract Conduit):
+- **Vertical bars** (bottom to top)
+- Property names on X-axis (rotated -45°)
+- Prices on Y-axis
+
+### Fix: Update PriceComparisonChart
+
+```tsx
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
+
+function PriceComparisonChart({ properties }: { properties: any[] }) {
+  const chartData = useMemo(() => {
+    return properties.slice(0, 12).map(p => ({
+      // Truncate address for label
+      name: truncateAddress(p.address, 15),
+      fullAddress: p.address || 'Unknown Address',
+      price: p.price || p.soldPrice || p.listPrice || 0,
+    }));
+  }, [properties]);
+
+  // Format price for tooltip
+  const formatPrice = (value: number) => {
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: 'USD',
+      maximumFractionDigits: 0,
+    }).format(value);
+  };
+
+  // Format Y-axis (price)
+  const formatYAxis = (value: number) => {
+    if (value >= 1000000) return `$${(value / 1000000).toFixed(1)}M`;
+    return `$${(value / 1000).toFixed(0)}K`;
+  };
+
+  // Truncate address helper
+  function truncateAddress(address: string | undefined, maxLength: number): string {
+    if (!address) return 'Unknown';
+    const street = address.split(',')[0] || address;
+    if (street.length <= maxLength) return street;
+    return street.substring(0, maxLength) + '...';
+  }
+
+  return (
+    <Card>
+      <CardHeader className="pb-2">
+        <CardTitle className="text-base flex items-center gap-2">
+          <TrendingUp className="w-4 h-4" />
+          Price Comparison
+        </CardTitle>
+      </CardHeader>
+      <CardContent>
+        <div className="h-[350px]">
+          <ResponsiveContainer width="100%" height="100%">
+            {/* VERTICAL BarChart - default layout */}
+            <BarChart 
+              data={chartData}
+              margin={{ top: 20, right: 20, left: 20, bottom: 80 }}
+              /* NO layout="vertical" - this makes it horizontal! */
+            >
+              <CartesianGrid strokeDasharray="3 3" className="stroke-muted" vertical={false} />
+              
+              {/* X-Axis: Property addresses at bottom, rotated */}
+              <XAxis 
+                dataKey="name"
+                tick={{ fontSize: 11, fill: '#666' }}
+                angle={-45}
+                textAnchor="end"
+                height={80}
+                interval={0}
+              />
+              
+              {/* Y-Axis: Prices on left side */}
+              <YAxis 
+                tick={{ fontSize: 11, fill: '#666' }}
+                tickFormatter={formatYAxis}
+                width={60}
+              />
+              
+              {/* Tooltip with full address and formatted price */}
+              <Tooltip 
+                cursor={{ fill: 'rgba(0, 0, 0, 0.1)' }}
+                content={({ active, payload, label }) => {
+                  if (!active || !payload?.[0]) return null;
+                  const data = payload[0].payload;
+                  return (
+                    <div className="bg-white dark:bg-gray-800 p-3 rounded-lg shadow-lg border">
+                      <p className="font-semibold text-sm">{data.fullAddress}</p>
+                      <p className="text-[#EF4923] font-bold">
+                        Price: {formatPrice(data.price)}
+                      </p>
+                    </div>
+                  );
+                }}
+              />
+              
+              {/* Vertical bars with Spyglass orange */}
+              <Bar 
+                dataKey="price" 
+                fill="#EF4923"
+                radius={[4, 4, 0, 0]}
+                maxBarSize={50}
+              />
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+```
+
+### Key Differences:
+
+| Property | Horizontal (WRONG) | Vertical (CORRECT) |
+|----------|-------------------|-------------------|
+| `layout` prop | `layout="vertical"` | NO layout prop (default) |
+| X-axis dataKey | Price | Address (`name`) |
+| Y-axis dataKey | Address | Price |
+| X-axis angle | None | `-45` (rotated) |
+| Bottom margin | Small | `80` (for rotated labels) |
+
+---
+
+## ISSUE 3: Chart Tooltip Format
+
+### Target Tooltip (from screenshot):
+```
+┌─────────────────────────────────────┐
+│ 324 Leaning Rock RDG, Austin, TX   │
+│ Price: $963,049                     │
+└─────────────────────────────────────┘
+```
+
+### Custom Tooltip Component:
+
+```tsx
+<Tooltip 
+  cursor={{ fill: 'rgba(0, 0, 0, 0.1)' }}
+  content={({ active, payload }) => {
+    if (!active || !payload?.[0]) return null;
+    const data = payload[0].payload;
+    
+    return (
+      <div className="bg-white dark:bg-gray-800 px-3 py-2 rounded-lg shadow-lg border text-sm">
+        <p className="font-medium text-gray-900 dark:text-white">
+          {data.fullAddress}
+        </p>
+        <p className="text-[#EF4923] font-semibold">
+          Price: ${data.price.toLocaleString()}
+        </p>
+      </div>
+    );
+  }}
+/>
+```
+
+---
+
+## TESTING CHECKLIST (MANDATORY)
+
+### Map Tests:
+- [ ] Map container renders (not white/blank)
+- [ ] Mapbox tiles load (streets visible)
+- [ ] Property markers appear on map
+- [ ] Subject property marker visible (blue)
+- [ ] Legend displays correctly
+- [ ] Map/Satellite toggle works
+- [ ] Check console - no Mapbox errors
+
+### Chart Tests:
+- [ ] Bars are VERTICAL (going up from bottom)
+- [ ] Property addresses on X-axis (bottom)
+- [ ] Prices on Y-axis (left side)
+- [ ] X-axis labels rotated at angle
+- [ ] Hover over bar shows tooltip
+- [ ] Tooltip shows full address
+- [ ] Tooltip shows "Price: $XXX,XXX"
+- [ ] Bars are Spyglass orange (#EF4923)
+
+### Console Check:
+- [ ] No "Mapbox" errors
+- [ ] No 401/403 errors
+- [ ] Token fetch succeeds
+
+---
+
+## FILES TO MODIFY
+
+```
+client/src/components/cma/
+├── CMAMapView.tsx              [FIX - map initialization]
+├── CMAStatsView.tsx            [FIX - chart orientation]
+└── charts/
+    └── PriceComparisonChart.tsx [FIX - vertical bars + tooltip]
+
+server/
+└── routes.ts                   [VERIFY - token endpoint]
+```
+
+---
+
+## QUICK REFERENCE: Vertical vs Horizontal Chart
+
+```tsx
+// VERTICAL BARS (CORRECT) - Default
+<BarChart data={data}>
+  <XAxis dataKey="name" />      {/* Categories on X */}
+  <YAxis />                      {/* Values on Y */}
+  <Bar dataKey="price" />
+</BarChart>
+
+// HORIZONTAL BARS (WRONG)
+<BarChart data={data} layout="vertical">  {/* <-- This makes it horizontal! */}
+  <XAxis type="number" />
+  <YAxis dataKey="name" type="category" />
+  <Bar dataKey="price" />
+</BarChart>
+```
+
+**To fix: Remove `layout="vertical"` prop from BarChart!**
+
+---
+
+**⚠️ REMINDER: Verify map loads AND chart is vertical before declaring complete!**

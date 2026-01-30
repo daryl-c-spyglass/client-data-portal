@@ -109,25 +109,29 @@ function SummaryCards({ properties, subjectProperty }: { properties: any[]; subj
 
 function PriceComparisonChart({ properties, subjectProperty }: { properties: any[]; subjectProperty: any }) {
   const chartData = useMemo(() => {
-    const data: { name: string; price: number; isSubject: boolean }[] = [];
+    const data: { name: string; fullAddress: string; price: number; isSubject: boolean }[] = [];
     
     if (subjectProperty) {
       const subjectPrice = extractPrice(subjectProperty);
+      const subjectAddress = getPropertyAddress(subjectProperty);
       if (subjectPrice) {
         data.push({
           name: 'Subject',
+          fullAddress: subjectAddress || 'Subject Property',
           price: subjectPrice,
           isSubject: true,
         });
       }
     }
 
-    properties.slice(0, 10).forEach((p, idx) => {
+    properties.slice(0, 11).forEach((p) => {
       const price = extractPrice(p);
       if (price) {
         const address = getPropertyAddress(p);
+        const streetAddress = address.split(',')[0] || address;
         data.push({
-          name: address.substring(0, 12) + (address.length > 12 ? '...' : ''),
+          name: streetAddress.length > 15 ? streetAddress.substring(0, 15) + '...' : streetAddress,
+          fullAddress: address,
           price,
           isSubject: false,
         });
@@ -136,6 +140,11 @@ function PriceComparisonChart({ properties, subjectProperty }: { properties: any
 
     return data;
   }, [properties, subjectProperty]);
+
+  const formatYAxis = (value: number) => {
+    if (value >= 1000000) return `$${(value / 1000000).toFixed(1)}M`;
+    return `$${(value / 1000).toFixed(0)}K`;
+  };
 
   return (
     <Card className="mx-4" data-testid="chart-price-comparison">
@@ -146,26 +155,44 @@ function PriceComparisonChart({ properties, subjectProperty }: { properties: any
         </CardTitle>
       </CardHeader>
       <CardContent>
-        <div className="h-[300px]">
+        <div className="h-[350px]">
           <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={chartData} layout="vertical" margin={{ left: 80, right: 20 }}>
-              <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+            <BarChart 
+              data={chartData} 
+              margin={{ top: 20, right: 20, left: 20, bottom: 80 }}
+            >
+              <CartesianGrid strokeDasharray="3 3" className="stroke-muted" vertical={false} />
               <XAxis 
-                type="number" 
-                tickFormatter={formatYAxisPrice}
+                dataKey="name"
                 tick={{ fontSize: 11 }}
+                angle={-45}
+                textAnchor="end"
+                height={80}
+                interval={0}
               />
               <YAxis 
-                type="category" 
-                dataKey="name" 
+                tickFormatter={formatYAxis}
                 tick={{ fontSize: 11 }}
-                width={75}
+                width={60}
               />
               <Tooltip 
-                formatter={(value: number) => [formatPrice(value), 'Price']}
-                contentStyle={{ backgroundColor: 'hsl(var(--background))', border: '1px solid hsl(var(--border))' }}
+                cursor={{ fill: 'rgba(0, 0, 0, 0.1)' }}
+                content={({ active, payload }) => {
+                  if (!active || !payload?.[0]) return null;
+                  const data = payload[0].payload as { fullAddress: string; price: number };
+                  return (
+                    <div className="bg-white dark:bg-gray-800 px-3 py-2 rounded-lg shadow-lg border text-sm">
+                      <p className="font-medium text-gray-900 dark:text-white">
+                        {data.fullAddress}
+                      </p>
+                      <p className="text-[#EF4923] font-semibold">
+                        Price: ${data.price.toLocaleString()}
+                      </p>
+                    </div>
+                  );
+                }}
               />
-              <Bar dataKey="price" radius={[0, 4, 4, 0]}>
+              <Bar dataKey="price" radius={[4, 4, 0, 0]} maxBarSize={50}>
                 {chartData.map((entry, index) => (
                   <Cell 
                     key={index} 

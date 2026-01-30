@@ -115,14 +115,32 @@ export function CMAMapView({
   const map = useRef<mapboxgl.Map | null>(null);
   const [mapLoaded, setMapLoaded] = useState(false);
   const [mapToken, setMapToken] = useState<string | null>(null);
+  const [mapError, setMapError] = useState<string | null>(null);
   const [mapStyle, setMapStyle] = useState<'streets' | 'satellite'>('streets');
+  const currentStyleRef = useRef<string | null>(null);
+  const addLayersRef = useRef<(() => void) | null>(null);
   const { theme } = useTheme();
 
   useEffect(() => {
+    console.log('[CMAMap] Component mounted, fetching token...');
     fetch('/api/mapbox-token')
-      .then((res) => res.json())
-      .then((data) => setMapToken(data.token))
-      .catch((err) => console.error('[CMAMap] Error fetching token:', err));
+      .then((res) => {
+        if (!res.ok) {
+          throw new Error(`Token fetch failed: ${res.status}`);
+        }
+        return res.json();
+      })
+      .then((data) => {
+        if (!data.token) {
+          throw new Error('No token in response');
+        }
+        console.log('[CMAMap] Token received, length:', data.token.length);
+        setMapToken(data.token);
+      })
+      .catch((err) => {
+        console.error('[CMAMap] Token fetch error:', err);
+        setMapError('Failed to load map token');
+      });
   }, []);
 
   const mapModel = useMemo(() => {
@@ -152,32 +170,55 @@ export function CMAMapView({
   useEffect(() => {
     if (!mapContainer.current || !mapToken || map.current) return;
 
-    mapboxgl.accessToken = mapToken;
+    console.log('[CMAMap] Creating map instance...');
+    
+    try {
+      mapboxgl.accessToken = mapToken;
 
-    let initialCenter: [number, number] = [-97.7431, 30.2672];
-    if (mapModel.subjectFeature) {
-      initialCenter = mapModel.subjectFeature.geometry.coordinates as [number, number];
-    } else if (mapModel.compFeatures.length > 0) {
-      initialCenter = mapModel.compFeatures[0].geometry.coordinates as [number, number];
+      let initialCenter: [number, number] = [-97.7431, 30.2672];
+      if (mapModel.subjectFeature) {
+        initialCenter = mapModel.subjectFeature.geometry.coordinates as [number, number];
+      } else if (mapModel.compFeatures.length > 0) {
+        initialCenter = mapModel.compFeatures[0].geometry.coordinates as [number, number];
+      }
+
+      const initialStyle = mapStyle === 'satellite' 
+        ? MAPBOX_STYLES.SATELLITE 
+        : (theme === 'dark' ? MAPBOX_STYLES.DARK : MAPBOX_STYLES.STREETS);
+
+      map.current = new mapboxgl.Map({
+        container: mapContainer.current,
+        style: initialStyle,
+        center: initialCenter,
+        zoom: 11,
+        attributionControl: true,
+      });
+
+      map.current.addControl(new mapboxgl.NavigationControl(), 'top-right');
+
+      map.current.on('load', () => {
+        console.log('[CMAMap] Map loaded successfully!');
+        setMapLoaded(true);
+      });
+      
+      map.current.on('style.load', () => {
+        console.log('[CMAMap] Style loaded event');
+        map.current?.once('idle', () => {
+          console.log('[CMAMap] Map idle - calling addLayers');
+          if (addLayersRef.current) {
+            addLayersRef.current();
+          }
+        });
+      });
+      
+      map.current.on('error', (e) => {
+        console.error('[CMAMap] Map error:', e.error);
+        setMapError(e.error?.message || 'Map failed to load');
+      });
+    } catch (error) {
+      console.error('[CMAMap] Map init error:', error);
+      setMapError('Failed to initialize map');
     }
-
-    const initialStyle = mapStyle === 'satellite' 
-      ? MAPBOX_STYLES.SATELLITE 
-      : (theme === 'dark' ? MAPBOX_STYLES.DARK : MAPBOX_STYLES.STREETS);
-
-    map.current = new mapboxgl.Map({
-      container: mapContainer.current,
-      style: initialStyle,
-      center: initialCenter,
-      zoom: 11,
-    });
-
-    map.current.addControl(new mapboxgl.NavigationControl(), 'top-right');
-
-    map.current.on('load', () => {
-      console.log('[CMAMap] Map loaded');
-      setMapLoaded(true);
-    });
 
     return () => {
       map.current?.remove();
@@ -185,21 +226,29 @@ export function CMAMapView({
     };
   }, [mapToken]);
 
-  useEffect(() => {
-    if (!map.current || !mapLoaded) return;
-
-    const newStyle = mapStyle === 'satellite' 
-      ? MAPBOX_STYLES.SATELLITE 
-      : (theme === 'dark' ? MAPBOX_STYLES.DARK : MAPBOX_STYLES.STREETS);
-    
-    map.current.setStyle(newStyle);
-  }, [mapStyle, theme, mapLoaded]);
-
+  const clickHandlerRef = useRef<((e: mapboxgl.MapMouseEvent & { features?: mapboxgl.MapboxGeoJSONFeature[] }) => void) | null>(null);
+  const mouseEnterHandlerRef = useRef<(() => void) | null>(null);
+  const mouseLeaveHandlerRef = useRef<(() => void) | null>(null);
+  
   useEffect(() => {
     if (!map.current || !mapLoaded) return;
 
     const addLayers = () => {
-      if (!map.current) return;
+      if (!map.current || !map.current.isStyleLoaded()) {
+        console.log('[CMAMap] Style not loaded yet, skipping addLayers');
+        return;
+      }
+      console.log('[CMAMap] Adding layers to map');
+      
+      if (clickHandlerRef.current) {
+        map.current.off('click', LAYER_IDS.compPoints, clickHandlerRef.current);
+      }
+      if (mouseEnterHandlerRef.current) {
+        map.current.off('mouseenter', LAYER_IDS.compPoints, mouseEnterHandlerRef.current);
+      }
+      if (mouseLeaveHandlerRef.current) {
+        map.current.off('mouseleave', LAYER_IDS.compPoints, mouseLeaveHandlerRef.current);
+      }
       
       [SOURCE_IDS.comps, SOURCE_IDS.subject].forEach(sourceId => {
         if (map.current?.getSource(sourceId)) {
@@ -338,7 +387,7 @@ export function CMAMapView({
         },
       });
 
-      map.current.on('click', LAYER_IDS.compPoints, (e) => {
+      const clickHandler = (e: mapboxgl.MapMouseEvent & { features?: mapboxgl.MapboxGeoJSONFeature[] }) => {
         if (e.features?.[0]?.properties && onPropertyClick) {
           const props = e.features[0].properties;
           const property = properties.find(p => 
@@ -346,14 +395,20 @@ export function CMAMapView({
           );
           if (property) onPropertyClick(property);
         }
-      });
+      };
+      clickHandlerRef.current = clickHandler;
+      map.current.on('click', LAYER_IDS.compPoints, clickHandler);
 
-      map.current.on('mouseenter', LAYER_IDS.compPoints, () => {
+      const mouseEnterHandler = () => {
         if (map.current) map.current.getCanvas().style.cursor = 'pointer';
-      });
-      map.current.on('mouseleave', LAYER_IDS.compPoints, () => {
+      };
+      const mouseLeaveHandler = () => {
         if (map.current) map.current.getCanvas().style.cursor = '';
-      });
+      };
+      mouseEnterHandlerRef.current = mouseEnterHandler;
+      mouseLeaveHandlerRef.current = mouseLeaveHandler;
+      map.current.on('mouseenter', LAYER_IDS.compPoints, mouseEnterHandler);
+      map.current.on('mouseleave', LAYER_IDS.compPoints, mouseLeaveHandler);
 
       if (mapModel.bounds) {
         map.current.fitBounds(mapModel.bounds, {
@@ -364,12 +419,50 @@ export function CMAMapView({
       }
     };
 
+    addLayersRef.current = addLayers;
+    
     if (map.current.isStyleLoaded()) {
       addLayers();
-    } else {
-      map.current.once('style.load', addLayers);
     }
   }, [mapLoaded, mapModel, properties, onPropertyClick]);
+
+  useEffect(() => {
+    if (!map.current || !mapLoaded) return;
+
+    const newStyle = mapStyle === 'satellite' 
+      ? MAPBOX_STYLES.SATELLITE 
+      : (theme === 'dark' ? MAPBOX_STYLES.DARK : MAPBOX_STYLES.STREETS);
+    
+    if (currentStyleRef.current === newStyle) return;
+    currentStyleRef.current = newStyle;
+    
+    console.log('[CMAMap] Changing style to:', mapStyle, theme);
+    map.current.setStyle(newStyle);
+  }, [mapStyle, theme, mapLoaded]);
+
+  if (mapError) {
+    return (
+      <div className={`space-y-2 ${className}`} data-testid="cma-map-view">
+        <div className="h-[550px] flex items-center justify-center bg-muted rounded-lg border">
+          <div className="text-center">
+            <p className="text-red-500 font-medium">Map Error</p>
+            <p className="text-sm text-muted-foreground">{mapError}</p>
+            <p className="text-xs text-muted-foreground mt-2">Check console for details</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (!mapToken) {
+    return (
+      <div className={`space-y-2 ${className}`} data-testid="cma-map-view">
+        <div className="h-[550px] flex items-center justify-center bg-muted rounded-lg border">
+          <p className="text-muted-foreground">Loading map...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className={`space-y-2 ${className}`} data-testid="cma-map-view">
