@@ -1,0 +1,390 @@
+# Property Modal Photo Navigation Fix
+
+## ISSUES
+
+1. **Forward (right) arrow missing** - Only backward arrow visible on photo carousel
+2. **Navigation not showing in List/Table views** - Modal from List and Table views missing photo navigation
+
+---
+
+## ROOT CAUSE
+
+The navigation arrows may be:
+1. Positioned outside the visible container
+2. Hidden behind other elements (z-index issue)
+3. Not rendering due to conditional logic issue
+
+---
+
+## FIX: Photo Navigation Arrows
+
+### File: `client/src/components/cma/PropertyDetailModal.tsx`
+
+Replace the photo carousel section with this fixed version:
+
+```tsx
+{/* Photo Carousel */}
+<div className="relative">
+  {/* Main Photo Container */}
+  <div className="aspect-[4/3] bg-muted relative overflow-hidden">
+    {photos.length > 0 ? (
+      <img 
+        src={photos[currentPhotoIndex]} 
+        alt={`Photo ${currentPhotoIndex + 1}`}
+        className="w-full h-full object-cover"
+      />
+    ) : (
+      <div className="w-full h-full flex items-center justify-center bg-muted">
+        <Home className="w-16 h-16 text-muted-foreground/30" />
+      </div>
+    )}
+    
+    {/* Photo Counter - Centered at bottom */}
+    {photos.length > 1 && (
+      <div className="absolute bottom-3 left-1/2 -translate-x-1/2 bg-black/60 text-white text-sm px-3 py-1 rounded-full z-10">
+        {currentPhotoIndex + 1} / {photos.length}
+      </div>
+    )}
+
+    {/* Navigation Arrows - BOTH LEFT AND RIGHT */}
+    {photos.length > 1 && (
+      <>
+        {/* Left/Previous Arrow */}
+        <button 
+          type="button"
+          onClick={(e) => { 
+            e.preventDefault();
+            e.stopPropagation(); 
+            setCurrentPhotoIndex((prev) => (prev - 1 + photos.length) % photos.length);
+          }}
+          className="absolute left-2 top-1/2 -translate-y-1/2 z-20 bg-black/50 hover:bg-black/70 text-white p-2 rounded-full transition-colors"
+          aria-label="Previous photo"
+        >
+          <ChevronLeft className="w-5 h-5" />
+        </button>
+        
+        {/* Right/Next Arrow */}
+        <button 
+          type="button"
+          onClick={(e) => { 
+            e.preventDefault();
+            e.stopPropagation(); 
+            setCurrentPhotoIndex((prev) => (prev + 1) % photos.length);
+          }}
+          className="absolute right-2 top-1/2 -translate-y-1/2 z-20 bg-black/50 hover:bg-black/70 text-white p-2 rounded-full transition-colors"
+          aria-label="Next photo"
+        >
+          <ChevronRight className="w-5 h-5" />
+        </button>
+      </>
+    )}
+  </div>
+
+  {/* Thumbnail Strip */}
+  {photos.length > 1 && (
+    <div className="flex gap-1 p-2 overflow-x-auto bg-muted/30">
+      {photos.slice(0, 12).map((photo: string, idx: number) => (
+        <button
+          key={idx}
+          type="button"
+          onClick={() => setCurrentPhotoIndex(idx)}
+          className={cn(
+            "flex-shrink-0 w-12 h-12 rounded overflow-hidden border-2 transition-all",
+            currentPhotoIndex === idx 
+              ? "border-primary opacity-100" 
+              : "border-transparent opacity-60 hover:opacity-100"
+          )}
+        >
+          <img src={photo} alt="" className="w-full h-full object-cover" />
+        </button>
+      ))}
+    </div>
+  )}
+</div>
+```
+
+---
+
+## KEY FIXES APPLIED
+
+| Issue | Fix |
+|-------|-----|
+| Right arrow missing | Added explicit right arrow button with `right-2` positioning |
+| z-index issues | Added `z-20` to both arrow buttons |
+| Arrows behind image | Added `overflow-hidden` to container, `z-20` to buttons |
+| Click propagation | Added `e.preventDefault()` and `e.stopPropagation()` |
+| Button type | Added `type="button"` to prevent form submission |
+| Accessibility | Added `aria-label` for screen readers |
+
+---
+
+## VERIFICATION CHECKLIST
+
+After implementing:
+
+- [ ] Open modal from **Grid view** - both arrows visible
+- [ ] Open modal from **List view** - both arrows visible  
+- [ ] Open modal from **Table view** - both arrows visible
+- [ ] Open modal from **Map view** - both arrows visible
+- [ ] Click left arrow - goes to previous photo
+- [ ] Click right arrow - goes to next photo
+- [ ] Photo counter updates correctly
+- [ ] Thumbnails clickable and highlight current photo
+- [ ] Arrows visible on hover (semi-transparent background)
+
+---
+
+## DEBUG: If Still Not Working
+
+Add console log to verify render:
+
+```tsx
+{photos.length > 1 && (
+  <>
+    {console.log('[Modal] Rendering arrows, photos count:', photos.length)}
+    {/* Left Arrow */}
+    <button ...>
+    {/* Right Arrow */}
+    <button ...>
+  </>
+)}
+```
+
+Check browser DevTools:
+1. Inspect the right arrow element
+2. Verify it exists in DOM
+3. Check computed styles (position, visibility, z-index)
+4. Look for CSS conflicts
+
+---
+
+## COMPLETE MODAL COMPONENT (If Needed)
+
+If the fixes above don't work, here's the complete corrected component:
+
+```tsx
+import { useState, useEffect } from 'react';
+import { X, ChevronLeft, ChevronRight, Home } from 'lucide-react';
+import { Dialog, DialogContent } from '@/components/ui/dialog';
+import { Badge } from '@/components/ui/badge';
+import { cn } from '@/lib/utils';
+import { formatPrice, normalizeStatus } from '@/lib/cma-data-utils';
+
+interface PropertyDetailModalProps {
+  property: any;
+  subjectProperty?: any;
+  isOpen: boolean;
+  onClose: () => void;
+}
+
+export function PropertyDetailModal({ 
+  property, 
+  subjectProperty,
+  isOpen, 
+  onClose 
+}: PropertyDetailModalProps) {
+  const [currentPhotoIndex, setCurrentPhotoIndex] = useState(0);
+  
+  // Reset photo index when property changes
+  useEffect(() => {
+    setCurrentPhotoIndex(0);
+  }, [property?.mlsNumber]);
+
+  if (!property) return null;
+
+  const photos = property.photos || [];
+  const status = normalizeStatus(property.status);
+  const price = property.soldPrice || property.closePrice || property.price || property.listPrice;
+  const sqft = property.sqft || property.livingArea;
+  const pricePerSqft = sqft ? Math.round(price / sqft) : null;
+
+  const goToPrevPhoto = () => {
+    setCurrentPhotoIndex((prev) => (prev - 1 + photos.length) % photos.length);
+  };
+
+  const goToNextPhoto = () => {
+    setCurrentPhotoIndex((prev) => (prev + 1) % photos.length);
+  };
+
+  return (
+    <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
+      <DialogContent className="max-w-md p-0 overflow-hidden rounded-xl gap-0">
+        {/* Header */}
+        <div className="p-4 pb-2">
+          <div className="flex items-start justify-between gap-2">
+            <div className="flex-1 min-w-0">
+              <h2 className="text-lg font-semibold leading-tight">
+                {property.address?.split(',')[0] || 'Unknown Address'}
+              </h2>
+              <p className="text-sm text-muted-foreground mt-0.5">
+                MLS# {property.mlsNumber || 'N/A'}
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* Photo Carousel - FIXED */}
+        <div className="relative">
+          <div className="aspect-[4/3] bg-muted relative">
+            {photos.length > 0 ? (
+              <img 
+                src={photos[currentPhotoIndex]} 
+                alt={`Photo ${currentPhotoIndex + 1}`}
+                className="w-full h-full object-cover"
+              />
+            ) : (
+              <div className="w-full h-full flex items-center justify-center">
+                <Home className="w-16 h-16 text-muted-foreground/30" />
+              </div>
+            )}
+            
+            {/* Photo Counter */}
+            {photos.length > 1 && (
+              <div className="absolute bottom-3 left-1/2 -translate-x-1/2 bg-black/60 text-white text-sm px-3 py-1 rounded-full z-10">
+                {currentPhotoIndex + 1} / {photos.length}
+              </div>
+            )}
+
+            {/* NAVIGATION ARROWS - BOTH VISIBLE */}
+            {photos.length > 1 && (
+              <>
+                {/* LEFT ARROW */}
+                <button 
+                  type="button"
+                  onClick={goToPrevPhoto}
+                  className="absolute left-2 top-1/2 -translate-y-1/2 z-20 bg-black/50 hover:bg-black/70 text-white p-2 rounded-full transition-colors"
+                >
+                  <ChevronLeft className="w-5 h-5" />
+                </button>
+                
+                {/* RIGHT ARROW */}
+                <button 
+                  type="button"
+                  onClick={goToNextPhoto}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 z-20 bg-black/50 hover:bg-black/70 text-white p-2 rounded-full transition-colors"
+                >
+                  <ChevronRight className="w-5 h-5" />
+                </button>
+              </>
+            )}
+          </div>
+
+          {/* Thumbnails */}
+          {photos.length > 1 && (
+            <div className="flex gap-1 p-2 overflow-x-auto">
+              {photos.slice(0, 12).map((photo: string, idx: number) => (
+                <button
+                  key={idx}
+                  type="button"
+                  onClick={() => setCurrentPhotoIndex(idx)}
+                  className={cn(
+                    "flex-shrink-0 w-12 h-12 rounded overflow-hidden border-2 transition-all",
+                    currentPhotoIndex === idx 
+                      ? "border-primary opacity-100" 
+                      : "border-transparent opacity-60 hover:opacity-100"
+                  )}
+                >
+                  <img src={photo} alt="" className="w-full h-full object-cover" />
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Property Details */}
+        <div className="p-4 space-y-3">
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <p className="text-xs text-muted-foreground">Price</p>
+              <p className="text-xl font-bold">{formatPrice(price)}</p>
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground">Price/SqFt</p>
+              <p className="text-xl font-bold">{pricePerSqft ? `$${pricePerSqft}` : 'N/A'}</p>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <p className="text-xs text-muted-foreground">Bedrooms</p>
+              <p className="text-lg font-semibold">{property.bedrooms || property.beds || 'N/A'}</p>
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground">Bathrooms</p>
+              <p className="text-lg font-semibold">{property.bathrooms || property.baths || 'N/A'}</p>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <p className="text-xs text-muted-foreground">Square Feet</p>
+              <p className="text-lg font-semibold">{sqft?.toLocaleString() || 'N/A'}</p>
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground">Days on Market</p>
+              <p className="text-lg font-semibold">{property.daysOnMarket ?? 'N/A'}</p>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4 pt-2 border-t">
+            <div>
+              <p className="text-xs text-muted-foreground mb-1">Status</p>
+              <Badge className={getStatusStyle(status)}>{getStatusLabel(status)}</Badge>
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground">List Date</p>
+              <p className="text-sm font-medium">
+                {property.listDate 
+                  ? new Date(property.listDate).toLocaleDateString('en-US', { 
+                      month: 'short', day: 'numeric', year: 'numeric' 
+                    })
+                  : 'N/A'
+                }
+              </p>
+            </div>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function getStatusStyle(status: string) {
+  const s = status.toUpperCase();
+  switch (s) {
+    case 'ACTIVE': return 'bg-green-500 text-white';
+    case 'UNDER_CONTRACT': return 'bg-orange-500 text-white';
+    case 'PENDING': return 'bg-gray-500 text-white';
+    case 'SOLD': return 'bg-red-500 text-white';
+    default: return 'bg-gray-400 text-white';
+  }
+}
+
+function getStatusLabel(status: string) {
+  const s = status.toUpperCase();
+  switch (s) {
+    case 'ACTIVE': return 'Active';
+    case 'UNDER_CONTRACT': return 'Active Under Contract';
+    case 'PENDING': return 'Pending';
+    case 'SOLD': return 'Closed';
+    default: return status;
+  }
+}
+```
+
+---
+
+## ACCEPTANCE CRITERIA
+
+- [ ] Left arrow visible and functional
+- [ ] Right arrow visible and functional
+- [ ] Both arrows show on Grid view modal
+- [ ] Both arrows show on List view modal
+- [ ] Both arrows show on Table view modal
+- [ ] Both arrows show on Map view modal
+- [ ] Photo counter updates when navigating
+- [ ] Thumbnails work correctly
+
+---
+
+Ready to implement!

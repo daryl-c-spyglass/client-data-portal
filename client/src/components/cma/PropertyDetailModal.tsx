@@ -120,18 +120,23 @@ export function PropertyDetailModal({
               </div>
             )}
 
+            {/* Navigation Arrows - z-20 ensures visibility above image */}
             {photos.length > 1 && (
               <>
                 <button 
-                  onClick={(e) => { e.stopPropagation(); prevPhoto(); }}
-                  className="absolute left-2 top-1/2 -translate-y-1/2 bg-black/50 hover:bg-black/70 text-white p-1.5 rounded-full transition-colors"
+                  type="button"
+                  onClick={(e) => { e.preventDefault(); e.stopPropagation(); prevPhoto(); }}
+                  className="absolute left-2 top-1/2 -translate-y-1/2 z-20 bg-black/50 hover:bg-black/70 text-white p-2 rounded-full transition-colors"
+                  aria-label="Previous photo"
                   data-testid="button-photo-prev"
                 >
                   <ChevronLeft className="w-5 h-5" />
                 </button>
                 <button 
-                  onClick={(e) => { e.stopPropagation(); nextPhoto(); }}
-                  className="absolute right-2 top-1/2 -translate-y-1/2 bg-black/50 hover:bg-black/70 text-white p-1.5 rounded-full transition-colors"
+                  type="button"
+                  onClick={(e) => { e.preventDefault(); e.stopPropagation(); nextPhoto(); }}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 z-20 bg-black/50 hover:bg-black/70 text-white p-2 rounded-full transition-colors"
+                  aria-label="Next photo"
                   data-testid="button-photo-next"
                 >
                   <ChevronRight className="w-5 h-5" />
@@ -141,10 +146,11 @@ export function PropertyDetailModal({
           </div>
 
           {photos.length > 1 && (
-            <div className="flex gap-1 p-2 overflow-x-auto">
+            <div className="flex gap-1 p-2 overflow-x-auto bg-muted/30">
               {photos.slice(0, 12).map((photo: string, idx: number) => (
                 <button
                   key={idx}
+                  type="button"
                   onClick={() => setCurrentPhotoIndex(idx)}
                   className={cn(
                     "flex-shrink-0 w-12 h-12 rounded overflow-hidden border-2 transition-all",
