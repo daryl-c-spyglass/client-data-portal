@@ -124,68 +124,27 @@ export function PropertyDetailModal({
               </div>
             )}
 
-            {/* Navigation Arrows - using explicit inline styles for guaranteed visibility */}
+            {/* Navigation Arrows */}
             {photos.length > 1 && (
               <>
-                {/* LEFT ARROW */}
-                <div 
-                  style={{
-                    position: 'absolute',
-                    left: 0,
-                    top: 0,
-                    width: '50%',
-                    height: '100%',
-                    cursor: 'pointer',
-                    zIndex: 20,
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'flex-start',
-                    paddingLeft: '12px',
-                  }}
+                <button
+                  type="button"
                   onClick={(e) => { e.preventDefault(); e.stopPropagation(); prevPhoto(); }}
-                  data-testid="zone-photo-prev"
+                  className="absolute left-2 top-1/2 -translate-y-1/2 z-20 bg-black/60 hover:bg-black/80 text-white p-2 rounded-full transition-colors"
+                  data-testid="button-photo-prev"
+                  aria-label="Previous photo"
                 >
-                  <div style={{
-                    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-                    borderRadius: '9999px',
-                    padding: '8px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                  }}>
-                    <ChevronLeft style={{ width: '20px', height: '20px', color: 'white' }} />
-                  </div>
-                </div>
-                
-                {/* RIGHT ARROW */}
-                <div 
-                  style={{
-                    position: 'absolute',
-                    right: 0,
-                    top: 0,
-                    width: '50%',
-                    height: '100%',
-                    cursor: 'pointer',
-                    zIndex: 20,
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'flex-end',
-                    paddingRight: '12px',
-                  }}
+                  <ChevronLeft className="w-5 h-5" />
+                </button>
+                <button
+                  type="button"
                   onClick={(e) => { e.preventDefault(); e.stopPropagation(); nextPhoto(); }}
-                  data-testid="zone-photo-next"
+                  className="absolute right-2 top-1/2 -translate-y-1/2 z-20 bg-black/60 hover:bg-black/80 text-white p-2 rounded-full transition-colors"
+                  data-testid="button-photo-next"
+                  aria-label="Next photo"
                 >
-                  <div style={{
-                    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-                    borderRadius: '9999px',
-                    padding: '8px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                  }}>
-                    <ChevronRight style={{ width: '20px', height: '20px', color: 'white' }} />
-                  </div>
-                </div>
+                  <ChevronRight className="w-5 h-5" />
+                </button>
               </>
             )}
           </div>

@@ -2581,67 +2581,27 @@ export function CMABuilder({ onCreateCMA, initialData }: CMABuilderProps) {
                       className="w-full h-full object-cover"
                       data-testid="img-cma-carousel"
                     />
-                    {/* Click zones for navigation - using inline styles for guaranteed visibility */}
+                    {/* Navigation Arrows */}
                     {photos.length > 1 && (
                       <>
-                        {/* LEFT ARROW */}
-                        <div 
-                          style={{
-                            position: 'absolute',
-                            left: 0,
-                            top: 0,
-                            width: '50%',
-                            height: '100%',
-                            cursor: 'pointer',
-                            zIndex: 20,
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'flex-start',
-                            paddingLeft: '12px',
-                          }}
+                        <button
+                          type="button"
                           onClick={(e) => { e.stopPropagation(); setCurrentPhotoIndex(prev => (prev - 1 + photos.length) % photos.length); }}
-                          data-testid="zone-cma-carousel-prev"
+                          className="absolute left-2 top-1/2 -translate-y-1/2 z-20 bg-black/60 hover:bg-black/80 text-white p-2 rounded-full transition-colors"
+                          data-testid="button-cma-carousel-prev"
+                          aria-label="Previous photo"
                         >
-                          <div style={{
-                            backgroundColor: 'rgba(0, 0, 0, 0.5)',
-                            borderRadius: '9999px',
-                            padding: '8px',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                          }}>
-                            <ChevronLeft style={{ width: '20px', height: '20px', color: 'white' }} />
-                          </div>
-                        </div>
-                        {/* RIGHT ARROW */}
-                        <div 
-                          style={{
-                            position: 'absolute',
-                            right: 0,
-                            top: 0,
-                            width: '50%',
-                            height: '100%',
-                            cursor: 'pointer',
-                            zIndex: 20,
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'flex-end',
-                            paddingRight: '12px',
-                          }}
+                          <ChevronLeft className="w-5 h-5" />
+                        </button>
+                        <button
+                          type="button"
                           onClick={(e) => { e.stopPropagation(); setCurrentPhotoIndex(prev => (prev + 1) % photos.length); }}
-                          data-testid="zone-cma-carousel-next"
+                          className="absolute right-2 top-1/2 -translate-y-1/2 z-20 bg-black/60 hover:bg-black/80 text-white p-2 rounded-full transition-colors"
+                          data-testid="button-cma-carousel-next"
+                          aria-label="Next photo"
                         >
-                          <div style={{
-                            backgroundColor: 'rgba(0, 0, 0, 0.5)',
-                            borderRadius: '9999px',
-                            padding: '8px',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                          }}>
-                            <ChevronRight style={{ width: '20px', height: '20px', color: 'white' }} />
-                          </div>
-                        </div>
+                          <ChevronRight className="w-5 h-5" />
+                        </button>
                         {/* Photo counter */}
                         <div className="absolute bottom-3 left-1/2 -translate-x-1/2 bg-black/60 text-white px-3 py-1.5 rounded-full text-sm font-medium z-20">
                           {currentPhotoIndex + 1} / {photos.length}
