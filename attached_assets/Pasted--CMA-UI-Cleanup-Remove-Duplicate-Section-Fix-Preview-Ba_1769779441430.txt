@@ -1,0 +1,262 @@
+# CMA UI Cleanup - Remove Duplicate Section & Fix Preview Banner
+
+## SCOPE
+
+Clean up the CMA Detail page by removing duplicate UI elements and applying Spyglass brand colors to the preview banner.
+
+---
+
+## ISSUE 1: Duplicate Section (CRITICAL)
+
+The page now shows TWO comparable sections:
+
+1. ✅ **NEW (Keep):** Clean white card with "Comparable Properties · 7 properties" header
+2. ❌ **OLD (Remove):** Dark header with "7 COMPARABLE HOMES" 
+
+**Action:** Remove the OLD section entirely. The page should only have ONE comparable properties section.
+
+### What to Remove:
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│ ≡  7 COMPARABLE HOMES              [Compare] [Map] [Stats] [List] │  ← REMOVE
+├─────────────────────────────────────────────────────────────┤
+│ All | Closed | Active Under Contract | Pending | Active     │  ← REMOVE
+├─────────────────────────────────────────────────────────────┤
+│ LOW PRICE   HIGH PRICE   AVG PRICE   MEDIAN   $/SQFT   DOM  │  ← REMOVE
+│ $715,000    $1,075,000   $908,257    $900,000 $273     59d  │  ← REMOVE (dark bg)
+├─────────────────────────────────────────────────────────────┤
+│ [Table with properties...]                                   │  ← KEEP (if this is the main table)
+└─────────────────────────────────────────────────────────────┘
+```
+
+### Search for duplicate code:
+
+```bash
+# Find duplicate "COMPARABLE HOMES" text
+grep -rn "COMPARABLE HOMES" --include="*.tsx" client/src/
+
+# Find duplicate stats bars
+grep -rn "LOW PRICE" --include="*.tsx" client/src/
+
+# Find duplicate view toggles  
+grep -rn "Compare.*Map.*Stats" --include="*.tsx" client/src/
+```
+
+---
+
+## ISSUE 2: Preview Banner - Apply Spyglass Brand Colors
+
+### Current (Yellow box):
+The preview banner uses generic colors. Update to use **Spyglass brand colors**.
+
+### Spyglass Brand Colors:
+```
+Primary (Red-Orange): #EF4923  |  rgb(239, 73, 35)  |  hsl(11, 85%, 54%)
+Black:                #222222  |  rgb(34, 34, 34)
+```
+
+### Update the Preview Banner:
+
+**Current styling (likely):**
+```tsx
+<div className="bg-yellow-50 border-yellow-200 ...">
+```
+
+**Updated styling:**
+```tsx
+{/* Preview Banner - Light Mode */}
+<div className="bg-[#FEF2EF] border border-[#EF4923]/20 rounded-lg p-4 flex items-center justify-between">
+  <p className="text-sm text-[#222222]">
+    You are seeing a preview of the report.
+  </p>
+  
+  <div className="flex items-center gap-2">
+    {/* Save Button - Primary CTA */}
+    <Button className="bg-[#EF4923] hover:bg-[#D9421F] text-white">
+      <Save className="w-4 h-4 mr-2" />
+      Save
+    </Button>
+    
+    {/* Secondary Buttons */}
+    <Button variant="outline">
+      <ExternalLink className="w-4 h-4 mr-2" />
+      Copy Live URL
+    </Button>
+    
+    <Button variant="outline">
+      <Mail className="w-4 h-4 mr-2" />
+      Share CMA
+    </Button>
+    
+    <Button variant="outline">
+      <Edit className="w-4 h-4 mr-2" />
+      Modify Search
+    </Button>
+    
+    <Button variant="outline">
+      Notes
+    </Button>
+  </div>
+</div>
+```
+
+### Theme-Optimized Styling:
+
+```tsx
+{/* Preview Banner - Theme Aware */}
+<div className={cn(
+  "rounded-lg p-4 flex items-center justify-between",
+  // Light mode
+  "bg-[#FEF2EF] border border-[#EF4923]/20",
+  // Dark mode
+  "dark:bg-[#EF4923]/10 dark:border-[#EF4923]/30"
+)}>
+  <p className="text-sm text-foreground">
+    You are seeing a preview of the report.
+  </p>
+  
+  <div className="flex items-center gap-2">
+    {/* Save Button */}
+    <Button 
+      className={cn(
+        "bg-[#EF4923] hover:bg-[#D9421F] text-white",
+        "dark:bg-[#EF4923] dark:hover:bg-[#C93B1C]"
+      )}
+    >
+      <Save className="w-4 h-4 mr-2" />
+      Save
+    </Button>
+    
+    {/* Secondary Buttons - use default outline which respects theme */}
+    <Button variant="outline">
+      <ExternalLink className="w-4 h-4 mr-2" />
+      Copy Live URL
+    </Button>
+    
+    {/* ... other buttons ... */}
+  </div>
+</div>
+```
+
+---
+
+## ISSUE 3: Check for Duplicate Functions
+
+The page may have duplicate functionality. Audit these:
+
+### Stats Display
+- Should only appear ONCE (in the new clean section)
+- Remove any duplicate stats calculation/display
+
+### Status Filter Tabs
+- Should only appear ONCE
+- "All | Closed | Active Under Contract | Pending | Active"
+
+### View Toggles
+- **Compare | Map | Stats** - Should appear once (new section)
+- **Grid | List | Table** - Should appear once (new section)
+- Remove duplicate toggles from old section
+
+### Property Table/List
+- Should only render ONCE
+- Ensure data isn't being fetched twice
+
+---
+
+## TASK CHECKLIST
+
+### Task 1: Remove Duplicate Section
+- [ ] Find and remove the OLD dark "7 COMPARABLE HOMES" header
+- [ ] Remove duplicate status filter tabs (dark background version)
+- [ ] Remove duplicate stats bar (dark background version)
+- [ ] Remove duplicate view toggles
+- [ ] Keep the property table (it should be shared by new UI)
+
+### Task 2: Fix Preview Banner Colors
+- [ ] Background: `bg-[#FEF2EF]` (light) / `dark:bg-[#EF4923]/10`
+- [ ] Border: `border-[#EF4923]/20` (light) / `dark:border-[#EF4923]/30`
+- [ ] Save button: `bg-[#EF4923] hover:bg-[#D9421F]`
+- [ ] Text: Use `text-foreground` for theme compatibility
+
+### Task 3: Verify Single Source of Truth
+- [ ] Stats calculated once, displayed once
+- [ ] Filters applied in one place
+- [ ] View mode state managed in one place
+- [ ] No duplicate API calls
+
+### Task 4: Theme Optimization
+- [ ] Test in Light mode
+- [ ] Test in Dark mode  
+- [ ] Test in System mode (follows OS preference)
+- [ ] Ensure smooth transitions between themes
+
+---
+
+## COLOR REFERENCE
+
+| Element | Light Mode | Dark Mode |
+|---------|------------|-----------|
+| Banner BG | `#FEF2EF` | `rgba(239,73,35,0.1)` |
+| Banner Border | `rgba(239,73,35,0.2)` | `rgba(239,73,35,0.3)` |
+| Save Button | `#EF4923` | `#EF4923` |
+| Save Hover | `#D9421F` | `#C93B1C` |
+| Text | `#222222` | `foreground` (theme) |
+
+---
+
+## ACCEPTANCE CRITERIA
+
+- [ ] Only ONE "Comparable Properties" section visible
+- [ ] No dark header bar with "7 COMPARABLE HOMES"
+- [ ] Preview banner uses Spyglass orange (`#EF4923`)
+- [ ] Save button is Spyglass orange
+- [ ] Banner looks correct in Light mode
+- [ ] Banner looks correct in Dark mode
+- [ ] No duplicate stats, filters, or toggles
+- [ ] Page renders without errors
+- [ ] All existing functionality preserved
+
+---
+
+## VALIDATION
+
+After changes, verify:
+
+```
+1. Light Mode:
+   - Banner background is light peachy-orange (#FEF2EF)
+   - Save button is bright orange (#EF4923)
+   - Only one stats section visible
+
+2. Dark Mode:
+   - Banner has subtle orange tint
+   - Save button remains orange
+   - All text is readable
+
+3. Functionality:
+   - Compare/Map/Stats toggle works
+   - Grid/List/Table toggle works
+   - Status filter tabs work
+   - Save button works
+   - All other buttons work
+```
+
+---
+
+## FILES TO CHECK
+
+```
+client/src/
+├── pages/
+│   └── CMADetailPage.tsx         [MAIN - remove duplicates]
+├── components/
+│   ├── CMAReport.tsx             [CHECK - may have old UI]
+│   ├── cma/
+│   │   ├── CMAPreviewBanner.tsx  [UPDATE - colors]
+│   │   └── [other cma files]     [CHECK - for duplicates]
+```
+
+---
+
+Ready to implement! The goal is a single, clean UI with proper Spyglass branding.

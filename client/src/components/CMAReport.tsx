@@ -525,14 +525,14 @@ export function CMAReport({
 
   return (
     <div className="space-y-6 cma-print">
-      {/* Preview Banner - hidden in print/PDF */}
+      {/* Preview Banner - Spyglass Brand Colors - hidden in print/PDF */}
       {isPreview && expiresAt && (
-        <div className="bg-yellow-100 dark:bg-yellow-900/20 border border-yellow-400 dark:border-yellow-600 rounded-md p-4 flex items-center justify-between gap-4 flex-wrap print:hidden cma-preview-banner" data-testid="cma-preview-banner">
-          <p className="text-sm">
+        <div className="bg-[#FEF2EF] dark:bg-[#EF4923]/10 border border-[#EF4923]/20 dark:border-[#EF4923]/30 rounded-lg p-4 flex items-center justify-between gap-4 flex-wrap print:hidden cma-preview-banner" data-testid="cma-preview-banner">
+          <p className="text-sm text-foreground">
             You are seeing a preview of the report.
           </p>
           <div className="flex items-center gap-2 flex-wrap">
-            <Button size="sm" onClick={onSave} data-testid="button-save-cma">
+            <Button size="sm" style={{ backgroundColor: '#EF4923' }} className="text-white" onClick={onSave} data-testid="button-save-cma">
               <Save className="w-4 h-4 mr-2" />
               Save
             </Button>
@@ -681,8 +681,8 @@ export function CMAReport({
         </Card>
       )}
 
-      {/* CloudCMA-Style Header Bar */}
-      <div className="bg-zinc-900 text-white rounded-t-lg print:hidden">
+      {/* CloudCMA-Style Header Bar - Hidden in preview mode since CMADetailPage has its own controls */}
+      {!isPreview && <div className="bg-zinc-900 text-white rounded-t-lg print:hidden">
         <div className="flex items-center justify-between px-4 py-3">
           <div className="flex items-center gap-3">
             {/* Menu for legacy tabs */}
@@ -779,7 +779,7 @@ export function CMAReport({
             </Button>
           </div>
         </div>
-      </div>
+      </div>}
 
       {/* Main Tabs - Hidden TabsList since we use the custom header */}
       <Tabs value={activeTab} onValueChange={setActiveTab}>
@@ -796,8 +796,8 @@ export function CMAReport({
 
         {/* Compare Tab - CloudCMA Style Table View */}
         <TabsContent value="compare" className="space-y-0 mt-0">
-          {/* Status Filter Sub-tabs */}
-          <div className="bg-zinc-800 px-2 sm:px-4 py-2 overflow-x-auto">
+          {/* Status Filter Sub-tabs - Hidden in preview mode since CMADetailPage provides controls */}
+          {!isPreview && <div className="bg-zinc-800 px-2 sm:px-4 py-2 overflow-x-auto">
             <Tabs value={activeListingTab} onValueChange={setActiveListingTab} className="w-auto">
               <TabsList className="bg-transparent h-auto p-0 gap-1 sm:gap-2 flex-wrap sm:flex-nowrap">
                 <TabsTrigger 
@@ -838,10 +838,10 @@ export function CMAReport({
                 </TabsTrigger>
               </TabsList>
             </Tabs>
-          </div>
+          </div>}
 
-          {/* Summary Stats Bar - CloudCMA Style */}
-          {(() => {
+          {/* Summary Stats Bar - CloudCMA Style - Hidden in preview mode */}
+          {!isPreview && ((() => {
             const pendingProperties = properties.filter(p => p.standardStatus === 'Pending');
             const filteredProps = (activeListingTab === 'all' ? allProperties :
               activeListingTab === 'sold' ? soldProperties :
@@ -914,7 +914,7 @@ export function CMAReport({
                 </div>
               </div>
             );
-          })()}
+          })())}
 
           {/* Data Table - CloudCMA Style */}
           <div className="bg-white dark:bg-zinc-950 rounded-b-lg relative">
