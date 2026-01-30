@@ -525,41 +525,8 @@ export function CMAReport({
 
   return (
     <div className="space-y-6 cma-print">
-      {/* Preview Banner - Spyglass Brand Colors - hidden in print/PDF */}
-      {isPreview && expiresAt && (
-        <div className="bg-[#FEF2EF] dark:bg-[#EF4923]/10 border border-[#EF4923]/20 dark:border-[#EF4923]/30 rounded-lg p-4 flex items-center justify-between gap-4 flex-wrap print:hidden cma-preview-banner" data-testid="cma-preview-banner">
-          <p className="text-sm text-foreground">
-            You are seeing a preview of the report.
-          </p>
-          <div className="flex items-center gap-2 flex-wrap">
-            <Button size="sm" style={{ backgroundColor: '#EF4923' }} className="text-white" onClick={onSave} data-testid="button-save-cma">
-              <Save className="w-4 h-4 mr-2" />
-              Save
-            </Button>
-            <Button size="sm" variant="outline" onClick={onPublicLink} data-testid="button-copy-live-url">
-              <ExternalLink className="w-4 h-4 mr-2" />
-              Copy Live URL
-            </Button>
-            <Button size="sm" variant="outline" onClick={onShareCMA} data-testid="button-share-cma-email">
-              <Mail className="w-4 h-4 mr-2" />
-              Share CMA
-            </Button>
-            <Button size="sm" variant="outline" onClick={onModifySearch} data-testid="button-modify-search">
-              <Edit className="w-4 h-4 mr-2" />
-              Modify Search
-            </Button>
-            {activeTab === "home-averages" && (
-              <Button size="sm" variant="outline" onClick={onModifyStats} data-testid="button-modify-stats">
-                <FileText className="w-4 h-4 mr-2" />
-                Modify Stats
-              </Button>
-            )}
-            <Button size="sm" variant="outline" onClick={onAddNotes} data-testid="button-notes">
-              Notes
-            </Button>
-          </div>
-        </div>
-      )}
+      {/* Preview Banner - Now rendered in CMADetailPage above the Card */}
+      {/* CMAReport no longer renders its own preview banner - parent components manage this */}
 
       {/* Print-only Summary Section - mirrors Share CMA layout for print/PDF */}
       <div className="hidden print:block space-y-6">

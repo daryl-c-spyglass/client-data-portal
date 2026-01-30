@@ -6,7 +6,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Card, CardContent } from "@/components/ui/card";
-import { ArrowLeft, Share2, Link as LinkIcon, Copy, Check, Trash2, ExternalLink, Printer, Loader2, Mail, LayoutGrid, MapPin, BarChart3, Map, TrendingUp, List, Table as TableIcon, RefreshCw } from "lucide-react";
+import { ArrowLeft, Share2, Link as LinkIcon, Copy, Check, Trash2, ExternalLink, Printer, Loader2, Mail, LayoutGrid, MapPin, BarChart3, Map, TrendingUp, List, Table as TableIcon, RefreshCw, Save, Edit } from "lucide-react";
 import { SiFacebook, SiX, SiInstagram, SiTiktok } from "react-icons/si";
 import { Link } from "wouter";
 import { CMAReport } from "@/components/CMAReport";
@@ -731,6 +731,58 @@ Best regards`;
         </div>
       </div>
 
+      {/* Preview Banner - Spyglass Brand Colors - ABOVE the Card */}
+      <div 
+        className="bg-[#FEF2EF] dark:bg-[#EF4923]/10 border border-[#EF4923]/20 dark:border-[#EF4923]/30 rounded-lg p-4 flex items-center justify-between gap-4 flex-wrap print:hidden"
+        data-testid="cma-preview-banner"
+      >
+        <p className="text-sm text-foreground">
+          You are seeing a preview of the report.
+        </p>
+        <div className="flex items-center gap-2 flex-wrap">
+          <Button size="sm" style={{ backgroundColor: '#EF4923' }} className="text-white" onClick={handleSave} data-testid="button-save-cma">
+            <Save className="w-4 h-4 mr-2" />
+            Save
+          </Button>
+          <Button size="sm" variant="outline" onClick={async () => {
+            try {
+              let shareUrl: string;
+              if (cma?.publicLink) {
+                shareUrl = `${window.location.origin}/share/cma/${cma.publicLink}`;
+              } else {
+                const result = await shareMutation.mutateAsync();
+                shareUrl = `${window.location.origin}/share/cma/${result.shareToken}`;
+              }
+              await navigator.clipboard.writeText(shareUrl);
+              toast({
+                title: "URL copied to clipboard",
+                description: shareUrl,
+              });
+            } catch (error) {
+              toast({
+                title: "Error",
+                description: "Failed to generate or copy share URL",
+                variant: "destructive",
+              });
+            }
+          }} data-testid="button-copy-live-url">
+            <ExternalLink className="w-4 h-4 mr-2" />
+            Copy Live URL
+          </Button>
+          <Button size="sm" variant="outline" onClick={() => setEmailShareDialogOpen(true)} data-testid="button-share-cma-email">
+            <Mail className="w-4 h-4 mr-2" />
+            Share CMA
+          </Button>
+          <Button size="sm" variant="outline" onClick={handleModifySearch} data-testid="button-modify-search">
+            <Edit className="w-4 h-4 mr-2" />
+            Modify Search
+          </Button>
+          <Button size="sm" variant="outline" onClick={handleOpenNotesDialog} data-testid="button-notes">
+            Notes
+          </Button>
+        </div>
+      </div>
+
       {/* Comparable Properties Card - Clean Design */}
       <Card className="overflow-hidden print:hidden">
         <CardContent className="p-6">
@@ -928,48 +980,51 @@ Best regards`;
               </Button>
             </div>
           </div>
+          
+          {/* Property Display - CMAReport renders the table/map/stats views INSIDE the Card */}
+          <div className="mt-4">
+            <CMAReport
+              properties={properties}
+              statistics={statistics || mockStatistics}
+              timelineData={timelineData}
+              isPreview={true}
+              expiresAt={cma.expiresAt ? new Date(cma.expiresAt) : new Date(Date.now() + 30 * 60 * 1000)}
+              visibleMetrics={visibleMetrics}
+              notes={cma.notes}
+              reportTitle={cma.name}
+              subjectPropertyId={cma.subjectPropertyId}
+              onSave={handleSave}
+              onShareCMA={() => setEmailShareDialogOpen(true)}
+              onPublicLink={async () => {
+                try {
+                  let shareUrl: string;
+                  if (cma?.publicLink) {
+                    shareUrl = `${window.location.origin}/share/cma/${cma.publicLink}`;
+                  } else {
+                    const result = await shareMutation.mutateAsync();
+                    shareUrl = `${window.location.origin}/share/cma/${result.shareToken}`;
+                  }
+                  await navigator.clipboard.writeText(shareUrl);
+                  toast({
+                    title: "URL copied to clipboard",
+                    description: shareUrl,
+                  });
+                } catch (error) {
+                  toast({
+                    title: "Error",
+                    description: "Failed to generate or copy share URL",
+                    variant: "destructive",
+                  });
+                }
+              }}
+              onModifySearch={handleModifySearch}
+              onModifyStats={handleModifyStats}
+              onAddNotes={handleOpenNotesDialog}
+              onPrint={handlePrint}
+            />
+          </div>
         </CardContent>
       </Card>
-
-      <CMAReport
-        properties={properties}
-        statistics={statistics || mockStatistics}
-        timelineData={timelineData}
-        isPreview={true}
-        expiresAt={cma.expiresAt ? new Date(cma.expiresAt) : new Date(Date.now() + 30 * 60 * 1000)}
-        visibleMetrics={visibleMetrics}
-        notes={cma.notes}
-        reportTitle={cma.name}
-        subjectPropertyId={cma.subjectPropertyId}
-        onSave={handleSave}
-        onShareCMA={() => setEmailShareDialogOpen(true)}
-        onPublicLink={async () => {
-          try {
-            let shareUrl: string;
-            if (cma?.publicLink) {
-              shareUrl = `${window.location.origin}/share/cma/${cma.publicLink}`;
-            } else {
-              const result = await shareMutation.mutateAsync();
-              shareUrl = `${window.location.origin}/share/cma/${result.shareToken}`;
-            }
-            await navigator.clipboard.writeText(shareUrl);
-            toast({
-              title: "URL copied to clipboard",
-              description: shareUrl,
-            });
-          } catch (error) {
-            toast({
-              title: "Error",
-              description: "Failed to generate or copy share URL",
-              variant: "destructive",
-            });
-          }
-        }}
-        onModifySearch={handleModifySearch}
-        onModifyStats={handleModifyStats}
-        onAddNotes={handleOpenNotesDialog}
-        onPrint={handlePrint}
-      />
 
       {/* Notes Dialog */}
       <Dialog open={notesDialogOpen} onOpenChange={setNotesDialogOpen}>
