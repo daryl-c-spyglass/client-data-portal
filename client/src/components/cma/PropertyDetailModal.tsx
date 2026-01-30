@@ -124,28 +124,66 @@ export function PropertyDetailModal({
               </div>
             )}
 
-            {/* Navigation Arrows - using click zones like CMAReport floating card */}
+            {/* Navigation Arrows - using explicit inline styles for guaranteed visibility */}
             {photos.length > 1 && (
               <>
-                {/* LEFT click zone - covers left half of image */}
+                {/* LEFT ARROW */}
                 <div 
-                  className="absolute left-0 top-0 w-1/2 h-full cursor-pointer z-10 group"
+                  style={{
+                    position: 'absolute',
+                    left: 0,
+                    top: 0,
+                    width: '50%',
+                    height: '100%',
+                    cursor: 'pointer',
+                    zIndex: 20,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'flex-start',
+                    paddingLeft: '12px',
+                  }}
                   onClick={(e) => { e.preventDefault(); e.stopPropagation(); prevPhoto(); }}
                   data-testid="zone-photo-prev"
                 >
-                  <div className="absolute left-3 top-1/2 -translate-y-1/2 bg-black/50 group-hover:bg-black/70 text-white p-2 rounded-full transition-all opacity-70 group-hover:opacity-100">
-                    <ChevronLeft className="w-5 h-5" />
+                  <div style={{
+                    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+                    borderRadius: '9999px',
+                    padding: '8px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}>
+                    <ChevronLeft style={{ width: '20px', height: '20px', color: 'white' }} />
                   </div>
                 </div>
                 
-                {/* RIGHT click zone - covers right half of image */}
+                {/* RIGHT ARROW */}
                 <div 
-                  className="absolute right-0 top-0 w-1/2 h-full cursor-pointer z-10 group"
+                  style={{
+                    position: 'absolute',
+                    right: 0,
+                    top: 0,
+                    width: '50%',
+                    height: '100%',
+                    cursor: 'pointer',
+                    zIndex: 20,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'flex-end',
+                    paddingRight: '12px',
+                  }}
                   onClick={(e) => { e.preventDefault(); e.stopPropagation(); nextPhoto(); }}
                   data-testid="zone-photo-next"
                 >
-                  <div className="absolute right-3 top-1/2 -translate-y-1/2 bg-black/50 group-hover:bg-black/70 text-white p-2 rounded-full transition-all opacity-70 group-hover:opacity-100">
-                    <ChevronRight className="w-5 h-5" />
+                  <div style={{
+                    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+                    borderRadius: '9999px',
+                    padding: '8px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}>
+                    <ChevronRight style={{ width: '20px', height: '20px', color: 'white' }} />
                   </div>
                 </div>
               </>
