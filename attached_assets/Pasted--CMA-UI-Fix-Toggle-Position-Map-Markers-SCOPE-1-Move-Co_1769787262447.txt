@@ -1,0 +1,512 @@
+# CMA UI Fix - Toggle Position & Map Markers
+
+## SCOPE
+
+1. Move "Compare | Map | Stats" toggle to the right side of header (where Refresh MLS Data was)
+2. Fix map view - property markers not displaying
+
+---
+
+## ISSUE 1: Move Compare/Map/Stats Toggle Position
+
+### Current Layout (Wrong):
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│ Comparable Properties · 10 properties [Nearby]                          │
+│                                                                         │
+│ [Compare] [Map] [Stats]                    [Refresh MLS Data]           │
+│                                                                         │
+│ (All) (Closed) (Active Under Contract) (Pending) (Active) (Leasing)     │
+└─────────────────────────────────────────────────────────────────────────┘
+```
+
+### Target Layout (Correct - Match Contract Conduit):
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│ Comparable Properties · 10 properties [Nearby]    [Compare] [Map] [Stats] │
+│                                                                         │
+│ (All) (Closed) (Active Under Contract) (Pending) (Active) (Leasing)     │
+└─────────────────────────────────────────────────────────────────────────┘
+```
+
+### Fix:
+
+```tsx
+{/* Section Header */}
+<div className="flex items-center justify-between mb-4">
+  {/* Left side - Title and count */}
+  <div className="flex items-center gap-3">
+    <h2 className="text-lg font-semibold">Comparable Properties</h2>
+    <span className="text-muted-foreground">{properties.length} properties</span>
+    {/* Remove Nearby pill or keep if needed */}
+  </div>
+  
+  {/* Right side - View Mode Toggle ONLY */}
+  <div className="flex items-center gap-1 bg-muted rounded-lg p-1">
+    <button
+      onClick={() => setViewMode('compare')}
+      className={cn(
+        "px-3 py-1.5 rounded-md text-sm font-medium transition-colors flex items-center gap-1.5",
+        viewMode === 'compare' 
+          ? "bg-background shadow-sm" 
+          : "text-muted-foreground hover:text-foreground"
+      )}
+    >
+      <BarChart3 className="w-4 h-4" />
+      Compare
+    </button>
+    <button
+      onClick={() => setViewMode('map')}
+      className={cn(
+        "px-3 py-1.5 rounded-md text-sm font-medium transition-colors flex items-center gap-1.5",
+        viewMode === 'map' 
+          ? "bg-background shadow-sm" 
+          : "text-muted-foreground hover:text-foreground"
+      )}
+    >
+      <Map className="w-4 h-4" />
+      Map
+    </button>
+    <button
+      onClick={() => setViewMode('stats')}
+      className={cn(
+        "px-3 py-1.5 rounded-md text-sm font-medium transition-colors flex items-center gap-1.5",
+        viewMode === 'stats' 
+          ? "bg-background shadow-sm" 
+          : "text-muted-foreground hover:text-foreground"
+      )}
+    >
+      <TrendingUp className="w-4 h-4" />
+      Stats
+    </button>
+  </div>
+</div>
+
+{/* Status Filter Tabs - Below header */}
+<div className="flex items-center gap-2 mb-4">
+  {['All', 'Closed', 'Active Under Contract', 'Pending', 'Active', 'Leasing'].map((status) => (
+    <button
+      key={status}
+      onClick={() => setStatusFilter(status === 'All' ? null : status)}
+      className={cn(
+        "px-3 py-1.5 rounded-full text-sm font-medium transition-colors",
+        statusFilter === (status === 'All' ? null : status)
+          ? "bg-gray-900 text-white dark:bg-white dark:text-gray-900"
+          : "bg-gray-100 dark:bg-gray-800 text-muted-foreground hover:bg-gray-200"
+      )}
+    >
+      {status}
+    </button>
+  ))}
+</div>
+```
+
+---
+
+## ISSUE 2: Map Markers Not Displaying
+
+The map loads but markers aren't showing. Common causes:
+
+### Debug Steps:
+
+1. **Check if properties have coordinates:**
+```tsx
+// Add debug logging
+useEffect(() => {
+  console.log('[CMAMap] Properties:', properties);
+  console.log('[CMAMap] Properties with coords:', 
+    properties.filter(p => p.map?.latitude && p.map?.longitude)
+  );
+  console.log('[CMAMap] Subject property:', subjectProperty);
+}, [properties, subjectProperty]);
+```
+
+2. **Check coordinate field names:**
+Properties may have coordinates in different fields:
+```tsx
+// Try multiple coordinate sources
+const getLngLat = (property: any): [number, number] | null => {
+  // Option 1: map.latitude/longitude
+  if (property.map?.latitude && property.map?.longitude) {
+    return [property.map.longitude, property.map.latitude];
+  }
+  // Option 2: coordinates.latitude/longitude
+  if (property.coordinates?.latitude && property.coordinates?.longitude) {
+    return [property.coordinates.longitude, property.coordinates.latitude];
+  }
+  // Option 3: direct lat/lng
+  if (property.latitude && property.longitude) {
+    return [property.longitude, property.latitude];
+  }
+  // Option 4: address.latitude/longitude
+  if (property.address?.latitude && property.address?.longitude) {
+    return [property.address.longitude, property.address.latitude];
+  }
+  return null;
+};
+```
+
+### Fix: Complete Map Component
+
+```tsx
+import { useRef, useEffect, useState } from 'react';
+import mapboxgl from 'mapbox-gl';
+import 'mapbox-gl/dist/mapbox-gl.css';
+
+// Set Mapbox token
+mapboxgl.accessToken = import.meta.env.VITE_MAPBOX_TOKEN;
+
+interface CMAMapViewProps {
+  properties: any[];
+  subjectProperty: any;
+}
+
+export function CMAMapView({ properties, subjectProperty }: CMAMapViewProps) {
+  const mapContainer = useRef<HTMLDivElement>(null);
+  const map = useRef<mapboxgl.Map | null>(null);
+  const markersRef = useRef<mapboxgl.Marker[]>([]);
+  const [mapLoaded, setMapLoaded] = useState(false);
+
+  // Get coordinates from property (try multiple fields)
+  const getCoordinates = (property: any): [number, number] | null => {
+    const lat = property.map?.latitude 
+      || property.coordinates?.latitude 
+      || property.latitude
+      || property.address?.latitude;
+    const lng = property.map?.longitude 
+      || property.coordinates?.longitude 
+      || property.longitude
+      || property.address?.longitude;
+    
+    if (lat && lng && !isNaN(lat) && !isNaN(lng)) {
+      return [lng, lat]; // Mapbox uses [lng, lat]
+    }
+    return null;
+  };
+
+  // Get subject coordinates for initial center
+  const getInitialCenter = (): [number, number] => {
+    const subjectCoords = getCoordinates(subjectProperty);
+    if (subjectCoords) return subjectCoords;
+    
+    // Find first property with coordinates
+    for (const p of properties) {
+      const coords = getCoordinates(p);
+      if (coords) return coords;
+    }
+    
+    // Default to Austin, TX
+    return [-97.7431, 30.2672];
+  };
+
+  // Get marker color based on status
+  const getMarkerColor = (status: string, isSubject: boolean = false): string => {
+    if (isSubject) return '#3b82f6'; // Blue
+    
+    const statusLower = status?.toLowerCase() || '';
+    if (statusLower.includes('active') && !statusLower.includes('under')) return '#22c55e'; // Green
+    if (statusLower.includes('under contract') || statusLower.includes('pending')) return '#f97316'; // Orange
+    if (statusLower.includes('closed') || statusLower.includes('sold')) return '#ef4444'; // Red
+    return '#6b7280'; // Gray
+  };
+
+  // Create marker element
+  const createMarkerElement = (
+    price: number, 
+    status: string, 
+    isSubject: boolean = false
+  ): HTMLElement => {
+    const el = document.createElement('div');
+    const color = getMarkerColor(status, isSubject);
+    const priceLabel = isSubject ? 'SUBJECT' : `$${Math.round(price / 1000)}K`;
+    
+    el.innerHTML = `
+      <div style="
+        background-color: ${color};
+        color: white;
+        padding: 4px 8px;
+        border-radius: 4px;
+        font-size: 11px;
+        font-weight: 600;
+        white-space: nowrap;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+        cursor: pointer;
+        transform: translate(-50%, -100%);
+      ">
+        ${priceLabel}
+        <div style="
+          position: absolute;
+          bottom: -6px;
+          left: 50%;
+          transform: translateX(-50%);
+          width: 0;
+          height: 0;
+          border-left: 6px solid transparent;
+          border-right: 6px solid transparent;
+          border-top: 6px solid ${color};
+        "></div>
+      </div>
+    `;
+    
+    return el;
+  };
+
+  // Initialize map
+  useEffect(() => {
+    if (!mapContainer.current || map.current) return;
+
+    const center = getInitialCenter();
+    console.log('[CMAMap] Initializing map at:', center);
+
+    map.current = new mapboxgl.Map({
+      container: mapContainer.current,
+      style: 'mapbox://styles/mapbox/streets-v12',
+      center: center,
+      zoom: 11,
+    });
+
+    map.current.addControl(new mapboxgl.NavigationControl(), 'top-right');
+
+    map.current.on('load', () => {
+      console.log('[CMAMap] Map loaded');
+      setMapLoaded(true);
+    });
+
+    return () => {
+      markersRef.current.forEach(marker => marker.remove());
+      markersRef.current = [];
+      map.current?.remove();
+      map.current = null;
+    };
+  }, []);
+
+  // Add markers when map is loaded
+  useEffect(() => {
+    if (!map.current || !mapLoaded) return;
+
+    // Clear existing markers
+    markersRef.current.forEach(marker => marker.remove());
+    markersRef.current = [];
+
+    const bounds = new mapboxgl.LngLatBounds();
+    let hasMarkers = false;
+
+    // Add subject property marker
+    if (subjectProperty) {
+      const coords = getCoordinates(subjectProperty);
+      if (coords) {
+        console.log('[CMAMap] Adding subject marker at:', coords);
+        
+        const el = createMarkerElement(
+          subjectProperty.listPrice || subjectProperty.price,
+          'subject',
+          true
+        );
+        
+        const marker = new mapboxgl.Marker({ element: el })
+          .setLngLat(coords)
+          .setPopup(
+            new mapboxgl.Popup({ offset: 25 }).setHTML(`
+              <div style="padding: 8px;">
+                <p style="font-weight: bold; color: #3b82f6;">SUBJECT PROPERTY</p>
+                <p style="font-weight: 600;">$${(subjectProperty.listPrice || subjectProperty.price)?.toLocaleString()}</p>
+                <p style="font-size: 12px;">${subjectProperty.address}</p>
+                <p style="font-size: 11px; color: #666;">
+                  ${subjectProperty.bedrooms || subjectProperty.beds} bd • 
+                  ${subjectProperty.bathrooms || subjectProperty.baths} ba • 
+                  ${subjectProperty.sqft?.toLocaleString()} sqft
+                </p>
+              </div>
+            `)
+          )
+          .addTo(map.current!);
+        
+        markersRef.current.push(marker);
+        bounds.extend(coords);
+        hasMarkers = true;
+      }
+    }
+
+    // Add comparable property markers
+    properties.forEach((property, index) => {
+      const coords = getCoordinates(property);
+      if (!coords) {
+        console.log(`[CMAMap] Property ${index} missing coordinates:`, property.address);
+        return;
+      }
+
+      console.log(`[CMAMap] Adding marker ${index} at:`, coords, property.address);
+
+      const el = createMarkerElement(
+        property.price || property.listPrice || property.soldPrice,
+        property.status
+      );
+
+      const marker = new mapboxgl.Marker({ element: el })
+        .setLngLat(coords)
+        .setPopup(
+          new mapboxgl.Popup({ offset: 25 }).setHTML(`
+            <div style="padding: 8px;">
+              <p style="font-weight: 600;">$${(property.price || property.listPrice)?.toLocaleString()}</p>
+              <p style="font-size: 12px;">${property.address}</p>
+              <p style="font-size: 11px; color: #666;">
+                ${property.bedrooms || property.beds} bd • 
+                ${property.bathrooms || property.baths} ba • 
+                ${property.sqft?.toLocaleString()} sqft
+              </p>
+              <p style="font-size: 11px; color: #666;">${property.status}</p>
+            </div>
+          `)
+        )
+        .addTo(map.current!);
+
+      markersRef.current.push(marker);
+      bounds.extend(coords);
+      hasMarkers = true;
+    });
+
+    // Fit map to bounds
+    if (hasMarkers && !bounds.isEmpty()) {
+      map.current.fitBounds(bounds, {
+        padding: 50,
+        maxZoom: 14,
+      });
+    }
+
+    console.log(`[CMAMap] Added ${markersRef.current.length} markers`);
+
+  }, [properties, subjectProperty, mapLoaded]);
+
+  // Count properties with coordinates
+  const propertiesWithCoords = properties.filter(p => getCoordinates(p)).length;
+
+  return (
+    <div className="space-y-2">
+      {/* Map info */}
+      <div className="flex items-center justify-between text-sm text-muted-foreground">
+        <span>{propertiesWithCoords} comparables + Subject</span>
+        {propertiesWithCoords < properties.length && (
+          <span className="text-amber-600">
+            {properties.length - propertiesWithCoords} properties missing coordinates
+          </span>
+        )}
+      </div>
+
+      {/* Map container */}
+      <div className="relative rounded-lg overflow-hidden border">
+        <div ref={mapContainer} className="h-[500px] w-full" />
+
+        {/* Legend */}
+        <div className="absolute bottom-4 left-4 bg-white dark:bg-gray-900 rounded-lg shadow-lg p-3 text-sm">
+          <p className="font-medium mb-2">Legend</p>
+          <div className="space-y-1.5">
+            <div className="flex items-center gap-2">
+              <div className="w-3 h-3 rounded-full bg-[#3b82f6]" />
+              <span>Subject Property</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="w-3 h-3 rounded-full bg-[#22c55e]" />
+              <span>Active</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="w-3 h-3 rounded-full bg-[#f97316]" />
+              <span>Under Contract</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="w-3 h-3 rounded-full bg-[#6b7280]" />
+              <span>Pending</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="w-3 h-3 rounded-full bg-[#ef4444]" />
+              <span>Closed</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+```
+
+---
+
+## TASK 3: Ensure Map Receives Correct Data
+
+Make sure the parent component passes the correct props:
+
+```tsx
+{/* In CMADetailPage.tsx */}
+{viewMode === 'map' && (
+  <CMAMapView 
+    properties={filteredProperties}  // Make sure this has the property data
+    subjectProperty={cma?.subjectPropertyData || cma?.subjectProperty}
+  />
+)}
+```
+
+### Check data structure:
+
+```tsx
+// Debug: Log what's being passed
+useEffect(() => {
+  if (viewMode === 'map') {
+    console.log('[CMADetail] Passing to map:');
+    console.log('  - properties:', properties);
+    console.log('  - subjectProperty:', subjectProperty);
+    console.log('  - First property coords:', properties[0]?.map);
+  }
+}, [viewMode, properties, subjectProperty]);
+```
+
+---
+
+## ACCEPTANCE CRITERIA
+
+- [ ] "Compare | Map | Stats" toggle is on the RIGHT side of header row
+- [ ] Status filter tabs are below the header
+- [ ] "Refresh MLS Data" button is removed (or moved elsewhere if needed)
+- [ ] Map view displays property markers
+- [ ] Subject property has blue marker with "SUBJECT" label
+- [ ] Comparable properties have colored markers based on status
+- [ ] Map auto-fits to show all markers
+- [ ] Legend displays in bottom-left corner
+- [ ] Clicking marker shows popup with property details
+- [ ] Console shows no coordinate errors
+
+---
+
+## VALIDATION
+
+After changes:
+
+1. Open browser console
+2. Navigate to CMA detail page
+3. Click "Map" toggle
+4. Check console for:
+   - `[CMAMap] Initializing map at: [lng, lat]`
+   - `[CMAMap] Map loaded`
+   - `[CMAMap] Adding subject marker at: [lng, lat]`
+   - `[CMAMap] Adding marker 0 at: [lng, lat]`
+   - `[CMAMap] Added X markers`
+
+If markers still don't show:
+- Check if `VITE_MAPBOX_TOKEN` is set
+- Check if properties have coordinates in expected fields
+- Check browser console for Mapbox errors
+
+---
+
+## FILES TO MODIFY
+
+```
+client/src/
+├── pages/
+│   └── CMADetailPage.tsx         [MODIFY - header layout]
+├── components/
+│   └── cma/
+│       └── CMAMapView.tsx        [FIX - marker display]
+```
+
+---
+
+Ready to implement!
