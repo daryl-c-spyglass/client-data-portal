@@ -124,62 +124,30 @@ export function PropertyDetailModal({
               </div>
             )}
 
-            {/* Navigation Arrows - using inline styles to guarantee visibility */}
+            {/* Navigation Arrows - using click zones like CMAReport floating card */}
             {photos.length > 1 && (
               <>
-                {/* LEFT ARROW - Previous Photo */}
-                <button 
-                  type="button"
+                {/* LEFT click zone - covers left half of image */}
+                <div 
+                  className="absolute left-0 top-0 w-1/2 h-full cursor-pointer z-10 group"
                   onClick={(e) => { e.preventDefault(); e.stopPropagation(); prevPhoto(); }}
-                  style={{
-                    position: 'absolute',
-                    left: '8px',
-                    top: '50%',
-                    transform: 'translateY(-50%)',
-                    zIndex: 50,
-                    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-                    borderRadius: '9999px',
-                    padding: '8px',
-                    cursor: 'pointer',
-                    border: 'none',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                  }}
-                  onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = 'rgba(0, 0, 0, 0.7)')}
-                  onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'rgba(0, 0, 0, 0.5)')}
-                  aria-label="Previous photo"
-                  data-testid="button-photo-prev"
+                  data-testid="zone-photo-prev"
                 >
-                  <ChevronLeft style={{ width: '20px', height: '20px', color: 'white' }} />
-                </button>
+                  <div className="absolute left-3 top-1/2 -translate-y-1/2 bg-black/50 group-hover:bg-black/70 text-white p-2 rounded-full transition-all opacity-70 group-hover:opacity-100">
+                    <ChevronLeft className="w-5 h-5" />
+                  </div>
+                </div>
                 
-                {/* RIGHT ARROW - Next Photo */}
-                <button 
-                  type="button"
+                {/* RIGHT click zone - covers right half of image */}
+                <div 
+                  className="absolute right-0 top-0 w-1/2 h-full cursor-pointer z-10 group"
                   onClick={(e) => { e.preventDefault(); e.stopPropagation(); nextPhoto(); }}
-                  style={{
-                    position: 'absolute',
-                    right: '8px',
-                    top: '50%',
-                    transform: 'translateY(-50%)',
-                    zIndex: 50,
-                    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-                    borderRadius: '9999px',
-                    padding: '8px',
-                    cursor: 'pointer',
-                    border: 'none',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                  }}
-                  onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = 'rgba(0, 0, 0, 0.7)')}
-                  onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'rgba(0, 0, 0, 0.5)')}
-                  aria-label="Next photo"
-                  data-testid="button-photo-next"
+                  data-testid="zone-photo-next"
                 >
-                  <ChevronRight style={{ width: '20px', height: '20px', color: 'white' }} />
-                </button>
+                  <div className="absolute right-3 top-1/2 -translate-y-1/2 bg-black/50 group-hover:bg-black/70 text-white p-2 rounded-full transition-all opacity-70 group-hover:opacity-100">
+                    <ChevronRight className="w-5 h-5" />
+                  </div>
+                </div>
               </>
             )}
           </div>
