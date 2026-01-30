@@ -13,6 +13,8 @@ import { CMAReport } from "@/components/CMAReport";
 import { CMAMapView } from "@/components/cma/CMAMapView";
 import { CMAStatsView } from "@/components/cma/CMAStatsView";
 import { PropertyDetailModal } from "@/components/cma/PropertyDetailModal";
+import { CMAShareDropdown } from "@/components/cma/CMAShareDropdown";
+import { CMAExportDropdown } from "@/components/cma/CMAExportDropdown";
 import { useToast } from "@/hooks/use-toast";
 import { 
   Dialog, 
@@ -753,52 +755,14 @@ Best regards`;
         </div>
 
         <div className="flex items-center gap-2">
-          <Button 
-            variant="outline" 
-            onClick={handleCopyClientEmail}
-            data-testid="button-copy-email"
-          >
-            <Mail className="w-4 h-4 mr-2" />
-            Copy Email
-          </Button>
-          <Button 
-            variant="outline" 
-            onClick={async () => {
-              try {
-                let shareUrl: string;
-                if (cma?.publicLink) {
-                  shareUrl = `${window.location.origin}/share/cma/${cma.publicLink}`;
-                } else {
-                  const result = await shareMutation.mutateAsync();
-                  shareUrl = `${window.location.origin}/share/cma/${result.shareToken}`;
-                }
-                await navigator.clipboard.writeText(shareUrl);
-                toast({
-                  title: "URL copied to clipboard",
-                  description: shareUrl,
-                });
-              } catch (error) {
-                toast({
-                  title: "Error",
-                  description: "Failed to generate or copy share URL",
-                  variant: "destructive",
-                });
-              }
-            }}
-            disabled={shareMutation.isPending}
-            data-testid="button-produce-url"
-          >
-            {shareMutation.isPending ? (
-              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-            ) : (
-              <LinkIcon className="w-4 h-4 mr-2" />
-            )}
-            Produce URL
-          </Button>
-          <Button variant="outline" onClick={handlePrint} data-testid="button-print-header">
-            <Printer className="w-4 h-4 mr-2" />
-            Print
-          </Button>
+          <CMAShareDropdown 
+            cma={cma} 
+            statistics={statistics ?? null} 
+            onRefetch={refetchCma}
+          />
+          <CMAExportDropdown 
+            cma={cma}
+          />
           <Button 
             variant="outline" 
             onClick={() => setLocation(`/cmas/${id}/presentation`)}
@@ -807,136 +771,6 @@ Best regards`;
             <LayoutGrid className="w-4 h-4 mr-2" />
             Presentation
           </Button>
-          <Dialog open={shareDialogOpen} onOpenChange={setShareDialogOpen}>
-            <DialogTrigger asChild>
-              <Button variant="outline" data-testid="button-share-cma">
-                <Share2 className="w-4 h-4 mr-2" />
-                Share
-              </Button>
-            </DialogTrigger>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Share CMA</DialogTitle>
-              <DialogDescription>
-                Generate a public link to share this CMA with clients.
-              </DialogDescription>
-            </DialogHeader>
-            <div className="space-y-4 pt-4">
-              {cma.publicLink ? (
-                <>
-                  <div className="space-y-2">
-                    <Label>Share Link</Label>
-                    <div className="flex gap-2">
-                      <Input 
-                        value={getShareUrl()} 
-                        readOnly 
-                        data-testid="input-share-link"
-                      />
-                      <Button 
-                        size="icon" 
-                        variant="outline"
-                        onClick={handleCopyLink}
-                        data-testid="button-copy-link"
-                      >
-                        {copied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
-                      </Button>
-                    </div>
-                  </div>
-                  
-                  {/* Social Media Sharing */}
-                  <div className="space-y-2 pt-4 border-t">
-                    <Label>Share on Social Media</Label>
-                    <div className="flex gap-2 flex-wrap">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => {
-                          const url = encodeURIComponent(getShareUrl());
-                          const text = encodeURIComponent(`Check out this CMA report: ${cma.name}`);
-                          window.open(`https://www.facebook.com/sharer/sharer.php?u=${url}`, '_blank', 'width=600,height=400');
-                        }}
-                        data-testid="button-share-facebook"
-                      >
-                        <SiFacebook className="w-4 h-4 mr-2" />
-                        Facebook
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => {
-                          const url = encodeURIComponent(getShareUrl());
-                          const text = encodeURIComponent(`Check out this CMA report: ${cma.name}`);
-                          window.open(`https://twitter.com/intent/tweet?url=${url}&text=${text}`, '_blank', 'width=600,height=400');
-                        }}
-                        data-testid="button-share-x"
-                      >
-                        <SiX className="w-4 h-4 mr-2" />
-                        X
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => {
-                          // Copy link silently, then open Instagram
-                          navigator.clipboard.writeText(getShareUrl());
-                          // Open Instagram web - users can share via story/post
-                          window.open('https://www.instagram.com/', '_blank');
-                        }}
-                        data-testid="button-share-instagram"
-                      >
-                        <SiInstagram className="w-4 h-4 mr-2" />
-                        Instagram
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => {
-                          // Copy link silently, then open TikTok
-                          navigator.clipboard.writeText(getShareUrl());
-                          // Open TikTok web - users can share via post/bio
-                          window.open('https://www.tiktok.com/', '_blank');
-                        }}
-                        data-testid="button-share-tiktok"
-                      >
-                        <SiTiktok className="w-4 h-4 mr-2" />
-                        TikTok
-                      </Button>
-                    </div>
-                  </div>
-                  
-                  <div className="flex justify-between pt-4">
-                    <Button
-                      variant="destructive"
-                      onClick={() => unshareMutation.mutate()}
-                      disabled={unshareMutation.isPending}
-                      data-testid="button-remove-share"
-                    >
-                      <Trash2 className="w-4 h-4 mr-2" />
-                      Remove Link
-                    </Button>
-                    <Button onClick={() => setShareDialogOpen(false)}>
-                      Done
-                    </Button>
-                  </div>
-                </>
-              ) : (
-                <div className="text-center py-4">
-                  <p className="text-muted-foreground mb-4">
-                    Generate a shareable link for this CMA. Links are permanent and can be manually revoked.
-                  </p>
-                  <Button 
-                    onClick={() => shareMutation.mutate()}
-                    disabled={shareMutation.isPending}
-                    data-testid="button-generate-link"
-                  >
-                    <LinkIcon className="w-4 h-4 mr-2" />
-                    {shareMutation.isPending ? 'Generating...' : 'Generate Share Link'}
-                  </Button>
-                </div>
-              )}
-            </div>
-          </DialogContent>
-        </Dialog>
         </div>
       </div>
 
@@ -952,35 +786,6 @@ Best regards`;
           <Button size="sm" style={{ backgroundColor: '#EF4923' }} className="text-white" onClick={handleSave} data-testid="button-save-cma">
             <Save className="w-4 h-4 mr-2" />
             Save
-          </Button>
-          <Button size="sm" variant="outline" onClick={async () => {
-            try {
-              let shareUrl: string;
-              if (cma?.publicLink) {
-                shareUrl = `${window.location.origin}/share/cma/${cma.publicLink}`;
-              } else {
-                const result = await shareMutation.mutateAsync();
-                shareUrl = `${window.location.origin}/share/cma/${result.shareToken}`;
-              }
-              await navigator.clipboard.writeText(shareUrl);
-              toast({
-                title: "URL copied to clipboard",
-                description: shareUrl,
-              });
-            } catch (error) {
-              toast({
-                title: "Error",
-                description: "Failed to generate or copy share URL",
-                variant: "destructive",
-              });
-            }
-          }} data-testid="button-copy-live-url">
-            <ExternalLink className="w-4 h-4 mr-2" />
-            Copy Live URL
-          </Button>
-          <Button size="sm" variant="outline" onClick={() => setEmailShareDialogOpen(true)} data-testid="button-share-cma-email">
-            <Mail className="w-4 h-4 mr-2" />
-            Share CMA
           </Button>
           <Button size="sm" variant="outline" onClick={handleModifySearch} data-testid="button-modify-search">
             <Edit className="w-4 h-4 mr-2" />

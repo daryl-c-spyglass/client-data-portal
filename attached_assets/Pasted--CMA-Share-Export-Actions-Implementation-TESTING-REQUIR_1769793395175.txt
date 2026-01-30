@@ -1,0 +1,642 @@
+# CMA Share & Export Actions Implementation
+
+## ⚠️ TESTING REQUIREMENT
+
+**Before declaring complete, you MUST test each action:**
+1. Share → Copy Email - verify email content copies to clipboard
+2. Share → Copy Live URL - verify URL copies to clipboard  
+3. Share → Share CMA - verify share modal/action works
+4. Export → Print - verify print dialog opens
+5. Export → Export PDF - verify PDF generates and downloads
+6. **DO NOT declare complete without testing ALL actions**
+
+---
+
+## SCOPE
+
+1. Add **Share** dropdown menu with working actions
+2. Add **Export** dropdown menu with working actions
+3. Update/remove the peach preview banner
+4. Ensure all actions are functional
+
+---
+
+## CURRENT STATE (Contract Conduit Reference)
+
+### Share Dropdown:
+- Copy Email
+- Copy Live URL
+- Share CMA
+
+### Export Dropdown:
+- Print
+- Export PDF
+
+### Preview Banner:
+- Shows "You are seeing a preview of the report"
+- Has action buttons: Save, Copy Live URL, Share CMA, Modify Search, Notes
+
+---
+
+## TASK 1: Create Share Dropdown Component
+
+### File: `client/src/components/cma/CMAShareDropdown.tsx`
+
+```tsx
+import { useState } from 'react';
+import { 
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import { Button } from '@/components/ui/button';
+import { Share2, Mail, Link, Send, ChevronDown, Check } from 'lucide-react';
+import { useToast } from '@/hooks/use-toast';
+
+interface CMAShareDropdownProps {
+  cmaId: string;
+  cmaName?: string;
+  subjectAddress?: string;
+  shareUrl?: string;
+}
+
+export function CMAShareDropdown({ 
+  cmaId, 
+  cmaName,
+  subjectAddress,
+  shareUrl 
+}: CMAShareDropdownProps) {
+  const { toast } = useToast();
+  const [copiedItem, setCopiedItem] = useState<string | null>(null);
+
+  // Generate share URL
+  const getLiveUrl = () => {
+    const baseUrl = window.location.origin;
+    return shareUrl || `${baseUrl}/cma/share/${cmaId}`;
+  };
+
+  // Generate email content
+  const getEmailContent = () => {
+    const url = getLiveUrl();
+    const subject = encodeURIComponent(`CMA Report: ${subjectAddress || cmaName || 'Property Analysis'}`);
+    const body = encodeURIComponent(
+      `I wanted to share this Comparative Market Analysis with you.\n\n` +
+      `Property: ${subjectAddress || 'See report'}\n\n` +
+      `View the full CMA report here:\n${url}\n\n` +
+      `Best regards`
+    );
+    return { subject, body, url };
+  };
+
+  // Copy Email (opens email client with pre-filled content)
+  const handleCopyEmail = async () => {
+    const { subject, body } = getEmailContent();
+    const mailtoLink = `mailto:?subject=${subject}&body=${body}`;
+    
+    // Also copy to clipboard
+    try {
+      await navigator.clipboard.writeText(getLiveUrl());
+      setCopiedItem('email');
+      setTimeout(() => setCopiedItem(null), 2000);
+      
+      // Open email client
+      window.location.href = mailtoLink;
+      
+      toast({
+        title: 'Email ready',
+        description: 'Link copied and email client opened',
+      });
+    } catch (err) {
+      // Fallback: just open email
+      window.location.href = mailtoLink;
+      toast({
+        title: 'Email client opened',
+        description: 'Compose your email with the CMA link',
+      });
+    }
+  };
+
+  // Copy Live URL to clipboard
+  const handleCopyLiveUrl = async () => {
+    const url = getLiveUrl();
+    try {
+      await navigator.clipboard.writeText(url);
+      setCopiedItem('url');
+      setTimeout(() => setCopiedItem(null), 2000);
+      
+      toast({
+        title: 'Link copied!',
+        description: 'CMA share link copied to clipboard',
+      });
+    } catch (err) {
+      // Fallback for older browsers
+      const textarea = document.createElement('textarea');
+      textarea.value = url;
+      document.body.appendChild(textarea);
+      textarea.select();
+      document.execCommand('copy');
+      document.body.removeChild(textarea);
+      
+      setCopiedItem('url');
+      setTimeout(() => setCopiedItem(null), 2000);
+      
+      toast({
+        title: 'Link copied!',
+        description: 'CMA share link copied to clipboard',
+      });
+    }
+  };
+
+  // Share CMA (could open a modal or trigger share API)
+  const handleShareCMA = async () => {
+    const url = getLiveUrl();
+    const title = `CMA Report: ${subjectAddress || cmaName || 'Property Analysis'}`;
+    
+    // Try native share API first (mobile/modern browsers)
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: title,
+          text: 'Check out this Comparative Market Analysis',
+          url: url,
+        });
+        toast({
+          title: 'Shared!',
+          description: 'CMA shared successfully',
+        });
+        return;
+      } catch (err) {
+        // User cancelled or error - fall through to copy
+        if ((err as Error).name !== 'AbortError') {
+          console.log('Share failed, copying to clipboard instead');
+        }
+      }
+    }
+    
+    // Fallback: copy to clipboard
+    await handleCopyLiveUrl();
+  };
+
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button variant="outline" size="sm" className="gap-2">
+          <Share2 className="w-4 h-4" />
+          Share
+          <ChevronDown className="w-3 h-3" />
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="w-48">
+        <DropdownMenuItem onClick={handleCopyEmail} className="cursor-pointer">
+          <Mail className="w-4 h-4 mr-2" />
+          Copy Email
+          {copiedItem === 'email' && <Check className="w-4 h-4 ml-auto text-green-500" />}
+        </DropdownMenuItem>
+        <DropdownMenuItem onClick={handleCopyLiveUrl} className="cursor-pointer">
+          <Link className="w-4 h-4 mr-2" />
+          Copy Live URL
+          {copiedItem === 'url' && <Check className="w-4 h-4 ml-auto text-green-500" />}
+        </DropdownMenuItem>
+        <DropdownMenuItem onClick={handleShareCMA} className="cursor-pointer">
+          <Send className="w-4 h-4 mr-2" />
+          Share CMA
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+```
+
+---
+
+## TASK 2: Create Export Dropdown Component
+
+### File: `client/src/components/cma/CMAExportDropdown.tsx`
+
+```tsx
+import { useState } from 'react';
+import { 
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import { Button } from '@/components/ui/button';
+import { Download, Printer, FileText, ChevronDown, Loader2 } from 'lucide-react';
+import { useToast } from '@/hooks/use-toast';
+
+interface CMAExportDropdownProps {
+  cmaId: string;
+  cmaName?: string;
+  subjectAddress?: string;
+}
+
+export function CMAExportDropdown({ 
+  cmaId, 
+  cmaName,
+  subjectAddress 
+}: CMAExportDropdownProps) {
+  const { toast } = useToast();
+  const [isExporting, setIsExporting] = useState(false);
+
+  // Print action
+  const handlePrint = () => {
+    // Add print-specific styles temporarily
+    const printStyles = document.createElement('style');
+    printStyles.id = 'print-styles';
+    printStyles.innerHTML = `
+      @media print {
+        /* Hide non-printable elements */
+        header, nav, .no-print, button, .dropdown-menu {
+          display: none !important;
+        }
+        
+        /* Optimize for print */
+        body {
+          print-color-adjust: exact;
+          -webkit-print-color-adjust: exact;
+        }
+        
+        /* Page breaks */
+        .page-break {
+          page-break-before: always;
+        }
+        
+        /* Ensure images print */
+        img {
+          max-width: 100% !important;
+          page-break-inside: avoid;
+        }
+        
+        /* Cards print nicely */
+        .card {
+          border: 1px solid #e5e7eb !important;
+          box-shadow: none !important;
+          page-break-inside: avoid;
+        }
+      }
+    `;
+    document.head.appendChild(printStyles);
+    
+    // Trigger print dialog
+    window.print();
+    
+    // Remove print styles after printing
+    setTimeout(() => {
+      const styles = document.getElementById('print-styles');
+      if (styles) styles.remove();
+    }, 1000);
+    
+    toast({
+      title: 'Print dialog opened',
+      description: 'Select your printer and settings',
+    });
+  };
+
+  // Export PDF action
+  const handleExportPDF = async () => {
+    setIsExporting(true);
+    
+    try {
+      // Option 1: Call backend API to generate PDF
+      const response = await fetch(`/api/cma/${cmaId}/export-pdf`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          includePhotos: true,
+          includeStats: true,
+          includeMap: true,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('PDF generation failed');
+      }
+
+      // Get the PDF blob
+      const blob = await response.blob();
+      
+      // Create download link
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `CMA-${subjectAddress?.replace(/[^a-zA-Z0-9]/g, '-') || cmaId}.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+
+      toast({
+        title: 'PDF exported!',
+        description: 'Your CMA report has been downloaded',
+      });
+    } catch (error) {
+      console.error('PDF export error:', error);
+      
+      // Fallback: Use browser print to PDF
+      toast({
+        title: 'Export as PDF',
+        description: 'Use Print dialog and select "Save as PDF"',
+      });
+      handlePrint();
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button variant="outline" size="sm" className="gap-2">
+          <Download className="w-4 h-4" />
+          Export
+          <ChevronDown className="w-3 h-3" />
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="w-40">
+        <DropdownMenuItem onClick={handlePrint} className="cursor-pointer">
+          <Printer className="w-4 h-4 mr-2" />
+          Print
+        </DropdownMenuItem>
+        <DropdownMenuItem 
+          onClick={handleExportPDF} 
+          className="cursor-pointer"
+          disabled={isExporting}
+        >
+          {isExporting ? (
+            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+          ) : (
+            <FileText className="w-4 h-4 mr-2" />
+          )}
+          Export PDF
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+```
+
+---
+
+## TASK 3: Update Preview Banner
+
+### Option A: Remove Peach Banner (Recommended)
+
+Remove the peach-colored preview banner entirely and integrate actions into the header.
+
+### Option B: Restyle Preview Banner
+
+If keeping the banner, update to use Spyglass colors:
+
+```tsx
+{/* Preview Banner - Updated Styling */}
+{isPreview && (
+  <div className="bg-gray-100 dark:bg-gray-800 border-b px-4 py-3">
+    <div className="flex items-center justify-between max-w-7xl mx-auto">
+      <p className="text-sm text-muted-foreground">
+        You are seeing a preview of the report.
+      </p>
+      <div className="flex items-center gap-2">
+        <Button size="sm" onClick={handleSave} className="bg-[#EF4923] hover:bg-[#d43d1a]">
+          <Save className="w-4 h-4 mr-1" />
+          Save
+        </Button>
+        <Button variant="outline" size="sm" onClick={handleModifySearch}>
+          Modify Search
+        </Button>
+        <Button variant="outline" size="sm" onClick={handleNotes}>
+          Notes
+        </Button>
+      </div>
+    </div>
+  </div>
+)}
+```
+
+---
+
+## TASK 4: Integrate into CMA Header
+
+### File: `client/src/pages/CMADetailPage.tsx` or `CMAHeader.tsx`
+
+```tsx
+import { CMAShareDropdown } from '@/components/cma/CMAShareDropdown';
+import { CMAExportDropdown } from '@/components/cma/CMAExportDropdown';
+
+// In the header section:
+<div className="flex items-center justify-between mb-4">
+  {/* Left: Title */}
+  <div>
+    <h1 className="text-2xl font-bold">{cma.name || 'CMA Report'}</h1>
+    <p className="text-muted-foreground">{cma.subjectPropertyData?.address}</p>
+  </div>
+  
+  {/* Right: Actions */}
+  <div className="flex items-center gap-2">
+    {/* Share Dropdown */}
+    <CMAShareDropdown 
+      cmaId={cma.id}
+      cmaName={cma.name}
+      subjectAddress={cma.subjectPropertyData?.address}
+      shareUrl={cma.shareUrl}
+    />
+    
+    {/* Export Dropdown */}
+    <CMAExportDropdown 
+      cmaId={cma.id}
+      cmaName={cma.name}
+      subjectAddress={cma.subjectPropertyData?.address}
+    />
+    
+    {/* More Actions (optional) */}
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button variant="outline" size="sm">
+          <MoreHorizontal className="w-4 h-4" />
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end">
+        <DropdownMenuItem onClick={handleRefreshData}>
+          <RefreshCw className="w-4 h-4 mr-2" />
+          Refresh MLS Data
+        </DropdownMenuItem>
+        <DropdownMenuItem onClick={handleEditCMA}>
+          <Edit className="w-4 h-4 mr-2" />
+          Edit CMA
+        </DropdownMenuItem>
+        <DropdownMenuSeparator />
+        <DropdownMenuItem 
+          onClick={handleDeleteCMA}
+          className="text-red-600 focus:text-red-600"
+        >
+          <Trash2 className="w-4 h-4 mr-2" />
+          Delete CMA
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  </div>
+</div>
+```
+
+---
+
+## TASK 5: Backend API for PDF Export (If Needed)
+
+### File: `server/routes.ts`
+
+```typescript
+import { generateCMAPDF } from './services/pdf-generator';
+
+// PDF Export endpoint
+app.post('/api/cma/:id/export-pdf', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { includePhotos, includeStats, includeMap } = req.body;
+
+    // Get CMA data
+    const cma = await db.query.cmas.findFirst({
+      where: eq(cmas.id, parseInt(id)),
+    });
+
+    if (!cma) {
+      return res.status(404).json({ error: 'CMA not found' });
+    }
+
+    // Generate PDF
+    const pdfBuffer = await generateCMAPDF(cma, {
+      includePhotos,
+      includeStats,
+      includeMap,
+    });
+
+    // Send PDF response
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="CMA-${id}.pdf"`);
+    res.send(pdfBuffer);
+  } catch (error) {
+    console.error('PDF export error:', error);
+    res.status(500).json({ error: 'Failed to generate PDF' });
+  }
+});
+```
+
+---
+
+## TASK 6: Share URL Route (If Not Exists)
+
+### File: `server/routes.ts`
+
+```typescript
+// Public CMA share route
+app.get('/api/cma/share/:shareId', async (req, res) => {
+  try {
+    const { shareId } = req.params;
+    
+    // Find CMA by share ID or generate a shareable version
+    const cma = await db.query.cmas.findFirst({
+      where: eq(cmas.shareId, shareId),
+    });
+
+    if (!cma) {
+      return res.status(404).json({ error: 'CMA not found' });
+    }
+
+    // Return public-safe CMA data
+    res.json({
+      id: cma.id,
+      name: cma.name,
+      subjectPropertyData: cma.subjectPropertyData,
+      comparableProperties: cma.comparableProperties,
+      statistics: cma.statistics,
+      // Don't include sensitive data
+    });
+  } catch (error) {
+    console.error('Share error:', error);
+    res.status(500).json({ error: 'Failed to load shared CMA' });
+  }
+});
+```
+
+---
+
+## COMPLETE HEADER LAYOUT
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ [CMA Title]                                                                 │
+│ [Subject Address]                                                           │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                           [Share ▾] [Export ▾] [Refresh] [...] │
+│                                                                             │
+│ ┌─ Share Dropdown ─┐    ┌─ Export Dropdown ─┐    ┌─ More Menu ─┐           │
+│ │ ✉ Copy Email     │    │ 🖨 Print           │    │ ↻ Refresh   │           │
+│ │ 🔗 Copy Live URL │    │ 📄 Export PDF      │    │ ✏ Edit      │           │
+│ │ 📤 Share CMA     │    └───────────────────┘    │ 🗑 Delete    │           │
+│ └──────────────────┘                              └─────────────┘           │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## ACCEPTANCE CRITERIA
+
+### Share Dropdown:
+- [ ] Dropdown opens on click
+- [ ] "Copy Email" - opens email client with pre-filled subject/body + copies link
+- [ ] "Copy Live URL" - copies shareable URL to clipboard + shows toast
+- [ ] "Share CMA" - uses native share API or copies to clipboard
+
+### Export Dropdown:
+- [ ] Dropdown opens on click
+- [ ] "Print" - opens browser print dialog
+- [ ] "Export PDF" - generates and downloads PDF (or falls back to print)
+
+### Preview Banner:
+- [ ] Peach color removed OR updated to neutral gray
+- [ ] Actions integrated into header if banner removed
+
+### General:
+- [ ] All dropdowns close after action
+- [ ] Toast notifications show for each action
+- [ ] Loading state for PDF export
+- [ ] Works in dark mode
+
+---
+
+## TESTING CHECKLIST (MANDATORY)
+
+**Before declaring complete:**
+
+- [ ] Click Share dropdown - menu opens
+- [ ] Click "Copy Email" - email client opens OR link copies
+- [ ] Click "Copy Live URL" - URL copies to clipboard, toast shows
+- [ ] Click "Share CMA" - native share OR copy action
+- [ ] Click Export dropdown - menu opens
+- [ ] Click "Print" - print dialog opens
+- [ ] Click "Export PDF" - PDF downloads OR print dialog as fallback
+- [ ] Verify toast notifications appear
+- [ ] Test in dark mode
+
+---
+
+## FILES TO CREATE/MODIFY
+
+```
+client/src/components/cma/
+├── CMAShareDropdown.tsx      [CREATE]
+├── CMAExportDropdown.tsx     [CREATE]
+└── CMAHeader.tsx             [MODIFY - integrate dropdowns]
+
+client/src/pages/
+└── CMADetailPage.tsx         [MODIFY - update header, remove/restyle banner]
+
+server/
+└── routes.ts                 [MODIFY - add PDF export endpoint if needed]
+```
+
+---
+
+**⚠️ REMINDER: Test ALL actions before declaring complete!**
