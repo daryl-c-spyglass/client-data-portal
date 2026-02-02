@@ -33,11 +33,23 @@ import { getRoleDisplayName, INITIAL_SUPER_ADMIN_EMAILS, UserRole } from "@share
 import { Link } from "wouter";
 
 interface FUBUser {
-  id: number;
+  id: string;
   name: string;
+  email: string;
   firstName?: string;
   lastName?: string;
-  email: string;
+  role?: string;
+  active: boolean;
+}
+
+interface FUBUsersData {
+  users: FUBUser[];
+  count: number;
+}
+
+interface FUBStatusData {
+  configured: boolean;
+  message?: string;
 }
 
 interface UserData {
@@ -81,7 +93,7 @@ function UserManagementContent() {
   const [searchQuery, setSearchQuery] = useState("");
   const [editingUserId, setEditingUserId] = useState<string | null>(null);
   const [pendingRole, setPendingRole] = useState<string>("");
-  const [invitingFubUserId, setInvitingFubUserId] = useState<number | null>(null);
+  const [invitingFubUserId, setInvitingFubUserId] = useState<string | null>(null);
   const [selectedInviteRole, setSelectedInviteRole] = useState<string>("agent");
   const [confirmDialog, setConfirmDialog] = useState<{
     open: boolean;
@@ -93,12 +105,18 @@ function UserManagementContent() {
     queryKey: ["/api/admin/users"],
   });
 
-  const { data: fubData } = useQuery<{ users: FUBUser[]; configured: boolean }>({
-    queryKey: ["/api/admin/fub/users"],
+  // Use same FUB endpoints as Leads page (proven working)
+  const { data: fubStatus } = useQuery<FUBStatusData>({
+    queryKey: ["/api/fub/status"],
   });
 
-  const fubUsers = fubData?.users || [];
-  const fubConfigured = fubData?.configured ?? false;
+  const { data: fubUsersData } = useQuery<FUBUsersData>({
+    queryKey: ["/api/fub/users"],
+    enabled: fubStatus?.configured === true,
+  });
+
+  const fubUsers = fubUsersData?.users || [];
+  const fubConfigured = fubStatus?.configured ?? false;
 
   const updateRoleMutation = useMutation({
     mutationFn: async ({ userId, role }: { userId: string; role: string }) => {
@@ -173,7 +191,7 @@ function UserManagementContent() {
       setInvitingFubUserId(null);
       setSelectedInviteRole("agent");
       queryClient.invalidateQueries({ queryKey: ['/api/admin/users'] });
-      queryClient.invalidateQueries({ queryKey: ['/api/admin/fub/users'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/fub/users'] });
     },
     onError: (error: Error) => {
       toast({ 

@@ -1,0 +1,257 @@
+# Fix User Management Search - Use Same FUB Pattern as Leads Page
+
+## ⚠️ TESTING REQUIREMENT
+
+**Before declaring complete, you MUST:**
+1. Search for "sunny@spyglassrealty.com" in User Management
+2. Verify FUB team member appears in search results
+3. Test the invite functionality
+4. **DO NOT declare complete without testing the search works like the Leads page**
+
+---
+
+## CONTEXT
+
+The **Leads page** (`/leads`) successfully fetches data from Follow Up Boss:
+- Shows 146,469 leads
+- Has "Assigned Agent" dropdown (pulls FUB agents)
+- Has working search functionality
+- Debug info shows FUB API is working
+
+The **User Management page** search does NOT work for FUB users - it only searches registered portal users.
+
+---
+
+## TASK
+
+### Step 1: Analyze How Leads Page Fetches FUB Data
+
+1. Find the Leads page component (likely `client/src/pages/Leads.tsx` or similar)
+2. Identify:
+   - How it fetches FUB users/agents for the "Assigned Agent" dropdown
+   - The API endpoint used (e.g., `/api/fub/users`, `/api/fub/agents`)
+   - How search is implemented
+3. Document the pattern
+
+### Step 2: Apply Same Pattern to User Management
+
+Use the SAME API endpoint and fetch pattern that Leads uses for the "Assigned Agent" dropdown to populate FUB team members in User Management search.
+
+---
+
+## INVESTIGATION CHECKLIST
+
+**Find and document:**
+
+- [ ] Leads page file location
+- [ ] FUB users/agents API endpoint used by Leads
+- [ ] How Leads fetches the agent list
+- [ ] The data structure returned (id, name, email, etc.)
+
+**Example investigation:**
+
+```typescript
+// Look for something like this in Leads page:
+const { data: agents } = useQuery({
+  queryKey: ['/api/fub/users'],  // or '/api/fub/agents'
+});
+
+// Or in the Assigned Agent dropdown:
+<Select>
+  {agents.map(agent => (
+    <SelectItem value={agent.id}>{agent.name}</SelectItem>
+  ))}
+</Select>
+```
+
+---
+
+## IMPLEMENTATION
+
+### Update User Management to Use Same FUB Endpoint
+
+Once you identify the working endpoint, update UserManagement.tsx:
+
+```typescript
+// client/src/pages/UserManagement.tsx
+
+// Use the SAME endpoint that Leads uses for agents
+const { data: fubUsers = [], isLoading: fubLoading } = useQuery({
+  queryKey: ['/api/fub/users'],  // <-- Use whatever endpoint Leads uses
+});
+
+// Combined search
+const { registeredUsers, unregisteredFubUsers } = useMemo(() => {
+  const query = searchQuery.toLowerCase().trim();
+  
+  // Filter registered users
+  const registered = portalUsers.filter((user: any) => {
+    if (!query) return true;
+    return (
+      user.email?.toLowerCase().includes(query) ||
+      `${user.firstName} ${user.lastName}`.toLowerCase().includes(query)
+    );
+  });
+  
+  // Get registered emails
+  const registeredEmails = new Set(
+    portalUsers.map((u: any) => u.email?.toLowerCase())
+  );
+  
+  // Filter FUB users not registered AND matching search
+  const unregistered = fubUsers
+    .filter((user: any) => !registeredEmails.has(user.email?.toLowerCase()))
+    .filter((user: any) => {
+      if (!query) return false;
+      return (
+        user.email?.toLowerCase().includes(query) ||
+        user.name?.toLowerCase().includes(query)
+      );
+    });
+  
+  return { registeredUsers: registered, unregisteredFubUsers: unregistered };
+}, [portalUsers, fubUsers, searchQuery]);
+```
+
+---
+
+## REMOVE "Import from Follow Up Boss" Button
+
+The button is no longer needed since search will include FUB users inline:
+
+```tsx
+// REMOVE this from the header
+<Button onClick={() => setShowFUBModal(true)}>
+  Import from Follow Up Boss
+</Button>
+```
+
+---
+
+## ADD FUB RESULTS SECTION
+
+When search finds unregistered FUB users, show them:
+
+```tsx
+{/* Show FUB users when searching */}
+{searchQuery && unregisteredFubUsers.length > 0 && (
+  <Card className="mt-4 border-2 border-dashed border-orange-300 bg-orange-50/50">
+    <CardHeader className="pb-2">
+      <CardTitle className="text-lg text-orange-700 flex items-center gap-2">
+        <Users className="w-5 h-5" />
+        Follow Up Boss Team Members
+      </CardTitle>
+      <CardDescription>
+        Found in Follow Up Boss but not registered. Click Invite to add.
+      </CardDescription>
+    </CardHeader>
+    <CardContent>
+      {unregisteredFubUsers.map((user: any) => (
+        <div key={user.id || user.email} className="flex items-center justify-between p-3 border rounded-lg mb-2 bg-white">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-full bg-orange-100 flex items-center justify-center text-orange-600 font-semibold">
+              {user.name?.[0]?.toUpperCase() || '?'}
+            </div>
+            <div>
+              <p className="font-medium">{user.name}</p>
+              <p className="text-sm text-muted-foreground">{user.email}</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <Badge variant="outline" className="text-orange-600 border-orange-400">
+              Not Registered
+            </Badge>
+            <Select defaultValue="agent">
+              <SelectTrigger className="w-32">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="agent">Agent</SelectItem>
+                <SelectItem value="admin">Admin</SelectItem>
+                <SelectItem value="super_admin">Super Admin</SelectItem>
+              </SelectContent>
+            </Select>
+            <Button size="sm" onClick={() => handleInvite(user, selectedRole)}>
+              Invite
+            </Button>
+          </div>
+        </div>
+      ))}
+    </CardContent>
+  </Card>
+)}
+```
+
+---
+
+## EXPECTED OUTCOME
+
+### Search: "sunny@spyglassrealty.com"
+
+**Before (broken):**
+```
+No users match your search
+```
+
+**After (fixed):**
+```
+Team Members
+─────────────────────────────────────
+No registered users match "sunny@spyglassrealty.com"
+
+┌─────────────────────────────────────────────────────────┐
+│ 👥 Follow Up Boss Team Members                          │
+│ Found in FUB but not registered. Click Invite to add.   │
+├─────────────────────────────────────────────────────────┤
+│ [S] Sunny Tracey    [Not Registered] [Agent▾] [Invite] │
+│     sunny@spyglassrealty.com                            │
+└─────────────────────────────────────────────────────────┘
+```
+
+---
+
+## VERIFICATION STEPS
+
+1. **Check Leads page works** - Confirm /leads loads and shows FUB data
+2. **Find the API endpoint** - Check Network tab or code for FUB endpoint
+3. **Update User Management** - Use same endpoint
+4. **Test search** - Search for "sunny" or any FUB team member
+5. **Test invite** - Invite a user and verify they appear in registered list
+
+---
+
+## DEBUG: Check Browser Console/Network
+
+If search still doesn't work after changes:
+
+1. Open Browser DevTools → Network tab
+2. Search for a user in User Management
+3. Look for API calls to `/api/fub/users` or similar
+4. Check if the response contains FUB team members
+5. Check Console for any errors
+
+---
+
+## FILES TO INVESTIGATE
+
+```
+client/src/pages/Leads.tsx          [READ - how it fetches FUB agents]
+client/src/pages/UserManagement.tsx [MODIFY - apply same pattern]
+server/routes.ts                    [CHECK - FUB endpoints available]
+```
+
+---
+
+## SUMMARY
+
+| Task | Action |
+|------|--------|
+| 1. Investigate | Find how Leads fetches FUB agents |
+| 2. Apply | Use same endpoint in User Management |
+| 3. Remove | Delete "Import from Follow Up Boss" button |
+| 4. Add | Show FUB users inline in search results |
+| 5. Test | Search for "sunny@spyglassrealty.com" |
+
+---
+
+**⚠️ REMINDER: The Leads page PROVES the FUB API works. Use the same pattern!**
