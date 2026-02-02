@@ -10,8 +10,9 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { Calendar, Clock, User, CheckCircle2, Circle, AlertCircle, RefreshCw, ChevronDown, ChevronLeft, ChevronRight, Bug, List, Grid3X3, ArrowDownUp, CalendarDays, X } from "lucide-react";
+import { Calendar, Clock, User, CheckCircle2, Circle, AlertCircle, RefreshCw, ChevronDown, ChevronLeft, ChevronRight, Bug, List, Grid3X3, ArrowDownUp, CalendarDays, X, Lock } from "lucide-react";
 import { format, startOfMonth, endOfMonth, addMonths, addWeeks, addDays, parseISO, startOfWeek, endOfWeek, eachDayOfInterval, isSameMonth, isSameDay, isToday } from "date-fns";
+import { usePermissions } from "@/hooks/use-permissions";
 
 type SortOption = "newest" | "oldest" | "az" | "za";
 type ViewMode = "list" | "month" | "week" | "day";
@@ -710,6 +711,7 @@ function DebugPanel({ calendarData, startDate, endDate }: { calendarData: Calend
 }
 
 export default function CalendarPage() {
+  const { isSuperAdmin, user } = usePermissions();
   const [selectedUserId, setSelectedUserId] = useState<string>("all");
   const [monthOffset, setMonthOffset] = useState(0);
   const [weekOffset, setWeekOffset] = useState(0);
@@ -842,7 +844,7 @@ export default function CalendarPage() {
   
   const { data: usersData } = useQuery<UsersData>({
     queryKey: ["/api/fub/users"],
-    enabled: statusData?.configured === true,
+    enabled: statusData?.configured === true && isSuperAdmin,
   });
   
   const { data: calendarData, isLoading, error, refetch } = useQuery<CalendarData>({
@@ -967,7 +969,12 @@ export default function CalendarPage() {
       <div className="flex items-center justify-between flex-wrap gap-4">
         <div>
           <h1 className="text-2xl font-bold" data-testid="text-page-title">Calendar</h1>
-          <p className="text-muted-foreground">Events and tasks from Follow Up Boss</p>
+          <p className="text-muted-foreground">
+            {isSuperAdmin 
+              ? 'View appointments and tasks for all agents'
+              : 'Your appointments and tasks from Follow Up Boss'
+            }
+          </p>
         </div>
         <div className="flex items-center gap-2">
           {calendarData && (
@@ -1012,22 +1019,29 @@ export default function CalendarPage() {
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4">
-            {/* Agent Filter */}
+            {/* Agent Filter - Only visible to Super Admins */}
             <div className="space-y-2">
               <Label>Agent</Label>
-              <Select value={selectedUserId} onValueChange={setSelectedUserId}>
-                <SelectTrigger data-testid="select-agent">
-                  <SelectValue placeholder="All agents" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All agents</SelectItem>
-                  {usersData?.users?.filter(u => u.active).map((user) => (
-                    <SelectItem key={user.id} value={user.id}>
-                      {user.name || user.email}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              {isSuperAdmin ? (
+                <Select value={selectedUserId} onValueChange={setSelectedUserId}>
+                  <SelectTrigger data-testid="select-agent">
+                    <SelectValue placeholder="All agents" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All agents</SelectItem>
+                    {usersData?.users?.filter(u => u.active).map((user) => (
+                      <SelectItem key={user.id} value={user.id}>
+                        {user.name || user.email}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              ) : (
+                <div className="flex items-center gap-2 h-9 px-3 rounded-md border border-input bg-background text-sm">
+                  <Lock className="h-3 w-3 text-muted-foreground" />
+                  <span className="text-muted-foreground">Your calendar only</span>
+                </div>
+              )}
             </div>
             
             {/* Period Navigation */}

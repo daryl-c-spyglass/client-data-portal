@@ -8,11 +8,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { UserCircle, Mail, Phone, Tag, Clock, AlertCircle, RefreshCw, Search, ArrowDownUp, Loader2, Cake, Home, Activity, MessageSquare, X, ChevronDown, ChevronUp } from "lucide-react";
+import { UserCircle, Mail, Phone, Tag, Clock, AlertCircle, RefreshCw, Search, ArrowDownUp, Loader2, Cake, Home, Activity, MessageSquare, X, ChevronDown, ChevronUp, Lock } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { format, parseISO, formatDistanceToNow } from "date-fns";
 import { sanitizeFubNoteText } from "@/lib/utils";
+import { usePermissions } from "@/hooks/use-permissions";
 
 interface Lead {
   id: string;
@@ -428,6 +429,7 @@ function LeadCard({
 const LEADS_PER_PAGE = 50;
 
 export default function LeadsPage() {
+  const { isSuperAdmin, user } = usePermissions();
   const [selectedUserId, setSelectedUserId] = useState<string>("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [sortOption, setSortOption] = useState<SortOption>("az");
@@ -442,7 +444,7 @@ export default function LeadsPage() {
   
   const { data: usersData } = useQuery<UsersData>({
     queryKey: ["/api/fub/users"],
-    enabled: statusData?.configured === true,
+    enabled: statusData?.configured === true && isSuperAdmin,
   });
   
   // Use infinite query for pagination
@@ -589,7 +591,12 @@ export default function LeadsPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold" data-testid="text-page-title">Leads</h1>
-          <p className="text-muted-foreground">People and contacts from Follow Up Boss</p>
+          <p className="text-muted-foreground">
+            {isSuperAdmin 
+              ? 'People and contacts from Follow Up Boss'
+              : 'Your assigned leads from Follow Up Boss'
+            }
+          </p>
         </div>
         {leadsData?.pages[0] && (
           <Badge variant="outline" className="text-xs">
@@ -632,25 +639,33 @@ export default function LeadsPage() {
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+            {/* Assigned Agent dropdown - Only visible to Super Admins */}
             <div className="space-y-2">
               <Label>Assigned Agent</Label>
-              <Select value={selectedUserId} onValueChange={(value) => {
-                setSelectedUserId(value);
-                setShowNoAgentMessage(false);
-                setSelectedLeadId(null);
-              }}>
-                <SelectTrigger data-testid="select-agent">
-                  <SelectValue placeholder="All agents" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All agents</SelectItem>
-                  {usersData?.users?.filter(u => u.active).map((user) => (
-                    <SelectItem key={user.id} value={user.id}>
-                      {user.name || user.email}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              {isSuperAdmin ? (
+                <Select value={selectedUserId} onValueChange={(value) => {
+                  setSelectedUserId(value);
+                  setShowNoAgentMessage(false);
+                  setSelectedLeadId(null);
+                }}>
+                  <SelectTrigger data-testid="select-agent">
+                    <SelectValue placeholder="All agents" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All agents</SelectItem>
+                    {usersData?.users?.filter(u => u.active).map((user) => (
+                      <SelectItem key={user.id} value={user.id}>
+                        {user.name || user.email}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              ) : (
+                <div className="flex items-center gap-2 h-9 px-3 rounded-md border border-input bg-background text-sm">
+                  <Lock className="h-3 w-3 text-muted-foreground" />
+                  <span className="text-muted-foreground">Your leads only</span>
+                </div>
+              )}
             </div>
             <div className="space-y-2">
               <Label>Sort by Name</Label>
