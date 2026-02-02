@@ -119,7 +119,7 @@ function UserManagementContent() {
 
   const updateRoleMutation = useMutation({
     mutationFn: async ({ userId, role }: { userId: string; role: string }) => {
-      return apiRequest("PUT", `/api/admin/users/${userId}/role`, { role });
+      return apiRequest(`/api/admin/users/${userId}/role`, "PUT", { role });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/users"] });
@@ -141,7 +141,7 @@ function UserManagementContent() {
 
   const updateStatusMutation = useMutation({
     mutationFn: async ({ userId, isActive }: { userId: string; isActive: boolean }) => {
-      return apiRequest("PUT", `/api/admin/users/${userId}/status`, { isActive });
+      return apiRequest(`/api/admin/users/${userId}/status`, "PUT", { isActive });
     },
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/users"] });
