@@ -84,12 +84,31 @@ export function normalizeRole(role: string | undefined | null): UserRole {
   return 'agent';
 }
 
-export const SUPER_ADMIN_EMAILS = [
+// Initial super admin emails - used as fallback for first-time setup only
+// Once users have roles in database, database role takes precedence
+export const INITIAL_SUPER_ADMIN_EMAILS = [
   'ryan@spyglassrealty.com',
   'daryl@spyglassrealty.com',
   'caleb@spyglassrealty.com',
 ];
 
+// @deprecated Use determineUserRole() instead which respects database roles
 export function isSuperAdminEmail(email: string): boolean {
-  return SUPER_ADMIN_EMAILS.includes(email.toLowerCase());
+  return INITIAL_SUPER_ADMIN_EMAILS.includes(email.toLowerCase());
+}
+
+// Determines user role with database role taking precedence
+// Falls back to initial super admin emails for first-time setup
+export function determineUserRole(user: { email: string; role?: string | null }): UserRole {
+  // Database role takes precedence
+  if (user.role === 'super_admin') return 'super_admin';
+  if (user.role === 'admin') return 'admin';
+  if (user.role === 'agent') return 'agent';
+  
+  // Fallback for initial super admins (first-time setup only)
+  if (INITIAL_SUPER_ADMIN_EMAILS.includes(user.email.toLowerCase())) {
+    return 'super_admin';
+  }
+  
+  return 'agent';
 }

@@ -1,0 +1,657 @@
+# Super Admin Feature Enhancement - Client Data Portal
+
+## CURRENT STATE ANALYSIS
+
+Based on extraction, the system ALREADY HAS:
+- 3-tier role system: `super_admin`, `admin`, `agent`
+- Permission system with `shared/permissions.ts`
+- User Management page (`/admin/users`) for Super Admins
+- API endpoints: `GET /api/admin/users`, `PUT /api/admin/users/:id/role`
+- Frontend hook: `usePermissions()` with `isSuperAdmin`, `can()`, `isAtLeast()`
+- ProtectedRoute component
+
+## GAPS TO ADDRESS
+
+| Gap | Current State | Required State |
+|-----|---------------|----------------|
+| Super Admin List | Hardcoded in `SUPER_ADMIN_EMAILS` array | Database-driven |
+| User Disable | Not implemented | Soft disable via `is_active` field |
+| Activity Logging | No audit tables | Track all admin actions |
+| Role Change History | No tracking | Log who changed what and when |
+| DB Default Mismatch | Schema: 'agent', DB: 'client' | Align to 'agent' |
+
+---
+
+## PHASE 1: Database Schema Updates
+
+### Task 1.1: Add User Status Field
+
+```sql
+-- Add is_active column for soft disable functionality
+ALTER TABLE users ADD COLUMN is_active BOOLEAN DEFAULT true;
+
+-- Add index for filtering active users
+CREATE INDEX idx_users_is_active ON users(is_active);
+```
+
+### Task 1.2: Create Admin Activity Log Table
+
+```sql
+CREATE TABLE admin_activity_logs (
+  id SERIAL PRIMARY KEY,
+  admin_user_id VARCHAR REFERENCES users(id) NOT NULL,
+  action VARCHAR(100) NOT NULL,
+  target_user_id VARCHAR REFERENCES users(id),
+  previous_value TEXT,
+  new_value TEXT,
+  details JSONB,
+  ip_address VARCHAR(45),
+  user_agent TEXT,
+  created_at TIMESTAMP DEFAULT NOW()
+);
+
+CREATE INDEX idx_admin_logs_admin_user ON admin_activity_logs(admin_user_id);
+CREATE INDEX idx_admin_logs_target_user ON admin_activity_logs(target_user_id);
+CREATE INDEX idx_admin_logs_action ON admin_activity_logs(action);
+CREATE INDEX idx_admin_logs_created_at ON admin_activity_logs(created_at DESC);
+```
+
+### Task 1.3: Fix Role Default (if needed)
+
+```sql
+-- Check current defaults
+SELECT column_default FROM information_schema.columns 
+WHERE table_name = 'users' AND column_name = 'role';
+
+-- If it shows 'client', update to 'agent'
+ALTER TABLE users ALTER COLUMN role SET DEFAULT 'agent';
+
+-- Update any existing 'client' roles to 'agent'
+UPDATE users SET role = 'agent' WHERE role = 'client';
+```
+
+### Task 1.4: Drizzle Schema Update
+
+```typescript
+// shared/schema.ts - Add to existing schema
+
+export const users = pgTable("users", {
+  // ... existing fields ...
+  isActive: boolean("is_active").notNull().default(true),  // ADD THIS
+});
+
+export const adminActivityLogs = pgTable("admin_activity_logs", {
+  id: serial("id").primaryKey(),
+  adminUserId: varchar("admin_user_id").notNull().references(() => users.id),
+  action: varchar("action", { length: 100 }).notNull(),
+  targetUserId: varchar("target_user_id").references(() => users.id),
+  previousValue: text("previous_value"),
+  newValue: text("new_value"),
+  details: jsonb("details"),
+  ipAddress: varchar("ip_address", { length: 45 }),
+  userAgent: text("user_agent"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+```
+
+---
+
+## PHASE 2: Backend Updates
+
+### Task 2.1: Update Permissions Logic
+
+```typescript
+// shared/permissions.ts - MODIFY
+
+// REMOVE hardcoded emails - make database-driven
+// Keep as fallback only for initial setup
+export const INITIAL_SUPER_ADMIN_EMAILS = [
+  'ryan@spyglassrealty.com',
+  'daryl@spyglassrealty.com', 
+  'caleb@spyglassrealty.com',
+];
+
+// Role determination should check database first
+export function determineUserRole(user: { email: string; role: string }): UserRole {
+  // Database role takes precedence
+  if (user.role === 'super_admin') return 'super_admin';
+  if (user.role === 'admin') return 'admin';
+  if (user.role === 'agent') return 'agent';
+  
+  // Fallback for initial super admins (first-time setup only)
+  if (INITIAL_SUPER_ADMIN_EMAILS.includes(user.email.toLowerCase())) {
+    return 'super_admin';
+  }
+  
+  return 'agent';
+}
+```
+
+### Task 2.2: Create Activity Logging Service
+
+```typescript
+// server/services/adminActivityService.ts
+
+import { db } from '../db';
+import { adminActivityLogs } from '../../shared/schema';
+
+export type AdminAction = 
+  | 'USER_ROLE_CHANGED'
+  | 'USER_DISABLED'
+  | 'USER_ENABLED'
+  | 'USER_CREATED'
+  | 'SETTINGS_UPDATED';
+
+interface LogActivityParams {
+  adminUserId: string;
+  action: AdminAction;
+  targetUserId?: string;
+  previousValue?: string;
+  newValue?: string;
+  details?: Record<string, any>;
+  req?: Express.Request;
+}
+
+export async function logAdminActivity({
+  adminUserId,
+  action,
+  targetUserId,
+  previousValue,
+  newValue,
+  details,
+  req,
+}: LogActivityParams): Promise<void> {
+  await db.insert(adminActivityLogs).values({
+    adminUserId,
+    action,
+    targetUserId,
+    previousValue,
+    newValue,
+    details,
+    ipAddress: req?.ip || req?.headers['x-forwarded-for']?.toString(),
+    userAgent: req?.headers['user-agent'],
+  });
+}
+
+export async function getActivityLogs(filters?: {
+  adminUserId?: string;
+  targetUserId?: string;
+  action?: AdminAction;
+  startDate?: Date;
+  endDate?: Date;
+  limit?: number;
+  offset?: number;
+}) {
+  let query = db.select().from(adminActivityLogs);
+  
+  // Apply filters...
+  
+  return query.orderBy(desc(adminActivityLogs.createdAt)).limit(filters?.limit || 50);
+}
+```
+
+### Task 2.3: Update Admin Routes
+
+```typescript
+// server/routes/admin.ts - ADD/MODIFY
+
+import { logAdminActivity } from '../services/adminActivityService';
+
+// GET /api/admin/users - Already exists, add is_active to response
+app.get('/api/admin/users', requireAuth, requireMinimumRole('super_admin'), async (req, res) => {
+  const users = await db.select({
+    id: usersTable.id,
+    email: usersTable.email,
+    firstName: usersTable.firstName,
+    lastName: usersTable.lastName,
+    role: usersTable.role,
+    isActive: usersTable.isActive,  // ADD THIS
+    createdAt: usersTable.createdAt,
+    lastLoginAt: usersTable.lastLoginAt,
+  }).from(usersTable);
+  
+  res.json(users);
+});
+
+// PUT /api/admin/users/:id/role - UPDATE to log activity
+app.put('/api/admin/users/:id/role', requireAuth, requireMinimumRole('super_admin'), async (req, res) => {
+  const { id } = req.params;
+  const { role } = req.body;
+  const adminUser = req.user;
+  
+  // Validation
+  if (!['super_admin', 'admin', 'agent'].includes(role)) {
+    return res.status(400).json({ error: 'Invalid role' });
+  }
+  
+  // Get target user
+  const [targetUser] = await db.select().from(usersTable).where(eq(usersTable.id, id));
+  if (!targetUser) {
+    return res.status(404).json({ error: 'User not found' });
+  }
+  
+  // Protection: Cannot change own role
+  if (targetUser.id === adminUser.id) {
+    return res.status(403).json({ error: 'Cannot change your own role' });
+  }
+  
+  // Protection: Cannot remove last super admin
+  if (targetUser.role === 'super_admin' && role !== 'super_admin') {
+    const superAdminCount = await db.select({ count: sql`count(*)` })
+      .from(usersTable)
+      .where(eq(usersTable.role, 'super_admin'));
+    
+    if (parseInt(superAdminCount[0].count) <= 1) {
+      return res.status(403).json({ error: 'Cannot remove the last Super Admin' });
+    }
+  }
+  
+  // Update role
+  const previousRole = targetUser.role;
+  await db.update(usersTable).set({ 
+    role,
+    updatedAt: new Date(),
+  }).where(eq(usersTable.id, id));
+  
+  // Log activity
+  await logAdminActivity({
+    adminUserId: adminUser.id,
+    action: 'USER_ROLE_CHANGED',
+    targetUserId: id,
+    previousValue: previousRole,
+    newValue: role,
+    req,
+  });
+  
+  res.json({ success: true, message: `Role updated to ${role}` });
+});
+
+// PUT /api/admin/users/:id/status - NEW: Enable/Disable user
+app.put('/api/admin/users/:id/status', requireAuth, requireMinimumRole('super_admin'), async (req, res) => {
+  const { id } = req.params;
+  const { isActive } = req.body;
+  const adminUser = req.user;
+  
+  // Get target user
+  const [targetUser] = await db.select().from(usersTable).where(eq(usersTable.id, id));
+  if (!targetUser) {
+    return res.status(404).json({ error: 'User not found' });
+  }
+  
+  // Protection: Cannot disable yourself
+  if (targetUser.id === adminUser.id) {
+    return res.status(403).json({ error: 'Cannot disable your own account' });
+  }
+  
+  // Protection: Cannot disable another super admin (optional rule)
+  if (targetUser.role === 'super_admin' && !isActive) {
+    return res.status(403).json({ error: 'Cannot disable a Super Admin account' });
+  }
+  
+  // Update status
+  const previousStatus = targetUser.isActive;
+  await db.update(usersTable).set({ 
+    isActive,
+    updatedAt: new Date(),
+  }).where(eq(usersTable.id, id));
+  
+  // Log activity
+  await logAdminActivity({
+    adminUserId: adminUser.id,
+    action: isActive ? 'USER_ENABLED' : 'USER_DISABLED',
+    targetUserId: id,
+    previousValue: String(previousStatus),
+    newValue: String(isActive),
+    req,
+  });
+  
+  res.json({ success: true, message: isActive ? 'User enabled' : 'User disabled' });
+});
+
+// GET /api/admin/activity-logs - NEW: Get activity logs
+app.get('/api/admin/activity-logs', requireAuth, requireMinimumRole('super_admin'), async (req, res) => {
+  const { adminUserId, action, limit = 50, offset = 0 } = req.query;
+  
+  const logs = await getActivityLogs({
+    adminUserId: adminUserId as string,
+    action: action as AdminAction,
+    limit: Number(limit),
+    offset: Number(offset),
+  });
+  
+  res.json(logs);
+});
+```
+
+### Task 2.4: Update Auth Middleware to Check is_active
+
+```typescript
+// server/auth.ts - MODIFY requireAuth
+
+export function requireAuth(req, res, next) {
+  if (!req.isAuthenticated()) {
+    return res.status(401).json({ error: 'Authentication required' });
+  }
+  
+  // Check if user is active
+  if (req.user.isActive === false) {
+    req.logout((err) => {
+      if (err) console.error('Logout error:', err);
+    });
+    return res.status(403).json({ error: 'Account is disabled. Please contact an administrator.' });
+  }
+  
+  next();
+}
+```
+
+---
+
+## PHASE 3: Frontend Updates
+
+### Task 3.1: Update User Management Page
+
+```typescript
+// client/src/pages/UserManagement.tsx - ENHANCE
+
+// Add status column and actions
+const columns = [
+  { header: 'Name', accessor: 'name' },
+  { header: 'Email', accessor: 'email' },
+  { header: 'Role', accessor: 'role' },
+  { header: 'Status', accessor: 'isActive' },  // ADD
+  { header: 'Last Login', accessor: 'lastLoginAt' },
+  { header: 'Actions', accessor: 'actions' },
+];
+
+// Add status badge
+function StatusBadge({ isActive }: { isActive: boolean }) {
+  return (
+    <Badge variant={isActive ? 'success' : 'destructive'}>
+      {isActive ? 'Active' : 'Disabled'}
+    </Badge>
+  );
+}
+
+// Add actions dropdown
+function UserActions({ user, currentUser, onRoleChange, onStatusChange }) {
+  const canModify = currentUser.id !== user.id;
+  
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button variant="ghost" size="sm">
+          <MoreHorizontal className="w-4 h-4" />
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end">
+        <DropdownMenuItem onClick={() => viewProfile(user.id)}>
+          View Profile
+        </DropdownMenuItem>
+        
+        <DropdownMenuSeparator />
+        
+        {/* Role Changes */}
+        {canModify && user.role !== 'super_admin' && (
+          <DropdownMenuItem onClick={() => onRoleChange(user.id, 'super_admin')}>
+            Grant Super Admin
+          </DropdownMenuItem>
+        )}
+        {canModify && user.role === 'super_admin' && (
+          <DropdownMenuItem onClick={() => onRoleChange(user.id, 'admin')}>
+            Revoke Super Admin
+          </DropdownMenuItem>
+        )}
+        {canModify && user.role !== 'admin' && user.role !== 'super_admin' && (
+          <DropdownMenuItem onClick={() => onRoleChange(user.id, 'admin')}>
+            Grant Admin
+          </DropdownMenuItem>
+        )}
+        {canModify && user.role === 'admin' && (
+          <DropdownMenuItem onClick={() => onRoleChange(user.id, 'agent')}>
+            Revoke Admin
+          </DropdownMenuItem>
+        )}
+        
+        <DropdownMenuSeparator />
+        
+        {/* Status Changes */}
+        {canModify && user.isActive && (
+          <DropdownMenuItem 
+            onClick={() => onStatusChange(user.id, false)}
+            className="text-red-600"
+          >
+            Disable Account
+          </DropdownMenuItem>
+        )}
+        {canModify && !user.isActive && (
+          <DropdownMenuItem onClick={() => onStatusChange(user.id, true)}>
+            Enable Account
+          </DropdownMenuItem>
+        )}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+```
+
+### Task 3.2: Add Confirmation Dialogs
+
+```typescript
+// client/src/components/admin/RoleChangeDialog.tsx
+
+interface RoleChangeDialogProps {
+  user: User;
+  newRole: UserRole;
+  isOpen: boolean;
+  onClose: () => void;
+  onConfirm: () => void;
+}
+
+export function RoleChangeDialog({ user, newRole, isOpen, onClose, onConfirm }) {
+  const isGranting = newRole === 'super_admin' || 
+    (newRole === 'admin' && user.role === 'agent');
+  
+  const title = isGranting 
+    ? `Grant ${getRoleDisplayName(newRole)} Access`
+    : `Revoke ${getRoleDisplayName(user.role)} Access`;
+  
+  return (
+    <AlertDialog open={isOpen} onOpenChange={onClose}>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>{title}</AlertDialogTitle>
+          <AlertDialogDescription>
+            {isGranting ? (
+              <>
+                Are you sure you want to grant <strong>{newRole === 'super_admin' ? 'Super Admin' : 'Admin'}</strong> privileges to{' '}
+                <strong>{user.firstName} {user.lastName}</strong>?
+                <br /><br />
+                {newRole === 'super_admin' && (
+                  <span className="text-amber-600">
+                    This will give them full administrative access including user management.
+                  </span>
+                )}
+              </>
+            ) : (
+              <>
+                Are you sure you want to change <strong>{user.firstName} {user.lastName}</strong>'s role from{' '}
+                <strong>{getRoleDisplayName(user.role)}</strong> to <strong>{getRoleDisplayName(newRole)}</strong>?
+              </>
+            )}
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel>Cancel</AlertDialogCancel>
+          <AlertDialogAction onClick={onConfirm}>
+            {isGranting ? 'Grant Access' : 'Change Role'}
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+  );
+}
+```
+
+### Task 3.3: Add Activity Logs Page
+
+```typescript
+// client/src/pages/admin/ActivityLogs.tsx
+
+export default function ActivityLogs() {
+  const { data: logs, isLoading } = useQuery({
+    queryKey: ['/api/admin/activity-logs'],
+  });
+  
+  const getActionLabel = (action: string) => {
+    switch (action) {
+      case 'USER_ROLE_CHANGED': return 'Role Changed';
+      case 'USER_DISABLED': return 'User Disabled';
+      case 'USER_ENABLED': return 'User Enabled';
+      default: return action;
+    }
+  };
+  
+  return (
+    <div className="p-6">
+      <h1 className="text-2xl font-bold mb-6">Activity Logs</h1>
+      
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead>Date</TableHead>
+            <TableHead>Admin</TableHead>
+            <TableHead>Action</TableHead>
+            <TableHead>Target User</TableHead>
+            <TableHead>Details</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {logs?.map((log) => (
+            <TableRow key={log.id}>
+              <TableCell>{formatDate(log.createdAt)}</TableCell>
+              <TableCell>{log.adminUser?.email}</TableCell>
+              <TableCell>
+                <Badge>{getActionLabel(log.action)}</Badge>
+              </TableCell>
+              <TableCell>{log.targetUser?.email || '-'}</TableCell>
+              <TableCell>
+                {log.previousValue && log.newValue && (
+                  <span>{log.previousValue} → {log.newValue}</span>
+                )}
+              </TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
+    </div>
+  );
+}
+```
+
+---
+
+## PHASE 4: Initial Setup
+
+### Task 4.1: Seed Initial Super Admins
+
+```typescript
+// server/scripts/seedSuperAdmins.ts
+
+const SUPER_ADMIN_EMAILS = [
+  'ryan@spyglassrealty.com',
+  'daryl@spyglassrealty.com',
+  'caleb@spyglassrealty.com',
+];
+
+async function seedSuperAdmins() {
+  for (const email of SUPER_ADMIN_EMAILS) {
+    await db.update(usersTable)
+      .set({ role: 'super_admin' })
+      .where(eq(usersTable.email, email));
+    
+    console.log(`Set ${email} as super_admin`);
+  }
+}
+```
+
+---
+
+## TESTING CHECKLIST
+
+### Backend Tests:
+- [ ] `GET /api/admin/users` returns all users with `isActive` field
+- [ ] `PUT /api/admin/users/:id/role` logs activity
+- [ ] `PUT /api/admin/users/:id/role` prevents self-role change
+- [ ] `PUT /api/admin/users/:id/role` prevents removing last super admin
+- [ ] `PUT /api/admin/users/:id/status` enables/disables user
+- [ ] `PUT /api/admin/users/:id/status` prevents self-disable
+- [ ] Disabled user cannot authenticate
+- [ ] `GET /api/admin/activity-logs` returns logs
+
+### Frontend Tests:
+- [ ] User table shows status column
+- [ ] Actions dropdown shows correct options based on user role
+- [ ] Grant Super Admin shows confirmation dialog
+- [ ] Revoke Super Admin shows confirmation dialog
+- [ ] Disable user shows confirmation dialog
+- [ ] Activity logs page loads and displays logs
+- [ ] Toast notifications for success/error
+
+---
+
+## FILES TO CREATE/MODIFY
+
+```
+shared/
+├── schema.ts                    [MODIFY - add isActive, adminActivityLogs]
+└── permissions.ts               [MODIFY - make database-driven]
+
+server/
+├── auth.ts                      [MODIFY - check isActive in requireAuth]
+├── routes/admin.ts              [MODIFY - add status endpoint, logging]
+├── services/
+│   └── adminActivityService.ts  [CREATE - activity logging]
+└── scripts/
+    └── seedSuperAdmins.ts       [CREATE - initial setup]
+
+client/src/
+├── pages/
+│   ├── UserManagement.tsx       [MODIFY - add status, actions]
+│   └── admin/
+│       └── ActivityLogs.tsx     [CREATE - logs page]
+└── components/
+    └── admin/
+        ├── RoleChangeDialog.tsx [CREATE - confirmation]
+        ├── StatusChangeDialog.tsx [CREATE - confirmation]
+        └── UserActions.tsx      [CREATE - actions dropdown]
+```
+
+---
+
+## ACCEPTANCE CRITERIA
+
+- [ ] Super Admin can view all users with their status
+- [ ] Super Admin can grant admin/super_admin role to users
+- [ ] Super Admin can revoke admin/super_admin role from users
+- [ ] Super Admin cannot change their own role
+- [ ] System prevents removing the last Super Admin
+- [ ] Super Admin can disable user accounts
+- [ ] Super Admin can enable disabled user accounts
+- [ ] Disabled users cannot log in
+- [ ] All admin actions are logged with timestamp
+- [ ] Activity logs are viewable by Super Admins
+- [ ] Confirmation dialogs appear for all destructive actions
+
+---
+
+## ⚠️ TESTING REQUIREMENT
+
+**Before declaring any task complete:**
+1. Test the specific functionality manually
+2. Verify database changes are correct
+3. Check activity logs are being created
+4. Test protection rules (self-change, last admin)
+5. Verify UI updates correctly
+
+**DO NOT declare complete without testing!**

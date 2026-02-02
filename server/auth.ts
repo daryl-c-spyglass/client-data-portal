@@ -160,6 +160,16 @@ export function requireAuth(req: Request, res: Response, next: NextFunction) {
   if (!req.isAuthenticated()) {
     return res.status(401).json({ error: "Authentication required" });
   }
+  
+  // Check if user account is active
+  const user = req.user as User;
+  if (user.isActive === false) {
+    req.logout((err) => {
+      if (err) console.error('[Auth] Logout error for disabled user:', err);
+    });
+    return res.status(403).json({ error: "Account is disabled. Please contact an administrator." });
+  }
+  
   next();
 }
 

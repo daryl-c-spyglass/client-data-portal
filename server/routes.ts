@@ -14,8 +14,9 @@ import { z } from "zod";
 import bcrypt from "bcryptjs";
 import passport from "passport";
 import { requireAuth, requireRole, requireMinimumRole, requirePermission } from "./auth";
-import { isSuperAdminEmail } from "@shared/permissions";
+import { isSuperAdminEmail, INITIAL_SUPER_ADMIN_EMAILS } from "@shared/permissions";
 import { fetchExternalUsers, fetchFromExternalApi } from "./external-api";
+import { logAdminActivity, getActivityLogs, type AdminAction } from "./admin-activity-service";
 import type { PropertyStatistics, TimelineDataPoint } from "@shared/schema";
 import { neighborhoodService } from "./neighborhood-service";
 import { registerWordPressRoutes } from "./wordpress-routes";
@@ -7641,6 +7642,7 @@ OUTPUT JSON:
           phone: u.phone,
           company: u.company,
           picture: u.picture,
+          isActive: u.isActive,
           createdAt: u.createdAt,
           lastLoginAt: u.lastLoginAt,
         }));
@@ -7669,23 +7671,121 @@ OUTPUT JSON:
       }
       
       if (targetUser.id === currentUser.id) {
-        return res.status(400).json({ error: "Cannot change your own role" });
+        return res.status(403).json({ error: "Cannot change your own role" });
       }
       
-      if (isSuperAdminEmail(targetUser.email) && role !== "super_admin") {
-        return res.status(400).json({ error: "Cannot demote hardcoded super admin" });
+      // Prevent demoting initial super admins (hardcoded fallback)
+      if (INITIAL_SUPER_ADMIN_EMAILS.includes(targetUser.email.toLowerCase()) && role !== "super_admin") {
+        return res.status(403).json({ error: "Cannot demote initial super admin" });
       }
       
+      // Prevent removing the last super admin
+      if (targetUser.role === "super_admin" && role !== "super_admin") {
+        const schema = await import("@shared/schema");
+        const { drizzle } = await import("drizzle-orm/neon-serverless");
+        const { Pool } = await import("@neondatabase/serverless");
+        const { eq, sql } = await import("drizzle-orm");
+        const pool = new Pool({ connectionString: process.env.DATABASE_URL });
+        const db = drizzle(pool);
+        const superAdminCount = await db.select({ count: sql<number>`count(*)` })
+          .from(schema.users)
+          .where(eq(schema.users.role, "super_admin"));
+        
+        if (Number(superAdminCount[0]?.count || 0) <= 1) {
+          return res.status(403).json({ error: "Cannot remove the last Super Admin" });
+        }
+      }
+      
+      const previousRole = targetUser.role;
       const updatedUser = await storage.updateUser(id, { role });
       if (!updatedUser) {
         return res.status(404).json({ error: "User not found" });
       }
       
-      console.log(`[Admin Users] Role updated: ${targetUser.email} from ${targetUser.role} to ${role} by ${currentUser.email}`);
+      // Log the activity
+      await logAdminActivity({
+        adminUserId: currentUser.id,
+        action: "USER_ROLE_CHANGED",
+        targetUserId: id,
+        previousValue: previousRole,
+        newValue: role,
+        req,
+      });
+      
+      console.log(`[Admin Users] Role updated: ${targetUser.email} from ${previousRole} to ${role} by ${currentUser.email}`);
       res.json({ success: true, user: updatedUser });
     } catch (error: any) {
       console.error("[Admin Users] Error updating:", error.message);
       res.status(500).json({ error: "Failed to update user" });
+    }
+  });
+
+  // Enable/Disable user account (Super Admin only)
+  app.put("/api/admin/users/:id/status", requireAuth, requireMinimumRole("super_admin"), async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { isActive } = req.body;
+      const currentUser = req.user as any;
+      
+      if (typeof isActive !== "boolean") {
+        return res.status(400).json({ error: "isActive must be a boolean" });
+      }
+      
+      const targetUser = await storage.getUser(id);
+      if (!targetUser) {
+        return res.status(404).json({ error: "User not found" });
+      }
+      
+      // Cannot disable yourself
+      if (targetUser.id === currentUser.id) {
+        return res.status(403).json({ error: "Cannot change your own account status" });
+      }
+      
+      // Cannot disable a super admin
+      if (targetUser.role === "super_admin" && !isActive) {
+        return res.status(403).json({ error: "Cannot disable a Super Admin account" });
+      }
+      
+      const previousStatus = targetUser.isActive;
+      const updatedUser = await storage.updateUser(id, { isActive });
+      if (!updatedUser) {
+        return res.status(404).json({ error: "User not found" });
+      }
+      
+      // Log the activity
+      await logAdminActivity({
+        adminUserId: currentUser.id,
+        action: isActive ? "USER_ENABLED" : "USER_DISABLED",
+        targetUserId: id,
+        previousValue: String(previousStatus),
+        newValue: String(isActive),
+        req,
+      });
+      
+      console.log(`[Admin Users] Status updated: ${targetUser.email} ${isActive ? "enabled" : "disabled"} by ${currentUser.email}`);
+      res.json({ success: true, user: updatedUser, message: isActive ? "User enabled" : "User disabled" });
+    } catch (error: any) {
+      console.error("[Admin Users] Error updating status:", error.message);
+      res.status(500).json({ error: "Failed to update user status" });
+    }
+  });
+
+  // Get admin activity logs (Super Admin only)
+  app.get("/api/admin/activity-logs", requireAuth, requireMinimumRole("super_admin"), async (req, res) => {
+    try {
+      const { adminUserId, action, limit = "50", offset = "0" } = req.query;
+      
+      const logs = await getActivityLogs({
+        adminUserId: adminUserId as string,
+        action: action as AdminAction,
+        limit: Number(limit),
+        offset: Number(offset),
+      });
+      
+      res.json(logs);
+    } catch (error: any) {
+      console.error("[Admin Activity] Error fetching logs:", error.message);
+      res.status(500).json({ error: "Failed to fetch activity logs" });
     }
   });
 
