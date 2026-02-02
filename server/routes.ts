@@ -202,6 +202,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
   const mlsGridClient = createMLSGridClient();
   const repliersClient = initRepliersClient();
   
+  // Health check endpoint for Render deployment
+  app.get("/health", (_req, res) => {
+    res.status(200).json({
+      status: "healthy",
+      timestamp: new Date().toISOString(),
+      environment: process.env.NODE_ENV || "development",
+    });
+  });
+  
   // Start the seller update email scheduler
   import('./seller-update-scheduler').then(({ startScheduler }) => {
     startScheduler();

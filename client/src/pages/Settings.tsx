@@ -54,6 +54,7 @@ import {
   Monitor
 } from "lucide-react";
 import { SiFacebook, SiInstagram, SiLinkedin, SiX } from "react-icons/si";
+import { UserRoleBadge } from "@/components/UserRoleBadge";
 
 const leadGateSchema = z.object({
   enabled: z.boolean(),
@@ -766,6 +767,12 @@ export default function Settings() {
                         className="bg-muted"
                         data-testid="input-email" 
                       />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Role</Label>
+                      <div className="mt-1">
+                        <UserRoleBadge />
+                      </div>
                     </div>
                     <div className="space-y-2">
                       <Label htmlFor="phone">Phone</Label>

@@ -8,6 +8,7 @@ import { AppSidebar } from "@/components/AppSidebar";
 import { ChatAssistant } from "@/components/ChatAssistant";
 import { UserMenu } from "@/components/UserMenu";
 import { ThemeToggle } from "@/components/ThemeToggle";
+import { UserRoleBadge } from "@/components/UserRoleBadge";
 import { LeadGateProvider } from "@/contexts/LeadGateContext";
 import { SelectedPropertyProvider } from "@/contexts/SelectedPropertyContext";
 import { ChatProvider } from "@/contexts/ChatContext";
@@ -159,6 +160,7 @@ export default function App() {
                                 <div className="text-sm text-muted-foreground hidden sm:block">
                                   MLS Grid IDX Platform
                                 </div>
+                                <UserRoleBadge className="hidden md:flex" />
                                 <ThemeToggle />
                                 <UserMenu />
                               </div>

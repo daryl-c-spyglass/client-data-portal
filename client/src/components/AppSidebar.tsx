@@ -1,4 +1,4 @@
-import { Home, Search, FileText, Users, Settings, BarChart3, Mail, Filter, Calendar, UserCircle, MessageCircle, Shield, UsersRound } from "lucide-react";
+import { Home, Search, FileText, Users, Settings, BarChart3, Mail, Filter, Calendar, UserCircle, MessageCircle, Shield, UsersRound, ClipboardList } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import {
   Sidebar,
@@ -81,6 +81,13 @@ const adminItems = [
     url: "/admin/users",
     icon: UsersRound,
     testId: "link-user-management",
+    requiredRole: "super_admin" as const,
+  },
+  {
+    title: "Activity Logs",
+    url: "/admin/activity-logs",
+    icon: ClipboardList,
+    testId: "link-activity-logs",
     requiredRole: "super_admin" as const,
   },
 ];
