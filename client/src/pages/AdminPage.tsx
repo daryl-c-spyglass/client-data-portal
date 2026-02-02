@@ -111,7 +111,7 @@ export default function AdminPage() {
     queryKey: ["/api/auth/me"],
   });
 
-  const isAdmin = currentUser?.role === "admin";
+  const isAdmin = currentUser?.role === "admin" || currentUser?.role === "super_admin";
 
   // Show loading while checking auth
   if (isLoadingUser) {

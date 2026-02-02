@@ -5,7 +5,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Loader2, ArrowLeft, Shield, UserCheck, UserX, RefreshCw, Clock } from "lucide-react";
+import { Loader2, ArrowLeft, Shield, UserCheck, UserX, RefreshCw, Clock, UserPlus } from "lucide-react";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { Link } from "wouter";
 import { queryClient } from "@/lib/queryClient";
@@ -30,7 +30,7 @@ interface ActivityLog {
   targetUser: UserInfo | null;
 }
 
-type ActionType = "USER_ROLE_CHANGED" | "USER_ENABLED" | "USER_DISABLED" | "USER_CREATED" | "SETTINGS_UPDATED";
+type ActionType = "USER_ROLE_CHANGED" | "USER_ENABLED" | "USER_DISABLED" | "USER_CREATED" | "USER_INVITED" | "SETTINGS_UPDATED";
 
 function getActionBadgeVariant(action: string): "default" | "secondary" | "destructive" | "outline" {
   switch (action) {
@@ -40,6 +40,7 @@ function getActionBadgeVariant(action: string): "default" | "secondary" | "destr
       return "default";
     case "USER_ENABLED":
     case "USER_CREATED":
+    case "USER_INVITED":
       return "secondary";
     default:
       return "outline";
@@ -54,6 +55,8 @@ function getActionIcon(action: string) {
       return <UserCheck className="w-3 h-3" />;
     case "USER_DISABLED":
       return <UserX className="w-3 h-3" />;
+    case "USER_INVITED":
+      return <UserPlus className="w-3 h-3" />;
     default:
       return <Clock className="w-3 h-3" />;
   }
@@ -69,6 +72,8 @@ function formatAction(action: string): string {
       return "User Disabled";
     case "USER_CREATED":
       return "User Created";
+    case "USER_INVITED":
+      return "User Invited";
     case "SETTINGS_UPDATED":
       return "Settings Updated";
     default:
@@ -93,6 +98,17 @@ function formatValueChange(action: string, previousValue: string | null, newValu
   }
   if (action === "USER_DISABLED") {
     return "Active → Disabled";
+  }
+  if (action === "USER_INVITED" && newValue) {
+    const formatRole = (r: string) => {
+      switch (r) {
+        case "super_admin": return "Super Admin";
+        case "admin": return "Admin";
+        case "agent": return "Agent";
+        default: return r;
+      }
+    };
+    return `Invited as ${formatRole(newValue)}`;
   }
   if (previousValue && newValue) {
     return `${previousValue} → ${newValue}`;
@@ -155,6 +171,7 @@ function ActivityLogsContent() {
                   <SelectItem value="USER_ROLE_CHANGED">Role Changes</SelectItem>
                   <SelectItem value="USER_ENABLED">User Enabled</SelectItem>
                   <SelectItem value="USER_DISABLED">User Disabled</SelectItem>
+                  <SelectItem value="USER_INVITED">User Invited</SelectItem>
                 </SelectContent>
               </Select>
               <Button 

@@ -31,6 +31,7 @@ import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { getRoleDisplayName, INITIAL_SUPER_ADMIN_EMAILS, UserRole } from "@shared/permissions";
 import { Link } from "wouter";
+import { FUBUserSearch } from "@/components/admin/FUBUserSearch";
 
 interface UserData {
   id: string;
@@ -194,17 +195,20 @@ function UserManagementContent() {
 
   return (
     <div className="p-6 space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between flex-wrap gap-4">
         <div>
           <h1 className="text-2xl font-bold" data-testid="text-page-title">User Management</h1>
           <p className="text-muted-foreground">Manage team member roles and permissions</p>
         </div>
-        <Link href="/admin/activity-logs">
-          <Button variant="outline" className="gap-2" data-testid="button-view-activity-logs">
-            <History className="h-4 w-4" />
-            Activity Logs
-          </Button>
-        </Link>
+        <div className="flex items-center gap-2">
+          <FUBUserSearch />
+          <Link href="/admin/activity-logs">
+            <Button variant="outline" className="gap-2" data-testid="button-view-activity-logs">
+              <History className="h-4 w-4" />
+              Activity Logs
+            </Button>
+          </Link>
+        </div>
       </div>
 
       <div className="grid gap-4 md:grid-cols-3">

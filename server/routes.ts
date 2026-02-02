@@ -7921,6 +7921,102 @@ OUTPUT JSON:
     }
   });
 
+  // Follow Up Boss Integration - Get all FUB team members
+  app.get("/api/admin/fub/users", requireAuth, requireMinimumRole("super_admin"), async (req, res) => {
+    try {
+      const { getFUBTeamMembers } = await import("./followupboss-service");
+      
+      const fubResult = await getFUBTeamMembers();
+      
+      if (!fubResult.configured) {
+        return res.json({ configured: false, users: [] });
+      }
+      
+      if (fubResult.error) {
+        console.error("[FUB Integration] Error:", fubResult.error);
+        return res.json({ configured: true, users: [], error: fubResult.error });
+      }
+      
+      // Get existing portal users to mark who's already registered
+      const portalUsers = await storage.getAllUsers();
+      const portalEmailSet = new Set(portalUsers.map(u => u.email.toLowerCase()));
+      
+      // Merge FUB users with portal registration status
+      const mergedUsers = fubResult.users.map(fubUser => ({
+        ...fubUser,
+        isRegistered: portalEmailSet.has(fubUser.email?.toLowerCase() || ''),
+        portalRole: portalUsers.find(
+          p => p.email.toLowerCase() === fubUser.email?.toLowerCase()
+        )?.role || null,
+      }));
+      
+      console.log(`[FUB Integration] Fetched ${fubResult.users.length} users, ${mergedUsers.filter(u => u.isRegistered).length} already registered`);
+      res.json({ configured: true, users: mergedUsers });
+    } catch (error: any) {
+      console.error("[FUB Integration] Error fetching users:", error.message);
+      res.status(500).json({ error: "Failed to fetch Follow Up Boss users" });
+    }
+  });
+
+  // Invite user from Follow Up Boss (pre-create account)
+  app.post("/api/admin/users/invite", requireAuth, requireMinimumRole("super_admin"), async (req, res) => {
+    try {
+      const { email, firstName, lastName, role = "agent" } = req.body;
+      const adminUser = req.user as any;
+      
+      // Validate input
+      if (!email || typeof email !== "string") {
+        return res.status(400).json({ error: "Email is required" });
+      }
+      
+      const normalizedEmail = email.toLowerCase().trim();
+      if (!normalizedEmail.includes("@")) {
+        return res.status(400).json({ error: "Invalid email format" });
+      }
+      
+      // Validate role
+      if (!["super_admin", "admin", "agent"].includes(role)) {
+        return res.status(400).json({ error: "Invalid role. Must be 'super_admin', 'admin', or 'agent'" });
+      }
+      
+      // Check if user already exists using storage layer
+      const existing = await storage.getUserByEmail(normalizedEmail);
+      if (existing) {
+        return res.status(400).json({ error: "User already exists" });
+      }
+      
+      // Create user using storage layer (they'll complete registration on first Google login)
+      const newUser = await storage.createUser({
+        email: normalizedEmail,
+        firstName: firstName || null,
+        lastName: lastName || null,
+        role,
+        isActive: true,
+      });
+      
+      // Log activity
+      await logAdminActivity({
+        adminUserId: adminUser.id,
+        action: "USER_INVITED" as AdminAction,
+        targetUserId: newUser.id,
+        newValue: role,
+        details: { 
+          email: normalizedEmail, 
+          firstName: firstName || null, 
+          lastName: lastName || null, 
+          source: "follow_up_boss" 
+        },
+        req,
+      });
+      
+      console.log(`[Admin Users] Invited: ${normalizedEmail} as ${role} by ${adminUser.email}`);
+      res.json({ success: true, user: newUser });
+    } catch (error: any) {
+      console.error("[Admin Users] Error inviting:", error.message);
+      res.status(500).json({ error: "Failed to invite user" });
+    }
+  });
+
   const httpServer = createServer(app);
 
   return httpServer;

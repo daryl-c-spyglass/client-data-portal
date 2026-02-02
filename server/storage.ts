@@ -61,6 +61,7 @@ export interface IStorage {
   // User operations
   getUser(id: string): Promise<User | undefined>;
   getUserByEmail(email: string): Promise<User | undefined>;
+  getAllUsers(): Promise<User[]>;
   createUser(user: InsertUser): Promise<User>;
   updateUser(id: string, user: Partial<User>): Promise<User | undefined>;
   deleteUser(id: string): Promise<boolean>;
@@ -212,6 +213,10 @@ export class MemStorage implements IStorage {
 
   async getUserByEmail(email: string): Promise<User | undefined> {
     return Array.from(this.users.values()).find(u => u.email === email);
+  }
+
+  async getAllUsers(): Promise<User[]> {
+    return Array.from(this.users.values());
   }
 
   async createUser(insertUser: InsertUser): Promise<User> {
@@ -1051,6 +1056,10 @@ export class DbStorage implements IStorage {
   async getUserByEmail(email: string): Promise<User | undefined> {
     const result = await this.db.select().from(users).where(eq(users.email, email)).limit(1);
     return result[0];
+  }
+
+  async getAllUsers(): Promise<User[]> {
+    return await this.db.select().from(users);
   }
 
   async createUser(insertUser: InsertUser): Promise<User> {
