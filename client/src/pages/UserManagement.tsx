@@ -25,8 +25,9 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Loader2, Search, Shield, ShieldCheck, User, MoreHorizontal, UserX, UserCheck, History, Users, UserPlus } from "lucide-react";
+import { Loader2, Search, Shield, ShieldCheck, User, MoreHorizontal, UserX, UserCheck, History, Users, UserPlus, Trash2, AlertTriangle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { usePermissions } from "@/hooks/use-permissions";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { getRoleDisplayName, INITIAL_SUPER_ADMIN_EMAILS, UserRole } from "@shared/permissions";
@@ -90,6 +91,7 @@ function getRoleIcon(role: string) {
 
 function UserManagementContent() {
   const { toast } = useToast();
+  const { user: currentUser } = usePermissions();
   const [searchQuery, setSearchQuery] = useState("");
   const [editingUserId, setEditingUserId] = useState<string | null>(null);
   const [pendingRole, setPendingRole] = useState<string>("");
@@ -99,6 +101,10 @@ function UserManagementContent() {
     type: "disable" | "enable" | null;
     user: UserData | null;
   }>({ open: false, type: null, user: null });
+  const [deleteDialog, setDeleteDialog] = useState<{
+    open: boolean;
+    user: UserData | null;
+  }>({ open: false, user: null });
 
   const { data: users = [], isLoading } = useQuery<UserData[]>({
     queryKey: ["/api/admin/users"],
@@ -200,6 +206,36 @@ function UserManagementContent() {
     },
   });
 
+  const deleteMutation = useMutation({
+    mutationFn: async (userId: string) => {
+      const res = await fetch(`/api/admin/users/${userId}`, {
+        method: 'DELETE',
+        credentials: 'include',
+      });
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.error || 'Failed to delete user');
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({ 
+        title: 'User deleted', 
+        description: 'User has been permanently removed',
+      });
+      setDeleteDialog({ open: false, user: null });
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/users'] });
+    },
+    onError: (error: Error) => {
+      toast({ 
+        title: 'Failed to delete user', 
+        description: error.message,
+        variant: 'destructive',
+      });
+      setDeleteDialog({ open: false, user: null });
+    },
+  });
+
   const { filteredUsers, unregisteredFubUsers } = useMemo(() => {
     const query = searchQuery.toLowerCase().trim();
     
@@ -276,7 +312,21 @@ function UserManagementContent() {
   };
 
   const canDisableUser = (user: UserData) => {
+    // Cannot disable self, Super Admins, or protected users
+    if (currentUser && user.id === currentUser.id) return false;
     return user.role !== "super_admin" && !isProtectedUser(user);
+  };
+
+  const canDeleteUser = (user: UserData) => {
+    // Cannot delete self, Super Admins, or protected users
+    if (currentUser && user.id === currentUser.id) return false;
+    return user.role !== "super_admin" && !isProtectedUser(user);
+  };
+
+  const handleDeleteUser = () => {
+    if (deleteDialog.user) {
+      deleteMutation.mutate(deleteDialog.user.id);
+    }
   };
 
   const handleInvite = (fubUser: FUBUser, role: string) => {
@@ -495,11 +545,26 @@ function UserManagementContent() {
                               <DropdownMenuItem
                                 onClick={() => handleStatusChange(user, false)}
                                 disabled={!canDisableUser(user)}
-                                className="text-destructive focus:text-destructive"
+                                className="text-destructive"
                                 data-testid={`menu-disable-${user.id}`}
                               >
                                 <UserX className="h-4 w-4 mr-2" />
                                 Disable User
+                              </DropdownMenuItem>
+                            )}
+                            <DropdownMenuSeparator />
+                            {canDeleteUser(user) ? (
+                              <DropdownMenuItem
+                                onClick={() => setDeleteDialog({ open: true, user })}
+                                className="text-destructive"
+                                data-testid={`menu-delete-${user.id}`}
+                              >
+                                <Trash2 className="h-4 w-4 mr-2" />
+                                Delete Permanently
+                              </DropdownMenuItem>
+                            ) : (
+                              <DropdownMenuItem disabled className="text-muted-foreground text-xs">
+                                Cannot delete {user.role === 'super_admin' ? 'Super Admins' : 'this user'}
                               </DropdownMenuItem>
                             )}
                           </DropdownMenuContent>
@@ -664,7 +729,7 @@ function UserManagementContent() {
             <AlertDialogCancel data-testid="button-cancel-status">Cancel</AlertDialogCancel>
             <AlertDialogAction
               onClick={confirmStatusChange}
-              className={confirmDialog.type === "disable" ? "bg-destructive hover:bg-destructive/90" : ""}
+              className={confirmDialog.type === "disable" ? "bg-destructive text-destructive-foreground" : ""}
               data-testid="button-confirm-status"
             >
               {updateStatusMutation.isPending ? (
@@ -673,6 +738,41 @@ function UserManagementContent() {
                 "Disable"
               ) : (
                 "Enable"
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={deleteDialog.open} onOpenChange={(open) => !open && setDeleteDialog({ open: false, user: null })}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2 text-destructive">
+              <AlertTriangle className="h-5 w-5" />
+              Delete User Permanently
+            </AlertDialogTitle>
+            <AlertDialogDescription className="space-y-2">
+              <p>
+                Are you sure you want to permanently delete{' '}
+                <strong>{deleteDialog.user?.firstName} {deleteDialog.user?.lastName}</strong> ({deleteDialog.user?.email})?
+              </p>
+              <p className="text-destructive font-medium">
+                This action cannot be undone. All user data will be permanently removed.
+              </p>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel data-testid="button-cancel-delete">Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteUser}
+              className="bg-destructive text-destructive-foreground"
+              data-testid="button-confirm-delete"
+            >
+              {deleteMutation.isPending ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                "Delete Permanently"
               )}
             </AlertDialogAction>
           </AlertDialogFooter>

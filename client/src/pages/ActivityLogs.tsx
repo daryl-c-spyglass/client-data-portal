@@ -5,7 +5,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Loader2, ArrowLeft, Shield, UserCheck, UserX, RefreshCw, Clock, UserPlus } from "lucide-react";
+import { Loader2, ArrowLeft, Shield, UserCheck, UserX, RefreshCw, Clock, UserPlus, Trash2 } from "lucide-react";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { Link } from "wouter";
 import { queryClient } from "@/lib/queryClient";
@@ -24,17 +24,23 @@ interface ActivityLog {
   targetUserId: string | null;
   previousValue: string | null;
   newValue: string | null;
+  details: {
+    deletedUserEmail?: string;
+    deletedUserName?: string;
+    deletedUserRole?: string;
+  } | null;
   ipAddress: string | null;
   createdAt: string;
   adminUser: UserInfo | null;
   targetUser: UserInfo | null;
 }
 
-type ActionType = "USER_ROLE_CHANGED" | "USER_ENABLED" | "USER_DISABLED" | "USER_CREATED" | "USER_INVITED" | "SETTINGS_UPDATED";
+type ActionType = "USER_ROLE_CHANGED" | "USER_ENABLED" | "USER_DISABLED" | "USER_CREATED" | "USER_INVITED" | "USER_DELETED" | "SETTINGS_UPDATED";
 
 function getActionBadgeVariant(action: string): "default" | "secondary" | "destructive" | "outline" {
   switch (action) {
     case "USER_DISABLED":
+    case "USER_DELETED":
       return "destructive";
     case "USER_ROLE_CHANGED":
       return "default";
@@ -57,6 +63,8 @@ function getActionIcon(action: string) {
       return <UserX className="w-3 h-3" />;
     case "USER_INVITED":
       return <UserPlus className="w-3 h-3" />;
+    case "USER_DELETED":
+      return <Trash2 className="w-3 h-3" />;
     default:
       return <Clock className="w-3 h-3" />;
   }
@@ -74,6 +82,8 @@ function formatAction(action: string): string {
       return "User Created";
     case "USER_INVITED":
       return "User Invited";
+    case "USER_DELETED":
+      return "User Deleted";
     case "SETTINGS_UPDATED":
       return "Settings Updated";
     default:
@@ -172,6 +182,7 @@ function ActivityLogsContent() {
                   <SelectItem value="USER_ENABLED">User Enabled</SelectItem>
                   <SelectItem value="USER_DISABLED">User Disabled</SelectItem>
                   <SelectItem value="USER_INVITED">User Invited</SelectItem>
+                  <SelectItem value="USER_DELETED">User Deleted</SelectItem>
                 </SelectContent>
               </Select>
               <Button 
@@ -215,11 +226,15 @@ function ActivityLogsContent() {
                       </Badge>
                     </TableCell>
                     <TableCell className="text-muted-foreground">
-                      {log.targetUser?.email || log.targetUserId || "-"}
+                      {log.action === "USER_DELETED" && log.details?.deletedUserEmail
+                        ? log.details.deletedUserEmail
+                        : log.targetUser?.email || log.targetUserId || "-"}
                     </TableCell>
                     <TableCell>
                       <span className="text-sm">
-                        {formatValueChange(log.action, log.previousValue, log.newValue)}
+                        {log.action === "USER_DELETED" && log.details
+                          ? `Deleted: ${log.details.deletedUserName || "Unknown"} (${log.details.deletedUserRole || "agent"})`
+                          : formatValueChange(log.action, log.previousValue, log.newValue)}
                       </span>
                     </TableCell>
                     <TableCell className="text-muted-foreground text-sm">

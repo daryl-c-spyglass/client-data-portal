@@ -1,0 +1,327 @@
+# Add Permanent Delete User Feature
+
+## ⚠️ TESTING REQUIREMENT
+
+**Before declaring complete, you MUST:**
+1. Fix the disable/enable fetch error first (URL as method bug)
+2. Test disable user works
+3. Test enable user works
+4. Test delete user with confirmation dialog
+5. Verify deleted user is removed from database
+6. Verify activity log records the deletion
+7. **DO NOT declare complete without testing all actions**
+
+---
+
+## PART 1: Fix Disable/Enable Bug First
+
+The current error: `"Failed to execute 'fetch' on 'Window': '/api/admin/users/.../status' is not a valid HTTP method."`
+
+Fix the fetch call:
+
+```typescript
+// WRONG - URL passed as method
+fetch('/api/admin/users/' + userId + '/status', 'PUT', { isActive: false })
+
+// CORRECT
+fetch(`/api/admin/users/${userId}/status`, {
+  method: 'PUT',
+  headers: { 'Content-Type': 'application/json' },
+  credentials: 'include',
+  body: JSON.stringify({ isActive })
+})
+```
+
+---
+
+## PART 2: Add Permanent Delete Feature
+
+### 2.1 Backend API Endpoint
+
+```typescript
+// server/routes/admin.ts
+
+// DELETE /api/admin/users/:id - Permanently delete user
+app.delete('/api/admin/users/:id', requireAuth, requireMinimumRole('super_admin'), async (req, res) => {
+  try {
+    const { id } = req.params;
+    const adminUser = req.user;
+    
+    // Get target user
+    const [targetUser] = await db.select().from(users).where(eq(users.id, id));
+    
+    if (!targetUser) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+    
+    // Protection: Cannot delete yourself
+    if (targetUser.id === adminUser.id) {
+      return res.status(403).json({ error: 'Cannot delete your own account' });
+    }
+    
+    // Protection: Cannot delete Super Admins
+    if (targetUser.role === 'super_admin') {
+      return res.status(403).json({ error: 'Cannot delete Super Admin accounts. Demote to Admin first.' });
+    }
+    
+    // Log activity BEFORE deletion (so we have the user info)
+    await logAdminActivity({
+      adminUserId: adminUser.id,
+      action: 'USER_DELETED',
+      targetUserId: id,
+      details: {
+        deletedUserEmail: targetUser.email,
+        deletedUserName: `${targetUser.firstName} ${targetUser.lastName}`,
+        deletedUserRole: targetUser.role,
+      },
+      req,
+    });
+    
+    // Delete user
+    await db.delete(users).where(eq(users.id, id));
+    
+    res.json({ success: true, message: 'User permanently deleted' });
+  } catch (error) {
+    console.error('Delete user error:', error);
+    res.status(500).json({ error: 'Failed to delete user' });
+  }
+});
+```
+
+### 2.2 Update Activity Log Action Type
+
+```typescript
+// server/services/adminActivityService.ts
+
+export type AdminAction = 
+  | 'USER_ROLE_CHANGED'
+  | 'USER_DISABLED'
+  | 'USER_ENABLED'
+  | 'USER_INVITED'
+  | 'USER_DELETED';  // ADD THIS
+```
+
+### 2.3 Frontend: Add Delete to Actions Menu
+
+```typescript
+// client/src/pages/UserManagement.tsx - Update UserActionsMenu
+
+function UserActionsMenu({ user, currentUser, onRoleChange, onStatusChange, onDelete }) {
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const canModify = currentUser?.id !== user.id;
+  const canDelete = canModify && user.role !== 'super_admin';
+
+  return (
+    <>
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button variant="ghost" size="sm">
+            <MoreHorizontal className="w-4 h-4" />
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end">
+          {/* Role change options */}
+          <DropdownMenuItem onClick={() => onRoleChange(user, 'admin')}>
+            Change Role
+          </DropdownMenuItem>
+          
+          <DropdownMenuSeparator />
+          
+          {/* Enable/Disable */}
+          {canModify && (
+            <DropdownMenuItem onClick={() => onStatusChange(user.id, !user.isActive)}>
+              {user.isActive !== false ? 'Disable User' : 'Enable User'}
+            </DropdownMenuItem>
+          )}
+          
+          <DropdownMenuSeparator />
+          
+          {/* Delete - only for non-Super Admins */}
+          {canDelete && (
+            <DropdownMenuItem 
+              onClick={() => setShowDeleteDialog(true)}
+              className="text-red-600 focus:text-red-600 focus:bg-red-50"
+            >
+              <Trash2 className="w-4 h-4 mr-2" />
+              Delete Permanently
+            </DropdownMenuItem>
+          )}
+          
+          {/* Show why delete is disabled for Super Admins */}
+          {canModify && user.role === 'super_admin' && (
+            <DropdownMenuItem disabled className="text-muted-foreground text-xs">
+              Cannot delete Super Admins
+            </DropdownMenuItem>
+          )}
+        </DropdownMenuContent>
+      </DropdownMenu>
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2 text-red-600">
+              <AlertTriangle className="w-5 h-5" />
+              Delete User Permanently
+            </AlertDialogTitle>
+            <AlertDialogDescription className="space-y-2">
+              <p>
+                Are you sure you want to permanently delete{' '}
+                <strong>{user.firstName} {user.lastName}</strong> ({user.email})?
+              </p>
+              <p className="text-red-600 font-medium">
+                This action cannot be undone. All user data will be permanently removed.
+              </p>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                onDelete(user.id);
+                setShowDeleteDialog(false);
+              }}
+              className="bg-red-600 hover:bg-red-700 text-white"
+            >
+              Delete Permanently
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
+  );
+}
+```
+
+### 2.4 Add Delete Mutation
+
+```typescript
+// In UserManagement.tsx
+
+// Delete mutation
+const deleteMutation = useMutation({
+  mutationFn: async (userId: string) => {
+    const res = await fetch(`/api/admin/users/${userId}`, {
+      method: 'DELETE',
+      credentials: 'include',
+    });
+    if (!res.ok) {
+      const error = await res.json();
+      throw new Error(error.error || 'Failed to delete user');
+    }
+    return res.json();
+  },
+  onSuccess: () => {
+    toast({ title: 'User deleted', description: 'User has been permanently removed' });
+    queryClient.invalidateQueries({ queryKey: ['/api/admin/users'] });
+  },
+  onError: (error: Error) => {
+    toast({ 
+      title: 'Failed to delete user', 
+      description: error.message,
+      variant: 'destructive',
+    });
+  },
+});
+
+// Handler
+const handleDeleteUser = (userId: string) => {
+  deleteMutation.mutate(userId);
+};
+```
+
+---
+
+## PROTECTION RULES
+
+| Rule | Description |
+|------|-------------|
+| Cannot delete self | Prevents admin from deleting their own account |
+| Cannot delete Super Admins | Must demote to Admin first, then delete |
+| Confirmation required | Dialog with warning before deletion |
+| Activity logged | Records who deleted whom with details |
+
+---
+
+## ACTIONS DROPDOWN MENU
+
+```
+┌─────────────────────────┐
+│ Change Role           → │
+├─────────────────────────┤
+│ Disable User            │  (or "Enable User" if disabled)
+├─────────────────────────┤
+│ 🗑 Delete Permanently   │  (red text, only for non-Super Admins)
+└─────────────────────────┘
+```
+
+---
+
+## DELETE CONFIRMATION DIALOG
+
+```
+┌─────────────────────────────────────────────────────────┐
+│ ⚠️ Delete User Permanently                              │
+├─────────────────────────────────────────────────────────┤
+│                                                         │
+│ Are you sure you want to permanently delete             │
+│ John Doe (john@example.com)?                            │
+│                                                         │
+│ ⚠️ This action cannot be undone. All user data will    │
+│ be permanently removed.                                 │
+│                                                         │
+│                        [Cancel]  [Delete Permanently]   │
+└─────────────────────────────────────────────────────────┘
+```
+
+---
+
+## TESTING CHECKLIST
+
+### Fix Disable/Enable First:
+- [ ] Click [...] → Disable User → Works (no fetch error)
+- [ ] Click [...] → Enable User → Works
+- [ ] Status badge updates correctly
+
+### Delete Feature:
+- [ ] Delete option appears for Agent/Admin users
+- [ ] Delete option does NOT appear for Super Admins
+- [ ] Delete option does NOT appear for your own account
+- [ ] Clicking Delete shows confirmation dialog
+- [ ] Dialog shows user name and email
+- [ ] Dialog has warning about permanent deletion
+- [ ] Cancel closes dialog without deleting
+- [ ] Confirm deletes user and shows toast
+- [ ] User removed from table
+- [ ] Activity log shows USER_DELETED action
+- [ ] Deleted user cannot log in
+
+---
+
+## FILES TO MODIFY
+
+```
+server/
+├── routes/admin.ts                 [MODIFY - add DELETE endpoint]
+└── services/adminActivityService.ts [MODIFY - add USER_DELETED action]
+
+client/src/pages/
+└── UserManagement.tsx              [MODIFY - fix fetch, add delete UI]
+```
+
+---
+
+## ACCEPTANCE CRITERIA
+
+- [ ] Disable/Enable works without errors
+- [ ] Delete button appears for non-Super Admin users
+- [ ] Delete button hidden for Super Admins
+- [ ] Delete button hidden for own account
+- [ ] Confirmation dialog appears before deletion
+- [ ] Deletion removes user from database
+- [ ] Deletion logged in activity logs
+- [ ] Toast notification on success/failure
+
+---
+
+**⚠️ REMINDER: Fix the disable/enable fetch bug FIRST, then add delete feature!**

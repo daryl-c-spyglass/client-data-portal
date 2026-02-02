@@ -18,6 +18,7 @@ export type AdminAction =
   | 'USER_ENABLED'
   | 'USER_CREATED'
   | 'USER_INVITED'
+  | 'USER_DELETED'
   | 'SETTINGS_UPDATED';
 
 interface LogActivityParams {

@@ -7779,6 +7779,53 @@ OUTPUT JSON:
     }
   });
 
+  // DELETE /api/admin/users/:id - Permanently delete user (Super Admin only)
+  app.delete("/api/admin/users/:id", requireAuth, requireMinimumRole("super_admin"), async (req, res) => {
+    try {
+      const { id } = req.params;
+      const adminUser = req.user as any;
+      
+      // Get target user
+      const targetUser = await storage.getUser(id);
+      
+      if (!targetUser) {
+        return res.status(404).json({ error: "User not found" });
+      }
+      
+      // Protection: Cannot delete yourself
+      if (targetUser.id === adminUser.id) {
+        return res.status(403).json({ error: "Cannot delete your own account" });
+      }
+      
+      // Protection: Cannot delete Super Admins
+      if (targetUser.role === "super_admin") {
+        return res.status(403).json({ error: "Cannot delete Super Admin accounts. Demote to Admin first." });
+      }
+      
+      // Log activity BEFORE deletion (so we have the user info)
+      await logAdminActivity({
+        adminUserId: adminUser.id,
+        action: "USER_DELETED",
+        targetUserId: id,
+        details: {
+          deletedUserEmail: targetUser.email,
+          deletedUserName: `${targetUser.firstName || ""} ${targetUser.lastName || ""}`.trim(),
+          deletedUserRole: targetUser.role,
+        },
+        req,
+      });
+      
+      // Delete user
+      await storage.deleteUser(id);
+      
+      console.log(`[Admin] User ${targetUser.email} permanently deleted by ${adminUser.email}`);
+      res.json({ success: true, message: "User permanently deleted" });
+    } catch (error: any) {
+      console.error("[Admin] Delete user error:", error.message);
+      res.status(500).json({ error: "Failed to delete user" });
+    }
+  });
+
   // Get admin activity logs (Super Admin only)
   app.get("/api/admin/activity-logs", requireAuth, requireMinimumRole("super_admin"), async (req, res) => {
     try {

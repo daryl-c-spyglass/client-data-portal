@@ -189,7 +189,7 @@ export const adminActivityLogs = pgTable("admin_activity_logs", {
   id: serial("id").primaryKey(),
   adminUserId: varchar("admin_user_id").notNull().references(() => users.id),
   action: varchar("action", { length: 100 }).notNull(),
-  targetUserId: varchar("target_user_id").references(() => users.id),
+  targetUserId: varchar("target_user_id").references(() => users.id, { onDelete: "set null" }),
   previousValue: text("previous_value"),
   newValue: text("new_value"),
   details: jsonb("details"),
