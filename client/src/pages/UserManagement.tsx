@@ -93,7 +93,6 @@ function UserManagementContent() {
   const [searchQuery, setSearchQuery] = useState("");
   const [editingUserId, setEditingUserId] = useState<string | null>(null);
   const [pendingRole, setPendingRole] = useState<string>("");
-  const [invitingFubUserId, setInvitingFubUserId] = useState<string | null>(null);
   const [selectedInviteRole, setSelectedInviteRole] = useState<string>("agent");
   const [confirmDialog, setConfirmDialog] = useState<{
     open: boolean;
@@ -188,7 +187,6 @@ function UserManagementContent() {
         title: 'User invited successfully',
         description: `${variables.email} has been added as ${getRoleDisplayName(variables.role as UserRole)}`,
       });
-      setInvitingFubUserId(null);
       setSelectedInviteRole("agent");
       queryClient.invalidateQueries({ queryKey: ['/api/admin/users'] });
       queryClient.invalidateQueries({ queryKey: ['/api/fub/users'] });
@@ -555,54 +553,35 @@ function UserManagementContent() {
                     </Badge>
                   </div>
                   <div className="flex items-center gap-2">
-                    {invitingFubUserId === fubUser.id ? (
-                      <>
-                        <Select value={selectedInviteRole} onValueChange={setSelectedInviteRole}>
-                          <SelectTrigger className="w-[130px]" data-testid={`select-invite-role-${fubUser.id}`}>
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="agent">Agent</SelectItem>
-                            <SelectItem value="admin">Admin</SelectItem>
-                            <SelectItem value="super_admin">Super Admin</SelectItem>
-                          </SelectContent>
-                        </Select>
-                        <Button 
-                          size="sm"
-                          onClick={() => handleInvite(fubUser, selectedInviteRole)}
-                          disabled={inviteMutation.isPending}
-                          data-testid={`button-confirm-invite-${fubUser.id}`}
-                        >
-                          {inviteMutation.isPending ? (
-                            <Loader2 className="h-4 w-4 animate-spin" />
-                          ) : (
-                            "Invite"
-                          )}
-                        </Button>
-                        <Button 
-                          size="sm" 
-                          variant="outline"
-                          onClick={() => {
-                            setInvitingFubUserId(null);
-                            setSelectedInviteRole("agent");
-                          }}
-                          data-testid={`button-cancel-invite-${fubUser.id}`}
-                        >
-                          Cancel
-                        </Button>
-                      </>
-                    ) : (
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        className="gap-1"
-                        onClick={() => setInvitingFubUserId(fubUser.id)}
-                        data-testid={`button-invite-${fubUser.id}`}
-                      >
-                        <UserPlus className="w-4 h-4" />
-                        Invite
-                      </Button>
-                    )}
+                    <Select 
+                      defaultValue="agent"
+                      onValueChange={(value) => setSelectedInviteRole(value)}
+                    >
+                      <SelectTrigger className="w-[130px]" data-testid={`select-role-${fubUser.id}`}>
+                        <SelectValue placeholder="Agent" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="agent">Agent</SelectItem>
+                        <SelectItem value="admin">Admin</SelectItem>
+                        <SelectItem value="super_admin">Super Admin</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <Button
+                      size="sm"
+                      className="gap-1"
+                      onClick={() => handleInvite(fubUser, selectedInviteRole || "agent")}
+                      disabled={inviteMutation.isPending}
+                      data-testid={`button-invite-${fubUser.id}`}
+                    >
+                      {inviteMutation.isPending ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <>
+                          <UserPlus className="w-4 h-4" />
+                          Invite
+                        </>
+                      )}
+                    </Button>
                   </div>
                 </div>
               ))}
