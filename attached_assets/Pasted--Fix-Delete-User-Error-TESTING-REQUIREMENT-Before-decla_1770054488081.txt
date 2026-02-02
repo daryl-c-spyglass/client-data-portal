@@ -1,0 +1,263 @@
+# Fix Delete User Error
+
+## ⚠️ TESTING REQUIREMENT
+
+**Before declaring complete, you MUST:**
+1. Delete "Test Agent" (test@example.com)
+2. Delete "John Doe" (agent@example.com)
+3. Delete all test users with @example.com emails
+4. Verify no errors occur
+5. Verify users are removed from the table
+6. **DO NOT declare complete without successfully deleting at least one user**
+
+---
+
+## ISSUE
+
+When trying to delete test users from User Management, an error occurs.
+
+**Users that need to be deletable (from screenshot):**
+- Test Agent - test@example.com (Disabled, Agent)
+- John Doe - agent@example.com (Disabled, Agent)
+- Jane Smith - agent2@example.com (Disabled, Agent)
+- Test User gluq - testtKUi@example.com (Active, Agent)
+- Test User 2djn - test37ozzX@example.com (Active, Agent)
+
+These are all test accounts with @example.com emails that should be deletable.
+
+---
+
+## DEBUG STEPS
+
+### 1. Check Browser Console for Error
+
+Open DevTools (F12) → Console tab → Try to delete a user → Look for error message
+
+Common errors:
+- `Failed to fetch` - Network/CORS issue
+- `404 Not Found` - Endpoint doesn't exist
+- `403 Forbidden` - Permission issue
+- `500 Internal Server Error` - Backend error
+
+### 2. Check Network Tab
+
+DevTools → Network tab → Try to delete → Look for the DELETE request:
+- URL should be: `DELETE /api/admin/users/{user-id}`
+- Check response status and body
+
+---
+
+## LIKELY ISSUES & FIXES
+
+### Issue A: DELETE Endpoint Missing
+
+Check if the endpoint exists in server/routes.ts or server/routes/admin.ts:
+
+```typescript
+// Add this if missing
+app.delete('/api/admin/users/:id', requireAuth, requireMinimumRole('super_admin'), async (req, res) => {
+  try {
+    const { id } = req.params;
+    const adminUser = req.user;
+    
+    // Get target user
+    const [targetUser] = await db.select().from(users).where(eq(users.id, id));
+    
+    if (!targetUser) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+    
+    // Cannot delete yourself
+    if (targetUser.id === adminUser.id) {
+      return res.status(403).json({ error: 'Cannot delete your own account' });
+    }
+    
+    // Cannot delete Super Admins (must demote first)
+    if (targetUser.role === 'super_admin') {
+      return res.status(403).json({ error: 'Cannot delete Super Admin accounts. Demote first.' });
+    }
+    
+    // Log the deletion
+    await db.insert(adminActivityLogs).values({
+      adminUserId: adminUser.id,
+      action: 'USER_DELETED',
+      targetUserId: id,
+      details: {
+        email: targetUser.email,
+        name: `${targetUser.firstName || ''} ${targetUser.lastName || ''}`.trim(),
+        role: targetUser.role,
+      },
+    });
+    
+    // Delete the user
+    await db.delete(users).where(eq(users.id, id));
+    
+    res.json({ success: true, message: 'User deleted successfully' });
+  } catch (error) {
+    console.error('Delete user error:', error);
+    res.status(500).json({ error: 'Failed to delete user' });
+  }
+});
+```
+
+### Issue B: Frontend Fetch Incorrect
+
+Check the delete mutation in UserManagement.tsx:
+
+```typescript
+// WRONG - might have similar issue as disable/enable
+const deleteMutation = useMutation({
+  mutationFn: async (userId: string) => {
+    // Make sure this is correct:
+    const res = await fetch(`/api/admin/users/${userId}`, {
+      method: 'DELETE',
+      credentials: 'include',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    });
+    
+    if (!res.ok) {
+      const error = await res.json();
+      throw new Error(error.error || 'Failed to delete user');
+    }
+    
+    return res.json();
+  },
+  onSuccess: () => {
+    toast({ title: 'User deleted successfully' });
+    queryClient.invalidateQueries({ queryKey: ['/api/admin/users'] });
+  },
+  onError: (error: Error) => {
+    toast({ 
+      title: 'Failed to delete user', 
+      description: error.message,
+      variant: 'destructive' 
+    });
+  },
+});
+```
+
+### Issue C: Foreign Key Constraints
+
+If users have related data (CMAs, sessions, etc.), deletion might fail due to database constraints.
+
+**Fix: Delete related data first or use CASCADE:**
+
+```typescript
+// In delete endpoint, delete related data first:
+app.delete('/api/admin/users/:id', requireAuth, requireMinimumRole('super_admin'), async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    // ... validation checks ...
+    
+    // Delete related records first (if foreign key constraints exist)
+    // Check what tables reference users:
+    
+    // Delete user's CMAs (if any)
+    await db.delete(cmas).where(eq(cmas.userId, id)).catch(() => {});
+    
+    // Delete user's sessions (if any)
+    await db.delete(sessions).where(eq(sessions.userId, id)).catch(() => {});
+    
+    // Delete any other related records...
+    
+    // Now delete the user
+    await db.delete(users).where(eq(users.id, id));
+    
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Delete error:', error);
+    res.status(500).json({ error: error.message || 'Failed to delete user' });
+  }
+});
+```
+
+---
+
+## QUICK TEST SCRIPT
+
+Add this temporarily to verify the endpoint works:
+
+```typescript
+// Add to server routes for testing
+app.get('/api/admin/test-delete/:id', requireAuth, requireMinimumRole('super_admin'), async (req, res) => {
+  const { id } = req.params;
+  
+  // Just check if user exists and can be deleted
+  const [user] = await db.select().from(users).where(eq(users.id, id));
+  
+  if (!user) {
+    return res.json({ canDelete: false, reason: 'User not found' });
+  }
+  
+  if (user.role === 'super_admin') {
+    return res.json({ canDelete: false, reason: 'Cannot delete Super Admin' });
+  }
+  
+  res.json({ 
+    canDelete: true, 
+    user: { 
+      id: user.id, 
+      email: user.email, 
+      role: user.role 
+    } 
+  });
+});
+```
+
+---
+
+## CHECK SERVER LOGS
+
+Look at the Replit console for server-side errors when delete is attempted:
+
+```
+[ERROR] Delete user error: ...
+```
+
+This will show the actual backend error.
+
+---
+
+## EXPECTED BEHAVIOR AFTER FIX
+
+1. Click [...] on "Test Agent" row
+2. Click "Delete Permanently"
+3. Confirmation dialog appears
+4. Click confirm
+5. Toast shows "User deleted successfully"
+6. "Test Agent" removed from table
+7. Total Users count decreases
+
+---
+
+## TESTING CHECKLIST
+
+- [ ] Delete "Test Agent" (test@example.com) - SUCCESS
+- [ ] Delete "John Doe" (agent@example.com) - SUCCESS
+- [ ] Delete "Jane Smith" (agent2@example.com) - SUCCESS
+- [ ] Delete "Test User gluq" - SUCCESS
+- [ ] Delete "Test User 2djn" - SUCCESS
+- [ ] All test users with @example.com removed
+- [ ] No errors in console
+- [ ] Activity log shows deletions
+
+---
+
+## FILES TO CHECK/MODIFY
+
+```
+server/
+├── routes.ts           [CHECK - does DELETE endpoint exist?]
+├── routes/admin.ts     [CHECK - does DELETE endpoint exist?]
+└── db/schema.ts        [CHECK - foreign key constraints]
+
+client/src/pages/
+└── UserManagement.tsx  [CHECK - delete mutation correct?]
+```
+
+---
+
+**⚠️ First check browser console and network tab for the specific error message, then apply the appropriate fix!**
