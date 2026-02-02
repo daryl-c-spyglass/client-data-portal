@@ -187,7 +187,7 @@ export type User = typeof users.$inferSelect;
 // Admin Activity Logs Schema - Tracks all admin actions for audit purposes
 export const adminActivityLogs = pgTable("admin_activity_logs", {
   id: serial("id").primaryKey(),
-  adminUserId: varchar("admin_user_id").notNull().references(() => users.id),
+  adminUserId: varchar("admin_user_id").references(() => users.id, { onDelete: "set null" }),
   action: varchar("action", { length: 100 }).notNull(),
   targetUserId: varchar("target_user_id").references(() => users.id, { onDelete: "set null" }),
   previousValue: text("previous_value"),
@@ -226,7 +226,7 @@ export type SavedSearch = typeof savedSearches.$inferSelect;
 // Seller Updates Schema - Quick Seller Update feature for automated market updates
 export const sellerUpdates = pgTable("seller_updates", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  userId: varchar("user_id").notNull().references(() => users.id),
+  userId: varchar("user_id").references(() => users.id, { onDelete: "set null" }),
   name: text("name").notNull(), // Property address for identification
   email: text("email").notNull(), // Email to send updates to
   // Location criteria
@@ -364,7 +364,7 @@ export interface CmaAdjustmentsData {
 
 export const cmas = pgTable("cmas", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  userId: varchar("user_id").references(() => users.id), // Nullable for unauthenticated users
+  userId: varchar("user_id").references(() => users.id, { onDelete: "set null" }), // Nullable for unauthenticated users
   name: text("name").notNull(),
   subjectPropertyId: text("subject_property_id"),
   comparablePropertyIds: json("comparable_property_ids").$type<string[]>().notNull(),
