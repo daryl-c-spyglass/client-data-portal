@@ -1,0 +1,506 @@
+# Role-Based Calendar & Leads Implementation
+
+## ⚠️ TESTING REQUIREMENT
+
+**Before declaring complete, you MUST:**
+1. Login as an Agent user → Verify they only see their own calendar/leads
+2. Login as Super Admin → Verify they see all agents' calendar/leads
+3. Test the agent dropdown visibility based on role
+4. Verify backend enforces role restrictions (can't bypass via URL params)
+5. **DO NOT declare complete without testing both roles**
+
+---
+
+## OVERVIEW
+
+### Current State
+- Any logged-in user can view any agent's Calendar and Leads
+- No role-based restrictions
+- No mapping between portal users and FUB agents
+
+### Target State
+
+| Role | Calendar | Leads |
+|------|----------|-------|
+| **Agent** | Only their own events/tasks | Only their assigned leads |
+| **Admin** | Only their own events/tasks | Only their assigned leads |
+| **Super Admin** | All events/tasks + agent filter dropdown | All leads + agent filter dropdown |
+
+---
+
+## PHASE 1: User-to-FUB Agent Mapping
+
+### Option A: Email Matching (Recommended - No Schema Change)
+
+Match portal user email to FUB user email at runtime.
+
+```typescript
+// server/services/fubService.ts - Add helper function
+
+export async function getFUBAgentIdByEmail(email: string): Promise<string | null> {
+  try {
+    const fubUsers = await getFUBTeamMembers();
+    const match = fubUsers.find(
+      (user: any) => user.email?.toLowerCase() === email.toLowerCase()
+    );
+    return match?.id?.toString() || null;
+  } catch (error) {
+    console.error('Error matching FUB agent by email:', error);
+    return null;
+  }
+}
+```
+
+### Option B: Add fubAgentId Column (Alternative)
+
+```sql
+-- If you prefer storing the mapping
+ALTER TABLE users ADD COLUMN fub_agent_id VARCHAR(50);
+```
+
+**For this implementation, use Option A (email matching) to avoid schema changes.**
+
+---
+
+## PHASE 2: Backend - Add Role-Based Filtering
+
+### 2.1 Update Calendar Endpoint
+
+```typescript
+// server/routes.ts - Update /api/fub/calendar endpoint
+
+app.get('/api/fub/calendar', requireAuth, async (req, res) => {
+  try {
+    const user = req.user as any;
+    const userRole = user.role;
+    const userEmail = user.email;
+    
+    let { agentId, start, end } = req.query;
+    
+    // Role-based filtering
+    if (userRole !== 'super_admin') {
+      // Non-Super Admins can only see their own calendar
+      const userFubId = await getFUBAgentIdByEmail(userEmail);
+      
+      if (!userFubId) {
+        return res.status(403).json({ 
+          error: 'Your account is not linked to a Follow Up Boss agent. Contact your administrator.' 
+        });
+      }
+      
+      // Force agentId to their own FUB ID (ignore any passed agentId)
+      agentId = userFubId;
+    }
+    
+    // If Super Admin selects "all", don't filter by agent
+    // If Super Admin selects specific agent, use that agentId
+    // If non-Super Admin, agentId is already forced to their own
+    
+    // Fetch appointments
+    let appointmentsUrl = `https://api.followupboss.com/v1/appointments?start=${start}&end=${end}&limit=100`;
+    if (agentId && agentId !== 'all') {
+      appointmentsUrl += `&userId=${agentId}`;
+    }
+    
+    // Fetch tasks
+    let tasksUrl = `https://api.followupboss.com/v1/tasks?dueStart=${start}&dueEnd=${end}&limit=100`;
+    if (agentId && agentId !== 'all') {
+      tasksUrl += `&assignedUserId=${agentId}`;
+    }
+    
+    // ... rest of fetch logic
+    
+    res.json({ appointments, tasks, userRole, restrictedToAgent: agentId });
+  } catch (error) {
+    console.error('Calendar error:', error);
+    res.status(500).json({ error: 'Failed to fetch calendar' });
+  }
+});
+```
+
+### 2.2 Update Leads Endpoint
+
+```typescript
+// server/routes.ts - Update /api/fub/leads endpoint
+
+app.get('/api/fub/leads', requireAuth, async (req, res) => {
+  try {
+    const user = req.user as any;
+    const userRole = user.role;
+    const userEmail = user.email;
+    
+    let { agentId, limit = 50, offset = 0, sort, search } = req.query;
+    
+    // Role-based filtering
+    if (userRole !== 'super_admin') {
+      // Non-Super Admins can only see their own leads
+      const userFubId = await getFUBAgentIdByEmail(userEmail);
+      
+      if (!userFubId) {
+        return res.status(403).json({ 
+          error: 'Your account is not linked to a Follow Up Boss agent. Contact your administrator.' 
+        });
+      }
+      
+      // Force agentId to their own FUB ID
+      agentId = userFubId;
+    }
+    
+    // Build FUB API URL
+    let url = `https://api.followupboss.com/v1/people?limit=${limit}&offset=${offset}`;
+    
+    if (agentId && agentId !== 'all') {
+      url += `&assignedTo=${agentId}`;
+    }
+    
+    if (sort) {
+      url += `&sort=${sort}`;
+    }
+    
+    // ... rest of fetch logic
+    
+    res.json({ 
+      leads, 
+      total, 
+      userRole, 
+      restrictedToAgent: agentId,
+      canViewAllAgents: userRole === 'super_admin'
+    });
+  } catch (error) {
+    console.error('Leads error:', error);
+    res.status(500).json({ error: 'Failed to fetch leads' });
+  }
+});
+```
+
+---
+
+## PHASE 3: Frontend - Role-Based UI
+
+### 3.1 Update CalendarPage.tsx
+
+```typescript
+// client/src/pages/CalendarPage.tsx
+
+import { usePermissions } from '@/hooks/use-permissions';
+
+export default function CalendarPage() {
+  const { isSuperAdmin, user } = usePermissions();
+  const [selectedAgentId, setSelectedAgentId] = useState<string>('');
+  
+  // Fetch FUB users (for dropdown) - only needed for Super Admins
+  const { data: fubUsers = [] } = useQuery({
+    queryKey: ['/api/fub/users'],
+    enabled: isSuperAdmin, // Only fetch if Super Admin
+  });
+  
+  // Get current user's FUB ID for non-Super Admins
+  const { data: currentUserFubId } = useQuery({
+    queryKey: ['/api/fub/user-id'],
+    enabled: !isSuperAdmin,
+  });
+  
+  // Set agent filter based on role
+  useEffect(() => {
+    if (!isSuperAdmin && currentUserFubId) {
+      setSelectedAgentId(currentUserFubId);
+    } else if (isSuperAdmin && !selectedAgentId) {
+      setSelectedAgentId('all'); // Default to "all" for Super Admins
+    }
+  }, [isSuperAdmin, currentUserFubId]);
+
+  return (
+    <div className="p-6">
+      <div className="flex items-center justify-between mb-6">
+        <div>
+          <h1 className="text-2xl font-bold">Calendar</h1>
+          <p className="text-muted-foreground">
+            {isSuperAdmin 
+              ? 'View appointments and tasks for all agents'
+              : 'Your appointments and tasks from Follow Up Boss'
+            }
+          </p>
+        </div>
+        
+        {/* Agent Dropdown - ONLY for Super Admins */}
+        {isSuperAdmin && (
+          <div className="flex items-center gap-2">
+            <label className="text-sm font-medium">Agent:</label>
+            <Select value={selectedAgentId} onValueChange={setSelectedAgentId}>
+              <SelectTrigger className="w-48">
+                <SelectValue placeholder="Select agent" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Agents</SelectItem>
+                {fubUsers.map((agent: any) => (
+                  <SelectItem key={agent.id} value={agent.id.toString()}>
+                    {agent.name || agent.email}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        )}
+        
+        {/* Show current agent name for non-Super Admins */}
+        {!isSuperAdmin && (
+          <Badge variant="outline">
+            Showing your calendar only
+          </Badge>
+        )}
+      </div>
+      
+      {/* Calendar content */}
+      {/* ... */}
+    </div>
+  );
+}
+```
+
+### 3.2 Update LeadsPage.tsx
+
+```typescript
+// client/src/pages/LeadsPage.tsx
+
+import { usePermissions } from '@/hooks/use-permissions';
+
+export default function LeadsPage() {
+  const { isSuperAdmin, user } = usePermissions();
+  const [selectedUserId, setSelectedUserId] = useState<string>('');
+  
+  // Fetch FUB users (for dropdown) - only for Super Admins
+  const { data: fubUsers = [] } = useQuery({
+    queryKey: ['/api/fub/users'],
+    enabled: isSuperAdmin,
+  });
+
+  return (
+    <div className="p-6">
+      <div className="flex items-center justify-between mb-6">
+        <div>
+          <h1 className="text-2xl font-bold">Leads</h1>
+          <p className="text-muted-foreground">
+            {isSuperAdmin 
+              ? 'People and contacts from Follow Up Boss'
+              : 'Your assigned leads from Follow Up Boss'
+            }
+          </p>
+        </div>
+      </div>
+      
+      {/* Filters Card */}
+      <Card className="mb-6">
+        <CardHeader>
+          <CardTitle>Filters</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="flex gap-4">
+            {/* Assigned Agent Dropdown - ONLY for Super Admins */}
+            {isSuperAdmin && (
+              <div>
+                <label className="text-sm font-medium">Assigned Agent</label>
+                <Select value={selectedUserId} onValueChange={setSelectedUserId}>
+                  <SelectTrigger className="w-48">
+                    <SelectValue placeholder="All agents" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Agents</SelectItem>
+                    {fubUsers.map((agent: any) => (
+                      <SelectItem key={agent.id} value={agent.id.toString()}>
+                        {agent.name || agent.email}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+            
+            {/* Show badge for non-Super Admins */}
+            {!isSuperAdmin && (
+              <div>
+                <label className="text-sm font-medium">Assigned Agent</label>
+                <div className="mt-2">
+                  <Badge variant="outline">Your leads only</Badge>
+                </div>
+              </div>
+            )}
+            
+            {/* Sort and Search remain visible for all */}
+            <div>
+              <label className="text-sm font-medium">Sort by Name</label>
+              <Select value={sortOrder} onValueChange={setSortOrder}>
+                {/* ... */}
+              </Select>
+            </div>
+            
+            <div>
+              <label className="text-sm font-medium">Search</label>
+              <Input placeholder="Search by name, email, or phone..." />
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+      
+      {/* Leads list */}
+      {/* ... */}
+    </div>
+  );
+}
+```
+
+### 3.3 Add Endpoint to Get Current User's FUB ID
+
+```typescript
+// server/routes.ts - Add new endpoint
+
+app.get('/api/fub/user-id', requireAuth, async (req, res) => {
+  try {
+    const user = req.user as any;
+    const fubAgentId = await getFUBAgentIdByEmail(user.email);
+    
+    if (!fubAgentId) {
+      return res.status(404).json({ 
+        error: 'No FUB agent found for your email',
+        email: user.email 
+      });
+    }
+    
+    res.json({ fubAgentId, email: user.email });
+  } catch (error) {
+    console.error('Get FUB user ID error:', error);
+    res.status(500).json({ error: 'Failed to get FUB user ID' });
+  }
+});
+```
+
+---
+
+## PHASE 4: Remove Debug Info
+
+Remove or hide the debug info panel on Leads page (only show in development):
+
+```typescript
+// Only show debug info for Super Admins in development
+{process.env.NODE_ENV === 'development' && isSuperAdmin && (
+  <Card className="mb-4">
+    <CardContent className="text-xs font-mono">
+      {/* Debug info */}
+    </CardContent>
+  </Card>
+)}
+```
+
+---
+
+## SUMMARY OF CHANGES
+
+### Backend (server/routes.ts)
+| Endpoint | Change |
+|----------|--------|
+| `/api/fub/calendar` | Add role check, force agentId for non-Super Admins |
+| `/api/fub/leads` | Add role check, force agentId for non-Super Admins |
+| `/api/fub/user-id` | NEW - Get current user's FUB agent ID |
+
+### Frontend
+| File | Change |
+|------|--------|
+| `CalendarPage.tsx` | Hide agent dropdown for non-Super Admins |
+| `LeadsPage.tsx` | Hide agent dropdown for non-Super Admins |
+
+### Service
+| File | Change |
+|------|--------|
+| `server/followupboss-service.ts` | Add `getFUBAgentIdByEmail()` helper |
+
+---
+
+## UI COMPARISON
+
+### Calendar - Agent View
+```
+┌─────────────────────────────────────────────────────────┐
+│ Calendar                          [Showing your calendar only] │
+│ Your appointments and tasks from Follow Up Boss         │
+├─────────────────────────────────────────────────────────┤
+│ [Calendar shows only this agent's events]               │
+└─────────────────────────────────────────────────────────┘
+```
+
+### Calendar - Super Admin View
+```
+┌─────────────────────────────────────────────────────────┐
+│ Calendar                          Agent: [All Agents ▾] │
+│ View appointments and tasks for all agents              │
+├─────────────────────────────────────────────────────────┤
+│ [Calendar shows all/selected agent's events]            │
+└─────────────────────────────────────────────────────────┘
+```
+
+### Leads - Agent View
+```
+┌─────────────────────────────────────────────────────────┐
+│ Leads                                                   │
+│ Your assigned leads from Follow Up Boss                 │
+├─────────────────────────────────────────────────────────┤
+│ Filters                                                 │
+│ Assigned Agent: [Your leads only]  Sort: [A→Z]  Search  │
+├─────────────────────────────────────────────────────────┤
+│ Showing 50 of 234 leads                                 │
+└─────────────────────────────────────────────────────────┘
+```
+
+### Leads - Super Admin View
+```
+┌─────────────────────────────────────────────────────────┐
+│ Leads                                                   │
+│ People and contacts from Follow Up Boss                 │
+├─────────────────────────────────────────────────────────┤
+│ Filters                                                 │
+│ Assigned Agent: [All Agents ▾]  Sort: [A→Z]  Search     │
+├─────────────────────────────────────────────────────────┤
+│ Showing 50 of 146,469 leads                             │
+└─────────────────────────────────────────────────────────┘
+```
+
+---
+
+## TESTING CHECKLIST
+
+### Agent Role Test:
+- [ ] Login as Agent (e.g., system@spyglassrealty.com)
+- [ ] Go to Calendar → No agent dropdown visible
+- [ ] Calendar shows only their events/tasks
+- [ ] Go to Leads → No agent dropdown visible
+- [ ] Leads shows only their assigned leads
+- [ ] Try to access `/api/fub/leads?agentId=other-id` → Should still only return their leads
+
+### Super Admin Role Test:
+- [ ] Login as Super Admin (e.g., daryl@spyglassrealty.com)
+- [ ] Go to Calendar → Agent dropdown visible with "All Agents" option
+- [ ] Can filter by specific agent
+- [ ] "All Agents" shows all events
+- [ ] Go to Leads → Agent dropdown visible
+- [ ] Can filter by specific agent
+- [ ] "All Agents" shows all leads (146k+)
+
+### Edge Cases:
+- [ ] User with no matching FUB agent → Friendly error message
+- [ ] API errors → Graceful handling
+
+---
+
+## FILES TO MODIFY
+
+```
+server/
+├── routes.ts                      [MODIFY - add role checks to FUB endpoints]
+└── followupboss-service.ts        [MODIFY - add getFUBAgentIdByEmail()]
+
+client/src/pages/
+├── CalendarPage.tsx               [MODIFY - conditional agent dropdown]
+└── LeadsPage.tsx                  [MODIFY - conditional agent dropdown]
+```
+
+---
+
+**⚠️ REMINDER: Test with both Agent and Super Admin roles before declaring complete!**

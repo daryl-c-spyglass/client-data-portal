@@ -76,3 +76,36 @@ export async function searchFUBTeamMembers(query: string): Promise<FUBResult> {
   
   return { ...result, users: filteredUsers };
 }
+
+/**
+ * Get a FUB agent ID by matching the portal user's email to a FUB user's email.
+ * Returns the FUB user ID as a string, or null if no match found.
+ */
+export async function getFUBAgentIdByEmail(email: string): Promise<string | null> {
+  if (!email) return null;
+  
+  try {
+    const result = await getFUBTeamMembers();
+    
+    if (!result.configured || result.users.length === 0) {
+      console.log('[FUB] Cannot match agent - FUB not configured or no users');
+      return null;
+    }
+    
+    const lowerEmail = email.toLowerCase();
+    const match = result.users.find(
+      user => user.email?.toLowerCase() === lowerEmail
+    );
+    
+    if (match) {
+      console.log(`[FUB] Matched portal user ${email} to FUB agent ID ${match.id}`);
+      return match.id.toString();
+    }
+    
+    console.log(`[FUB] No FUB agent found for email: ${email}`);
+    return null;
+  } catch (error: any) {
+    console.error('[FUB] Error matching agent by email:', error.message);
+    return null;
+  }
+}

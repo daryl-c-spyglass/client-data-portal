@@ -6184,14 +6184,46 @@ OUTPUT JSON:
   // Uses /appointments first, falls back to /tasks if appointments returns empty
   // Note: FUB appointments only returns items created in FUB that the API key user owns
   // or has calendar sharing enabled - Google calendar events may not appear
-  app.get("/api/fub/calendar", async (req, res) => {
+  app.get("/api/fub/calendar", requireAuth, async (req, res) => {
     try {
+      const user = req.user as any;
+      const userRole = user?.role || 'agent';
+      const userEmail = user?.email;
+      
       const { agentId, start, end, userId } = req.query as Record<string, string>;
       
       // Use agentId or userId - treat empty string as "all"
-      const fubUserId = (agentId && agentId !== '') ? agentId : (userId && userId !== '') ? userId : null;
+      let fubUserId = (agentId && agentId !== '') ? agentId : (userId && userId !== '') ? userId : null;
       
-      console.log(`[FUB Calendar] Fetching - userId: ${fubUserId || 'all'}, start: ${start}, end: ${end}`);
+      // Role-based filtering: Non-Super Admins can only see their own calendar
+      let restrictedToOwnCalendar = false;
+      if (userRole !== 'super_admin') {
+        const { getFUBAgentIdByEmail } = await import("./followupboss-service");
+        const userFubId = await getFUBAgentIdByEmail(userEmail);
+        
+        if (!userFubId) {
+          console.log(`[FUB Calendar] User ${userEmail} has no FUB agent match - returning empty results`);
+          res.json({
+            items: [],
+            count: 0,
+            dataSource: 'none',
+            agentId: 'unmatched',
+            dateRange: { start, end },
+            fetchedAt: new Date().toISOString(),
+            restrictedToOwnCalendar: true,
+            userFubIdNotFound: true,
+            message: 'Your account is not linked to a Follow Up Boss agent. Contact your administrator.'
+          });
+          return;
+        }
+        
+        // Force agentId to their own FUB ID (ignore any passed agentId)
+        fubUserId = userFubId;
+        restrictedToOwnCalendar = true;
+        console.log(`[FUB Calendar] Role-based filter: ${userRole} user ${userEmail} restricted to FUB ID ${userFubId}`);
+      }
+      
+      console.log(`[FUB Calendar] Fetching - userId: ${fubUserId || 'all'}, start: ${start}, end: ${end}, role: ${userRole}`);
       
       const cacheKey = `fub_calendar_${fubUserId || 'all'}_${start || 'default'}_${end || 'default'}`;
       const cached = fubCache.get(cacheKey);
@@ -6302,6 +6334,8 @@ OUTPUT JSON:
         agentId: fubUserId || 'all',
         dateRange: { start, end },
         fetchedAt: new Date().toISOString(),
+        restrictedToOwnCalendar,
+        canViewAllAgents: userRole === 'super_admin',
         debug: {
           appointmentsCount: appointments.length,
           tasksCount: tasks.length,
@@ -6313,7 +6347,7 @@ OUTPUT JSON:
       
       fubCache.set(cacheKey, { data: result, timestamp: Date.now() });
       
-      console.log(`[FUB Calendar] Returning ${calendarItems.length} items (${dataSource}) for agent ${fubUserId || 'all'}`);
+      console.log(`[FUB Calendar] Returning ${calendarItems.length} items (${dataSource}) for agent ${fubUserId || 'all'}, restricted: ${restrictedToOwnCalendar}`);
       
       res.json(result);
     } catch (error: any) {
@@ -6328,15 +6362,51 @@ OUTPUT JSON:
   });
   
   // Get leads from FUB for a specific agent with pagination support
-  app.get("/api/fub/leads", async (req, res) => {
+  app.get("/api/fub/leads", requireAuth, async (req, res) => {
     try {
+      const user = req.user as any;
+      const userRole = user?.role || 'agent';
+      const userEmail = user?.email;
+      
       const { agentId, userId, limit = '50', offset = '0' } = req.query as Record<string, string>;
       
-      const fubUserId = agentId || userId;
+      let fubUserId = agentId || userId;
       const limitNum = Math.min(parseInt(limit) || 50, 100);
       const offsetNum = parseInt(offset) || 0;
       
-      console.log(`[FUB Leads] Fetching leads - agentId: ${fubUserId}, limit: ${limitNum}, offset: ${offsetNum}`);
+      // Role-based filtering: Non-Super Admins can only see their own leads
+      let restrictedToOwnLeads = false;
+      if (userRole !== 'super_admin') {
+        const { getFUBAgentIdByEmail } = await import("./followupboss-service");
+        const userFubId = await getFUBAgentIdByEmail(userEmail);
+        
+        if (!userFubId) {
+          console.log(`[FUB Leads] User ${userEmail} has no FUB agent match - returning empty results`);
+          res.json({
+            leads: [],
+            count: 0,
+            totalCount: 0,
+            hasMore: false,
+            offset: offsetNum,
+            limit: limitNum,
+            dataSource: 'Follow Up Boss',
+            agentId: 'unmatched',
+            fetchedAt: new Date().toISOString(),
+            restrictedToOwnLeads: true,
+            userFubIdNotFound: true,
+            canViewAllAgents: false,
+            message: 'Your account is not linked to a Follow Up Boss agent. Contact your administrator.'
+          });
+          return;
+        }
+        
+        // Force agentId to their own FUB ID (ignore any passed agentId)
+        fubUserId = userFubId;
+        restrictedToOwnLeads = true;
+        console.log(`[FUB Leads] Role-based filter: ${userRole} user ${userEmail} restricted to FUB ID ${userFubId}`);
+      }
+      
+      console.log(`[FUB Leads] Fetching leads - agentId: ${fubUserId}, limit: ${limitNum}, offset: ${offsetNum}, role: ${userRole}`);
       
       const cacheKey = `fub_leads_${fubUserId || 'all'}_${limitNum}_${offsetNum}`;
       const cached = fubCache.get(cacheKey);
@@ -6384,11 +6454,13 @@ OUTPUT JSON:
         dataSource: 'Follow Up Boss',
         agentId: fubUserId || 'all',
         fetchedAt: new Date().toISOString(),
+        restrictedToOwnLeads,
+        canViewAllAgents: userRole === 'super_admin',
       };
       
       fubCache.set(cacheKey, { data: result, timestamp: Date.now() });
       
-      console.log(`[FUB Leads] Fetched ${leads.length} leads (offset: ${offsetNum}, total: ${totalCount}) for agent ${fubUserId || 'all'}`);
+      console.log(`[FUB Leads] Fetched ${leads.length} leads (offset: ${offsetNum}, total: ${totalCount}) for agent ${fubUserId || 'all'}, restricted: ${restrictedToOwnLeads}`);
       
       res.json(result);
     } catch (error: any) {
@@ -6398,6 +6470,35 @@ OUTPUT JSON:
         details: error.message,
         note: process.env.FUB_API_KEY ? 'API key configured' : 'API key not configured'
       });
+    }
+  });
+  
+  // Get current user's FUB agent ID by matching their email
+  app.get("/api/fub/user-id", requireAuth, async (req, res) => {
+    try {
+      const user = req.user as any;
+      const userEmail = user?.email;
+      
+      if (!userEmail) {
+        res.status(400).json({ error: 'No email found for current user' });
+        return;
+      }
+      
+      const { getFUBAgentIdByEmail } = await import("./followupboss-service");
+      const fubAgentId = await getFUBAgentIdByEmail(userEmail);
+      
+      if (!fubAgentId) {
+        res.status(404).json({ 
+          error: 'No FUB agent found for your email',
+          email: userEmail 
+        });
+        return;
+      }
+      
+      res.json({ fubAgentId, email: userEmail });
+    } catch (error: any) {
+      console.error('[FUB User ID] Error:', error.message);
+      res.status(500).json({ error: 'Failed to get FUB user ID', details: error.message });
     }
   });
   
