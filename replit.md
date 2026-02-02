@@ -57,6 +57,12 @@ The UI incorporates Spyglass Realty branding with an orange primary color scheme
 - **CMA Generation**: Tools for creating detailed Comparative Market Analyses with professional report building, agent profiles, customizable sections, company branding, and AI-powered cover letter generation (GPT-4o) and photo selection (Repliers imageInsights API). Includes interactive Mapbox integration for listing visualization and static map URL generation for PDF export.
 - **CMA Property Adjustments**: Full property value adjustment feature for CMA comparisons with configurable adjustment rates (sqft: $50/unit, bedrooms: $10K, bathrooms: $7.5K, pool: $25K, garage: $5K/space, year built: $1K/year, lot size: $2/sqft). Supports per-comparable manual overrides and custom adjustments. Data stored in `cmas.adjustments` JSONB column with types: `CmaAdjustmentRates`, `CmaCompAdjustmentOverrides`, `CmaAdjustmentsData`. Calculation library at `client/src/lib/adjustmentCalculations.ts`. UI component at `client/src/components/AdjustmentsSection.tsx`. Uses `getPropertyId(comp)` helper for consistent comparable identification across storage and preview calculations.
 - **Agent Productivity Tools**: Integrations with Mission Control (ReZen) for production volume reporting and Follow Up Boss (FUB) for calendar events and lead management.
+  - **Role-Based FUB Data Access**: Calendar and Leads pages enforce role-based data visibility:
+    - **Super Admins**: Can view all agents' calendar/leads data via agent dropdown selector
+    - **Admins/Agents**: Restricted to their own data only (matched by portal email → FUB agent email)
+    - Backend enforces filtering server-side via `requireAuth` + role check in `/api/fub/calendar` and `/api/fub/leads`
+    - `getFUBAgentIdByEmail()` helper in `server/followupboss-service.ts` maps portal users to FUB agents
+    - Users without FUB email match see info message with `userFubIdNotFound: true` response flag
 - **Seller Updates**: Automated market update emails with SendGrid integration.
 - **Settings Page**: Management for agent profile, data sync, display preferences, embed codes, and lead capture, including profile photo uploads to object storage.
 - **Admin Panel**: Master admin controls for company branding, custom report pages, and user role management.
