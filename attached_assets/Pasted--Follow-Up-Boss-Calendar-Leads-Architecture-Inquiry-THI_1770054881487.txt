@@ -1,0 +1,188 @@
+# Follow Up Boss Calendar & Leads - Architecture Inquiry
+
+## ⚠️ THIS IS AN INQUIRY ONLY - DO NOT MODIFY ANY CODE
+
+**Purpose:** Understand the current implementation of Calendar and Leads features to plan role-based filtering.
+
+**Future Goal:** 
+- Agent role: See only their own calendar events and leads
+- Super Admin role: See all calendar events and leads across all agents
+
+---
+
+## INFORMATION NEEDED
+
+### 1. CALENDAR FEATURE (`/calendar`)
+
+**Questions to answer:**
+
+1. What is the file location of the Calendar page component?
+   - Example: `client/src/pages/Calendar.tsx`
+
+2. What API endpoints does Calendar use?
+   - List all `/api/...` calls made by the Calendar page
+   - Example: `/api/fub/calendar`, `/api/fub/events`
+
+3. How does Calendar fetch data from Follow Up Boss?
+   - What FUB API endpoint is called?
+   - Example: `https://api.followupboss.com/v1/events`
+
+4. What parameters are currently passed to the FUB API?
+   - Is there an `assignedTo` or `userId` filter?
+   - What date range filters exist?
+
+5. Does Calendar currently filter by user/agent?
+   - If yes, how?
+   - If no, does it show all events for all agents?
+
+6. What data structure is returned?
+   - Show example of calendar event object
+
+**Provide:**
+```
+Calendar File Location: [path]
+API Endpoints Used: [list]
+FUB API Called: [endpoint]
+Current Filtering: [description]
+Sample Event Object: [structure]
+```
+
+---
+
+### 2. LEADS FEATURE (`/leads`)
+
+**Questions to answer:**
+
+1. What is the file location of the Leads page component?
+   - Example: `client/src/pages/Leads.tsx`
+
+2. What API endpoints does Leads use?
+   - List all `/api/...` calls made by the Leads page
+   - Example: `/api/fub/leads`, `/api/fub/people`
+
+3. How does Leads fetch data from Follow Up Boss?
+   - What FUB API endpoint is called?
+   - Example: `https://api.followupboss.com/v1/people`
+
+4. What parameters are currently passed to the FUB API?
+   - Is there an `assignedTo` filter?
+   - What pagination exists?
+
+5. How does the "Assigned Agent" dropdown work?
+   - Where does it get the list of agents?
+   - What happens when an agent is selected?
+
+6. Does Leads currently filter by logged-in user?
+   - If yes, how?
+   - If no, does it show all leads for all agents?
+
+7. What data structure is returned for leads?
+   - Show example of lead object
+
+**Provide:**
+```
+Leads File Location: [path]
+API Endpoints Used: [list]
+FUB API Called: [endpoint]
+Assigned Agent Dropdown: [how it works]
+Current Filtering: [description]
+Sample Lead Object: [structure]
+```
+
+---
+
+### 3. FUB API INTEGRATION
+
+**Questions to answer:**
+
+1. Where is the FUB API integration code located?
+   - Example: `server/services/fubService.ts`
+
+2. How is the FUB API key stored and accessed?
+   - Environment variable name: `FUB_API_KEY`?
+
+3. What FUB API endpoints are currently implemented?
+   - List all endpoints the server calls
+
+4. Is there a mapping between portal users and FUB users?
+   - How do we know which portal user = which FUB agent?
+   - Is it by email match?
+
+**Provide:**
+```
+FUB Service Location: [path]
+API Key Variable: [name]
+Implemented Endpoints: [list]
+User-to-Agent Mapping: [description]
+```
+
+---
+
+### 4. CURRENT USER CONTEXT
+
+**Questions to answer:**
+
+1. How does the frontend know who is logged in?
+   - What hook or context provides user info?
+   - Example: `usePermissions()`, `useAuth()`
+
+2. What user information is available?
+   - User ID, email, role, etc.
+
+3. Is the logged-in user's FUB agent ID available?
+   - If yes, where?
+   - If no, how could we get it?
+
+**Provide:**
+```
+User Context Hook: [name]
+Available User Fields: [list]
+FUB Agent ID Available: [yes/no, how]
+```
+
+---
+
+## OUTPUT FORMAT
+
+Please provide a summary document with all the above information:
+
+```markdown
+# FUB Calendar & Leads - Current Architecture
+
+## Calendar
+- **File:** [path]
+- **API Endpoints:** [list]
+- **FUB Integration:** [description]
+- **Current Filtering:** [none/by agent/etc]
+
+## Leads
+- **File:** [path]
+- **API Endpoints:** [list]
+- **FUB Integration:** [description]
+- **Assigned Agent Dropdown:** [how it works]
+- **Current Filtering:** [none/by agent/etc]
+
+## FUB Service
+- **File:** [path]
+- **Endpoints Implemented:** [list]
+- **User Mapping:** [description]
+
+## User Context
+- **Hook:** [name]
+- **Fields Available:** [list]
+- **FUB Agent ID:** [available/not available]
+
+## Key Files
+- [list all relevant files]
+
+## Notes for Role-Based Implementation
+- [any observations about what would need to change]
+```
+
+---
+
+## REMINDER
+
+**DO NOT MODIFY ANY CODE** - This is an inquiry only.
+
+Just read the code and provide the information requested above so we can plan the role-based filtering implementation.
