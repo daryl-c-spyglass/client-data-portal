@@ -29,13 +29,16 @@ The UI incorporates Spyglass Realty branding with an orange primary color scheme
 - **Security**: Return URL sanitization prevents open redirect vulnerabilities. CSP headers allow iframe embedding from `*.replit.dev`, `*.replit.app`, `*.onrender.com`, `*.spyglassrealty.com`.
 - **Iframe Embedding (Popup OAuth)**: When embedded in an iframe (e.g., Mission Control / Agent Hub Portal), authentication uses popup-based OAuth flow since Google blocks OAuth redirects in iframes. Implementation in `client/src/lib/iframe.ts` with `isInIframe()` detection and `openAuthPopup()` helper. Server routes: `/auth/google/popup` initiates popup flow, callback uses postMessage to communicate success/error to parent window. Auto dark theme sync when embedded.
 - **3-Tier Role System**: Role-based access control with Super Admin > Admin > Agent hierarchy.
-  - **Super Admin**: Full platform access including user management, presentation library management, company settings. Hardcoded emails: ryan@, daryl@, caleb@ @spyglassrealty.com
+  - **Super Admin**: Full platform access including user management, presentation library management, company settings. Initial super admins: ryan@, daryl@, caleb@ @spyglassrealty.com (defined in `INITIAL_SUPER_ADMIN_EMAILS` as fallback for first-time setup)
   - **Admin**: Template creation, presentation library viewing, display settings management
   - **Agent**: CMA creation, presentations, global slides access, analytics viewing
-  - **Permission Utilities**: `shared/permissions.ts` exports `hasPermission()`, `isAtLeast()`, `normalizeRole()` helpers
+  - **Permission Utilities**: `shared/permissions.ts` exports `hasPermission()`, `isAtLeast()`, `normalizeRole()`, `INITIAL_SUPER_ADMIN_EMAILS` helpers
   - **Frontend Hook**: `usePermissions()` hook provides `can()`, `isAtLeast()`, role flags
-  - **Backend Middleware**: `requireMinimumRole()` and `requirePermission()` in `server/auth.ts`
+  - **Backend Middleware**: `requireMinimumRole()` and `requirePermission()` in `server/auth.ts`. Auth middleware checks `isActive` status to block disabled users.
   - **Protected Routes**: `ProtectedRoute` component wraps pages requiring specific roles/permissions
+  - **User Management** (`/admin/users`): Super Admin page for viewing all users, changing roles, and enabling/disabling accounts. Features: search, status badges, action dropdowns, confirmation dialogs. Protection rules enforced server-side: cannot change own role/status, cannot disable super admins, cannot remove last super admin.
+  - **Activity Logs** (`/admin/activity-logs`): Audit trail of admin actions (role changes, user enable/disable). Stored in `admin_activity_logs` table with admin/target user info, IP address, previous/new values. Service in `server/admin-activity-service.ts`.
+  - **User Status Control**: `isActive` boolean on users table enables soft disable. Disabled users cannot log in but data is preserved.
 
 ### Technical Implementations
 - **Data Sourcing**: Primary property data from Repliers API (active, pending, closed listings) and MLS Grid API. Repliers API stores MLS SubdivisionName data in `address.neighborhood`.

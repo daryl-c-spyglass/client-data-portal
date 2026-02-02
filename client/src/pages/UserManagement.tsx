@@ -7,11 +7,30 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Input } from "@/components/ui/input";
-import { Loader2, Search, Shield, ShieldCheck, User } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { Loader2, Search, Shield, ShieldCheck, User, MoreHorizontal, UserX, UserCheck, History } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { getRoleDisplayName, isSuperAdminEmail, UserRole } from "@shared/permissions";
+import { getRoleDisplayName, INITIAL_SUPER_ADMIN_EMAILS, UserRole } from "@shared/permissions";
+import { Link } from "wouter";
 
 interface UserData {
   id: string;
@@ -22,6 +41,7 @@ interface UserData {
   phone?: string | null;
   company?: string | null;
   picture?: string | null;
+  isActive?: boolean;
   createdAt?: string;
   lastLoginAt?: string | null;
 }
@@ -53,6 +73,11 @@ function UserManagementContent() {
   const [searchQuery, setSearchQuery] = useState("");
   const [editingUserId, setEditingUserId] = useState<string | null>(null);
   const [pendingRole, setPendingRole] = useState<string>("");
+  const [confirmDialog, setConfirmDialog] = useState<{
+    open: boolean;
+    type: "disable" | "enable" | null;
+    user: UserData | null;
+  }>({ open: false, type: null, user: null });
 
   const { data: users = [], isLoading } = useQuery<UserData[]>({
     queryKey: ["/api/admin/users"],
@@ -80,6 +105,30 @@ function UserManagementContent() {
     },
   });
 
+  const updateStatusMutation = useMutation({
+    mutationFn: async ({ userId, isActive }: { userId: string; isActive: boolean }) => {
+      return apiRequest("PUT", `/api/admin/users/${userId}/status`, { isActive });
+    },
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/users"] });
+      toast({
+        title: variables.isActive ? "User enabled" : "User disabled",
+        description: variables.isActive 
+          ? "User can now access the platform." 
+          : "User has been disabled and cannot log in.",
+      });
+      setConfirmDialog({ open: false, type: null, user: null });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to update user status.",
+        variant: "destructive",
+      });
+      setConfirmDialog({ open: false, type: null, user: null });
+    },
+  });
+
   const filteredUsers = users.filter((user) => {
     const searchLower = searchQuery.toLowerCase();
     return (
@@ -93,6 +142,23 @@ function UserManagementContent() {
     updateRoleMutation.mutate({ userId, role: newRole });
   };
 
+  const handleStatusChange = (user: UserData, enable: boolean) => {
+    setConfirmDialog({ 
+      open: true, 
+      type: enable ? "enable" : "disable", 
+      user 
+    });
+  };
+
+  const confirmStatusChange = () => {
+    if (confirmDialog.user && confirmDialog.type) {
+      updateStatusMutation.mutate({
+        userId: confirmDialog.user.id,
+        isActive: confirmDialog.type === "enable",
+      });
+    }
+  };
+
   const startEditing = (user: UserData) => {
     setEditingUserId(user.id);
     setPendingRole(user.role);
@@ -103,6 +169,18 @@ function UserManagementContent() {
     setPendingRole("");
   };
 
+  const isProtectedUser = (user: UserData) => {
+    return INITIAL_SUPER_ADMIN_EMAILS.includes(user.email.toLowerCase());
+  };
+
+  const canModifyUser = (user: UserData) => {
+    return !isProtectedUser(user);
+  };
+
+  const canDisableUser = (user: UserData) => {
+    return user.role !== "super_admin" && !isProtectedUser(user);
+  };
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]" data-testid="loading-users">
@@ -111,18 +189,50 @@ function UserManagementContent() {
     );
   }
 
+  const activeCount = users.filter(u => u.isActive !== false).length;
+  const disabledCount = users.filter(u => u.isActive === false).length;
+
   return (
     <div className="p-6 space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold" data-testid="text-page-title">User Management</h1>
-        <p className="text-muted-foreground">Manage team member roles and permissions</p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold" data-testid="text-page-title">User Management</h1>
+          <p className="text-muted-foreground">Manage team member roles and permissions</p>
+        </div>
+        <Link href="/admin/activity-logs">
+          <Button variant="outline" className="gap-2" data-testid="button-view-activity-logs">
+            <History className="h-4 w-4" />
+            Activity Logs
+          </Button>
+        </Link>
+      </div>
+
+      <div className="grid gap-4 md:grid-cols-3">
+        <Card>
+          <CardHeader className="pb-2">
+            <CardDescription>Total Users</CardDescription>
+            <CardTitle className="text-3xl" data-testid="text-total-users">{users.length}</CardTitle>
+          </CardHeader>
+        </Card>
+        <Card>
+          <CardHeader className="pb-2">
+            <CardDescription>Active</CardDescription>
+            <CardTitle className="text-3xl text-green-600" data-testid="text-active-users">{activeCount}</CardTitle>
+          </CardHeader>
+        </Card>
+        <Card>
+          <CardHeader className="pb-2">
+            <CardDescription>Disabled</CardDescription>
+            <CardTitle className="text-3xl text-muted-foreground" data-testid="text-disabled-users">{disabledCount}</CardTitle>
+          </CardHeader>
+        </Card>
       </div>
 
       <Card>
         <CardHeader>
           <CardTitle>Team Members</CardTitle>
           <CardDescription>
-            {users.length} registered team member{users.length !== 1 ? "s" : ""}
+            Manage user accounts, roles, and access
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -145,6 +255,7 @@ function UserManagementContent() {
                 <TableRow>
                   <TableHead>User</TableHead>
                   <TableHead>Email</TableHead>
+                  <TableHead>Status</TableHead>
                   <TableHead>Role</TableHead>
                   <TableHead>Last Login</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
@@ -152,7 +263,11 @@ function UserManagementContent() {
               </TableHeader>
               <TableBody>
                 {filteredUsers.map((user) => (
-                  <TableRow key={user.id} data-testid={`row-user-${user.id}`}>
+                  <TableRow 
+                    key={user.id} 
+                    data-testid={`row-user-${user.id}`}
+                    className={user.isActive === false ? "opacity-60" : ""}
+                  >
                     <TableCell>
                       <div className="flex items-center gap-3">
                         <Avatar className="h-8 w-8">
@@ -172,6 +287,19 @@ function UserManagementContent() {
                     </TableCell>
                     <TableCell className="text-muted-foreground">
                       {user.email}
+                    </TableCell>
+                    <TableCell>
+                      {user.isActive === false ? (
+                        <Badge variant="outline" className="text-muted-foreground border-muted-foreground/50">
+                          <UserX className="w-3 h-3 mr-1" />
+                          Disabled
+                        </Badge>
+                      ) : (
+                        <Badge variant="outline" className="text-green-600 border-green-600/50">
+                          <UserCheck className="w-3 h-3 mr-1" />
+                          Active
+                        </Badge>
+                      )}
                     </TableCell>
                     <TableCell>
                       {editingUserId === user.id ? (
@@ -222,22 +350,57 @@ function UserManagementContent() {
                           </Button>
                         </div>
                       ) : (
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          onClick={() => startEditing(user)}
-                          disabled={isSuperAdminEmail(user.email)}
-                          data-testid={`button-edit-role-${user.id}`}
-                        >
-                          Edit Role
-                        </Button>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button 
+                              size="icon" 
+                              variant="ghost"
+                              data-testid={`button-actions-${user.id}`}
+                            >
+                              <MoreHorizontal className="h-4 w-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem
+                              onClick={() => startEditing(user)}
+                              disabled={!canModifyUser(user)}
+                              data-testid={`menu-edit-role-${user.id}`}
+                            >
+                              <Shield className="h-4 w-4 mr-2" />
+                              Change Role
+                            </DropdownMenuItem>
+                            <DropdownMenuSeparator />
+                            {user.isActive === false ? (
+                              <DropdownMenuItem
+                                onClick={() => handleStatusChange(user, true)}
+                                disabled={!canModifyUser(user)}
+                                data-testid={`menu-enable-${user.id}`}
+                              >
+                                <UserCheck className="h-4 w-4 mr-2" />
+                                Enable User
+                              </DropdownMenuItem>
+                            ) : (
+                              <DropdownMenuItem
+                                onClick={() => handleStatusChange(user, false)}
+                                disabled={!canDisableUser(user)}
+                                className="text-destructive focus:text-destructive"
+                                data-testid={`menu-disable-${user.id}`}
+                              >
+                                <UserX className="h-4 w-4 mr-2" />
+                                Disable User
+                              </DropdownMenuItem>
+                            )}
+                          </DropdownMenuContent>
+                        </DropdownMenu>
                       )}
                     </TableCell>
                   </TableRow>
                 ))}
                 {filteredUsers.length === 0 && (
                   <TableRow>
-                    <TableCell colSpan={5} className="text-center text-muted-foreground py-8">
+                    <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
                       {searchQuery ? "No users match your search" : "No users found"}
                     </TableCell>
                   </TableRow>
@@ -290,11 +453,52 @@ function UserManagementContent() {
                 <li>Manage user roles</li>
                 <li>Manage templates</li>
                 <li>Manage company settings</li>
+                <li>Enable/disable users</li>
+                <li>View activity logs</li>
               </ul>
             </div>
           </div>
         </CardContent>
       </Card>
+
+      <AlertDialog open={confirmDialog.open} onOpenChange={(open) => !open && setConfirmDialog({ open: false, type: null, user: null })}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {confirmDialog.type === "disable" ? "Disable User Account" : "Enable User Account"}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {confirmDialog.type === "disable" ? (
+                <>
+                  Are you sure you want to disable <strong>{confirmDialog.user?.email}</strong>?
+                  They will not be able to log in until their account is re-enabled.
+                </>
+              ) : (
+                <>
+                  Are you sure you want to enable <strong>{confirmDialog.user?.email}</strong>?
+                  They will be able to log in and access the platform again.
+                </>
+              )}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel data-testid="button-cancel-status">Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmStatusChange}
+              className={confirmDialog.type === "disable" ? "bg-destructive hover:bg-destructive/90" : ""}
+              data-testid="button-confirm-status"
+            >
+              {updateStatusMutation.isPending ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : confirmDialog.type === "disable" ? (
+                "Disable"
+              ) : (
+                "Enable"
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

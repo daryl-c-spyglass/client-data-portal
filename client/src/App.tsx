@@ -35,6 +35,7 @@ import LeadsPage from "@/pages/LeadsPage";
 import InventoryAudit from "@/pages/InventoryAudit";
 import AdminPage from "@/pages/AdminPage";
 import UserManagement from "@/pages/UserManagement";
+import ActivityLogs from "@/pages/ActivityLogs";
 import Login from "@/pages/Login";
 import { useEffect } from "react";
 
@@ -120,6 +121,7 @@ function Router() {
       <Route path="/inventory-audit" component={InventoryAudit} />
       <Route path="/admin" component={AdminPage} />
       <Route path="/admin/users" component={UserManagement} />
+      <Route path="/admin/activity-logs" component={ActivityLogs} />
       <Route component={NotFound} />
     </Switch>
   );
