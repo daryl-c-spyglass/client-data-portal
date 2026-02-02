@@ -1,0 +1,273 @@
+### INVESTIGATION ONLY - Document Theme System + Mobile Optimization Audit
+
+**⚠️ DO NOT MAKE ANY CHANGES YET - This is documentation/audit only**
+
+**Goals:**
+1. Document the complete theme system implementation (light/dark/system mode)
+2. Audit ALL sections for mobile optimization compliance
+3. Identify any issues or inconsistencies
+
+---
+
+## PART 1: THEME SYSTEM DOCUMENTATION
+
+### Please Provide the Complete Code For:
+
+#### 1.1 Theme Context/Provider
+- Full file path
+- Complete code of ThemeContext.tsx or equivalent
+- How theme state is managed (useState, localStorage, etc.)
+- How it syncs with user preferences from API
+- How system theme detection works
+
+**Please share the COMPLETE ThemeContext/ThemeProvider file.**
+
+---
+
+#### 1.2 App.tsx Integration
+- How ThemeProvider wraps the app
+- Order of providers (QueryClient, Auth, Theme, Router, etc.)
+- Any theme initialization logic
+
+**Please share the relevant portion of App.tsx showing the provider setup.**
+
+---
+
+#### 1.3 Tailwind Configuration
+- Dark mode setting (class vs media)
+- Any custom color configurations
+- CSS variables for theme colors
+- Spyglass brand colors (#EF4923, #222222)
+
+**Please share:**
+- `tailwind.config.js` or `tailwind.config.ts`
+- Theme-related CSS from `index.css` or `globals.css`
+
+---
+
+#### 1.4 Layout Component
+- How Layout uses the theme
+- Background classes applied (bg-gray-900 for dark, bg-gray-50 for light)
+- How dark class is applied to document/html element
+- Sidebar and main content area theming
+
+**Please share the complete Layout component.**
+
+---
+
+#### 1.5 Example Page Usage Pattern
+- How a page component uses the theme
+- Import statement for useTheme
+- How isDark is used for conditional styling
+- Common patterns for theme-aware classes
+
+**Please share an example of theme usage in a page component (Dashboard or Properties - first 100 lines showing the pattern).**
+
+---
+
+#### 1.6 Theme Toggle Component
+- How users switch between light/dark/system
+- UI component for the toggle (dropdown, buttons, icons)
+- How it calls setTheme function
+- Visual indicator of current theme
+
+**Please share the theme toggle/switcher component.**
+
+---
+
+#### 1.7 CSS Variables
+- All CSS variables used for theming
+- Light mode values
+- Dark mode values
+- How they're applied
+
+**Please share all theme-related CSS variables from your stylesheets.**
+
+---
+
+## PART 2: MOBILE OPTIMIZATION AUDIT
+
+### Audit ALL sections against these requirements:
+
+| Device | Browser | Screen Size |
+|--------|---------|-------------|
+| iPad Pro | Safari | 1024 x 1366 |
+| iPad Air/Mini | Safari | 768 x 1024 |
+| iPhone 14/15 Pro | Safari | 393 x 852 |
+| iPhone SE | Safari | 375 x 667 |
+| Android Tablet | Chrome | 800 x 1280 |
+| Android Phone | Chrome | 360 x 800 |
+
+### Mobile UX Checklist (Check Each Section):
+
+#### 2.1 Dashboard
+- [ ] Touch targets minimum 44x44px (buttons, cards, links)
+- [ ] Market Pulse bars/cards clickable on touch
+- [ ] Spyglass Listings horizontal scroll works with swipe
+- [ ] No horizontal overflow
+- [ ] Responsive layout (stacks on mobile)
+- [ ] Readable font sizes
+
+#### 2.2 Properties Page
+- [ ] Filter panel collapsible on mobile
+- [ ] Filter dropdowns work on touch
+- [ ] Grid view responsive (1 col mobile, 2 tablet, 4 desktop)
+- [ ] List view readable on mobile
+- [ ] Table view horizontally scrollable
+- [ ] Pagination buttons 44x44px
+- [ ] Listing modal full-screen on mobile
+- [ ] Photo carousel swipeable
+
+#### 2.3 Leads Page
+- [ ] Touch targets on lead cards
+- [ ] Filter/sort dropdowns work on touch
+- [ ] Responsive layout
+- [ ] No horizontal overflow
+
+#### 2.4 Reports Page
+- [ ] Touch targets on report items
+- [ ] Responsive layout
+- [ ] No horizontal overflow
+
+#### 2.5 Calendar Page
+- [ ] Calendar navigation buttons 44x44px
+- [ ] Day cells tappable
+- [ ] Event items readable
+- [ ] Responsive layout
+
+#### 2.6 Training Page
+- [ ] Video cards horizontal scroll with swipe
+- [ ] Touch targets on video cards
+- [ ] Video modal works on mobile
+- [ ] Categories scrollable
+- [ ] Tab navigation works on touch
+
+#### 2.7 Marketing Calendar
+- [ ] Content idea cards responsive
+- [ ] Save/Copy/Delete buttons 44x44px
+- [ ] Tab navigation works
+- [ ] Platform badges readable
+
+#### 2.8 My Performance
+- [ ] Charts/graphs responsive
+- [ ] Stats readable on mobile
+- [ ] No horizontal overflow
+
+#### 2.9 Navigation/Sidebar
+- [ ] Mobile menu toggle works
+- [ ] Menu items 44x44px touch targets
+- [ ] Smooth open/close animation
+- [ ] Overlay closes on tap outside
+
+#### 2.10 Modals (All)
+- [ ] Full-screen on mobile devices
+- [ ] Close button 44x44px
+- [ ] Content scrollable
+- [ ] Touch outside to close works
+- [ ] No content cut off
+
+#### 2.11 Forms & Inputs
+- [ ] Input fields at least 44px height
+- [ ] Dropdowns work on touch
+- [ ] Date pickers mobile-friendly
+- [ ] Keyboard doesn't obscure inputs
+
+---
+
+## EXPECTED RESPONSE FORMAT
+
+Please provide findings in this structure:
+PART 1: THEME SYSTEM DOCUMENTATION
+1.1 THEME CONTEXT
+File: [full path]
+tsx[complete code]
+1.2 APP.TSX INTEGRATION
+File: client/src/App.tsx
+tsx[relevant code showing provider setup]
+1.3 TAILWIND CONFIG
+File: [path]
+js[config code]
+CSS Variables (index.css):
+css[theme variables]
+1.4 LAYOUT COMPONENT
+File: [full path]
+tsx[complete code]
+1.5 EXAMPLE PAGE USAGE
+File: [path]
+tsx[example showing theme usage pattern]
+1.6 THEME TOGGLE
+File: [path]
+tsx[toggle component code]
+1.7 CSS VARIABLES
+css[all theme CSS variables]
+```
+
+---
+
+## PART 2: MOBILE OPTIMIZATION AUDIT RESULTS
+
+### Summary
+| Section | Status | Issues Found |
+|---------|--------|--------------|
+| Dashboard | ✅/⚠️/❌ | [list issues] |
+| Properties | ✅/⚠️/❌ | [list issues] |
+| ... | ... | ... |
+
+### Detailed Findings
+
+#### 2.1 Dashboard
+- Touch Targets: ✅/❌ [details]
+- Responsive Layout: ✅/❌ [details]
+- Horizontal Overflow: ✅/❌ [details]
+[etc.]
+
+#### 2.2 Properties
+[same format]
+
+[Continue for all sections...]
+
+### Critical Issues to Fix
+1. [Issue 1 - Section - Description]
+2. [Issue 2 - Section - Description]
+3. [etc.]
+
+### Recommended Fixes
+1. [Fix 1]
+2. [Fix 2]
+3. [etc.]
+```
+
+---
+
+## IMPORTANT NOTES
+
+1. **DO NOT MAKE ANY CHANGES** - This is investigation/documentation only
+2. Document what EXISTS, not what should exist
+3. Be specific about file paths and line numbers
+4. Include complete code blocks for the theme system
+5. For mobile audit, test actual behavior if possible or inspect code
+6. Flag any inconsistencies between sections
+7. Note any missing theme support in components
+8. Identify components that don't use the ThemeContext properly
+
+---
+
+## QUESTIONS TO ANSWER
+
+### Theme System
+1. Is there ONE centralized ThemeContext or multiple?
+2. Does theme persist across page refreshes (localStorage)?
+3. Does theme sync with server/user preferences?
+4. Does "system" mode properly detect OS preference?
+5. Are all components using the theme consistently?
+
+### Mobile Optimization
+1. Which sections have the best mobile support?
+2. Which sections need the most work?
+3. Are there any components missing touch support entirely?
+4. Are there hardcoded widths causing horizontal scroll?
+5. Are there hover-only interactions without touch alternatives?
+
+---
+
+**After this investigation, we will create a unified fix prompt based on the findings.**

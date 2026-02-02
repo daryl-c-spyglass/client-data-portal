@@ -1,0 +1,176 @@
+# Super Admin Feature - Application Architecture Extraction
+
+## PURPOSE
+
+This is an INQUIRY ONLY prompt. DO NOT make any changes.
+
+We need to understand the current authentication, user management, and role system in Client Data Portal before implementing a Super Admin feature.
+
+---
+
+## INFORMATION NEEDED
+
+### 1. Authentication System
+
+Please provide details about:
+
+**Current Auth Implementation:**
+- What authentication method is used? (Replit Auth, Google OAuth, custom, etc.)
+- Where is the auth configuration located?
+- How are users authenticated on login?
+- Is there email/password auth or OAuth only?
+
+**Auth-related files:**
+- List all auth-related files (middleware, hooks, providers)
+- Show the main auth configuration
+
+**Session Management:**
+- How are sessions managed?
+- Where is session data stored?
+- How long do sessions last?
+
+---
+
+### 2. User Database Schema
+
+Please provide:
+
+**Users Table Schema:**
+- Show the complete users table schema (all columns)
+- What fields exist? (id, email, name, role, createdAt, etc.)
+- Are there any role-related fields already?
+
+**Related Tables:**
+- Are there any role or permission tables?
+- Any user_roles junction tables?
+- Any audit/activity log tables?
+
+**Sample Query:**
+```sql
+-- Show me the users table structure
+SELECT column_name, data_type, is_nullable, column_default
+FROM information_schema.columns
+WHERE table_name = 'users';
+```
+
+---
+
+### 3. Current Role System (If Any)
+
+**Existing Roles:**
+- Are there any roles defined currently?
+- How are roles assigned to users?
+- Where is role logic implemented?
+
+**Permission Checks:**
+- Are there any permission/role checks in the codebase?
+- How are protected routes handled?
+- Any middleware for authorization?
+
+---
+
+### 4. API Routes Structure
+
+**User-related Endpoints:**
+- List all user-related API endpoints
+- Show route protection patterns
+- Any admin-only endpoints currently?
+
+**Route Files:**
+- Where are API routes defined?
+- Show the main routes file structure
+
+---
+
+### 5. Frontend User Context
+
+**User State Management:**
+- How is user data stored on frontend?
+- Is there a UserContext or AuthContext?
+- How do components access current user info?
+
+**Protected Components:**
+- Are there any role-based component renders?
+- How are admin features hidden/shown?
+
+---
+
+### 6. Database Connection
+
+**Database Type:**
+- PostgreSQL, MySQL, SQLite, etc.?
+- ORM used? (Drizzle, Prisma, etc.)
+- Where is the DB schema defined?
+
+**Schema Files:**
+- Show the location of schema definitions
+- Show how tables are defined
+
+---
+
+## OUTPUT FORMAT
+
+Please provide the following:
+
+1. **File List:** All files related to auth, users, roles
+2. **Schema:** Complete users table schema
+3. **Auth Flow:** How login/logout works
+4. **Current Roles:** Any existing role system
+5. **API Endpoints:** User-related routes
+6. **Frontend Context:** How user data is accessed
+
+---
+
+## EXAMPLE RESPONSE FORMAT
+
+```
+### 1. AUTH FILES
+- server/auth.ts - Main auth configuration
+- server/middleware/auth.ts - Auth middleware
+- client/src/hooks/useAuth.ts - Frontend auth hook
+- client/src/context/AuthContext.tsx - Auth context provider
+
+### 2. USERS TABLE SCHEMA
+CREATE TABLE users (
+  id SERIAL PRIMARY KEY,
+  email VARCHAR(255) UNIQUE NOT NULL,
+  name VARCHAR(255),
+  password_hash VARCHAR(255),
+  google_id VARCHAR(255),
+  created_at TIMESTAMP DEFAULT NOW(),
+  updated_at TIMESTAMP
+);
+
+### 3. AUTH FLOW
+1. User clicks login
+2. Redirects to Google OAuth
+3. Callback creates/updates user in DB
+4. Session stored in [cookie/localStorage/etc]
+
+### 4. CURRENT ROLES
+- No role system currently exists
+- OR
+- Basic role field exists: role VARCHAR(50) DEFAULT 'user'
+
+### 5. USER API ENDPOINTS
+GET /api/users - List users (no protection)
+GET /api/users/:id - Get user
+POST /api/users - Create user
+PUT /api/users/:id - Update user
+
+### 6. FRONTEND USER CONTEXT
+- useAuth() hook returns { user, isAuthenticated, login, logout }
+- User object: { id, email, name }
+```
+
+---
+
+## IMPORTANT
+
+- DO NOT modify any files
+- Only read and report current state
+- Include file paths for all referenced code
+- Note any missing functionality
+- Highlight potential issues or gaps
+
+This information will be used to plan the Super Admin implementation.
