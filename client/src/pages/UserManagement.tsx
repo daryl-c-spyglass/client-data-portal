@@ -1,5 +1,5 @@
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
@@ -25,13 +25,21 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Loader2, Search, Shield, ShieldCheck, User, MoreHorizontal, UserX, UserCheck, History } from "lucide-react";
+import { Loader2, Search, Shield, ShieldCheck, User, MoreHorizontal, UserX, UserCheck, History, Users, UserPlus } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { getRoleDisplayName, INITIAL_SUPER_ADMIN_EMAILS, UserRole } from "@shared/permissions";
 import { Link } from "wouter";
 import { FUBUserSearch } from "@/components/admin/FUBUserSearch";
+
+interface FUBUser {
+  id: number;
+  name: string;
+  firstName?: string;
+  lastName?: string;
+  email: string;
+}
 
 interface UserData {
   id: string;
@@ -74,6 +82,8 @@ function UserManagementContent() {
   const [searchQuery, setSearchQuery] = useState("");
   const [editingUserId, setEditingUserId] = useState<string | null>(null);
   const [pendingRole, setPendingRole] = useState<string>("");
+  const [invitingFubUserId, setInvitingFubUserId] = useState<number | null>(null);
+  const [selectedInviteRole, setSelectedInviteRole] = useState<string>("agent");
   const [confirmDialog, setConfirmDialog] = useState<{
     open: boolean;
     type: "disable" | "enable" | null;
@@ -83,6 +93,13 @@ function UserManagementContent() {
   const { data: users = [], isLoading } = useQuery<UserData[]>({
     queryKey: ["/api/admin/users"],
   });
+
+  const { data: fubData } = useQuery<{ users: FUBUser[]; configured: boolean }>({
+    queryKey: ["/api/admin/fub/users"],
+  });
+
+  const fubUsers = fubData?.users || [];
+  const fubConfigured = fubData?.configured ?? false;
 
   const updateRoleMutation = useMutation({
     mutationFn: async ({ userId, role }: { userId: string; role: string }) => {
@@ -130,14 +147,79 @@ function UserManagementContent() {
     },
   });
 
-  const filteredUsers = users.filter((user) => {
-    const searchLower = searchQuery.toLowerCase();
-    return (
-      user.email.toLowerCase().includes(searchLower) ||
-      (user.firstName?.toLowerCase() || "").includes(searchLower) ||
-      (user.lastName?.toLowerCase() || "").includes(searchLower)
-    );
+  const inviteMutation = useMutation({
+    mutationFn: async (userData: { 
+      email: string; 
+      firstName: string; 
+      lastName: string; 
+      role: string 
+    }) => {
+      const res = await fetch('/api/admin/users/invite', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify(userData),
+      });
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.error || 'Failed to invite user');
+      }
+      return res.json();
+    },
+    onSuccess: (_, variables) => {
+      toast({ 
+        title: 'User invited successfully',
+        description: `${variables.email} has been added as ${getRoleDisplayName(variables.role as UserRole)}`,
+      });
+      setInvitingFubUserId(null);
+      setSelectedInviteRole("agent");
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/users'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/fub/users'] });
+    },
+    onError: (error: Error) => {
+      toast({ 
+        title: 'Failed to invite user', 
+        description: error.message,
+        variant: 'destructive',
+      });
+    },
   });
+
+  const { filteredUsers, unregisteredFubUsers } = useMemo(() => {
+    const query = searchQuery.toLowerCase().trim();
+    
+    const registered = users.filter((user) => {
+      if (!query) return true;
+      const fullName = `${user.firstName || ''} ${user.lastName || ''}`.toLowerCase();
+      return (
+        user.email.toLowerCase().includes(query) ||
+        (user.firstName?.toLowerCase() || "").includes(query) ||
+        (user.lastName?.toLowerCase() || "").includes(query) ||
+        fullName.includes(query)
+      );
+    });
+    
+    const registeredEmails = new Set(
+      users.map((u) => u.email.toLowerCase())
+    );
+    
+    const unregistered = fubUsers
+      .filter((user) => !registeredEmails.has(user.email?.toLowerCase()))
+      .filter((user) => {
+        if (!query) return false;
+        return (
+          user.email?.toLowerCase().includes(query) ||
+          user.name?.toLowerCase().includes(query) ||
+          user.firstName?.toLowerCase().includes(query) ||
+          user.lastName?.toLowerCase().includes(query)
+        );
+      });
+    
+    return {
+      filteredUsers: registered,
+      unregisteredFubUsers: unregistered,
+    };
+  }, [users, fubUsers, searchQuery]);
 
   const handleRoleChange = (userId: string, newRole: string) => {
     updateRoleMutation.mutate({ userId, role: newRole });
@@ -180,6 +262,16 @@ function UserManagementContent() {
 
   const canDisableUser = (user: UserData) => {
     return user.role !== "super_admin" && !isProtectedUser(user);
+  };
+
+  const handleInvite = (fubUser: FUBUser, role: string) => {
+    const nameParts = fubUser.name?.split(' ') || [];
+    inviteMutation.mutate({
+      email: fubUser.email,
+      firstName: fubUser.firstName || nameParts[0] || '',
+      lastName: fubUser.lastName || nameParts.slice(1).join(' ') || '',
+      role,
+    });
   };
 
   if (isLoading) {
@@ -244,7 +336,7 @@ function UserManagementContent() {
             <div className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
-                placeholder="Search by name or email..."
+                placeholder={fubConfigured ? "Search by name or email (includes Follow Up Boss team)..." : "Search by name or email..."}
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="pl-10"
@@ -402,7 +494,7 @@ function UserManagementContent() {
                     </TableCell>
                   </TableRow>
                 ))}
-                {filteredUsers.length === 0 && (
+                {filteredUsers.length === 0 && unregisteredFubUsers.length === 0 && (
                   <TableRow>
                     <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
                       {searchQuery ? "No users match your search" : "No users found"}
@@ -414,6 +506,94 @@ function UserManagementContent() {
           </div>
         </CardContent>
       </Card>
+
+      {searchQuery && unregisteredFubUsers.length > 0 && (
+        <Card className="border-2 border-dashed border-orange-300 bg-orange-50/30 dark:bg-orange-950/10">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-orange-700 dark:text-orange-400">
+              <Users className="w-5 h-5" />
+              Follow Up Boss Team Members
+            </CardTitle>
+            <CardDescription>
+              These team members are in Follow Up Boss but haven't logged into the portal yet.
+              Invite them to pre-assign their role.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="divide-y">
+              {unregisteredFubUsers.map((fubUser) => (
+                <div key={fubUser.id} className="flex items-center justify-between py-3" data-testid={`fub-user-${fubUser.id}`}>
+                  <div className="flex items-center gap-3">
+                    <Avatar className="h-8 w-8">
+                      <AvatarFallback className="bg-orange-100 text-orange-700 dark:bg-orange-900 dark:text-orange-300">
+                        {(fubUser.firstName?.[0] || fubUser.name?.[0] || fubUser.email[0]).toUpperCase()}
+                      </AvatarFallback>
+                    </Avatar>
+                    <div>
+                      <div className="font-medium">{fubUser.name || fubUser.email.split("@")[0]}</div>
+                      <div className="text-sm text-muted-foreground">{fubUser.email}</div>
+                    </div>
+                    <Badge variant="outline" className="ml-2 text-orange-600 border-orange-300">
+                      <Users className="w-3 h-3 mr-1" />
+                      Not Registered
+                    </Badge>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {invitingFubUserId === fubUser.id ? (
+                      <>
+                        <Select value={selectedInviteRole} onValueChange={setSelectedInviteRole}>
+                          <SelectTrigger className="w-[130px]" data-testid={`select-invite-role-${fubUser.id}`}>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="agent">Agent</SelectItem>
+                            <SelectItem value="admin">Admin</SelectItem>
+                            <SelectItem value="super_admin">Super Admin</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <Button 
+                          size="sm"
+                          onClick={() => handleInvite(fubUser, selectedInviteRole)}
+                          disabled={inviteMutation.isPending}
+                          data-testid={`button-confirm-invite-${fubUser.id}`}
+                        >
+                          {inviteMutation.isPending ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : (
+                            "Invite"
+                          )}
+                        </Button>
+                        <Button 
+                          size="sm" 
+                          variant="outline"
+                          onClick={() => {
+                            setInvitingFubUserId(null);
+                            setSelectedInviteRole("agent");
+                          }}
+                          data-testid={`button-cancel-invite-${fubUser.id}`}
+                        >
+                          Cancel
+                        </Button>
+                      </>
+                    ) : (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="gap-1"
+                        onClick={() => setInvitingFubUserId(fubUser.id)}
+                        data-testid={`button-invite-${fubUser.id}`}
+                      >
+                        <UserPlus className="w-4 h-4" />
+                        Invite
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       <Card>
         <CardHeader>
