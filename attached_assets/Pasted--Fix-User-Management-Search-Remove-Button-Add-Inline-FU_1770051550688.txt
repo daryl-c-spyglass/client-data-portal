@@ -1,0 +1,333 @@
+# Fix User Management Search - Remove Button, Add Inline FUB Search
+
+## ⚠️ TESTING REQUIREMENT
+
+**Before declaring complete, you MUST:**
+1. Verify "Import from Follow Up Boss" button is REMOVED
+2. Search for "sunny@spyglassrealty.com" - should show Sunny from FUB
+3. Search for "daryl" - should show Daryl (registered user)
+4. Test inviting a FUB user from search results
+5. **DO NOT declare complete without testing search for both registered AND FUB users**
+
+---
+
+## CHANGES REQUIRED
+
+### 1. REMOVE "Import from Follow Up Boss" Button
+
+Remove this button from the header completely. The FUB search will be integrated into the main search box.
+
+**Before:**
+```
+User Management                    [Import from Follow Up Boss] [Activity Logs]
+```
+
+**After:**
+```
+User Management                                                 [Activity Logs]
+```
+
+---
+
+### 2. FIX SEARCH to Include FUB Users
+
+The search box should search:
+- Registered portal users (show in main table)
+- FUB team members who are NOT registered (show in separate section below)
+
+---
+
+## IMPLEMENTATION
+
+### Update UserManagement.tsx
+
+```tsx
+// client/src/pages/UserManagement.tsx
+
+import { useState, useMemo } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+// ... other imports
+
+export default function UserManagement() {
+  const [searchQuery, setSearchQuery] = useState('');
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+
+  // Fetch registered portal users
+  const { data: portalUsers = [], isLoading: portalLoading } = useQuery({
+    queryKey: ['/api/admin/users'],
+  });
+
+  // Fetch FUB users - always fetch so search works
+  const { data: fubUsers = [], isLoading: fubLoading } = useQuery({
+    queryKey: ['/api/admin/fub/users'],
+  });
+
+  // Invite mutation
+  const inviteMutation = useMutation({
+    mutationFn: async (userData: { email: string; firstName: string; lastName: string; role: string }) => {
+      const res = await fetch('/api/admin/users/invite', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify(userData),
+      });
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.error || 'Failed to invite user');
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({ title: 'User invited successfully' });
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/users'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/fub/users'] });
+    },
+    onError: (error: Error) => {
+      toast({ title: 'Failed to invite user', description: error.message, variant: 'destructive' });
+    },
+  });
+
+  // Combined search logic
+  const { registeredUsers, unregisteredFubUsers } = useMemo(() => {
+    const query = searchQuery.toLowerCase().trim();
+    
+    // Filter registered portal users
+    const registered = portalUsers.filter((user: any) => {
+      if (!query) return true;
+      const fullName = `${user.firstName || ''} ${user.lastName || ''}`.toLowerCase();
+      return (
+        user.email?.toLowerCase().includes(query) ||
+        fullName.includes(query) ||
+        user.firstName?.toLowerCase().includes(query) ||
+        user.lastName?.toLowerCase().includes(query)
+      );
+    });
+    
+    // Get registered emails
+    const registeredEmails = new Set(
+      portalUsers.map((u: any) => u.email?.toLowerCase())
+    );
+    
+    // Filter FUB users: NOT registered AND matches search query
+    const unregistered = fubUsers
+      .filter((user: any) => !registeredEmails.has(user.email?.toLowerCase()))
+      .filter((user: any) => {
+        if (!query) return false; // Only show when searching
+        return (
+          user.email?.toLowerCase().includes(query) ||
+          user.name?.toLowerCase().includes(query)
+        );
+      });
+    
+    return { registeredUsers: registered, unregisteredFubUsers: unregistered };
+  }, [portalUsers, fubUsers, searchQuery]);
+
+  // Handle invite
+  const handleInvite = (fubUser: any, role: string) => {
+    const nameParts = fubUser.name?.split(' ') || [];
+    inviteMutation.mutate({
+      email: fubUser.email,
+      firstName: fubUser.firstName || nameParts[0] || '',
+      lastName: fubUser.lastName || nameParts.slice(1).join(' ') || '',
+      role,
+    });
+  };
+
+  return (
+    <div className="p-6">
+      {/* Header - NO Import from FUB button */}
+      <div className="flex items-center justify-between mb-6">
+        <div>
+          <h1 className="text-2xl font-bold">User Management</h1>
+          <p className="text-muted-foreground">Manage team member roles and permissions</p>
+        </div>
+        <Button variant="outline" asChild>
+          <a href="/admin/activity-logs">
+            <FileText className="w-4 h-4 mr-2" />
+            Activity Logs
+          </a>
+        </Button>
+      </div>
+
+      {/* Stats Cards */}
+      {/* ... existing stats cards ... */}
+
+      {/* Team Members */}
+      <Card className="mb-6">
+        <CardHeader>
+          <CardTitle>Team Members</CardTitle>
+          <CardDescription>Manage user accounts, roles, and access</CardDescription>
+        </CardHeader>
+        <CardContent>
+          {/* Search Box */}
+          <div className="relative mb-4">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+            <Input
+              placeholder="Search by name or email..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-10"
+            />
+          </div>
+
+          {/* Registered Users Table */}
+          {registeredUsers.length > 0 ? (
+            <Table>
+              {/* ... existing table ... */}
+            </Table>
+          ) : searchQuery && !portalLoading ? (
+            <p className="text-center text-muted-foreground py-4">
+              No registered users match "{searchQuery}"
+            </p>
+          ) : null}
+        </CardContent>
+      </Card>
+
+      {/* FUB Users - Shows ONLY when searching and matches found */}
+      {searchQuery && unregisteredFubUsers.length > 0 && (
+        <Card className="mb-6 border-2 border-dashed border-orange-300 bg-orange-50/50 dark:bg-orange-950/20">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-lg flex items-center gap-2">
+              <Users className="w-5 h-5 text-orange-600" />
+              <span className="text-orange-700 dark:text-orange-400">
+                Follow Up Boss Team Members
+              </span>
+            </CardTitle>
+            <CardDescription>
+              Found in Follow Up Boss but not registered in portal. Click Invite to add.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-2">
+              {unregisteredFubUsers.map((user: any) => (
+                <FUBUserRow 
+                  key={user.id || user.email} 
+                  user={user} 
+                  onInvite={handleInvite}
+                  isInviting={inviteMutation.isPending}
+                />
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* No results anywhere */}
+      {searchQuery && registeredUsers.length === 0 && unregisteredFubUsers.length === 0 && !portalLoading && !fubLoading && (
+        <Card>
+          <CardContent className="py-8 text-center text-muted-foreground">
+            No users found matching "{searchQuery}"
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Role Permissions */}
+      {/* ... existing role permissions section ... */}
+    </div>
+  );
+}
+
+// FUB User Row - inline invite
+function FUBUserRow({ user, onInvite, isInviting }: { user: any; onInvite: (user: any, role: string) => void; isInviting: boolean }) {
+  const [selectedRole, setSelectedRole] = useState('agent');
+
+  return (
+    <div className="flex items-center justify-between p-3 rounded-lg bg-white dark:bg-gray-900 border">
+      <div className="flex items-center gap-3">
+        <div className="w-10 h-10 rounded-full bg-orange-100 dark:bg-orange-900/50 flex items-center justify-center text-orange-600 font-semibold">
+          {user.name?.[0]?.toUpperCase() || user.email?.[0]?.toUpperCase() || '?'}
+        </div>
+        <div>
+          <p className="font-medium">{user.name || 'Unknown'}</p>
+          <p className="text-sm text-muted-foreground">{user.email}</p>
+        </div>
+      </div>
+      <div className="flex items-center gap-2">
+        <Badge variant="outline" className="text-orange-600 border-orange-400 bg-orange-50">
+          Not Registered
+        </Badge>
+        <Select value={selectedRole} onValueChange={setSelectedRole}>
+          <SelectTrigger className="w-32 h-9">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="agent">Agent</SelectItem>
+            <SelectItem value="admin">Admin</SelectItem>
+            <SelectItem value="super_admin">Super Admin</SelectItem>
+          </SelectContent>
+        </Select>
+        <Button 
+          size="sm" 
+          onClick={() => onInvite(user, selectedRole)}
+          disabled={isInviting}
+        >
+          {isInviting ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Invite'}
+        </Button>
+      </div>
+    </div>
+  );
+}
+```
+
+---
+
+## CHECKLIST
+
+### Remove:
+- [ ] Remove "Import from Follow Up Boss" button from header
+
+### Fix Search:
+- [ ] Search fetches FUB users in background
+- [ ] Searching shows matching registered users in table
+- [ ] Searching shows matching FUB users (not registered) in orange section below
+- [ ] FUB section only appears when there are matching unregistered users
+- [ ] Each FUB user has role dropdown + Invite button
+- [ ] Invite creates user in database with selected role
+
+---
+
+## EXPECTED BEHAVIOR
+
+**Search: "sunny@spyglassrealty.com"**
+
+```
+Team Members
+────────────────────────────────────────────────
+🔍 sunny@spyglassrealty.com
+────────────────────────────────────────────────
+No registered users match "sunny@spyglassrealty.com"
+
+
+┌─────────────────────────────────────────────────────────────┐
+│ 👥 Follow Up Boss Team Members                              │
+│ Found in Follow Up Boss but not registered in portal.       │
+├─────────────────────────────────────────────────────────────┤
+│ [S] Sunny Tracey          [Not Registered] [Agent▾] [Invite]│
+│     sunny@spyglassrealty.com                                │
+└─────────────────────────────────────────────────────────────┘
+```
+
+**Search: "daryl"**
+
+```
+Team Members
+────────────────────────────────────────────────
+🔍 daryl
+────────────────────────────────────────────────
+│ [D] Daryl Camingao │ daryl@spyglassrealty.com │ Active │ Super Admin │ ... │
+```
+
+(No FUB section because Daryl is already registered)
+
+---
+
+## FILES TO MODIFY
+
+```
+client/src/pages/UserManagement.tsx
+```
+
+---
+
+**⚠️ REMINDER: Test searching for "sunny@spyglassrealty.com" - she should appear from FUB with Invite button!**

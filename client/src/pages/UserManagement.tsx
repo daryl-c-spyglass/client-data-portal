@@ -31,7 +31,6 @@ import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { getRoleDisplayName, INITIAL_SUPER_ADMIN_EMAILS, UserRole } from "@shared/permissions";
 import { Link } from "wouter";
-import { FUBUserSearch } from "@/components/admin/FUBUserSearch";
 
 interface FUBUser {
   id: number;
@@ -293,7 +292,6 @@ function UserManagementContent() {
           <p className="text-muted-foreground">Manage team member roles and permissions</p>
         </div>
         <div className="flex items-center gap-2">
-          <FUBUserSearch />
           <Link href="/admin/activity-logs">
             <Button variant="outline" className="gap-2" data-testid="button-view-activity-logs">
               <History className="h-4 w-4" />
