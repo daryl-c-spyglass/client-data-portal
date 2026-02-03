@@ -1,0 +1,223 @@
+# Inquiry: Follow Up Boss Calendar & Leads - Current Behavior Check
+
+## DO NOT MODIFY CODE - INQUIRY ONLY
+
+This is an information gathering request. Please analyze and report back the current behavior of the Calendar and Leads pages.
+
+---
+
+## TEST SCENARIOS TO VERIFY
+
+### Test URL for Calendar:
+`/calendar`
+
+### Test URL for Leads:
+`/leads`
+
+---
+
+## QUESTIONS TO ANSWER
+
+### 1. Role-Based Data Filtering
+
+**For each role, what data is shown?**
+
+| Role | Calendar Shows | Leads Shows |
+|------|----------------|-------------|
+| Developer | ? | ? |
+| Super Admin | ? | ? |
+| Admin | ? | ? |
+| Agent | ? | ? |
+
+Specifically check:
+- Does Developer see ALL agents' calendar events and leads?
+- Does Super Admin see ALL agents' calendar events and leads?
+- Does Admin see only THEIR OWN calendar events and leads?
+- Does Agent see only THEIR OWN calendar events and leads?
+
+### 2. Agent Dropdown Visibility
+
+**Calendar Page:**
+- Is the "Agent" dropdown visible for Developer?
+- Is the "Agent" dropdown visible for Super Admin?
+- Is the "Agent" dropdown visible for Admin?
+- Is the "Agent" dropdown visible for Agent?
+
+**Leads Page:**
+- Is the "Assigned Agent" dropdown visible for Developer?
+- Is the "Assigned Agent" dropdown visible for Super Admin?
+- Is the "Assigned Agent" dropdown visible for Admin?
+- Is the "Assigned Agent" dropdown visible for Agent?
+
+### 3. Default Selection
+
+When page loads, what is the default agent filter?
+
+| Role | Calendar Default | Leads Default |
+|------|------------------|---------------|
+| Developer | "All agents" or specific agent? | "All agents" or specific agent? |
+| Super Admin | "All agents" or specific agent? | "All agents" or specific agent? |
+| Admin | ? | ? |
+| Agent | ? | ? |
+
+### 4. Debug Info Visibility
+
+**Calendar Page:**
+- Is "Debug Details" section visible for Developer?
+- Is "Debug Details" section visible for Super Admin?
+- Is "Debug Details" section visible for Admin?
+- Is "Debug Details" section visible for Agent?
+
+**Leads Page:**
+- Is "Debug Info" section visible for Developer?
+- Is "Debug Info" section visible for Super Admin?
+- Is "Debug Info" section visible for Admin?
+- Is "Debug Info" section visible for Agent?
+
+### 5. Data Count Verification
+
+**For Developer/Super Admin with "All agents" selected:**
+- How many total leads are shown? (Should be ~146,000+)
+- Are calendar events showing for multiple agents?
+
+**For Admin/Agent:**
+- How many leads are shown? (Should be only their assigned leads)
+- Are calendar events only for their account?
+
+### 6. User-to-FUB Agent Mapping
+
+How does the system determine which FUB agent ID corresponds to a portal user?
+- Is it email matching?
+- Is there a `fubAgentId` column in the users table?
+- What happens if a portal user's email doesn't match any FUB agent?
+
+---
+
+## HOW TO TEST
+
+### Option A: Check the Code
+
+Look at these files:
+```
+client/src/pages/CalendarPage.tsx
+client/src/pages/LeadsPage.tsx
+server/routes.ts (search for /api/fub/calendar and /api/fub/leads)
+```
+
+Check for:
+- `usePermissions()` hook usage
+- `isDeveloper`, `isSuperAdmin` checks
+- Conditional rendering of dropdowns
+- Agent filter logic
+
+### Option B: Manual Testing
+
+1. Login as Developer (daryl@spyglassrealty.com)
+   - Go to /calendar - Note what you see
+   - Go to /leads - Note what you see
+
+2. Login as Super Admin (if different from Developer)
+   - Go to /calendar - Note what you see
+   - Go to /leads - Note what you see
+
+3. Login as Admin (if test user exists)
+   - Go to /calendar - Note what you see
+   - Go to /leads - Note what you see
+
+4. Login as Agent (if test user exists)
+   - Go to /calendar - Note what you see
+   - Go to /leads - Note what you see
+
+---
+
+## EXPECTED RESPONSE FORMAT
+
+```markdown
+# FUB Calendar & Leads - Current Behavior Report
+
+## Calendar Page
+
+### Agent Dropdown
+- Developer: [visible/hidden]
+- Super Admin: [visible/hidden]
+- Admin: [visible/hidden]
+- Agent: [visible/hidden]
+
+### Default Agent Selection
+- Developer: [all/specific/own]
+- Super Admin: [all/specific/own]
+- Admin: [own]
+- Agent: [own]
+
+### Debug Details Visibility
+- Developer: [visible/hidden]
+- Super Admin: [visible/hidden]
+- Admin: [visible/hidden]
+- Agent: [visible/hidden]
+
+### Data Shown
+- Developer with "All agents": [description]
+- Super Admin with "All agents": [description]
+- Admin: [description]
+- Agent: [description]
+
+## Leads Page
+
+### Assigned Agent Dropdown
+- Developer: [visible/hidden]
+- Super Admin: [visible/hidden]
+- Admin: [visible/hidden]
+- Agent: [visible/hidden]
+
+### Default Agent Selection
+- Developer: [all/specific/own]
+- Super Admin: [all/specific/own]
+- Admin: [own]
+- Agent: [own]
+
+### Debug Info Visibility
+- Developer: [visible/hidden]
+- Super Admin: [visible/hidden]
+- Admin: [visible/hidden]
+- Agent: [visible/hidden]
+
+### Data Shown
+- Developer with "All agents": [X leads total]
+- Super Admin with "All agents": [X leads total]
+- Admin: [X leads - own only]
+- Agent: [X leads - own only]
+
+## User-to-FUB Mapping
+- Method: [email match / fubAgentId column / other]
+- Location: [file path]
+- Edge case handling: [what happens if no match]
+
+## Current Issues (if any)
+- [list any problems observed]
+
+## Alignment Check
+
+| Requirement | Current State | Aligned? |
+|-------------|---------------|----------|
+| Developer sees all data | [yes/no] | [✓/✗] |
+| Super Admin sees all data | [yes/no] | [✓/✗] |
+| Admin sees own data only | [yes/no] | [✓/✗] |
+| Agent sees own data only | [yes/no] | [✓/✗] |
+| Debug Info for Developer only | [yes/no] | [✓/✗] |
+| Agent dropdown for Dev/SA only | [yes/no] | [✓/✗] |
+```
+
+---
+
+## EXPECTED BEHAVIOR (FOR REFERENCE)
+
+This is what SHOULD be happening:
+
+| Role | Agent Dropdown | Data Scope | Debug Info |
+|------|----------------|------------|------------|
+| Developer | Visible (default: All) | All agents | Visible |
+| Super Admin | Visible (default: All) | All agents | Hidden |
+| Admin | Hidden | Own only | Hidden |
+| Agent | Hidden | Own only | Hidden |
+
+Please verify if the current implementation matches this expectation.
