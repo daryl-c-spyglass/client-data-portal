@@ -1,0 +1,200 @@
+# Status Check: All Pending Items - Client Data Portal
+
+## DO NOT MODIFY CODE - STATUS CHECK ONLY
+
+Please verify the current status of each item below and report back which are working and which still need fixes.
+
+---
+
+## ITEM 1: Disable/Enable User
+
+**Location:** User Management page (`/admin/users`)
+
+**Test Steps:**
+1. Go to `/admin/users`
+2. Find a non-Super Admin user (e.g., test@example.com or any Agent)
+3. Click the [...] actions menu
+4. Click "Disable User"
+
+**Expected:** User status changes to "Disabled", toast notification appears
+
+**Previous Error:** `Failed to execute 'fetch' on 'Window': '/api/admin/users/.../status' is not a valid HTTP method`
+
+**Status:** [ ] Fixed / [ ] Still Broken
+
+---
+
+## ITEM 2: Delete User
+
+**Location:** User Management page (`/admin/users`)
+
+**Test Steps:**
+1. Go to `/admin/users`
+2. Find a test user (any @example.com email)
+3. Click the [...] actions menu
+4. Click "Delete Permanently"
+5. Confirm deletion
+
+**Expected:** User is removed from list, toast notification appears
+
+**Previous Error:** Delete action was throwing an error
+
+**Status:** [ ] Fixed / [ ] Still Broken
+
+---
+
+## ITEM 3: CMA Map Error
+
+**Location:** CMA Detail page → Map tab
+
+**Test URL:** `/cmas/7bb1e947-d96c-4c92-ae8c-fd785143fd5c`
+
+**Test Steps:**
+1. Open the CMA URL above
+2. Click on "Map" tab (between Compare and Stats)
+
+**Expected:** Map renders with property markers (subject property + comparables)
+
+**Previous Error:** "Map Error - Failed to load map token - Check console for details"
+
+**Status:** [ ] Fixed / [ ] Still Broken
+
+If still broken, check:
+- Is `MAPBOX_ACCESS_TOKEN` set in Replit Secrets?
+- Is the token being passed to the map component?
+
+---
+
+## ITEM 4: CMA Preview Banner
+
+**Location:** CMA Detail page
+
+**Test URL:** `/cmas/7bb1e947-d96c-4c92-ae8c-fd785143fd5c`
+
+**Test Steps:**
+1. Open the CMA URL above
+2. Look for a peach/salmon colored banner near the top
+
+**Previous State:** Shows banner with "You are seeing a preview of the report." and Save/Modify Search/Notes buttons
+
+**Expected After Fix:** Banner should be REMOVED
+
+**Status:** [ ] Removed / [ ] Still Visible
+
+---
+
+## ITEM 5: CMA Stats Tab - Property Click Modal
+
+**Location:** CMA Detail page → Stats tab
+
+**Test URL:** `/cmas/7bb1e947-d96c-4c92-ae8c-fd785143fd5c`
+
+**Test Steps:**
+1. Open the CMA URL above
+2. Click on "Stats" tab
+3. Find "Days on Market" or "Price Comparison" card
+4. Click on any property in the list
+
+**Expected:** A modal/dialog opens showing property details (photo, address, price, beds, baths, sqft, DOM, status)
+
+**Status:** [ ] Modal Opens / [ ] No Modal (not clickable)
+
+---
+
+## ITEM 6: Role Visibility - Admin Sidebar
+
+**Location:** Sidebar navigation
+
+**Test Steps:**
+1. Login as Developer (daryl@spyglassrealty.com) → Check if "Admin" section visible in sidebar
+2. Login as Super Admin → Check if "Admin" section visible in sidebar
+3. Login as Admin (if test user exists) → Check if "Admin" section visible
+4. Login as Agent (if test user exists) → Check if "Admin" section visible
+
+**Expected:**
+- Developer: Admin section VISIBLE
+- Super Admin: Admin section VISIBLE
+- Admin: Admin section HIDDEN
+- Agent: Admin section HIDDEN
+
+**Current Status:**
+
+| Role | Admin Section Visible? |
+|------|------------------------|
+| Developer | [ ] Yes / [ ] No |
+| Super Admin | [ ] Yes / [ ] No |
+| Admin | [ ] Yes / [ ] No |
+| Agent | [ ] Yes / [ ] No |
+
+---
+
+## ITEM 7: Role Permissions Section Visibility
+
+**Location:** User Management page (`/admin/users`) → "Role Permissions" section at bottom
+
+**Test Steps:**
+1. Login as Developer → Go to User Management → Scroll to bottom
+2. Login as Super Admin → Go to User Management → Scroll to bottom
+
+**Expected:** "Role Permissions - Overview of what each role can access" section with 4 cards (Agent, Admin, Super Admin, Developer) should be visible for both Developer and Super Admin
+
+**Status:** [ ] Visible for Developer / [ ] Visible for Super Admin
+
+---
+
+## ITEM 8: Calendar/Leads - All Agents Data
+
+**Location:** `/calendar` and `/leads`
+
+**Test Steps:**
+1. Login as Developer
+2. Go to `/calendar` with "All agents" selected
+3. Check if calendar events appear (not empty)
+4. Go to `/leads` with "All agents" selected
+5. Check total lead count
+
+**Expected:**
+- Calendar: Shows events for all agents (not "No items found")
+- Leads: Shows 146,000+ total leads (not 0)
+
+**Current Status:**
+
+| Page | Default Selection | Data Shown |
+|------|-------------------|------------|
+| Calendar | [ ] All agents / [ ] Specific agent | [ ] Has events / [ ] Empty |
+| Leads | [ ] All agents / [ ] Specific agent | [ ] 146k+ leads / [ ] 0 leads |
+
+---
+
+## RESPONSE FORMAT
+
+Please respond with this summary table:
+
+```
+# Pending Items Status Report
+
+| # | Item | Status | Notes |
+|---|------|--------|-------|
+| 1 | Disable/Enable User | ✅ Fixed / ❌ Broken | [details] |
+| 2 | Delete User | ✅ Fixed / ❌ Broken | [details] |
+| 3 | CMA Map Error | ✅ Fixed / ❌ Broken | [details] |
+| 4 | CMA Preview Banner | ✅ Removed / ❌ Still There | [details] |
+| 5 | CMA Property Click Modal | ✅ Working / ❌ Not Working | [details] |
+| 6 | Admin Sidebar Visibility | ✅ Correct / ❌ Needs Fix | [details] |
+| 7 | Role Permissions Visibility | ✅ Correct / ❌ Needs Fix | [details] |
+| 8 | Calendar/Leads All Agents | ✅ Working / ❌ Empty Data | [details] |
+
+## Items Still Needing Fixes:
+1. [list items that are still broken]
+
+## Items Completed:
+1. [list items that are working]
+```
+
+---
+
+## IMPORTANT
+
+- Test each item manually or check the code
+- Do NOT make any changes - just report current status
+- If an item is broken, note any error messages in the console
