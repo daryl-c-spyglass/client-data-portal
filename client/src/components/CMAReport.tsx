@@ -314,12 +314,6 @@ export function CMAReport({
   const underContractProperties = properties.filter(p => p.standardStatus === 'Active Under Contract');
   const activeProperties = properties.filter(p => p.standardStatus === 'Active');
   
-  // Log filtered rentals for debugging
-  if (rentalProperties.length > 0) {
-    console.log(`CMAReport: Filtered ${rentalProperties.length} rental properties from Sold section:`, 
-      rentalProperties.map(p => `${p.unparsedAddress}: $${Number(p.closePrice).toLocaleString()}`));
-  }
-
   // Compute filtered counts based on excluded properties
   const includedAll = useMemo(() => allProperties.filter(p => !excludedPropertyIds.has(p.id)), [allProperties, excludedPropertyIds]);
   const includedSold = useMemo(() => soldProperties.filter(p => !excludedPropertyIds.has(p.id)), [soldProperties, excludedPropertyIds]);

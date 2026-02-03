@@ -279,7 +279,6 @@ export function MapboxMap({
     if (!map.current || !mapLoaded) return;
     if (currentStyleRef.current === effectiveStyle) return;
     
-    console.log('[MapboxMap] Theme changed, updating style from', currentStyleRef.current, 'to', effectiveStyle);
     currentStyleRef.current = effectiveStyle;
     
     // Set new style - Mapbox will handle the transition
@@ -288,7 +287,6 @@ export function MapboxMap({
     // Re-add polygons after style loads (markers are DOM elements and persist,
     // but polygon sources/layers need to be re-added)
     map.current.once('style.load', () => {
-      console.log('[MapboxMap] Style loaded, restoring polygon overlays');
       addPolygonToMap();
     });
   }, [effectiveStyle, mapLoaded, polygon, showPolygon, polygonColor]);

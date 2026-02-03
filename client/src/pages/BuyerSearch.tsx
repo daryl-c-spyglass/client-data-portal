@@ -3576,9 +3576,6 @@ export default function BuyerSearch() {
                           property={property}
                           media={media}
                           onClick={() => handlePropertyClick(property, property.photos || [])}
-                          onAddToCart={() => {
-                            console.log('Add to selection:', property.id);
-                          }}
                         />
                       );
                     })}
@@ -3647,9 +3644,6 @@ export default function BuyerSearch() {
                           property={property}
                           media={media}
                           onClick={() => handlePropertyClick(property, property.photos || [])}
-                          onAddToCart={() => {
-                            console.log('Add to selection:', property.id);
-                          }}
                         />
                       </div>
                     );
@@ -3679,9 +3673,6 @@ export default function BuyerSearch() {
                           property={property}
                           media={media}
                           onClick={() => handlePropertyClick(property, property.photos || [])}
-                          onAddToCart={() => {
-                            console.log('Add to selection:', property.id);
-                          }}
                         />
                       );
                     })}

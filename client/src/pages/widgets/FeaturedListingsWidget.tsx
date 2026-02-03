@@ -57,7 +57,7 @@ export function FeaturedListingsWidget({ properties, mediaMap }: FeaturedListing
             key={property.id}
             property={property}
             media={mediaMap.get(property.listingId)}
-            onClick={() => console.log("Property clicked:", property.id)}
+            onClick={() => {}}
           />
         ))}
       </div>

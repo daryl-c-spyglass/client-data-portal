@@ -41,14 +41,6 @@ export function normalizePhotos(photoResponse: RepliersPhotoResponse): PhotoGall
     return (indexA === -1 ? 999 : indexA) - (indexB === -1 ? 999 : indexB);
   });
 
-  console.log('[PhotoNormalizer] Stats:', {
-    totalPhotos: photos.length,
-    hasImageInsights: hasInsights,
-    classifiedPhotos: allPhotos.filter(p => p.roomType).length,
-    highConfidencePhotos: allPhotos.filter(p => p.confidence && p.confidence >= CLASSIFICATION_CONFIDENCE_THRESHOLD).length,
-    roomTypesFound: roomTypes.length,
-  });
-
   return {
     allPhotos,
     roomTypes,

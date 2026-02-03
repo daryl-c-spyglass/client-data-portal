@@ -150,8 +150,6 @@ export function CMAMapView({
   useEffect(() => {
     if (!mapContainer.current || !mapToken || map.current) return;
 
-    console.log('[CMAMap] Creating map instance with token length:', mapToken.length);
-    
     try {
       mapboxgl.accessToken = mapToken;
 
@@ -177,14 +175,11 @@ export function CMAMapView({
       map.current.addControl(new mapboxgl.NavigationControl(), 'top-right');
 
       map.current.on('load', () => {
-        console.log('[CMAMap] Map loaded successfully!');
         setMapLoaded(true);
       });
       
       map.current.on('style.load', () => {
-        console.log('[CMAMap] Style loaded event');
         map.current?.once('idle', () => {
-          console.log('[CMAMap] Map idle - calling addLayers');
           if (addLayersRef.current) {
             addLayersRef.current();
           }
@@ -215,10 +210,8 @@ export function CMAMapView({
 
     const addLayers = () => {
       if (!map.current || !map.current.isStyleLoaded()) {
-        console.log('[CMAMap] Style not loaded yet, skipping addLayers');
         return;
       }
-      console.log('[CMAMap] Adding layers to map');
       
       if (clickHandlerRef.current) {
         map.current.off('click', LAYER_IDS.compPoints, clickHandlerRef.current);
@@ -415,8 +408,6 @@ export function CMAMapView({
     
     if (currentStyleRef.current === newStyle) return;
     currentStyleRef.current = newStyle;
-    
-    console.log('[CMAMap] Changing style to:', mapStyle, theme);
     map.current.setStyle(newStyle);
   }, [mapStyle, theme, mapLoaded]);
 

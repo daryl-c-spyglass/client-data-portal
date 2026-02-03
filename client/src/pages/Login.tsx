@@ -37,28 +37,16 @@ export default function Login() {
     const hasEmbeddedParam = urlParams.has('embedded');
     const isEmbedded = hasThemeParam || hasEmbeddedParam || isInIframe();
     
-    // Debug logging
-    console.log('=== AUTH CLICK DEBUG ===');
-    console.log('[Auth] URL:', window.location.href);
-    console.log('[Auth] search params:', window.location.search);
-    console.log('[Auth] Has ?theme param:', hasThemeParam);
-    console.log('[Auth] Has ?embedded param:', hasEmbeddedParam);
-    console.log('[Auth] isInIframe():', isInIframe());
-    console.log('[Auth] Final isEmbedded:', isEmbedded);
-    console.log('========================');
-    
     if (isEmbedded) {
       // CRITICAL: Prevent any default navigation when embedded
       e.preventDefault();
       e.stopPropagation();
       
-      console.log('[Auth] USING POPUP AUTH - embedded mode detected');
       setIsAuthenticating(true);
       
       const popup = openAuthPopup(
         '/auth/google/popup',
         () => {
-          console.log('[Auth] Popup auth SUCCESS');
           setIsAuthenticating(false);
           queryClient.invalidateQueries({ queryKey: ["/api/auth/me"] });
           refetch().then(() => {
@@ -66,14 +54,11 @@ export default function Login() {
           });
         },
         (error) => {
-          console.log('[Auth] Popup auth ERROR:', error);
           setIsAuthenticating(false);
           setAuthError(error);
         }
       );
-      console.log('[Auth] Popup window result:', popup ? 'OPENED' : 'BLOCKED/FAILED');
     } else {
-      console.log('[Auth] USING REDIRECT AUTH - direct access mode');
       const loginUrl = next !== "/" 
         ? `/auth/google?next=${encodeURIComponent(next)}`
         : "/auth/google";
@@ -82,11 +67,8 @@ export default function Login() {
   };
 
   // Auto-enable dark theme when embedded in iframe (Mission Control uses dark theme)
-  // Also log iframe detection on mount for debugging
   useEffect(() => {
     const inIframe = isInIframe();
-    console.log('[Auth Debug] Page loaded - isInIframe:', inIframe);
-    console.log('[Auth Debug] Page loaded - window.self === window.top:', window.self === window.top);
     if (inIframe) {
       document.documentElement.classList.add('dark');
     }

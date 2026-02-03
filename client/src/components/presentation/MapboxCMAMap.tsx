@@ -72,12 +72,6 @@ export function MapboxCMAMap({
     // Check for token - try VITE_ prefixed first, then fall back to non-prefixed
     const token = import.meta.env.VITE_MAPBOX_TOKEN || import.meta.env.MAPBOX_ACCESS_TOKEN;
     
-    console.log('[MAPBOX] Token check:', {
-      hasViteToken: !!import.meta.env.VITE_MAPBOX_TOKEN,
-      hasAccessToken: !!import.meta.env.MAPBOX_ACCESS_TOKEN,
-      tokenPrefix: token?.substring(0, 10)
-    });
-    
     if (!token || token === 'undefined' || !token.startsWith('pk.')) {
       setMapError('Mapbox token not configured');
       return;

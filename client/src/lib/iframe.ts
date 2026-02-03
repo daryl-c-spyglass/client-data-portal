@@ -47,14 +47,6 @@ export function isInIframe(): boolean {
   const urlParams = new URLSearchParams(window.location.search);
   const hasEmbedIndicator = urlParams.has('theme') || urlParams.has('embedded');
   
-  // Always log for debugging (removed once-per-page limitation)
-  console.log('[isInIframe] Detection methods:');
-  console.log('  method1 (self !== top):', method1);
-  console.log('  method2 (parent !== self):', method2);
-  console.log('  method3 (frameElement):', method3);
-  console.log('  method4 (URL params):', hasEmbedIndicator);
-  console.log('  Final result:', method1 || method2 || method3 || hasEmbedIndicator);
-  
   // Return true if ANY method detects iframe
   return method1 || method2 || method3 || hasEmbedIndicator;
 }
