@@ -1,0 +1,214 @@
+# Fix CMA Stats Tab - SPECIFIC PAGE
+
+## EXACT PAGE TO UPDATE
+
+**URL:** `https://f58e6159-1bf8-4479-a256-c997461de361-00-1jv089vliph98.riker.replit.dev/cmas/7bb1e947-d96c-4c92-ae8c-fd785143fd5c`
+
+**Page:** CMA Detail page for "Highpointe" subdivision
+
+**Section:** The "Stats" tab (click the "Stats" button next to "Compare" and "Map")
+
+---
+
+## BEFORE YOU START
+
+1. Open the exact URL above in browser
+2. Click the "Stats" tab button (next to Compare and Map)
+3. Scroll down to see current layout
+4. Take note of what currently exists
+
+---
+
+## ISSUE 1: Remove Peach/Pink Preview Banner
+
+**Location:** Top of the CMA page, below the header
+
+**Current:** Shows a peach/salmon colored banner with:
+```
+"You are seeing a preview of the report."  [Save] [Modify Search] [Notes]
+```
+
+**Required:** DELETE this banner completely. It should not appear on the CMA detail page.
+
+**How to find it:** Search the codebase for:
+- "You are seeing a preview"
+- "preview of the report"
+- `bg-orange` or `bg-red` or `bg-pink` near "preview"
+
+---
+
+## ISSUE 2: Map Tab Shows Error
+
+**Location:** Click the "Map" tab (between Compare and Stats)
+
+**Current:** Shows:
+```
+Map Error
+Failed to load map token
+Check console for details
+```
+
+**Required:** Map should display with property markers showing all comparable properties.
+
+**How to fix:** 
+1. Check if `MAPBOX_ACCESS_TOKEN` is set in Replit Secrets
+2. Ensure the map component receives the token
+3. If using client-side, may need `VITE_MAPBOX_ACCESS_TOKEN`
+
+---
+
+## ISSUE 3: Stats Tab - Fix Layout
+
+**Location:** Click the "Stats" tab
+
+### Current Problems:
+1. Missing property list on left side of "Days on Market" card
+2. Missing property list on left side of "Price/Sq.Ft" card  
+3. Properties in lists should be clickable (open modal with details)
+
+### Required Layout for Each Stats Card:
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│ Card Title (e.g., "Days on Market" or "Price Comparison")       │
+├─────────────────────────────┬───────────────────────────────────┤
+│ LEFT SIDE: Property List    │ RIGHT SIDE: Chart                 │
+│ (scrollable, clickable)     │                                   │
+│                             │                                   │
+│ ● 125 Stoney Point RD       │    [Chart visualization]          │
+│   5 Days • 100.00%          │                                   │
+│                             │                                   │
+│ ● 433 Stoney Point RD       │                                   │
+│   28 Days • 98.62%          │                                   │
+│                             │                                   │
+│ Click any property to       │                                   │
+│ see full details            │                                   │
+└─────────────────────────────┴───────────────────────────────────┘
+```
+
+---
+
+## ISSUE 4: Property Click → Modal
+
+**Current:** Clicking on a property in the list does nothing (or no list exists)
+
+**Required:** When user clicks on any property in the Stats cards:
+1. A modal/dialog should open
+2. Modal shows property details:
+   - Property photo(s)
+   - Full address
+   - Price (and sold price if closed)
+   - Beds / Baths / Sq.Ft / $/Sq.Ft
+   - Days on Market
+   - Status (Active, Closed, etc.)
+   - Year Built
+   - MLS Number
+
+### Modal Component Example:
+
+```tsx
+function PropertyDetailModal({ property, isOpen, onClose }) {
+  if (!property || !isOpen) return null;
+  
+  return (
+    <Dialog open={isOpen} onOpenChange={onClose}>
+      <DialogContent className="max-w-lg">
+        <DialogHeader>
+          <DialogTitle>{property.address}</DialogTitle>
+        </DialogHeader>
+        
+        {property.photo && (
+          <img src={property.photo} alt="" className="w-full h-48 object-cover rounded" />
+        )}
+        
+        <div className="text-xl font-bold">${property.price?.toLocaleString()}</div>
+        
+        <div className="grid grid-cols-2 gap-4 text-sm">
+          <div>
+            <span className="text-gray-500">Beds:</span> {property.beds}
+          </div>
+          <div>
+            <span className="text-gray-500">Baths:</span> {property.baths}
+          </div>
+          <div>
+            <span className="text-gray-500">Sq.Ft:</span> {property.sqft?.toLocaleString()}
+          </div>
+          <div>
+            <span className="text-gray-500">$/Sq.Ft:</span> ${Math.round(property.price / property.sqft)}
+          </div>
+          <div>
+            <span className="text-gray-500">DOM:</span> {property.daysOnMarket} days
+          </div>
+          <div>
+            <span className="text-gray-500">Status:</span> {property.status}
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+```
+
+---
+
+## FILE LOCATIONS TO CHECK
+
+Based on the URL pattern `/cmas/:id`, look for:
+
+```
+client/src/pages/CMADetail.tsx        ← Main CMA page
+client/src/pages/CMAPage.tsx          ← Alternative name
+client/src/components/cma/            ← CMA components folder
+  - CMAStats.tsx                      ← Stats tab content
+  - CMAStatsView.tsx                  ← Alternative name
+  - StatsTab.tsx                      ← Alternative name
+  - DaysOnMarketCard.tsx              ← DOM card
+  - PriceComparisonCard.tsx           ← Price card
+```
+
+---
+
+## TESTING CHECKLIST
+
+Open: `https://[your-replit-url]/cmas/7bb1e947-d96c-4c92-ae8c-fd785143fd5c`
+
+### Banner:
+- [ ] Peach "preview" banner is GONE
+
+### Map Tab:
+- [ ] Click "Map" → Map renders (no error)
+- [ ] Property markers visible on map
+
+### Stats Tab:
+- [ ] Click "Stats" → All cards visible
+- [ ] Days on Market card has property list on LEFT
+- [ ] Price/Sq.Ft card has property list on LEFT
+- [ ] Each property in list shows: Address, Days, Percentage
+- [ ] Click any property → Modal opens with details
+- [ ] Modal shows: Photo, Price, Beds, Baths, SqFt, DOM, Status
+
+---
+
+## DO NOT DECLARE COMPLETE UNTIL:
+
+1. You have opened the exact URL provided
+2. You have clicked on the Stats tab
+3. You see property lists on the LEFT side of chart cards
+4. You have clicked on a property and the modal opened
+5. The peach banner is removed
+
+---
+
+## SCREENSHOT REFERENCE
+
+The user provided a screenshot showing the "Days on Market" section with:
+- "17 DAYS ON MARKET" header
+- "99.31% OF LIST PRICE" 
+- Left side: 2 properties listed (125 Stoney Point RD, 433 Stoney Point RD)
+- Right side: Scatter plot chart
+- Legend: Green (≥100% of list), Yellow (95-99% of list), Red (<95% of list)
+
+This layout is CORRECT for the scatter plot. But ensure:
+1. Properties on left ARE CLICKABLE
+2. Clicking opens a detail modal
+3. The peach preview banner above is REMOVED
