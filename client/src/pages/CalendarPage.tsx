@@ -656,21 +656,18 @@ function CalendarLegend({ horizontal = false }: { horizontal?: boolean }) {
 
 function DebugPanel({ calendarData, startDate, endDate }: { calendarData: CalendarData; startDate: string; endDate: string }) {
   const [isOpen, setIsOpen] = useState(false);
-  const isDev = import.meta.env.DEV;
-  
-  if (!isDev) return null;
   
   return (
     <Collapsible open={isOpen} onOpenChange={setIsOpen}>
-      <Card className="bg-muted/50 border-dashed">
+      <Card className="bg-emerald-50/30 dark:bg-emerald-950/10 border-emerald-300">
         <CollapsibleTrigger asChild>
           <button 
             className="flex items-center justify-between w-full px-4 py-2 text-left hover-elevate rounded-md"
             data-testid="button-debug-toggle"
           >
-            <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
+            <div className="flex items-center gap-2 text-sm font-medium text-emerald-700 dark:text-emerald-400">
               <Bug className="h-4 w-4" />
-              Debug Details
+              Debug Details (Developer Only)
             </div>
             {isOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
           </button>
@@ -711,7 +708,7 @@ function DebugPanel({ calendarData, startDate, endDate }: { calendarData: Calend
 }
 
 export default function CalendarPage() {
-  const { isSuperAdmin, user } = usePermissions();
+  const { isSuperAdmin, isDeveloper, canViewDebug, user } = usePermissions();
   const [selectedUserId, setSelectedUserId] = useState<string>("all");
   const [monthOffset, setMonthOffset] = useState(0);
   const [weekOffset, setWeekOffset] = useState(0);
@@ -1155,7 +1152,7 @@ export default function CalendarPage() {
         </CardContent>
       </Card>
       
-      {calendarData && (
+      {canViewDebug && calendarData && (
         <DebugPanel calendarData={calendarData} startDate={startDate} endDate={endDate} />
       )}
       

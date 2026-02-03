@@ -8,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { UserCircle, Mail, Phone, Tag, Clock, AlertCircle, RefreshCw, Search, ArrowDownUp, Loader2, Cake, Home, Activity, MessageSquare, X, ChevronDown, ChevronUp, Lock } from "lucide-react";
+import { UserCircle, Mail, Phone, Tag, Clock, AlertCircle, RefreshCw, Search, ArrowDownUp, Loader2, Cake, Home, Activity, MessageSquare, X, ChevronDown, ChevronUp, Lock, Bug } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { format, parseISO, formatDistanceToNow } from "date-fns";
@@ -429,7 +429,7 @@ function LeadCard({
 const LEADS_PER_PAGE = 50;
 
 export default function LeadsPage() {
-  const { isSuperAdmin, user } = usePermissions();
+  const { isSuperAdmin, isDeveloper, canViewDebug, user } = usePermissions();
   const [selectedUserId, setSelectedUserId] = useState<string>("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [sortOption, setSortOption] = useState<SortOption>("az");
@@ -744,19 +744,22 @@ export default function LeadsPage() {
         />
       )}
       
-      {process.env.NODE_ENV === "development" && leadsData?.pages[0] && (
-        <Card className="bg-muted/50">
+      {canViewDebug && leadsData?.pages[0] && (
+        <Card className="bg-emerald-50/30 dark:bg-emerald-950/10 border-emerald-300">
           <CardHeader className="py-2">
-            <CardTitle className="text-sm">Debug Info</CardTitle>
+            <CardTitle className="text-sm flex items-center gap-2 text-emerald-700 dark:text-emerald-400">
+              <Bug className="h-4 w-4" />
+              Debug Info (Developer Only)
+            </CardTitle>
           </CardHeader>
-          <CardContent className="py-2 text-xs font-mono">
-            <p>Agent ID: {leadsData.pages[0].agentId || "all"}</p>
-            <p>Total Leads: {totalCount}</p>
-            <p>Loaded: {allLeads.length}</p>
-            <p>Pages: {leadsData.pages.length}</p>
-            <p>Has More: {hasNextPage ? "Yes" : "No"}</p>
-            <p>Sort: {sortOption}</p>
-            <p>Fetched At: {leadsData.pages[0].fetchedAt}</p>
+          <CardContent className="py-2 text-xs font-mono space-y-1">
+            <p><span className="text-muted-foreground">Agent ID:</span> {leadsData.pages[0].agentId || "all"}</p>
+            <p><span className="text-muted-foreground">Total Leads:</span> {totalCount}</p>
+            <p><span className="text-muted-foreground">Loaded:</span> {allLeads.length}</p>
+            <p><span className="text-muted-foreground">Pages:</span> {leadsData.pages.length}</p>
+            <p><span className="text-muted-foreground">Has More:</span> {hasNextPage ? "Yes" : "No"}</p>
+            <p><span className="text-muted-foreground">Sort:</span> {sortOption}</p>
+            <p><span className="text-muted-foreground">Fetched At:</span> {leadsData.pages[0].fetchedAt}</p>
           </CardContent>
         </Card>
       )}
