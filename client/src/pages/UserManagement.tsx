@@ -25,12 +25,13 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Loader2, Search, Shield, ShieldCheck, User, MoreHorizontal, UserX, UserCheck, History, Users, UserPlus, Trash2, AlertTriangle } from "lucide-react";
+import { Loader2, Search, Shield, ShieldCheck, User, MoreHorizontal, UserX, UserCheck, History, Users, UserPlus, Trash2, AlertTriangle, Code } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { usePermissions } from "@/hooks/use-permissions";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { getRoleDisplayName, INITIAL_SUPER_ADMIN_EMAILS, UserRole } from "@shared/permissions";
+import { getRoleDisplayName, DEVELOPER_EMAILS, INITIAL_SUPER_ADMIN_EMAILS, UserRole } from "@shared/permissions";
+import { RoleBadge } from "@/components/RoleBadge";
 import { Link } from "wouter";
 
 interface FUBUser {
@@ -67,19 +68,10 @@ interface UserData {
   lastLoginAt?: string | null;
 }
 
-function getRoleBadgeVariant(role: string): "default" | "secondary" | "destructive" | "outline" {
-  switch (role) {
-    case "super_admin":
-      return "destructive";
-    case "admin":
-      return "default";
-    default:
-      return "secondary";
-  }
-}
-
 function getRoleIcon(role: string) {
   switch (role) {
+    case "developer":
+      return <Code className="w-3 h-3" />;
     case "super_admin":
       return <ShieldCheck className="w-3 h-3" />;
     case "admin":
@@ -91,7 +83,7 @@ function getRoleIcon(role: string) {
 
 function UserManagementContent() {
   const { toast } = useToast();
-  const { user: currentUser } = usePermissions();
+  const { user: currentUser, isDeveloper } = usePermissions();
   const [searchQuery, setSearchQuery] = useState("");
   const [editingUserId, setEditingUserId] = useState<string | null>(null);
   const [pendingRole, setPendingRole] = useState<string>("");
@@ -304,23 +296,32 @@ function UserManagementContent() {
   };
 
   const isProtectedUser = (user: UserData) => {
-    return INITIAL_SUPER_ADMIN_EMAILS.includes(user.email.toLowerCase());
+    return DEVELOPER_EMAILS.includes(user.email.toLowerCase()) || 
+           INITIAL_SUPER_ADMIN_EMAILS.includes(user.email.toLowerCase());
   };
 
   const canModifyUser = (user: UserData) => {
-    return !isProtectedUser(user);
+    if (currentUser && user.id === currentUser.id) return false;
+    if (user.role === "developer" || user.role === "super_admin") {
+      return isDeveloper;
+    }
+    return true;
   };
 
   const canDisableUser = (user: UserData) => {
-    // Cannot disable self, Super Admins, or protected users
     if (currentUser && user.id === currentUser.id) return false;
-    return user.role !== "super_admin" && !isProtectedUser(user);
+    if (user.role === "developer" || user.role === "super_admin") {
+      return isDeveloper;
+    }
+    return true;
   };
 
   const canDeleteUser = (user: UserData) => {
-    // Cannot delete self, Super Admins, or protected users
     if (currentUser && user.id === currentUser.id) return false;
-    return user.role !== "super_admin" && !isProtectedUser(user);
+    if (user.role === "developer" || user.role === "super_admin") {
+      return isDeveloper;
+    }
+    return true;
   };
 
   const handleDeleteUser = () => {
@@ -471,13 +472,11 @@ function UserManagementContent() {
                             <SelectItem value="agent">Agent</SelectItem>
                             <SelectItem value="admin">Admin</SelectItem>
                             <SelectItem value="super_admin">Super Admin</SelectItem>
+                            {isDeveloper && <SelectItem value="developer">Developer</SelectItem>}
                           </SelectContent>
                         </Select>
                       ) : (
-                        <Badge variant={getRoleBadgeVariant(user.role)} className="gap-1">
-                          {getRoleIcon(user.role)}
-                          {getRoleDisplayName(user.role as UserRole)}
-                        </Badge>
+                        <RoleBadge role={user.role} />
                       )}
                     </TableCell>
                     <TableCell className="text-muted-foreground">
@@ -629,6 +628,7 @@ function UserManagementContent() {
                         <SelectItem value="agent">Agent</SelectItem>
                         <SelectItem value="admin">Admin</SelectItem>
                         <SelectItem value="super_admin">Super Admin</SelectItem>
+                        {isDeveloper && <SelectItem value="developer">Developer</SelectItem>}
                       </SelectContent>
                     </Select>
                     <Button
@@ -661,7 +661,7 @@ function UserManagementContent() {
           <CardDescription>Overview of what each role can access</CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="grid gap-4 md:grid-cols-3">
+          <div className={`grid gap-4 ${isDeveloper ? 'md:grid-cols-4' : 'md:grid-cols-3'}`}>
             <div className="p-4 rounded-lg border">
               <div className="flex items-center gap-2 mb-2">
                 <User className="w-4 h-4" />
@@ -701,6 +701,22 @@ function UserManagementContent() {
                 <li>View activity logs</li>
               </ul>
             </div>
+            {isDeveloper && (
+              <div className="p-4 rounded-lg border border-emerald-300 bg-emerald-50/30 dark:bg-emerald-950/10">
+                <div className="flex items-center gap-2 mb-2">
+                  <Code className="w-4 h-4 text-emerald-600" />
+                  <h3 className="font-medium text-emerald-700 dark:text-emerald-400">Developer</h3>
+                </div>
+                <ul className="text-sm text-muted-foreground space-y-1">
+                  <li>All Super Admin permissions</li>
+                  <li>Grant Developer role</li>
+                  <li>Manage Super Admins</li>
+                  <li>Delete privileged users</li>
+                  <li>View debug info</li>
+                  <li>System diagnostics</li>
+                </ul>
+              </div>
+            )}
           </div>
         </CardContent>
       </Card>
