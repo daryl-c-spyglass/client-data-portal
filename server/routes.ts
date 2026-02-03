@@ -7768,11 +7768,12 @@ OUTPUT JSON:
   app.put("/api/admin/users/:id/role", requireAuth, requireMinimumRole("super_admin"), async (req, res) => {
     try {
       const { id } = req.params;
-      const { role } = req.body;
+      const { role: newRole } = req.body;
       const currentUser = req.user as any;
+      const adminRole = currentUser.role;
       
-      if (!role || !["super_admin", "admin", "agent"].includes(role)) {
-        return res.status(400).json({ error: "Invalid role. Must be 'super_admin', 'admin', or 'agent'" });
+      if (!newRole || !["developer", "super_admin", "admin", "agent"].includes(newRole)) {
+        return res.status(400).json({ error: "Invalid role. Must be 'developer', 'super_admin', 'admin', or 'agent'" });
       }
       
       const targetUser = await storage.getUser(id);
@@ -7784,30 +7785,39 @@ OUTPUT JSON:
         return res.status(403).json({ error: "Cannot change your own role" });
       }
       
-      // Prevent demoting initial super admins (hardcoded fallback)
-      if (INITIAL_SUPER_ADMIN_EMAILS.includes(targetUser.email.toLowerCase()) && role !== "super_admin") {
-        return res.status(403).json({ error: "Cannot demote initial super admin" });
+      // Protection: Only Developers can modify Super Admin or Developer roles
+      if (targetUser.role === "super_admin" || targetUser.role === "developer") {
+        if (adminRole !== "developer") {
+          return res.status(403).json({ 
+            error: "Only Developers can modify Super Admin or Developer accounts" 
+          });
+        }
       }
       
-      // Prevent removing the last super admin
-      if (targetUser.role === "super_admin" && role !== "super_admin") {
+      // Protection: Only Developers can grant Developer role
+      if (newRole === "developer" && adminRole !== "developer") {
+        return res.status(403).json({ error: "Only Developers can grant Developer role" });
+      }
+      
+      // Protection: Cannot demote the last Developer
+      if (targetUser.role === "developer" && newRole !== "developer") {
         const schema = await import("@shared/schema");
         const { drizzle } = await import("drizzle-orm/neon-serverless");
         const { Pool } = await import("@neondatabase/serverless");
         const { eq, sql } = await import("drizzle-orm");
         const pool = new Pool({ connectionString: process.env.DATABASE_URL });
         const db = drizzle(pool);
-        const superAdminCount = await db.select({ count: sql<number>`count(*)` })
+        const developerCount = await db.select({ count: sql<number>`count(*)` })
           .from(schema.users)
-          .where(eq(schema.users.role, "super_admin"));
+          .where(eq(schema.users.role, "developer"));
         
-        if (Number(superAdminCount[0]?.count || 0) <= 1) {
-          return res.status(403).json({ error: "Cannot remove the last Super Admin" });
+        if (Number(developerCount[0]?.count || 0) <= 1) {
+          return res.status(403).json({ error: "Cannot remove the last Developer" });
         }
       }
       
       const previousRole = targetUser.role;
-      const updatedUser = await storage.updateUser(id, { role });
+      const updatedUser = await storage.updateUser(id, { role: newRole });
       if (!updatedUser) {
         return res.status(404).json({ error: "User not found" });
       }
@@ -7818,11 +7828,11 @@ OUTPUT JSON:
         action: "USER_ROLE_CHANGED",
         targetUserId: id,
         previousValue: previousRole,
-        newValue: role,
+        newValue: newRole,
         req,
       });
       
-      console.log(`[Admin Users] Role updated: ${targetUser.email} from ${previousRole} to ${role} by ${currentUser.email}`);
+      console.log(`[Admin Users] Role updated: ${targetUser.email} from ${previousRole} to ${newRole} by ${currentUser.email}`);
       res.json({ success: true, user: updatedUser });
     } catch (error: any) {
       console.error("[Admin Users] Error updating:", error.message);
@@ -7836,6 +7846,7 @@ OUTPUT JSON:
       const { id } = req.params;
       const { isActive } = req.body;
       const currentUser = req.user as any;
+      const adminRole = currentUser.role;
       
       if (typeof isActive !== "boolean") {
         return res.status(400).json({ error: "isActive must be a boolean" });
@@ -7851,9 +7862,11 @@ OUTPUT JSON:
         return res.status(403).json({ error: "Cannot change your own account status" });
       }
       
-      // Cannot disable a super admin
-      if (targetUser.role === "super_admin" && !isActive) {
-        return res.status(403).json({ error: "Cannot disable a Super Admin account" });
+      // Only Developers can disable Super Admins or Developers
+      if ((targetUser.role === "super_admin" || targetUser.role === "developer") && !isActive) {
+        if (adminRole !== "developer") {
+          return res.status(403).json({ error: "Only Developers can disable Super Admin or Developer accounts" });
+        }
       }
       
       const previousStatus = targetUser.isActive;
@@ -7885,6 +7898,7 @@ OUTPUT JSON:
     try {
       const { id } = req.params;
       const adminUser = req.user as any;
+      const adminRole = adminUser.role;
       
       // Get target user
       const targetUser = await storage.getUser(id);
@@ -7898,9 +7912,28 @@ OUTPUT JSON:
         return res.status(403).json({ error: "Cannot delete your own account" });
       }
       
-      // Protection: Cannot delete Super Admins
-      if (targetUser.role === "super_admin") {
-        return res.status(403).json({ error: "Cannot delete Super Admin accounts. Demote to Admin first." });
+      // Protection: Only Developers can delete Super Admins or Developers
+      if (targetUser.role === "super_admin" || targetUser.role === "developer") {
+        if (adminRole !== "developer") {
+          return res.status(403).json({ error: "Only Developers can delete Super Admin or Developer accounts" });
+        }
+      }
+      
+      // Protection: Cannot delete the last Developer
+      if (targetUser.role === "developer") {
+        const schema = await import("@shared/schema");
+        const { drizzle } = await import("drizzle-orm/neon-serverless");
+        const { Pool } = await import("@neondatabase/serverless");
+        const { eq, sql } = await import("drizzle-orm");
+        const pool = new Pool({ connectionString: process.env.DATABASE_URL });
+        const db = drizzle(pool);
+        const developerCount = await db.select({ count: sql<number>`count(*)` })
+          .from(schema.users)
+          .where(eq(schema.users.role, "developer"));
+        
+        if (Number(developerCount[0]?.count || 0) <= 1) {
+          return res.status(403).json({ error: "Cannot delete the last Developer" });
+        }
       }
       
       // Log activity BEFORE deletion (so we have the user info)
