@@ -67,7 +67,8 @@ export function setupAuth() {
   const googleClientSecret = process.env.GOOGLE_CLIENT_SECRET;
   
   if (googleClientId && googleClientSecret) {
-    const callbackURL = process.env.GOOGLE_REDIRECT_URI || 
+    const callbackURL = process.env.GOOGLE_CALLBACK_URL || 
+      process.env.GOOGLE_REDIRECT_URI || 
       (process.env.REPLIT_DOMAINS 
         ? `https://${process.env.REPLIT_DOMAINS.split(',')[0]}/auth/google/callback`
         : process.env.REPLIT_DEV_DOMAIN

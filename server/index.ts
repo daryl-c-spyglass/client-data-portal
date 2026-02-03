@@ -17,8 +17,8 @@ import { registerObjectStorageRoutes } from "./replit_integrations/object_storag
 
 const app = express();
 
-// Trust proxy - required for secure cookies behind Replit's reverse proxy
-app.set('trust proxy', 1);
+// Trust proxy - required for secure cookies behind reverse proxies (Render/Replit)
+app.set('trust proxy', process.env.NODE_ENV === 'production' ? 1 : false);
 
 // CSP Headers for iframe embedding (Mission Control / Agent Hub Portal)
 // Must be added BEFORE routes to allow embedding from Replit and Render domains
@@ -60,10 +60,15 @@ if (process.env.NODE_ENV === "production" && !process.env.DATABASE_URL) {
 
 const sessionStore = process.env.DATABASE_URL 
   ? new PgSession({
-      pool: new Pool({ connectionString: process.env.DATABASE_URL }),
+      pool: new Pool({ 
+        connectionString: process.env.DATABASE_URL,
+        ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false
+      }),
       createTableIfMissing: true,
     })
   : undefined;
+
+const isProduction = process.env.NODE_ENV === 'production';
 
 app.use(
   session({
@@ -72,11 +77,11 @@ app.use(
     resave: false,
     saveUninitialized: false,
     cookie: {
-      // For iframe embedding: sameSite must be 'none' with secure: true
-      // This allows cookies to be sent in cross-origin iframe contexts
-      secure: true, // Required for sameSite: 'none'
+      // Production: secure cookies with sameSite 'none' for cross-origin iframe support
+      // Development: allow insecure cookies for local testing
+      secure: isProduction,
       httpOnly: true,
-      sameSite: "none", // Required for iframe cross-origin cookie support
+      sameSite: isProduction ? "none" : "lax",
       maxAge: 1000 * 60 * 60 * 24 * 7,
     },
   })
@@ -87,6 +92,11 @@ app.use(passport.session());
 
 setupAuth();
 setupAuthRoutes(app);
+
+// Health check endpoint for Render and load balancers
+app.get('/health', (_req, res) => {
+  res.status(200).json({ status: 'ok', timestamp: new Date().toISOString() });
+});
 
 app.use((req, res, next) => {
   const start = Date.now();

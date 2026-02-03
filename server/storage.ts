@@ -1043,7 +1043,10 @@ export class DbStorage implements IStorage {
   private db;
 
   constructor(connectionString: string) {
-    const pool = new Pool({ connectionString });
+    const pool = new Pool({ 
+      connectionString,
+      ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false
+    });
     this.db = drizzle(pool, { schema: { users, properties, media, savedSearches, cmas } });
   }
 
