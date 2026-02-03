@@ -1,0 +1,348 @@
+# Role-Based Visibility for Admin Sections
+
+## TESTING REQUIREMENT
+
+**Before declaring complete, you MUST test with ALL 4 roles:**
+1. Developer → Can see: User Management, Activity Logs, Role Permissions section
+2. Super Admin → Can see: User Management, Activity Logs, Role Permissions section
+3. Admin → Can see: (nothing in Admin section - no sidebar links)
+4. Agent → Can see: (nothing in Admin section - no sidebar links)
+
+**DO NOT declare complete without testing all 4 roles**
+
+---
+
+## REQUIREMENTS
+
+### Sidebar Navigation Visibility
+
+| Sidebar Item | Agent | Admin | Super Admin | Developer |
+|--------------|:-----:|:-----:|:-----------:|:---------:|
+| Dashboard | Yes | Yes | Yes | Yes |
+| Properties | Yes | Yes | Yes | Yes |
+| CMAs | Yes | Yes | Yes | Yes |
+| Seller Updates | Yes | Yes | Yes | Yes |
+| Buyer Search | Yes | Yes | Yes | Yes |
+| Clients | Yes | Yes | Yes | Yes |
+| Analytics | Yes | Yes | Yes | Yes |
+| Settings | Yes | Yes | Yes | Yes |
+| **Admin** (section header) | No | No | Yes | Yes |
+| **User Management** | No | No | Yes | Yes |
+| **Activity Logs** | No | No | Yes | Yes |
+| Follow Up Boss (section) | Yes | Yes | Yes | Yes |
+| Calendar | Yes | Yes | Yes | Yes |
+| Leads | Yes | Yes | Yes | Yes |
+
+### Role Permissions Section (on User Management page)
+
+| Element | Agent | Admin | Super Admin | Developer |
+|---------|:-----:|:-----:|:-----------:|:---------:|
+| Role Permissions cards | N/A | N/A | Yes | Yes |
+
+(Agent and Admin can't access User Management page at all, so N/A)
+
+---
+
+## IMPLEMENTATION
+
+### 1. Update Sidebar Navigation
+
+```tsx
+// client/src/components/Sidebar.tsx (or Layout.tsx)
+
+import { usePermissions } from '@/hooks/use-permissions';
+
+export function Sidebar() {
+  const { isSuperAdmin, isDeveloper } = usePermissions();
+  
+  // Only Super Admin and Developer can see Admin section
+  const canAccessAdmin = isSuperAdmin || isDeveloper;
+
+  return (
+    <nav>
+      {/* Application Section */}
+      <div className="mb-4">
+        <p className="text-xs text-muted-foreground mb-2">Application</p>
+        <NavLink to="/dashboard">Dashboard</NavLink>
+        <NavLink to="/properties">Properties</NavLink>
+        <NavLink to="/cmas">CMAs</NavLink>
+        <NavLink to="/seller-updates">Seller Updates</NavLink>
+        <NavLink to="/buyer-search">Buyer Search</NavLink>
+        <NavLink to="/clients">Clients</NavLink>
+        <NavLink to="/analytics">Analytics</NavLink>
+        <NavLink to="/settings">Settings</NavLink>
+      </div>
+      
+      {/* Admin Section - Only for Super Admin and Developer */}
+      {canAccessAdmin && (
+        <div className="mb-4">
+          <p className="text-xs text-muted-foreground mb-2">Admin</p>
+          <NavLink to="/admin/users">User Management</NavLink>
+          <NavLink to="/admin/activity-logs">Activity Logs</NavLink>
+        </div>
+      )}
+      
+      {/* Follow Up Boss Section */}
+      <div className="mb-4">
+        <p className="text-xs text-muted-foreground mb-2">Follow Up Boss</p>
+        <NavLink to="/calendar">Calendar</NavLink>
+        <NavLink to="/leads">Leads</NavLink>
+      </div>
+    </nav>
+  );
+}
+```
+
+### 2. Protect Admin Routes
+
+```tsx
+// client/src/App.tsx or routes.tsx
+
+import { usePermissions } from '@/hooks/use-permissions';
+import { Navigate } from 'react-router-dom';
+
+function ProtectedAdminRoute({ children }) {
+  const { isSuperAdmin, isDeveloper, isLoading } = usePermissions();
+  
+  if (isLoading) return <LoadingSpinner />;
+  
+  if (!isSuperAdmin && !isDeveloper) {
+    return <Navigate to="/dashboard" replace />;
+  }
+  
+  return children;
+}
+
+// In routes:
+<Route 
+  path="/admin/users" 
+  element={
+    <ProtectedAdminRoute>
+      <UserManagement />
+    </ProtectedAdminRoute>
+  } 
+/>
+<Route 
+  path="/admin/activity-logs" 
+  element={
+    <ProtectedAdminRoute>
+      <ActivityLogs />
+    </ProtectedAdminRoute>
+  } 
+/>
+```
+
+### 3. Role Permissions Section Visibility
+
+```tsx
+// client/src/pages/UserManagement.tsx
+
+import { usePermissions } from '@/hooks/use-permissions';
+
+export default function UserManagement() {
+  const { isSuperAdmin, isDeveloper } = usePermissions();
+  
+  // Role Permissions visible to Super Admin and Developer
+  const canViewRolePermissions = isSuperAdmin || isDeveloper;
+
+  return (
+    <div className="p-6 space-y-6">
+      {/* Header */}
+      <div>
+        <h1 className="text-2xl font-bold">User Management</h1>
+        <p className="text-muted-foreground">Manage team member roles and permissions</p>
+      </div>
+      
+      {/* Stats Cards */}
+      <div className="grid grid-cols-3 gap-4">
+        {/* Total Users, Active, Disabled cards */}
+      </div>
+      
+      {/* Team Members Table */}
+      <Card>
+        {/* User table */}
+      </Card>
+      
+      {/* Role Permissions - Only for Super Admin and Developer */}
+      {canViewRolePermissions && (
+        <div className="mt-8">
+          <h2 className="text-lg font-semibold mb-2">Role Permissions</h2>
+          <p className="text-sm text-muted-foreground mb-4">
+            Overview of what each role can access
+          </p>
+          
+          <div className="grid grid-cols-4 gap-4">
+            {/* Agent Card */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <User className="w-4 h-4" />
+                  Agent
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="text-sm text-muted-foreground">
+                <ul className="space-y-1">
+                  <li>Create and edit own CMAs</li>
+                  <li>Create presentations</li>
+                  <li>Use global slides</li>
+                  <li>View analytics</li>
+                </ul>
+              </CardContent>
+            </Card>
+            
+            {/* Admin Card */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Shield className="w-4 h-4" />
+                  Admin
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="text-sm text-muted-foreground">
+                <ul className="space-y-1">
+                  <li>All Agent permissions</li>
+                  <li>View presentation library</li>
+                  <li>Create templates</li>
+                  <li>Manage display settings</li>
+                </ul>
+              </CardContent>
+            </Card>
+            
+            {/* Super Admin Card */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <ShieldCheck className="w-4 h-4" />
+                  Super Admin
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="text-sm text-muted-foreground">
+                <ul className="space-y-1">
+                  <li>All Admin permissions</li>
+                  <li>Manage presentation library</li>
+                  <li>Manage user roles</li>
+                  <li>Manage templates</li>
+                  <li>Manage company settings</li>
+                  <li>Enable/disable users</li>
+                  <li>View activity logs</li>
+                </ul>
+              </CardContent>
+            </Card>
+            
+            {/* Developer Card */}
+            <Card className="border-emerald-200 bg-emerald-50/30">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-emerald-700">
+                  <Code className="w-4 h-4" />
+                  Developer
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="text-sm text-muted-foreground">
+                <ul className="space-y-1">
+                  <li>All Super Admin permissions</li>
+                  <li>Grant Developer role</li>
+                  <li>Manage Super Admins</li>
+                  <li>Delete privileged users</li>
+                  <li>View debug info</li>
+                  <li>System diagnostics</li>
+                </ul>
+              </CardContent>
+            </Card>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+```
+
+---
+
+## BACKEND PROTECTION
+
+Also ensure backend routes are protected:
+
+```typescript
+// server/routes/admin.ts
+
+// Middleware to check Super Admin or Developer access
+function requireAdminAccess(req, res, next) {
+  const user = req.user as any;
+  if (user.role !== 'super_admin' && user.role !== 'developer') {
+    return res.status(403).json({ error: 'Access denied. Super Admin or Developer required.' });
+  }
+  next();
+}
+
+// Apply to all admin routes
+app.get('/api/admin/users', requireAuth, requireAdminAccess, async (req, res) => { ... });
+app.put('/api/admin/users/:id/role', requireAuth, requireAdminAccess, async (req, res) => { ... });
+app.get('/api/admin/activity-logs', requireAuth, requireAdminAccess, async (req, res) => { ... });
+```
+
+---
+
+## SUMMARY
+
+### Who Can See What
+
+| Feature | Agent | Admin | Super Admin | Developer |
+|---------|:-----:|:-----:|:-----------:|:---------:|
+| Admin sidebar section | No | No | Yes | Yes |
+| User Management page | No | No | Yes | Yes |
+| Activity Logs page | No | No | Yes | Yes |
+| Role Permissions section | No | No | Yes | Yes |
+| Debug Info (Calendar/Leads) | No | No | No | Yes |
+
+### What Happens If Agent/Admin Tries to Access Admin Pages
+
+1. **Sidebar:** Admin section links are hidden
+2. **Direct URL:** Redirected to Dashboard
+3. **API Call:** Returns 403 Forbidden
+
+---
+
+## TESTING CHECKLIST
+
+### Test as Developer (daryl@spyglassrealty.com):
+- [ ] Sidebar shows: Admin section with User Management, Activity Logs
+- [ ] Can access /admin/users
+- [ ] Can access /admin/activity-logs
+- [ ] Role Permissions section visible on User Management page
+- [ ] All 4 role cards displayed (Agent, Admin, Super Admin, Developer)
+
+### Test as Super Admin (caleb@spyglassrealty.com):
+- [ ] Sidebar shows: Admin section with User Management, Activity Logs
+- [ ] Can access /admin/users
+- [ ] Can access /admin/activity-logs
+- [ ] Role Permissions section visible on User Management page
+
+### Test as Admin (create test user with admin role):
+- [ ] Sidebar does NOT show Admin section
+- [ ] Cannot access /admin/users (redirects to dashboard)
+- [ ] Cannot access /admin/activity-logs (redirects to dashboard)
+
+### Test as Agent (create test user with agent role):
+- [ ] Sidebar does NOT show Admin section
+- [ ] Cannot access /admin/users (redirects to dashboard)
+- [ ] Cannot access /admin/activity-logs (redirects to dashboard)
+
+---
+
+## FILES TO MODIFY
+
+```
+client/src/
+├── components/
+│   └── Sidebar.tsx              [MODIFY - hide Admin section for Agent/Admin]
+├── App.tsx or routes.tsx        [MODIFY - protect admin routes]
+└── pages/
+    └── UserManagement.tsx       [MODIFY - conditional Role Permissions section]
+
+server/
+└── routes/admin.ts              [VERIFY - backend protection exists]
+```
+
+---
+
+**REMINDER: Test with all 4 roles to ensure proper visibility and access control!**

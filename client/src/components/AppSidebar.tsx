@@ -1,4 +1,4 @@
-import { Home, Search, FileText, Users, Settings, BarChart3, Mail, Filter, Calendar, UserCircle, MessageCircle, Shield, UsersRound, ClipboardList } from "lucide-react";
+import { Home, Search, FileText, Users, Settings, BarChart3, Mail, Filter, Calendar, UserCircle, MessageCircle, UsersRound, ClipboardList } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import {
   Sidebar,
@@ -70,25 +70,16 @@ const menuItems = [
 
 const adminItems = [
   {
-    title: "Admin",
-    url: "/admin",
-    icon: Shield,
-    testId: "link-admin",
-    requiredRole: "admin" as const,
-  },
-  {
     title: "User Management",
     url: "/admin/users",
     icon: UsersRound,
     testId: "link-user-management",
-    requiredRole: "super_admin" as const,
   },
   {
     title: "Activity Logs",
     url: "/admin/activity-logs",
     icon: ClipboardList,
     testId: "link-activity-logs",
-    requiredRole: "super_admin" as const,
   },
 ];
 
@@ -111,7 +102,7 @@ const calendarItems = [
 export function AppSidebar() {
   const [location] = useLocation();
   const { openChat } = useChat();
-  const { isAtLeast } = usePermissions();
+  const { canAccessAdmin } = usePermissions();
 
   return (
     <Sidebar>
@@ -143,8 +134,16 @@ export function AppSidebar() {
                   </SidebarMenuButton>
                 </SidebarMenuItem>
               ))}
-              {adminItems.map((item) => 
-                isAtLeast(item.requiredRole) && (
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+        
+        {canAccessAdmin && (
+          <SidebarGroup>
+            <SidebarGroupLabel>Admin</SidebarGroupLabel>
+            <SidebarGroupContent>
+              <SidebarMenu>
+                {adminItems.map((item) => (
                   <SidebarMenuItem key={item.title}>
                     <SidebarMenuButton 
                       asChild
@@ -156,11 +155,11 @@ export function AppSidebar() {
                       </Link>
                     </SidebarMenuButton>
                   </SidebarMenuItem>
-                )
-              )}
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
+                ))}
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+        )}
         
         <SidebarGroup>
           <SidebarGroupLabel>Follow Up Boss</SidebarGroupLabel>
