@@ -1,6 +1,9 @@
-export type UserRole = 'super_admin' | 'admin' | 'agent';
+export type UserRole = 'developer' | 'super_admin' | 'admin' | 'agent';
 
 export type Permission = 
+  | 'developer.all'
+  | 'developer.debug'
+  | 'developer.manage_super_admins'
   | 'presentation_library.view'
   | 'presentation_library.manage'
   | 'user_management.view'
@@ -15,9 +18,27 @@ export type Permission =
   | 'settings.manage_display'
   | 'analytics.view';
 
-const ROLE_HIERARCHY: UserRole[] = ['agent', 'admin', 'super_admin'];
+const ROLE_HIERARCHY: UserRole[] = ['agent', 'admin', 'super_admin', 'developer'];
 
 const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
+  developer: [
+    'developer.all',
+    'developer.debug',
+    'developer.manage_super_admins',
+    'presentation_library.view',
+    'presentation_library.manage',
+    'user_management.view',
+    'user_management.manage',
+    'templates.create',
+    'templates.manage',
+    'cma.create',
+    'cma.edit_own',
+    'presentations.create',
+    'presentations.use_global_slides',
+    'settings.manage_company',
+    'settings.manage_display',
+    'analytics.view',
+  ],
   super_admin: [
     'presentation_library.view',
     'presentation_library.manage',
@@ -70,6 +91,7 @@ export function isAtLeast(role: UserRole, requiredRole: UserRole): boolean {
 
 export function getRoleDisplayName(role: UserRole): string {
   const displayNames: Record<UserRole, string> = {
+    developer: 'Developer',
     super_admin: 'Super Admin',
     admin: 'Admin',
     agent: 'Agent',
@@ -78,34 +100,44 @@ export function getRoleDisplayName(role: UserRole): string {
 }
 
 export function normalizeRole(role: string | undefined | null): UserRole {
-  if (role === 'super_admin' || role === 'admin' || role === 'agent') {
+  if (role === 'developer' || role === 'super_admin' || role === 'admin' || role === 'agent') {
     return role;
   }
   return 'agent';
 }
 
-// Initial super admin emails - used as fallback for first-time setup only
-// Once users have roles in database, database role takes precedence
-export const INITIAL_SUPER_ADMIN_EMAILS = [
-  'ryan@spyglassrealty.com',
+export function canManageRole(actorRole: UserRole, targetRole: UserRole): boolean {
+  const actorLevel = ROLE_HIERARCHY.indexOf(actorRole);
+  const targetLevel = ROLE_HIERARCHY.indexOf(targetRole);
+  return actorLevel > targetLevel;
+}
+
+export const DEVELOPER_EMAILS = [
   'daryl@spyglassrealty.com',
+  'ryan@spyglassrealty.com',
+];
+
+export const INITIAL_SUPER_ADMIN_EMAILS = [
   'caleb@spyglassrealty.com',
 ];
 
-// @deprecated Use determineUserRole() instead which respects database roles
+export function isDeveloperEmail(email: string): boolean {
+  return DEVELOPER_EMAILS.includes(email.toLowerCase());
+}
+
 export function isSuperAdminEmail(email: string): boolean {
   return INITIAL_SUPER_ADMIN_EMAILS.includes(email.toLowerCase());
 }
 
-// Determines user role with database role taking precedence
-// Falls back to initial super admin emails for first-time setup
 export function determineUserRole(user: { email: string; role?: string | null }): UserRole {
-  // Database role takes precedence
+  if (user.role === 'developer') return 'developer';
   if (user.role === 'super_admin') return 'super_admin';
   if (user.role === 'admin') return 'admin';
   if (user.role === 'agent') return 'agent';
   
-  // Fallback for initial super admins (first-time setup only)
+  if (DEVELOPER_EMAILS.includes(user.email.toLowerCase())) {
+    return 'developer';
+  }
   if (INITIAL_SUPER_ADMIN_EMAILS.includes(user.email.toLowerCase())) {
     return 'super_admin';
   }

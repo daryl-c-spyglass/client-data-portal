@@ -39,9 +39,14 @@ export function usePermissions() {
     canAll: (permissions: Permission[]) => hasAllPermissions(role, permissions),
     isAtLeast: (requiredRole: UserRole) => isAtLeast(role, requiredRole),
     
-    isSuperAdmin: role === "super_admin",
-    isAdmin: role === "admin" || role === "super_admin",
+    isDeveloper: role === "developer",
+    isSuperAdmin: role === "super_admin" || role === "developer",
+    isAdmin: role === "admin" || role === "super_admin" || role === "developer",
     isAgent: role === "agent",
+    
+    canViewDebug: role === "developer",
+    canManageSuperAdmins: role === "developer",
+    canAccessAdmin: role === "super_admin" || role === "developer",
     
     roleDisplayName: getRoleDisplayName(role),
   };

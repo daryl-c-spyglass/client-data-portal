@@ -1,0 +1,691 @@
+# Add Developer Role with Elevated Privileges
+
+## TESTING REQUIREMENT
+
+**Before declaring complete, you MUST:**
+1. Verify Daryl and Ryan show as "Developer" role
+2. Test Developer can remove Super Admin privileges from another user
+3. Test Developer can see Debug Info on Calendar and Leads pages
+4. Test Super Admin CANNOT remove another Super Admin (only Developer can)
+5. Test Super Admin CANNOT see Debug Info
+6. **DO NOT declare complete without testing all scenarios**
+
+---
+
+## OVERVIEW
+
+### New Role Hierarchy (4 Tiers)
+
+```
+Developer (highest)
+    ↓
+Super Admin
+    ↓
+Admin
+    ↓
+Agent (lowest)
+```
+
+### Developer-Only Privileges
+
+| Privilege | Developer | Super Admin | Admin | Agent |
+|-----------|:---------:|:-----------:|:-----:|:-----:|
+| Remove Super Admin role | Yes | No | No | No |
+| Delete Super Admin account | Yes | No | No | No |
+| View Debug Info (Calendar/Leads) | Yes | No | No | No |
+| Manage all users | Yes | Yes | No | No |
+| View Activity Logs | Yes | Yes | No | No |
+| Access Admin panel | Yes | Yes | No | No |
+
+### Developer Users (Hardcoded Initially)
+
+| Name | Email | Role |
+|------|-------|------|
+| Daryl Camingao | daryl@spyglassrealty.com | Developer |
+| Ryan Rodenbeck | ryan@spyglassrealty.com | Developer |
+
+---
+
+## PHASE 1: Update Role System
+
+### 1.1 Update Role Types
+
+```typescript
+// shared/permissions.ts
+
+export type UserRole = 'developer' | 'super_admin' | 'admin' | 'agent';
+
+// Updated hierarchy (highest to lowest)
+const ROLE_HIERARCHY: UserRole[] = ['agent', 'admin', 'super_admin', 'developer'];
+
+// Developer emails (hardcoded for security)
+export const DEVELOPER_EMAILS = [
+  'daryl@spyglassrealty.com',
+  'ryan@spyglassrealty.com',
+];
+
+// Super Admin emails (can be managed by Developers)
+export const INITIAL_SUPER_ADMIN_EMAILS = [
+  'caleb@spyglassrealty.com',
+];
+
+// Role display names
+export function getRoleDisplayName(role: UserRole): string {
+  switch (role) {
+    case 'developer': return 'Developer';
+    case 'super_admin': return 'Super Admin';
+    case 'admin': return 'Admin';
+    case 'agent': return 'Agent';
+    default: return 'Agent';
+  }
+}
+
+// Check if role can manage another role
+export function canManageRole(actorRole: UserRole, targetRole: UserRole): boolean {
+  const actorLevel = ROLE_HIERARCHY.indexOf(actorRole);
+  const targetLevel = ROLE_HIERARCHY.indexOf(targetRole);
+  return actorLevel > targetLevel;
+}
+```
+
+### 1.2 Update Permission Definitions
+
+```typescript
+// shared/permissions.ts - Add developer permissions
+
+export type Permission = 
+  | 'developer.all'                    // Full system access
+  | 'developer.debug'                  // View debug info
+  | 'developer.manage_super_admins'    // Can remove/delete super admins
+  | 'user_management.view'
+  | 'user_management.manage'
+  | 'presentation_library.view'
+  | 'presentation_library.manage'
+  | 'templates.create'
+  | 'templates.manage'
+  | 'cma.create'
+  | 'cma.edit_own'
+  | 'presentations.create'
+  | 'presentations.use_global_slides'
+  | 'settings.manage_company'
+  | 'settings.manage_display'
+  | 'analytics.view';
+
+// Role permissions
+const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
+  developer: [
+    'developer.all',
+    'developer.debug',
+    'developer.manage_super_admins',
+    'user_management.view',
+    'user_management.manage',
+    'presentation_library.view',
+    'presentation_library.manage',
+    'templates.create',
+    'templates.manage',
+    'cma.create',
+    'cma.edit_own',
+    'presentations.create',
+    'presentations.use_global_slides',
+    'settings.manage_company',
+    'settings.manage_display',
+    'analytics.view',
+  ],
+  super_admin: [
+    'user_management.view',
+    'user_management.manage',
+    'presentation_library.view',
+    'presentation_library.manage',
+    'templates.create',
+    'templates.manage',
+    'cma.create',
+    'cma.edit_own',
+    'presentations.create',
+    'presentations.use_global_slides',
+    'settings.manage_company',
+    'settings.manage_display',
+    'analytics.view',
+  ],
+  admin: [
+    'presentation_library.view',
+    'templates.create',
+    'cma.create',
+    'cma.edit_own',
+    'presentations.create',
+    'presentations.use_global_slides',
+    'settings.manage_display',
+    'analytics.view',
+  ],
+  agent: [
+    'cma.create',
+    'cma.edit_own',
+    'presentations.create',
+    'presentations.use_global_slides',
+    'analytics.view',
+  ],
+};
+```
+
+---
+
+## PHASE 2: Update Database
+
+### 2.1 Update Developer Users
+
+```sql
+-- Set Daryl and Ryan as Developers
+UPDATE users SET role = 'developer', updated_at = NOW() 
+WHERE email IN ('daryl@spyglassrealty.com', 'ryan@spyglassrealty.com');
+
+-- Verify Caleb remains Super Admin
+UPDATE users SET role = 'super_admin', updated_at = NOW() 
+WHERE email = 'caleb@spyglassrealty.com' AND role != 'developer';
+
+-- Verify changes
+SELECT email, role FROM users WHERE email LIKE '%@spyglassrealty.com';
+```
+
+---
+
+## PHASE 3: Update Backend Protection Rules
+
+### 3.1 Update Role Change Endpoint
+
+```typescript
+// server/routes/admin.ts - Update PUT /api/admin/users/:id/role
+
+app.put('/api/admin/users/:id/role', requireAuth, requireMinimumRole('super_admin'), async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { role: newRole } = req.body;
+    const adminUser = req.user as any;
+    const adminRole = adminUser.role;
+    
+    // Validate role
+    if (!['developer', 'super_admin', 'admin', 'agent'].includes(newRole)) {
+      return res.status(400).json({ error: 'Invalid role' });
+    }
+    
+    // Get target user
+    const [targetUser] = await db.select().from(users).where(eq(users.id, id));
+    if (!targetUser) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+    
+    // Protection: Cannot change own role
+    if (targetUser.id === adminUser.id) {
+      return res.status(403).json({ error: 'Cannot change your own role' });
+    }
+    
+    // Protection: Only Developers can modify Super Admin or Developer roles
+    if (targetUser.role === 'super_admin' || targetUser.role === 'developer') {
+      if (adminRole !== 'developer') {
+        return res.status(403).json({ 
+          error: 'Only Developers can modify Super Admin or Developer accounts' 
+        });
+      }
+    }
+    
+    // Protection: Only Developers can grant Developer role
+    if (newRole === 'developer' && adminRole !== 'developer') {
+      return res.status(403).json({ error: 'Only Developers can grant Developer role' });
+    }
+    
+    // Protection: Cannot demote the last Developer
+    if (targetUser.role === 'developer' && newRole !== 'developer') {
+      const developerCount = await db.select({ count: sql`count(*)` })
+        .from(users)
+        .where(eq(users.role, 'developer'));
+      
+      if (parseInt(developerCount[0].count) <= 1) {
+        return res.status(403).json({ error: 'Cannot remove the last Developer' });
+      }
+    }
+    
+    // Update role
+    const previousRole = targetUser.role;
+    await db.update(users).set({ 
+      role: newRole,
+      updatedAt: new Date(),
+    }).where(eq(users.id, id));
+    
+    // Log activity
+    await logAdminActivity({
+      adminUserId: adminUser.id,
+      action: 'USER_ROLE_CHANGED',
+      targetUserId: id,
+      previousValue: previousRole,
+      newValue: newRole,
+      req,
+    });
+    
+    res.json({ success: true, message: `Role updated to ${newRole}` });
+  } catch (error) {
+    console.error('Role change error:', error);
+    res.status(500).json({ error: 'Failed to update role' });
+  }
+});
+```
+
+### 3.2 Update Delete Endpoint
+
+```typescript
+// server/routes/admin.ts - Update DELETE /api/admin/users/:id
+
+app.delete('/api/admin/users/:id', requireAuth, requireMinimumRole('super_admin'), async (req, res) => {
+  try {
+    const { id } = req.params;
+    const adminUser = req.user as any;
+    const adminRole = adminUser.role;
+    
+    // Get target user
+    const [targetUser] = await db.select().from(users).where(eq(users.id, id));
+    if (!targetUser) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+    
+    // Cannot delete yourself
+    if (targetUser.id === adminUser.id) {
+      return res.status(403).json({ error: 'Cannot delete your own account' });
+    }
+    
+    // Only Developers can delete Super Admins or Developers
+    if (targetUser.role === 'super_admin' || targetUser.role === 'developer') {
+      if (adminRole !== 'developer') {
+        return res.status(403).json({ 
+          error: 'Only Developers can delete Super Admin or Developer accounts' 
+        });
+      }
+    }
+    
+    // Cannot delete the last Developer
+    if (targetUser.role === 'developer') {
+      const developerCount = await db.select({ count: sql`count(*)` })
+        .from(users)
+        .where(eq(users.role, 'developer'));
+      
+      if (parseInt(developerCount[0].count) <= 1) {
+        return res.status(403).json({ error: 'Cannot delete the last Developer' });
+      }
+    }
+    
+    // Log activity BEFORE deletion
+    await logAdminActivity({
+      adminUserId: adminUser.id,
+      action: 'USER_DELETED',
+      targetUserId: id,
+      details: {
+        deletedUserEmail: targetUser.email,
+        deletedUserRole: targetUser.role,
+      },
+      req,
+    });
+    
+    // Delete the user
+    await db.delete(users).where(eq(users.id, id));
+    
+    res.json({ success: true, message: 'User deleted successfully' });
+  } catch (error) {
+    console.error('Delete user error:', error);
+    res.status(500).json({ error: 'Failed to delete user' });
+  }
+});
+```
+
+---
+
+## PHASE 4: Update Frontend
+
+### 4.1 Update usePermissions Hook
+
+```typescript
+// client/src/hooks/use-permissions.ts
+
+export function usePermissions() {
+  const { data: user, isLoading } = useQuery<UserData>({
+    queryKey: ["/api/auth/me"],
+  });
+  
+  const role = normalizeRole(user?.role);
+  
+  return {
+    user,
+    role,
+    isLoading,
+    isAuthenticated: !!user,
+    can: (permission: Permission) => hasPermission(role, permission),
+    isAtLeast: (requiredRole: UserRole) => isAtLeast(role, requiredRole),
+    
+    // Role checks
+    isDeveloper: role === 'developer',
+    isSuperAdmin: role === 'super_admin' || role === 'developer',  // Developers have Super Admin access
+    isAdmin: role === 'admin' || role === 'super_admin' || role === 'developer',
+    isAgent: role === 'agent',
+    
+    // Specific permission checks
+    canViewDebug: role === 'developer',
+    canManageSuperAdmins: role === 'developer',
+    canAccessAdmin: role === 'super_admin' || role === 'developer',
+    
+    roleDisplayName: getRoleDisplayName(role),
+  };
+}
+```
+
+### 4.2 Update RoleBadge Component
+
+```typescript
+// client/src/components/RoleBadge.tsx
+
+import { Badge } from '@/components/ui/badge';
+import { Code, ShieldCheck, Shield, User } from 'lucide-react';
+
+interface RoleBadgeProps {
+  role: string;
+  showLabel?: boolean;
+}
+
+export function RoleBadge({ role, showLabel = true }: RoleBadgeProps) {
+  switch (role) {
+    case 'developer':
+      return (
+        <Badge className="bg-emerald-600 hover:bg-emerald-700 text-white gap-1">
+          <Code className="w-3 h-3" />
+          {showLabel && 'Developer'}
+        </Badge>
+      );
+    case 'super_admin':
+      return (
+        <Badge className="bg-purple-600 hover:bg-purple-700 text-white gap-1">
+          <ShieldCheck className="w-3 h-3" />
+          {showLabel && 'Super Admin'}
+        </Badge>
+      );
+    case 'admin':
+      return (
+        <Badge className="bg-blue-600 hover:bg-blue-700 text-white gap-1">
+          <Shield className="w-3 h-3" />
+          {showLabel && 'Admin'}
+        </Badge>
+      );
+    default:
+      return (
+        <Badge variant="secondary" className="gap-1">
+          <User className="w-3 h-3" />
+          {showLabel && 'Agent'}
+        </Badge>
+      );
+  }
+}
+```
+
+### 4.3 Update User Management Actions
+
+```typescript
+// client/src/pages/UserManagement.tsx - Update actions visibility
+
+function UserActionsMenu({ user, currentUser }) {
+  const { isDeveloper, canManageSuperAdmins } = usePermissions();
+  
+  const canModify = currentUser?.id !== user.id;
+  
+  // Developers can modify anyone (except themselves)
+  // Super Admins can modify Admin and Agent only
+  const canChangeRole = canModify && (
+    isDeveloper || 
+    (user.role !== 'developer' && user.role !== 'super_admin')
+  );
+  
+  const canDelete = canModify && (
+    isDeveloper || 
+    (user.role !== 'developer' && user.role !== 'super_admin')
+  );
+  
+  const canDisable = canModify && (
+    isDeveloper || 
+    (user.role !== 'developer' && user.role !== 'super_admin')
+  );
+
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button variant="ghost" size="sm">
+          <MoreHorizontal className="w-4 h-4" />
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end">
+        {canChangeRole && (
+          <>
+            <DropdownMenuItem onClick={() => openRoleDialog(user)}>
+              Change Role
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+          </>
+        )}
+        
+        {canDisable && (
+          <DropdownMenuItem onClick={() => toggleUserStatus(user)}>
+            {user.isActive !== false ? 'Disable User' : 'Enable User'}
+          </DropdownMenuItem>
+        )}
+        
+        {canDelete && (
+          <>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem 
+              onClick={() => openDeleteDialog(user)}
+              className="text-red-600"
+            >
+              Delete Permanently
+            </DropdownMenuItem>
+          </>
+        )}
+        
+        {/* Show why actions are limited for Super Admins viewing other Super Admins */}
+        {!isDeveloper && (user.role === 'super_admin' || user.role === 'developer') && canModify && (
+          <DropdownMenuItem disabled className="text-xs text-muted-foreground">
+            Only Developers can modify this user
+          </DropdownMenuItem>
+        )}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+```
+
+### 4.4 Update Calendar/Leads Debug Visibility
+
+```typescript
+// client/src/pages/CalendarPage.tsx and LeadsPage.tsx
+
+import { usePermissions } from '@/hooks/use-permissions';
+
+export default function CalendarPage() {
+  const { canViewDebug, isDeveloper } = usePermissions();
+  
+  return (
+    <div>
+      {/* ... */}
+      
+      {/* Debug Details - ONLY for Developers */}
+      {canViewDebug && (
+        <Card className="mb-4">
+          <CardHeader className="py-2">
+            <CardTitle className="text-sm flex items-center gap-2">
+              Debug Details
+              <Badge variant="outline" className="text-xs bg-emerald-50 text-emerald-700 border-emerald-300">
+                Developer Only
+              </Badge>
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="text-xs font-mono">
+            {/* Debug info */}
+          </CardContent>
+        </Card>
+      )}
+      
+      {/* ... */}
+    </div>
+  );
+}
+```
+
+---
+
+## PHASE 5: Update Role Permissions Display
+
+```typescript
+// client/src/pages/UserManagement.tsx - Update Role Permissions section
+
+<div className="grid grid-cols-4 gap-4">
+  <Card>
+    <CardHeader>
+      <CardTitle className="flex items-center gap-2">
+        <User className="w-4 h-4" />
+        Agent
+      </CardTitle>
+    </CardHeader>
+    <CardContent className="text-sm text-muted-foreground">
+      <ul className="space-y-1">
+        <li>Create and edit own CMAs</li>
+        <li>Create presentations</li>
+        <li>Use global slides</li>
+        <li>View analytics</li>
+      </ul>
+    </CardContent>
+  </Card>
+  
+  <Card>
+    <CardHeader>
+      <CardTitle className="flex items-center gap-2">
+        <Shield className="w-4 h-4" />
+        Admin
+      </CardTitle>
+    </CardHeader>
+    <CardContent className="text-sm text-muted-foreground">
+      <ul className="space-y-1">
+        <li>All Agent permissions</li>
+        <li>View presentation library</li>
+        <li>Create templates</li>
+        <li>Manage display settings</li>
+      </ul>
+    </CardContent>
+  </Card>
+  
+  <Card>
+    <CardHeader>
+      <CardTitle className="flex items-center gap-2">
+        <ShieldCheck className="w-4 h-4" />
+        Super Admin
+      </CardTitle>
+    </CardHeader>
+    <CardContent className="text-sm text-muted-foreground">
+      <ul className="space-y-1">
+        <li>All Admin permissions</li>
+        <li>Manage presentation library</li>
+        <li>Manage user roles (Admin/Agent)</li>
+        <li>Manage templates</li>
+        <li>Manage company settings</li>
+        <li>Enable/disable users</li>
+        <li>View activity logs</li>
+      </ul>
+    </CardContent>
+  </Card>
+  
+  <Card className="border-emerald-200 bg-emerald-50/30">
+    <CardHeader>
+      <CardTitle className="flex items-center gap-2 text-emerald-700">
+        <Code className="w-4 h-4" />
+        Developer
+      </CardTitle>
+    </CardHeader>
+    <CardContent className="text-sm text-muted-foreground">
+      <ul className="space-y-1">
+        <li>All Super Admin permissions</li>
+        <li>Manage Super Admin roles</li>
+        <li>Delete Super Admin accounts</li>
+        <li>View debug information</li>
+        <li>Full system access</li>
+      </ul>
+    </CardContent>
+  </Card>
+</div>
+```
+
+---
+
+## SUMMARY
+
+### Role Hierarchy
+
+| Role | Color | Icon | Can Manage |
+|------|-------|------|------------|
+| Developer | Emerald/Green | Code | Everyone |
+| Super Admin | Purple | ShieldCheck | Admin, Agent |
+| Admin | Blue | Shield | (no user management) |
+| Agent | Gray | User | (no user management) |
+
+### Developer Users
+
+| Email | Name |
+|-------|------|
+| daryl@spyglassrealty.com | Daryl Camingao |
+| ryan@spyglassrealty.com | Ryan Rodenbeck |
+
+### Protection Rules
+
+| Rule | Description |
+|------|-------------|
+| Cannot self-modify | No one can change their own role |
+| Last Developer protection | Cannot remove the last Developer |
+| Super Admin protection | Only Developers can modify/delete Super Admins |
+| Developer role grant | Only Developers can grant Developer role |
+
+---
+
+## TESTING CHECKLIST
+
+### Developer Tests (Login as Daryl or Ryan):
+- [ ] Shows "Developer" badge (emerald/green)
+- [ ] Can see Debug Info on Calendar page
+- [ ] Can see Debug Info on Leads page
+- [ ] Can change Caleb's role from Super Admin to Admin
+- [ ] Can delete a Super Admin (after demoting)
+- [ ] Cannot change own role
+- [ ] Cannot delete self
+
+### Super Admin Tests (Login as Caleb):
+- [ ] Shows "Super Admin" badge (purple)
+- [ ] Cannot see Debug Info on Calendar page
+- [ ] Cannot see Debug Info on Leads page
+- [ ] Can change Admin/Agent roles
+- [ ] Cannot change Developer roles
+- [ ] Cannot change other Super Admin roles
+- [ ] Cannot delete Super Admin or Developer accounts
+- [ ] Actions menu shows "Only Developers can modify this user" for Developer/Super Admin rows
+
+---
+
+## FILES TO MODIFY
+
+```
+shared/
+└── permissions.ts                 [MODIFY - add developer role]
+
+server/routes/
+└── admin.ts                       [MODIFY - update protection rules]
+
+client/src/
+├── hooks/
+│   └── use-permissions.ts         [MODIFY - add isDeveloper, canViewDebug]
+├── components/
+│   └── RoleBadge.tsx              [MODIFY - add developer badge]
+└── pages/
+    ├── UserManagement.tsx         [MODIFY - developer actions, role cards]
+    ├── CalendarPage.tsx           [MODIFY - debug visibility]
+    └── LeadsPage.tsx              [MODIFY - debug visibility]
+```
+
+---
+
+**REMINDER: Update Daryl and Ryan to Developer role in database before testing!**
