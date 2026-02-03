@@ -1,0 +1,292 @@
+# Fix Calendar & Leads - Show All Agents for Developer and Super Admin
+
+## TESTING REQUIREMENT
+
+**Before declaring complete, you MUST:**
+1. Login as Developer (Daryl or Ryan) → Calendar shows ALL agents' events (not empty)
+2. Login as Developer → Leads shows ALL 146k+ leads (not 0)
+3. Login as Super Admin → Calendar shows ALL agents' events
+4. Login as Super Admin → Leads shows ALL leads
+5. Verify Agent dropdown defaults to "All agents" for Developer/Super Admin
+6. **DO NOT declare complete without seeing actual calendar events and leads data**
+
+---
+
+## ISSUE
+
+Currently when logged in as Developer:
+- Calendar shows: "No items found for this period" 
+- Leads shows: "Agent ID: 461", "Total Leads: 0", "No leads found for this agent"
+
+**Expected behavior:**
+- Developer and Super Admin should see ALL agents' data by default
+- Should show the same 146k+ leads and full calendar we saw before
+
+---
+
+## ROOT CAUSE
+
+The role-based filtering is incorrectly applying agent filtering to Developer/Super Admin roles. It's setting a specific `agentId` (461) instead of showing all agents.
+
+---
+
+## FIX REQUIRED
+
+### Backend: Update Calendar Endpoint
+
+```typescript
+// server/routes.ts - Fix /api/fub/calendar
+
+app.get('/api/fub/calendar', requireAuth, async (req, res) => {
+  try {
+    const user = req.user as any;
+    const userRole = user.role;
+    
+    let { agentId, start, end } = req.query;
+    
+    // Developer and Super Admin can see ALL agents
+    if (userRole === 'developer' || userRole === 'super_admin') {
+      // If agentId is not specified or is 'all', don't filter by agent
+      if (!agentId || agentId === 'all') {
+        agentId = null; // No agent filter = all agents
+      }
+      // If a specific agent is selected, use that filter
+    } else {
+      // Admin and Agent can only see their own
+      const userFubId = await getFUBAgentIdByEmail(user.email);
+      if (!userFubId) {
+        return res.status(403).json({ 
+          error: 'Your account is not linked to a Follow Up Boss agent.' 
+        });
+      }
+      agentId = userFubId; // Force to their own agent
+    }
+    
+    // Build FUB API URLs
+    let appointmentsUrl = `https://api.followupboss.com/v1/appointments?start=${start}&end=${end}&limit=100`;
+    let tasksUrl = `https://api.followupboss.com/v1/tasks?dueStart=${start}&dueEnd=${end}&limit=100`;
+    
+    // Only add agent filter if agentId is specified
+    if (agentId && agentId !== 'all') {
+      appointmentsUrl += `&userId=${agentId}`;
+      tasksUrl += `&assignedUserId=${agentId}`;
+    }
+    
+    // Fetch from FUB...
+    const [appointmentsRes, tasksRes] = await Promise.all([
+      fetch(appointmentsUrl, { headers: fubHeaders }),
+      fetch(tasksUrl, { headers: fubHeaders }),
+    ]);
+    
+    // ... rest of processing
+    
+    res.json({ 
+      appointments, 
+      tasks,
+      agentFilter: agentId || 'all',
+      userRole,
+    });
+  } catch (error) {
+    console.error('Calendar error:', error);
+    res.status(500).json({ error: 'Failed to fetch calendar' });
+  }
+});
+```
+
+### Backend: Update Leads Endpoint
+
+```typescript
+// server/routes.ts - Fix /api/fub/leads
+
+app.get('/api/fub/leads', requireAuth, async (req, res) => {
+  try {
+    const user = req.user as any;
+    const userRole = user.role;
+    
+    let { agentId, limit = 50, offset = 0, sort, search } = req.query;
+    
+    // Developer and Super Admin can see ALL agents
+    if (userRole === 'developer' || userRole === 'super_admin') {
+      // If agentId is not specified or is 'all', don't filter by agent
+      if (!agentId || agentId === 'all') {
+        agentId = null; // No agent filter = all leads
+      }
+      // If a specific agent is selected, use that filter
+    } else {
+      // Admin and Agent can only see their own leads
+      const userFubId = await getFUBAgentIdByEmail(user.email);
+      if (!userFubId) {
+        return res.status(403).json({ 
+          error: 'Your account is not linked to a Follow Up Boss agent.' 
+        });
+      }
+      agentId = userFubId; // Force to their own agent
+    }
+    
+    // Build FUB API URL
+    let url = `https://api.followupboss.com/v1/people?limit=${limit}&offset=${offset}`;
+    
+    // Only add agent filter if agentId is specified
+    if (agentId && agentId !== 'all') {
+      url += `&assignedTo=${agentId}`;
+    }
+    
+    if (sort) {
+      url += `&sort=${sort}`;
+    }
+    
+    // Fetch from FUB...
+    const response = await fetch(url, { headers: fubHeaders });
+    const data = await response.json();
+    
+    res.json({ 
+      leads: data.people || [],
+      total: data._metadata?.total || 0,
+      agentFilter: agentId || 'all',
+      userRole,
+    });
+  } catch (error) {
+    console.error('Leads error:', error);
+    res.status(500).json({ error: 'Failed to fetch leads' });
+  }
+});
+```
+
+### Frontend: Fix Default Agent Selection
+
+```typescript
+// client/src/pages/CalendarPage.tsx
+
+const { isDeveloper, isSuperAdmin } = usePermissions();
+
+// Default to 'all' for Developer and Super Admin
+const [selectedAgentId, setSelectedAgentId] = useState<string>(
+  (isDeveloper || isSuperAdmin) ? 'all' : ''
+);
+
+// When fetching calendar, use 'all' if no specific agent selected
+const { data: calendarData } = useQuery({
+  queryKey: ['/api/fub/calendar', selectedAgentId || 'all', month, year],
+  queryFn: () => fetch(`/api/fub/calendar?agentId=${selectedAgentId || 'all'}&start=${startDate}&end=${endDate}`)
+    .then(res => res.json()),
+});
+```
+
+```typescript
+// client/src/pages/LeadsPage.tsx
+
+const { isDeveloper, isSuperAdmin } = usePermissions();
+
+// Default to 'all' for Developer and Super Admin
+const [selectedUserId, setSelectedUserId] = useState<string>(
+  (isDeveloper || isSuperAdmin) ? 'all' : ''
+);
+
+// When fetching leads, use 'all' if no specific agent selected
+const { data: leadsData } = useQuery({
+  queryKey: ['/api/fub/leads', selectedUserId || 'all', sortOrder, currentPage],
+  queryFn: () => fetch(`/api/fub/leads?agentId=${selectedUserId || 'all'}&limit=50&offset=${offset}`)
+    .then(res => res.json()),
+});
+```
+
+---
+
+## ROLE ACCESS SUMMARY
+
+| Role | Calendar Default | Leads Default | Can Filter by Agent |
+|------|------------------|---------------|---------------------|
+| Developer | All agents | All leads (146k+) | Yes (dropdown) |
+| Super Admin | All agents | All leads (146k+) | Yes (dropdown) |
+| Admin | Own only | Own only | No |
+| Agent | Own only | Own only | No |
+
+---
+
+## EXPECTED RESULTS AFTER FIX
+
+### Developer/Super Admin - Calendar
+```
+Calendar                                    [Developer]
+View appointments and tasks for all agents
+
+Agent: [All agents ▾]   Month: [Feb 2026]
+
+[Shows full calendar with all events - same as before]
+```
+
+### Developer/Super Admin - Leads
+```
+Leads                                       [Developer]
+People and contacts from Follow Up Boss
+
+Assigned Agent: [All agents ▾]
+
+Debug Info (Developer Only)
+Agent ID: all
+Total Leads: 146483
+Loaded: 50
+
+Showing 50 of 146,483 leads
+[Shows lead list]
+```
+
+### Agent - Calendar
+```
+Calendar                                    [Agent]
+Your appointments and tasks
+
+Agent: [Your calendar only]   Month: [Feb 2026]
+
+[Shows only this agent's events]
+```
+
+### Agent - Leads
+```
+Leads                                       [Agent]
+Your assigned leads
+
+Assigned Agent: [Your leads only]
+
+Showing 50 of 234 leads (your assigned leads)
+[Shows only this agent's leads]
+```
+
+---
+
+## TESTING CHECKLIST
+
+### Developer (Daryl):
+- [ ] Calendar shows "All agents" in dropdown (default)
+- [ ] Calendar shows events (NOT "No items found")
+- [ ] Leads shows "All agents" in dropdown (default)
+- [ ] Leads shows 146k+ total leads (NOT 0)
+- [ ] Debug Info shows "Agent ID: all"
+- [ ] Can select specific agent from dropdown to filter
+
+### Super Admin (Caleb):
+- [ ] Calendar shows "All agents" in dropdown (default)
+- [ ] Calendar shows all events
+- [ ] Leads shows "All agents" in dropdown (default)
+- [ ] Leads shows 146k+ total leads
+- [ ] No Debug Info visible (Developer only)
+
+### Agent (test user):
+- [ ] Calendar shows "Your calendar only" badge (no dropdown)
+- [ ] Calendar shows only their events
+- [ ] Leads shows "Your leads only" badge (no dropdown)
+- [ ] Leads shows only their assigned leads
+
+---
+
+## FILES TO MODIFY
+
+```
+server/routes.ts                    [FIX - calendar and leads endpoints]
+client/src/pages/CalendarPage.tsx   [FIX - default agent selection]
+client/src/pages/LeadsPage.tsx      [FIX - default agent selection]
+```
+
+---
+
+**CRITICAL: The fix is to NOT filter by agent when agentId is 'all' or not specified for Developer/Super Admin roles. Currently it's incorrectly forcing an agent filter.**

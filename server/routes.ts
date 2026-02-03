@@ -6192,12 +6192,17 @@ OUTPUT JSON:
       
       const { agentId, start, end, userId } = req.query as Record<string, string>;
       
-      // Use agentId or userId - treat empty string as "all"
-      let fubUserId = (agentId && agentId !== '') ? agentId : (userId && userId !== '') ? userId : null;
+      // Use agentId or userId - treat empty string or 'all' as null (no filter)
+      let fubUserId = (agentId && agentId !== '' && agentId !== 'all') 
+        ? agentId 
+        : (userId && userId !== '' && userId !== 'all') ? userId : null;
       
-      // Role-based filtering: Non-Super Admins can only see their own calendar
+      // Role-based filtering: Developer and Super Admin can see all agents
+      // Admin and Agent can only see their own calendar
       let restrictedToOwnCalendar = false;
-      if (userRole !== 'super_admin') {
+      const canViewAllAgents = userRole === 'developer' || userRole === 'super_admin';
+      
+      if (!canViewAllAgents) {
         const { getFUBAgentIdByEmail } = await import("./followupboss-service");
         const userFubId = await getFUBAgentIdByEmail(userEmail);
         
@@ -6221,6 +6226,8 @@ OUTPUT JSON:
         fubUserId = userFubId;
         restrictedToOwnCalendar = true;
         console.log(`[FUB Calendar] Role-based filter: ${userRole} user ${userEmail} restricted to FUB ID ${userFubId}`);
+      } else {
+        console.log(`[FUB Calendar] ${userRole} user ${userEmail} can view all agents, filter: ${fubUserId || 'all'}`);
       }
       
       console.log(`[FUB Calendar] Fetching - userId: ${fubUserId || 'all'}, start: ${start}, end: ${end}, role: ${userRole}`);
@@ -6370,13 +6377,19 @@ OUTPUT JSON:
       
       const { agentId, userId, limit = '50', offset = '0' } = req.query as Record<string, string>;
       
-      let fubUserId = agentId || userId;
+      // Treat empty string or 'all' as null (no filter)
+      let fubUserId = (agentId && agentId !== '' && agentId !== 'all') 
+        ? agentId 
+        : (userId && userId !== '' && userId !== 'all') ? userId : null;
       const limitNum = Math.min(parseInt(limit) || 50, 100);
       const offsetNum = parseInt(offset) || 0;
       
-      // Role-based filtering: Non-Super Admins can only see their own leads
+      // Role-based filtering: Developer and Super Admin can see all leads
+      // Admin and Agent can only see their own leads
       let restrictedToOwnLeads = false;
-      if (userRole !== 'super_admin') {
+      const canViewAllAgents = userRole === 'developer' || userRole === 'super_admin';
+      
+      if (!canViewAllAgents) {
         const { getFUBAgentIdByEmail } = await import("./followupboss-service");
         const userFubId = await getFUBAgentIdByEmail(userEmail);
         
@@ -6404,6 +6417,8 @@ OUTPUT JSON:
         fubUserId = userFubId;
         restrictedToOwnLeads = true;
         console.log(`[FUB Leads] Role-based filter: ${userRole} user ${userEmail} restricted to FUB ID ${userFubId}`);
+      } else {
+        console.log(`[FUB Leads] ${userRole} user ${userEmail} can view all agents, filter: ${fubUserId || 'all'}`);
       }
       
       console.log(`[FUB Leads] Fetching leads - agentId: ${fubUserId}, limit: ${limitNum}, offset: ${offsetNum}, role: ${userRole}`);
