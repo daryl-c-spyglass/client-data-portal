@@ -23,9 +23,10 @@ import { STATUS_COLORS } from '@/lib/statusColors';
 interface CMAStatsViewProps {
   properties: any[];
   subjectProperty: any;
+  onPropertyClick?: (property: any) => void;
 }
 
-export function CMAStatsView({ properties, subjectProperty }: CMAStatsViewProps) {
+export function CMAStatsView({ properties, subjectProperty, onPropertyClick }: CMAStatsViewProps) {
   const closedProperties = useMemo(() => {
     return properties.filter(p => {
       const status = normalizeStatus(p.status || p.standardStatus);
@@ -36,9 +37,9 @@ export function CMAStatsView({ properties, subjectProperty }: CMAStatsViewProps)
   return (
     <div className="space-y-6" data-testid="cma-stats-view">
       <SummaryCards properties={properties} subjectProperty={subjectProperty} />
-      <PriceComparisonChart properties={properties} subjectProperty={subjectProperty} />
-      <DaysOnMarketSection closedProperties={closedProperties} />
-      <AveragePricePerSqftSection closedProperties={closedProperties} subjectProperty={subjectProperty} />
+      <PriceComparisonChart properties={properties} subjectProperty={subjectProperty} onPropertyClick={onPropertyClick} />
+      <DaysOnMarketSection closedProperties={closedProperties} onPropertyClick={onPropertyClick} />
+      <AveragePricePerSqftSection closedProperties={closedProperties} subjectProperty={subjectProperty} onPropertyClick={onPropertyClick} />
     </div>
   );
 }
@@ -107,7 +108,7 @@ function SummaryCards({ properties, subjectProperty }: { properties: any[]; subj
   );
 }
 
-function PriceComparisonChart({ properties, subjectProperty }: { properties: any[]; subjectProperty: any }) {
+function PriceComparisonChart({ properties, subjectProperty, onPropertyClick }: { properties: any[]; subjectProperty: any; onPropertyClick?: (property: any) => void }) {
   const chartData = useMemo(() => {
     const data: { name: string; fullAddress: string; price: number; isSubject: boolean }[] = [];
     
@@ -218,7 +219,7 @@ function PriceComparisonChart({ properties, subjectProperty }: { properties: any
   );
 }
 
-function DaysOnMarketSection({ closedProperties }: { closedProperties: any[] }) {
+function DaysOnMarketSection({ closedProperties, onPropertyClick }: { closedProperties: any[]; onPropertyClick?: (property: any) => void }) {
   const avgDOM = useMemo(() => {
     const withDom = closedProperties.filter(p => p.daysOnMarket != null);
     if (withDom.length === 0) return 0;
@@ -260,6 +261,7 @@ function DaysOnMarketSection({ closedProperties }: { closedProperties: any[] }) 
         fill: getColor(percent),
         address: getPropertyAddress(p),
         photo: photos[0] || null,
+        property: p,
       };
     });
   }, [closedProperties]);
@@ -310,6 +312,7 @@ function DaysOnMarketSection({ closedProperties }: { closedProperties: any[] }) 
                   key={idx}
                   className="flex items-center gap-3 p-2 rounded-lg hover:bg-muted/50 cursor-pointer transition-colors"
                   data-testid={`dom-property-${idx}`}
+                  onClick={() => onPropertyClick?.(data.property)}
                 >
                   <div className="w-12 h-12 bg-muted rounded overflow-hidden flex-shrink-0">
                     {data.photo ? (
@@ -393,10 +396,12 @@ function DaysOnMarketSection({ closedProperties }: { closedProperties: any[] }) 
 
 function AveragePricePerSqftSection({ 
   closedProperties, 
-  subjectProperty 
+  subjectProperty,
+  onPropertyClick 
 }: { 
   closedProperties: any[]; 
   subjectProperty: any;
+  onPropertyClick?: (property: any) => void;
 }) {
   const [showSubject, setShowSubject] = useState(true);
   const [showClosed, setShowClosed] = useState(true);
@@ -471,8 +476,9 @@ function AveragePricePerSqftSection({
           <div className="lg:w-56 flex-shrink-0">
             {subjectProperty && (
               <div 
-                className="flex items-center gap-3 p-2 rounded-lg border-b mb-2 pb-3 ring-2 ring-blue-500/30"
+                className="flex items-center gap-3 p-2 rounded-lg border-b mb-2 pb-3 ring-2 ring-blue-500/30 cursor-pointer hover:bg-muted/50 transition-colors"
                 data-testid="sqft-subject-property"
+                onClick={() => onPropertyClick?.(subjectProperty)}
               >
                 <div className="w-12 h-12 bg-muted rounded overflow-hidden flex-shrink-0">
                   {getPropertyPhotos(subjectProperty)[0] ? (
@@ -506,6 +512,7 @@ function AveragePricePerSqftSection({
                     key={idx}
                     className="flex items-center gap-3 p-2 rounded-lg hover:bg-muted/50 cursor-pointer transition-colors"
                     data-testid={`sqft-property-${idx}`}
+                    onClick={() => onPropertyClick?.(property)}
                   >
                     <div className="w-12 h-12 bg-muted rounded overflow-hidden flex-shrink-0">
                       {photos[0] ? (

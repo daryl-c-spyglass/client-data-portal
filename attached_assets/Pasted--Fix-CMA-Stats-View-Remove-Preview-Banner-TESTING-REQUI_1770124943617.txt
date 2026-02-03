@@ -1,0 +1,448 @@
+# Fix CMA Stats View & Remove Preview Banner
+
+## TESTING REQUIREMENT
+
+**Before declaring complete, you MUST:**
+1. Verify peach preview banner is REMOVED
+2. Verify Stats tab shows all cards correctly
+3. Verify Days on Market card has property list on left side
+4. Verify Average Price/Sq.Ft. card has property list on left side
+5. Click on a property in any card → Verify modal opens with property details
+6. **DO NOT declare complete without testing clickable properties**
+
+---
+
+## ISSUE 1: Remove Peach Preview Banner
+
+**Current state:** Shows peach/pink banner with:
+- "You are seeing a preview of the report."
+- Save, Modify Search, Notes buttons
+
+**Required:** Remove this banner entirely from the CMA view.
+
+### Fix
+
+```typescript
+// Find and REMOVE this component/section in CMA detail page
+// Look for something like:
+
+<div className="bg-orange-50 border border-orange-200 ...">
+  <p>You are seeing a preview of the report.</p>
+  <Button>Save</Button>
+  <Button>Modify Search</Button>
+  <Button>Notes</Button>
+</div>
+
+// DELETE this entire section
+```
+
+**Alternative:** If the buttons (Save, Modify Search, Notes) are needed, move them to the header area near Share/Export/Presentation buttons.
+
+---
+
+## ISSUE 2: Stats Tab - Missing/Incomplete Cards
+
+### Current Problems:
+1. Second card below "Price Comparison" is missing
+2. "Days on Market" card - left side property list is empty/incomplete
+3. "Average Price/Sq. Ft." card - left side property list is empty/incomplete
+
+### Expected Stats View Layout (4 Cards):
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ CARD 1: Price Comparison                                                    │
+│ ┌─────────────────────────────┐ ┌─────────────────────────────────────────┐ │
+│ │ Property List (scrollable)  │ │ Bar Chart                               │ │
+│ │ ● 123 Main St - $715,000    │ │ [Horizontal bars showing prices]        │ │
+│ │ ● 456 Oak Ave - $890,000    │ │                                         │ │
+│ │ ● 789 Pine Rd - $1,075,000  │ │                                         │ │
+│ │ (clickable → opens modal)   │ │                                         │ │
+│ └─────────────────────────────┘ └─────────────────────────────────────────┘ │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ CARD 2: Price per Square Foot                                               │
+│ ┌─────────────────────────────┐ ┌─────────────────────────────────────────┐ │
+│ │ Property List (scrollable)  │ │ Bar Chart                               │ │
+│ │ ● 123 Main St - $273/sqft   │ │ [Horizontal bars showing $/sqft]        │ │
+│ │ ● 456 Oak Ave - $285/sqft   │ │                                         │ │
+│ │ ● 789 Pine Rd - $310/sqft   │ │                                         │ │
+│ │ (clickable → opens modal)   │ │                                         │ │
+│ └─────────────────────────────┘ └─────────────────────────────────────────┘ │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ CARD 3: Days on Market                                                      │
+│ ┌─────────────────────────────┐ ┌─────────────────────────────────────────┐ │
+│ │ Property List (scrollable)  │ │ Bar Chart                               │ │
+│ │ ● 123 Main St - 45 days     │ │ [Horizontal bars showing DOM]           │ │
+│ │ ● 456 Oak Ave - 30 days     │ │                                         │ │
+│ │ ● 789 Pine Rd - 62 days     │ │                                         │ │
+│ │ (clickable → opens modal)   │ │                                         │ │
+│ └─────────────────────────────┘ └─────────────────────────────────────────┘ │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ CARD 4: CMA Market Review (Summary)                                         │
+│ ┌─────────────────────────────────────────────────────────────────────────┐ │
+│ │ Market Overview              │ Price Per Square Foot                    │ │
+│ │ Based on X comparable...     │ Average price per sq ft is $X...         │ │
+│ │                              │                                          │ │
+│ │ Days on Market               │ Property Size                            │ │
+│ │ Average: X days              │ Avg: X sqft                              │ │
+│ │                              │                                          │ │
+│ │ Bed/Bath                     │                                          │ │
+│ │ Avg: X beds / X baths        │                                          │ │
+│ └─────────────────────────────────────────────────────────────────────────┘ │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## ISSUE 3: Property List Missing on Cards
+
+### Fix for Days on Market Card
+
+```typescript
+// components/cma/DaysOnMarketCard.tsx (or similar)
+
+export function DaysOnMarketCard({ properties, onPropertyClick }) {
+  // Sort by DOM
+  const sortedProperties = [...properties].sort((a, b) => 
+    (a.daysOnMarket || 0) - (b.daysOnMarket || 0)
+  );
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Days on Market</CardTitle>
+      </CardHeader>
+      <CardContent>
+        <div className="grid grid-cols-2 gap-4">
+          {/* LEFT: Property List */}
+          <div className="max-h-64 overflow-y-auto space-y-2">
+            {sortedProperties.map((property) => (
+              <div
+                key={property.id}
+                onClick={() => onPropertyClick(property)}
+                className="flex items-center justify-between p-2 rounded hover:bg-muted cursor-pointer"
+              >
+                <span className="text-sm truncate flex-1">
+                  {property.address}
+                </span>
+                <span className="text-sm font-medium ml-2">
+                  {property.daysOnMarket || 0} days
+                </span>
+              </div>
+            ))}
+          </div>
+          
+          {/* RIGHT: Bar Chart */}
+          <div className="h-64">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart
+                data={sortedProperties.map(p => ({
+                  name: p.address?.split(',')[0] || 'Property',
+                  value: p.daysOnMarket || 0,
+                }))}
+                layout="vertical"
+              >
+                <XAxis type="number" />
+                <YAxis type="category" dataKey="name" width={100} />
+                <Tooltip />
+                <Bar dataKey="value" fill="#f97316" />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+```
+
+### Fix for Price Per Sq Ft Card
+
+```typescript
+// components/cma/PricePerSqFtCard.tsx (or similar)
+
+export function PricePerSqFtCard({ properties, onPropertyClick }) {
+  // Calculate $/sqft and sort
+  const propertiesWithPricePerSqFt = properties
+    .map(p => ({
+      ...p,
+      pricePerSqFt: p.squareFeet ? Math.round(p.price / p.squareFeet) : 0,
+    }))
+    .sort((a, b) => a.pricePerSqFt - b.pricePerSqFt);
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Average Price / Sq. Ft.</CardTitle>
+      </CardHeader>
+      <CardContent>
+        <div className="grid grid-cols-2 gap-4">
+          {/* LEFT: Property List */}
+          <div className="max-h-64 overflow-y-auto space-y-2">
+            {propertiesWithPricePerSqFt.map((property) => (
+              <div
+                key={property.id}
+                onClick={() => onPropertyClick(property)}
+                className="flex items-center justify-between p-2 rounded hover:bg-muted cursor-pointer"
+              >
+                <span className="text-sm truncate flex-1">
+                  {property.address}
+                </span>
+                <span className="text-sm font-medium ml-2">
+                  ${property.pricePerSqFt}/sqft
+                </span>
+              </div>
+            ))}
+          </div>
+          
+          {/* RIGHT: Bar Chart */}
+          <div className="h-64">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart
+                data={propertiesWithPricePerSqFt.map(p => ({
+                  name: p.address?.split(',')[0] || 'Property',
+                  value: p.pricePerSqFt,
+                }))}
+                layout="vertical"
+              >
+                <XAxis type="number" tickFormatter={(v) => `$${v}`} />
+                <YAxis type="category" dataKey="name" width={100} />
+                <Tooltip formatter={(v) => `$${v}/sqft`} />
+                <Bar dataKey="value" fill="#3b82f6" />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+```
+
+---
+
+## ISSUE 4: Clickable Properties → Modal
+
+### Property Detail Modal
+
+```typescript
+// components/cma/PropertyDetailModal.tsx
+
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import { Badge } from '@/components/ui/badge';
+
+interface PropertyDetailModalProps {
+  property: Property | null;
+  isOpen: boolean;
+  onClose: () => void;
+}
+
+export function PropertyDetailModal({ property, isOpen, onClose }: PropertyDetailModalProps) {
+  if (!property) return null;
+
+  return (
+    <Dialog open={isOpen} onOpenChange={onClose}>
+      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            {property.address}
+            <StatusBadge status={property.status} />
+          </DialogTitle>
+        </DialogHeader>
+        
+        {/* Property Photo */}
+        {property.photos?.[0] && (
+          <div className="relative h-48 rounded-lg overflow-hidden">
+            <img
+              src={property.photos[0]}
+              alt={property.address}
+              className="w-full h-full object-cover"
+            />
+          </div>
+        )}
+        
+        {/* Price */}
+        <div className="text-2xl font-bold">
+          ${property.price?.toLocaleString()}
+          {property.status === 'Closed' && (
+            <span className="text-sm font-normal text-muted-foreground ml-2">
+              (Sold)
+            </span>
+          )}
+        </div>
+        
+        {/* Key Stats */}
+        <div className="grid grid-cols-4 gap-4">
+          <div>
+            <p className="text-sm text-muted-foreground">Beds</p>
+            <p className="font-medium">{property.bedrooms || '-'}</p>
+          </div>
+          <div>
+            <p className="text-sm text-muted-foreground">Baths</p>
+            <p className="font-medium">{property.bathrooms || '-'}</p>
+          </div>
+          <div>
+            <p className="text-sm text-muted-foreground">Sq Ft</p>
+            <p className="font-medium">{property.squareFeet?.toLocaleString() || '-'}</p>
+          </div>
+          <div>
+            <p className="text-sm text-muted-foreground">$/Sq Ft</p>
+            <p className="font-medium">
+              ${property.squareFeet ? Math.round(property.price / property.squareFeet) : '-'}
+            </p>
+          </div>
+        </div>
+        
+        {/* Additional Details */}
+        <div className="grid grid-cols-2 gap-4 pt-4 border-t">
+          <div>
+            <p className="text-sm text-muted-foreground">Year Built</p>
+            <p className="font-medium">{property.yearBuilt || '-'}</p>
+          </div>
+          <div>
+            <p className="text-sm text-muted-foreground">Days on Market</p>
+            <p className="font-medium">{property.daysOnMarket || '-'} days</p>
+          </div>
+          <div>
+            <p className="text-sm text-muted-foreground">Lot Size</p>
+            <p className="font-medium">{property.lotSize || '-'}</p>
+          </div>
+          <div>
+            <p className="text-sm text-muted-foreground">Property Type</p>
+            <p className="font-medium">{property.propertyType || '-'}</p>
+          </div>
+        </div>
+        
+        {/* MLS Info */}
+        <div className="pt-4 border-t text-sm text-muted-foreground">
+          <p>MLS #: {property.mlsNumber || '-'}</p>
+          {property.closeDate && (
+            <p>Closed: {new Date(property.closeDate).toLocaleDateString()}</p>
+          )}
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function StatusBadge({ status }: { status: string }) {
+  const colors: Record<string, string> = {
+    'Active': 'bg-green-500',
+    'Under Contract': 'bg-orange-500',
+    'Pending': 'bg-orange-500',
+    'Closed': 'bg-red-500',
+    'Sold': 'bg-red-500',
+  };
+  
+  return (
+    <Badge className={`${colors[status] || 'bg-gray-500'} text-white`}>
+      {status}
+    </Badge>
+  );
+}
+```
+
+### Integrate Modal with Stats Cards
+
+```typescript
+// In CMA Stats view component
+
+import { useState } from 'react';
+import { PropertyDetailModal } from './PropertyDetailModal';
+
+export function CMAStatsView({ properties }) {
+  const [selectedProperty, setSelectedProperty] = useState(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+
+  const handlePropertyClick = (property) => {
+    setSelectedProperty(property);
+    setIsModalOpen(true);
+  };
+
+  return (
+    <div className="space-y-6">
+      {/* Price Comparison Card */}
+      <PriceComparisonCard 
+        properties={properties} 
+        onPropertyClick={handlePropertyClick} 
+      />
+      
+      {/* Price Per Sq Ft Card */}
+      <PricePerSqFtCard 
+        properties={properties} 
+        onPropertyClick={handlePropertyClick} 
+      />
+      
+      {/* Days on Market Card */}
+      <DaysOnMarketCard 
+        properties={properties} 
+        onPropertyClick={handlePropertyClick} 
+      />
+      
+      {/* CMA Market Review Card */}
+      <CMAMarketReviewCard properties={properties} />
+      
+      {/* Property Detail Modal */}
+      <PropertyDetailModal
+        property={selectedProperty}
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+      />
+    </div>
+  );
+}
+```
+
+---
+
+## SUMMARY OF CHANGES
+
+| Issue | Fix |
+|-------|-----|
+| Peach preview banner | Remove entirely |
+| Missing 2nd card (Price/SqFt) | Add card with property list + chart |
+| Days on Market incomplete | Add property list on left side |
+| Price/SqFt incomplete | Add property list on left side |
+| Properties not clickable | Add onClick handler → opens modal |
+
+---
+
+## TESTING CHECKLIST
+
+- [ ] Peach banner removed from CMA view
+- [ ] Stats tab shows 4 cards (Price, Price/SqFt, DOM, Market Review)
+- [ ] Price Comparison card: property list on left, chart on right
+- [ ] Price Per Sq Ft card: property list on left, chart on right
+- [ ] Days on Market card: property list on left, chart on right
+- [ ] Click property in any list → modal opens
+- [ ] Modal shows: photo, address, price, beds, baths, sqft, $/sqft, DOM, status
+- [ ] Modal close button works
+- [ ] Scrolling works on property lists with many items
+
+---
+
+## FILES TO MODIFY
+
+```
+client/src/pages/CMADetail.tsx              [REMOVE preview banner]
+client/src/components/cma/CMAStatsView.tsx  [FIX cards layout]
+client/src/components/cma/PriceComparisonCard.tsx
+client/src/components/cma/PricePerSqFtCard.tsx
+client/src/components/cma/DaysOnMarketCard.tsx
+client/src/components/cma/PropertyDetailModal.tsx [CREATE if missing]
+```
+
+---
+
+**REMINDER: Test clicking on properties in each card to verify modal opens with correct data!**

@@ -774,29 +774,6 @@ Best regards`;
         </div>
       </div>
 
-      {/* Preview Banner - Spyglass Brand Colors - ABOVE the Card */}
-      <div 
-        className="bg-[#FEF2EF] dark:bg-[#EF4923]/10 border border-[#EF4923]/20 dark:border-[#EF4923]/30 rounded-lg p-4 flex items-center justify-between gap-4 flex-wrap print:hidden"
-        data-testid="cma-preview-banner"
-      >
-        <p className="text-sm text-foreground">
-          You are seeing a preview of the report.
-        </p>
-        <div className="flex items-center gap-2 flex-wrap">
-          <Button size="sm" style={{ backgroundColor: '#EF4923' }} className="text-white" onClick={handleSave} data-testid="button-save-cma">
-            <Save className="w-4 h-4 mr-2" />
-            Save
-          </Button>
-          <Button size="sm" variant="outline" onClick={handleModifySearch} data-testid="button-modify-search">
-            <Edit className="w-4 h-4 mr-2" />
-            Modify Search
-          </Button>
-          <Button size="sm" variant="outline" onClick={handleOpenNotesDialog} data-testid="button-notes">
-            Notes
-          </Button>
-        </div>
-      </div>
-
       {/* Comparable Properties Card - Clean Design */}
       <Card className="overflow-hidden print:hidden">
         <CardContent className="p-6">
@@ -1042,6 +1019,7 @@ Best regards`;
               <CMAStatsView 
                 properties={statusFilter === 'All' ? properties : properties.filter(p => p.standardStatus === statusFilter)} 
                 subjectProperty={subjectProperty}
+                onPropertyClick={handlePropertyClick}
               />
             )}
           </div>
