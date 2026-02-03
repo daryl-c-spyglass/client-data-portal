@@ -114,34 +114,14 @@ export function CMAMapView({
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<mapboxgl.Map | null>(null);
   const [mapLoaded, setMapLoaded] = useState(false);
-  const [mapToken, setMapToken] = useState<string | null>(null);
   const [mapError, setMapError] = useState<string | null>(null);
   const [mapStyle, setMapStyle] = useState<'streets' | 'satellite'>('streets');
   const currentStyleRef = useRef<string | null>(null);
   const addLayersRef = useRef<(() => void) | null>(null);
   const { theme } = useTheme();
 
-  useEffect(() => {
-    console.log('[CMAMap] Component mounted, fetching token...');
-    fetch('/api/mapbox-token')
-      .then((res) => {
-        if (!res.ok) {
-          throw new Error(`Token fetch failed: ${res.status}`);
-        }
-        return res.json();
-      })
-      .then((data) => {
-        if (!data.token) {
-          throw new Error('No token in response');
-        }
-        console.log('[CMAMap] Token received, length:', data.token.length);
-        setMapToken(data.token);
-      })
-      .catch((err) => {
-        console.error('[CMAMap] Token fetch error:', err);
-        setMapError('Failed to load map token');
-      });
-  }, []);
+  // Use Vite environment variable directly (same pattern as MapboxMap component)
+  const mapToken = import.meta.env.VITE_MAPBOX_TOKEN;
 
   const mapModel = useMemo(() => {
     const subjectFeature = subjectProperty 
@@ -170,7 +150,7 @@ export function CMAMapView({
   useEffect(() => {
     if (!mapContainer.current || !mapToken || map.current) return;
 
-    console.log('[CMAMap] Creating map instance...');
+    console.log('[CMAMap] Creating map instance with token length:', mapToken.length);
     
     try {
       mapboxgl.accessToken = mapToken;
@@ -440,6 +420,19 @@ export function CMAMapView({
     map.current.setStyle(newStyle);
   }, [mapStyle, theme, mapLoaded]);
 
+  if (!mapToken) {
+    return (
+      <div className={`space-y-2 ${className}`} data-testid="cma-map-view">
+        <div className="h-[550px] flex items-center justify-center bg-muted rounded-lg border">
+          <div className="text-center">
+            <p className="text-red-500 font-medium">Map Configuration Error</p>
+            <p className="text-sm text-muted-foreground mt-1">Please configure VITE_MAPBOX_TOKEN</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   if (mapError) {
     return (
       <div className={`space-y-2 ${className}`} data-testid="cma-map-view">
@@ -449,16 +442,6 @@ export function CMAMapView({
             <p className="text-sm text-muted-foreground">{mapError}</p>
             <p className="text-xs text-muted-foreground mt-2">Check console for details</p>
           </div>
-        </div>
-      </div>
-    );
-  }
-
-  if (!mapToken) {
-    return (
-      <div className={`space-y-2 ${className}`} data-testid="cma-map-view">
-        <div className="h-[550px] flex items-center justify-center bg-muted rounded-lg border">
-          <p className="text-muted-foreground">Loading map...</p>
         </div>
       </div>
     );

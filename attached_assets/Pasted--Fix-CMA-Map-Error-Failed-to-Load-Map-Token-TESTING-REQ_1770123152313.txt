@@ -1,0 +1,283 @@
+# Fix CMA Map Error - Failed to Load Map Token
+
+## TESTING REQUIREMENT
+
+**Before declaring complete, you MUST:**
+1. Open a CMA with comparable properties
+2. Click on "Map" view between Compare and Stats
+3. Verify map loads with property markers
+4. Verify no "Map Error" or "Failed to load map token" message
+5. **DO NOT declare complete without seeing the map render with properties**
+
+---
+
+## ISSUE
+
+On the CMA Comparable Properties section, when clicking the "Map" view tab:
+- Shows "Map Error"
+- "Failed to load map token"
+- "Check console for details"
+
+**Location:** `/cmas/{id}` → Comparable Properties → Map tab
+
+---
+
+## LIKELY CAUSES
+
+### 1. Mapbox Token Not Available to Component
+
+The Mapbox token may not be passed to the CMA map component correctly.
+
+**Check these locations:**
+
+```typescript
+// Environment variable
+MAPBOX_ACCESS_TOKEN=pk.xxx  // or VITE_MAPBOX_ACCESS_TOKEN for client-side
+
+// Server-side endpoint to provide token
+GET /api/mapbox/token
+
+// Or passed via props/context to map component
+```
+
+### 2. Token Environment Variable Name Mismatch
+
+```typescript
+// Common issue - different names used in different places
+process.env.MAPBOX_ACCESS_TOKEN      // Server-side
+import.meta.env.VITE_MAPBOX_ACCESS_TOKEN  // Vite client-side
+process.env.NEXT_PUBLIC_MAPBOX_TOKEN // Next.js
+```
+
+### 3. Token Not Exposed to Frontend
+
+If using Vite, the token must be prefixed with `VITE_` to be accessible on the client:
+
+```bash
+# In .env or Replit Secrets
+VITE_MAPBOX_ACCESS_TOKEN=pk.your_token_here
+```
+
+---
+
+## DEBUGGING STEPS
+
+### Step 1: Check Console for Specific Error
+
+Open browser DevTools → Console tab → Look for the actual error message.
+
+Common errors:
+- `Mapbox token is required`
+- `Invalid access token`
+- `Token undefined`
+
+### Step 2: Check How Other Maps Load Token
+
+The Calendar page uses Mapbox successfully (if applicable). Check how it loads the token and apply the same pattern.
+
+Also check if there's a working map elsewhere in the app (Property search, etc.)
+
+### Step 3: Check Token Endpoint
+
+```typescript
+// If there's an API endpoint for the token
+GET /api/mapbox/token
+
+// Response should be:
+{ token: "pk.xxx..." }
+```
+
+---
+
+## FIX OPTIONS
+
+### Option A: Use Server-Side Token Endpoint
+
+```typescript
+// client/src/components/CMAMap.tsx (or similar)
+
+import { useQuery } from '@tanstack/react-query';
+import Map, { Marker } from 'react-map-gl';
+
+export function CMAMap({ properties, subjectProperty }) {
+  // Fetch token from server
+  const { data: tokenData, isLoading: tokenLoading, error: tokenError } = useQuery({
+    queryKey: ['/api/mapbox/token'],
+  });
+
+  if (tokenLoading) {
+    return <div className="flex items-center justify-center h-96">Loading map...</div>;
+  }
+
+  if (tokenError || !tokenData?.token) {
+    return (
+      <div className="flex items-center justify-center h-96 text-red-500">
+        <div className="text-center">
+          <p className="font-medium">Map Error</p>
+          <p className="text-sm">Failed to load map token</p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <Map
+      mapboxAccessToken={tokenData.token}
+      initialViewState={{
+        longitude: subjectProperty?.longitude || -97.7431,
+        latitude: subjectProperty?.latitude || 30.2672,
+        zoom: 12,
+      }}
+      style={{ width: '100%', height: '400px' }}
+      mapStyle="mapbox://styles/mapbox/streets-v12"
+    >
+      {/* Subject Property Marker */}
+      {subjectProperty && (
+        <Marker
+          longitude={subjectProperty.longitude}
+          latitude={subjectProperty.latitude}
+          color="#3b82f6" // Blue
+        />
+      )}
+      
+      {/* Comparable Properties Markers */}
+      {properties?.map((prop) => (
+        <Marker
+          key={prop.id}
+          longitude={prop.longitude}
+          latitude={prop.latitude}
+          color={getMarkerColor(prop.status)}
+        />
+      ))}
+    </Map>
+  );
+}
+
+function getMarkerColor(status: string): string {
+  switch (status?.toLowerCase()) {
+    case 'active': return '#22c55e'; // Green
+    case 'under contract':
+    case 'pending': return '#f97316'; // Orange
+    case 'closed':
+    case 'sold': return '#ef4444'; // Red
+    default: return '#6b7280'; // Gray
+  }
+}
+```
+
+### Option B: Backend Token Endpoint (if missing)
+
+```typescript
+// server/routes.ts - Add if missing
+
+app.get('/api/mapbox/token', requireAuth, (req, res) => {
+  const token = process.env.MAPBOX_ACCESS_TOKEN;
+  
+  if (!token) {
+    console.error('MAPBOX_ACCESS_TOKEN not configured');
+    return res.status(500).json({ error: 'Map token not configured' });
+  }
+  
+  res.json({ token });
+});
+```
+
+### Option C: Use Environment Variable Directly (Vite)
+
+```typescript
+// If using Vite, ensure token is prefixed with VITE_
+
+// .env or Replit Secrets
+VITE_MAPBOX_ACCESS_TOKEN=pk.your_token_here
+
+// In component
+const mapboxToken = import.meta.env.VITE_MAPBOX_ACCESS_TOKEN;
+
+if (!mapboxToken) {
+  return <div>Map Error: Token not configured</div>;
+}
+
+<Map mapboxAccessToken={mapboxToken} ... />
+```
+
+---
+
+## CHECK EXISTING MAP IMPLEMENTATIONS
+
+Look for other working maps in the codebase:
+
+```bash
+# Search for Mapbox usage
+grep -r "mapboxAccessToken" client/src/
+grep -r "react-map-gl" client/src/
+grep -r "MAPBOX" .env*
+```
+
+Common files that might have working map implementations:
+- `client/src/components/PropertyMap.tsx`
+- `client/src/components/SearchMap.tsx`
+- `client/src/pages/Properties.tsx`
+
+Copy the token loading pattern from the working implementation.
+
+---
+
+## ENVIRONMENT VARIABLE CHECKLIST
+
+Verify these are set in Replit Secrets:
+
+```
+MAPBOX_ACCESS_TOKEN=pk.xxxxx (for server-side)
+VITE_MAPBOX_ACCESS_TOKEN=pk.xxxxx (for client-side if using Vite)
+```
+
+Note: Both may need to be set with the SAME token value.
+
+---
+
+## TESTING CHECKLIST
+
+After fix:
+- [ ] Open CMA: `/cmas/7bb1e947-d96c-4c92-ae8c-fd735143fd6c`
+- [ ] Scroll to "Comparable Properties" section
+- [ ] Click "Map" tab (between Compare and Stats)
+- [ ] Map renders (no error message)
+- [ ] Subject property marker visible (blue)
+- [ ] Comparable property markers visible (color-coded by status)
+- [ ] Can zoom/pan the map
+- [ ] Clicking a marker shows property info (if implemented)
+
+---
+
+## FILES TO CHECK/MODIFY
+
+```
+# Environment
+.env                                    [CHECK - MAPBOX_ACCESS_TOKEN]
+Replit Secrets                          [CHECK - token exists]
+
+# Server
+server/routes.ts                        [CHECK - /api/mapbox/token endpoint]
+
+# Client - Find the CMA map component
+client/src/components/cma/CMAMap.tsx    [MODIFY - token loading]
+client/src/pages/CMADetail.tsx          [CHECK - how map is rendered]
+```
+
+---
+
+## QUICK FIX IF TOKEN EXISTS BUT NOT LOADING
+
+If the token is set but not loading, the issue is likely in how the component fetches it:
+
+```typescript
+// Check if useQuery is returning the token
+const { data, error } = useQuery({ queryKey: ['/api/mapbox/token'] });
+console.log('Mapbox token response:', data, error);
+```
+
+Add this console log temporarily to debug.
+
+---
+
+**REMINDER: Check browser console for the specific error message - it will indicate exactly what's failing.**
