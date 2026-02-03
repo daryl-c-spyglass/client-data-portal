@@ -949,8 +949,8 @@
 
     render() {
       const p = this.escapeHtml(this.containerId);
-      const logoUrl = this.escapeHtml(this.options.logoUrl || (this.options.apiUrl ? `${this.options.apiUrl}/spyglass-logo-white.png` : '/spyglass-logo-white.png'));
-      // semgrep-ignore: properly sanitized via escapeHtml()
+      const logoUrl = this.sanitizeUrl(this.options.logoUrl || (this.options.apiUrl ? `${this.options.apiUrl}/spyglass-logo-white.png` : '/spyglass-logo-white.png'));
+      // semgrep-ignore: properly sanitized via escapeHtml() and sanitizeUrl()
       this.container.innerHTML = `
         <div class="spyglass-widget">
           <div class="spyglass-header">
@@ -1245,7 +1245,7 @@
     }
 
     renderPropertyCard(property) {
-      const imageUrl = property.primaryPhoto || 'https://placehold.co/400x300/e0e0e0/666?text=No+Photo';
+      const imageUrl = this.sanitizeUrl(property.primaryPhoto) || 'https://placehold.co/400x300/e0e0e0/666?text=No+Photo';
       const status = property.standardStatus || 'Active';
       const statusClass = status === 'Active' ? 'active' : 
                          status === 'Pending' ? 'pending' : 'under-contract';
@@ -1253,7 +1253,7 @@
       return `
         <div class="spyglass-property-card" data-mls-id="${this.escapeHtml(String(property.listingId))}">
           <div class="spyglass-card-image">
-            <img src="${this.escapeHtml(imageUrl)}" alt="${this.escapeHtml(property.streetAddress || 'Property')}" loading="lazy" onerror="this.src='https://placehold.co/400x300/e0e0e0/666?text=No+Photo'">
+            <img src="${imageUrl}" alt="${this.escapeHtml(property.streetAddress || 'Property')}" loading="lazy" onerror="this.src='https://placehold.co/400x300/e0e0e0/666?text=No+Photo'">
             <span class="spyglass-card-status spyglass-status-${statusClass}">${this.escapeHtml(status)}</span>
           </div>
           <div class="spyglass-card-body">
@@ -1618,7 +1618,7 @@
             const propJson = JSON.stringify(this.property).replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
             const infoContent = `
               <div class="spyglass-info-window">
-                <img src="${widget.escapeHtml(this.property.primaryPhoto) || 'https://placehold.co/200x120/e0e0e0/666?text=No+Photo'}" alt="${widget.escapeHtml(this.property.streetAddress)}" onerror="this.src='https://placehold.co/200x120/e0e0e0/666?text=No+Photo'">
+                <img src="${widget.sanitizeUrl(this.property.primaryPhoto) || 'https://placehold.co/200x120/e0e0e0/666?text=No+Photo'}" alt="${widget.escapeHtml(this.property.streetAddress)}" onerror="this.src='https://placehold.co/200x120/e0e0e0/666?text=No+Photo'">`
                 <div class="spyglass-info-window-price">$${widget.formatNumber(this.property.listPrice)}</div>
                 <div class="spyglass-info-window-address">${widget.escapeHtml(this.property.streetAddress) || ''}</div>
                 <button class="spyglass-info-window-btn" onclick="document.getElementById('${widget.escapeHtml(widget.containerId)}').__spyglassWidget.openPropertyDetail(${propJson})">View Details</button>
@@ -1695,10 +1695,10 @@
         else soldPriceClass = 'red';
       }
 
-      // semgrep-ignore: properly sanitized via escapeHtml()
+      // semgrep-ignore: properly sanitized via escapeHtml() and sanitizeUrl()
       content.innerHTML = `
         <div class="spyglass-modal-gallery" style="position: relative;">
-          <img class="spyglass-modal-main-image" id="${p}-main-image" src="${this.escapeHtml(mainPhoto)}" alt="${this.escapeHtml(property.streetAddress)}" onerror="this.src='https://placehold.co/900x400/e0e0e0/666?text=No+Photo'">
+          <img class="spyglass-modal-main-image" id="${p}-main-image" src="${this.sanitizeUrl(mainPhoto)}" alt="${this.escapeHtml(property.streetAddress)}" onerror="this.src='https://placehold.co/900x400/e0e0e0/666?text=No+Photo'">
           ${photoCount > 0 ? `
             <div class="spyglass-photo-count">
               <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/></svg>
@@ -1708,7 +1708,7 @@
           ${photos.length > 1 ? `
             <div class="spyglass-modal-thumbnails">
               ${photos.slice(0, 10).map((photo, i) => `
-                <img class="spyglass-modal-thumb ${i === 0 ? 'active' : ''}" src="${this.escapeHtml(photo.mediaUrl)}" alt="Photo ${i + 1}" data-url="${this.escapeHtml(photo.mediaUrl)}" onerror="this.style.display='none'">
+                <img class="spyglass-modal-thumb ${i === 0 ? 'active' : ''}" src="${this.sanitizeUrl(photo.mediaUrl)}" alt="Photo ${i + 1}" data-url="${this.sanitizeUrl(photo.mediaUrl)}" onerror="this.style.display='none'">
               `).join('')}
             </div>
           ` : ''}
@@ -1889,6 +1889,22 @@
       const div = document.createElement('div');
       div.textContent = str;
       return div.innerHTML;
+    }
+
+    sanitizeUrl(url) {
+      if (!url) return '';
+      const escaped = this.escapeHtml(url);
+      try {
+        const parsed = new URL(escaped, window.location.origin);
+        const allowedProtocols = ['http:', 'https:', 'data:'];
+        if (!allowedProtocols.includes(parsed.protocol)) {
+          return '';
+        }
+        return escaped;
+      } catch {
+        if (escaped.startsWith('/')) return escaped;
+        return '';
+      }
     }
 
     destroy() {
