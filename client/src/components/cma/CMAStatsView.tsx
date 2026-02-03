@@ -5,7 +5,7 @@ import {
   CartesianGrid, Cell 
 } from 'recharts';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Home, TrendingUp, DollarSign, Calendar, Ruler } from 'lucide-react';
+import { Home, TrendingUp, DollarSign, Calendar, Ruler, FileText } from 'lucide-react';
 import { 
   extractPrice, 
   extractSqft, 
@@ -38,6 +38,7 @@ export function CMAStatsView({ properties, subjectProperty, onPropertyClick }: C
     <div className="space-y-6" data-testid="cma-stats-view">
       <SummaryCards properties={properties} subjectProperty={subjectProperty} />
       <PriceComparisonChart properties={properties} subjectProperty={subjectProperty} onPropertyClick={onPropertyClick} />
+      <CMAMarketReviewSection properties={properties} closedProperties={closedProperties} subjectProperty={subjectProperty} />
       <DaysOnMarketSection closedProperties={closedProperties} onPropertyClick={onPropertyClick} />
       <AveragePricePerSqftSection closedProperties={closedProperties} subjectProperty={subjectProperty} onPropertyClick={onPropertyClick} />
     </div>
@@ -213,6 +214,103 @@ function PriceComparisonChart({ properties, subjectProperty, onPropertyClick }: 
             <div className="w-3 h-3 rounded" style={{ backgroundColor: '#EF4923' }} />
             <span className="text-sm text-muted-foreground">Comparables</span>
           </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+function CMAMarketReviewSection({ 
+  properties, 
+  closedProperties, 
+  subjectProperty 
+}: { 
+  properties: any[]; 
+  closedProperties: any[]; 
+  subjectProperty: any;
+}) {
+  const stats = useMemo(() => calculateStatistics(properties), [properties]);
+  
+  const priceRange = useMemo(() => {
+    const prices = properties.map(p => extractPrice(p)).filter(Boolean) as number[];
+    if (prices.length === 0) return { min: 0, max: 0 };
+    return { min: Math.min(...prices), max: Math.max(...prices) };
+  }, [properties]);
+
+  const sqftRange = useMemo(() => {
+    const areas = properties.map(p => extractSqft(p)).filter(Boolean) as number[];
+    if (areas.length === 0) return { min: 0, max: 0 };
+    return { min: Math.min(...areas), max: Math.max(...areas) };
+  }, [properties]);
+
+  const pricePerSqftRange = useMemo(() => {
+    const ppsf = properties.map(p => {
+      const price = extractPrice(p);
+      const sqft = extractSqft(p);
+      return price && sqft ? price / sqft : null;
+    }).filter(Boolean) as number[];
+    if (ppsf.length === 0) return { min: 0, max: 0 };
+    return { min: Math.round(Math.min(...ppsf)), max: Math.round(Math.max(...ppsf)) };
+  }, [properties]);
+
+  return (
+    <Card className="mx-4" data-testid="cma-market-review">
+      <CardHeader className="pb-2">
+        <CardTitle className="text-lg flex items-center gap-2">
+          <FileText className="w-5 h-5" />
+          CMA Market Review
+        </CardTitle>
+      </CardHeader>
+      <CardContent>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div>
+            <h4 className="font-semibold text-sm text-muted-foreground mb-1">Market Overview</h4>
+            <p className="text-sm">
+              Based on {properties.length} comparable properties, the average price is{' '}
+              <span className="font-semibold text-[#EF4923]">{formatPrice(stats.price.average)}</span>{' '}
+              with a median of{' '}
+              <span className="font-semibold text-[#EF4923]">{formatPrice(stats.price.median)}</span>.
+              Prices range from {formatPrice(priceRange.min)} to {formatPrice(priceRange.max)}.
+            </p>
+          </div>
+
+          <div>
+            <h4 className="font-semibold text-sm text-muted-foreground mb-1">Price Per Square Foot</h4>
+            <p className="text-sm">
+              Average price per square foot is{' '}
+              <span className="font-semibold text-[#EF4923]">${Math.round(stats.pricePerSqFt.average)}</span>{' '}
+              across comparable properties. This ranges from ${pricePerSqftRange.min} to ${pricePerSqftRange.max}/sqft.
+            </p>
+          </div>
+
+          <div>
+            <h4 className="font-semibold text-sm text-muted-foreground mb-1">Days on Market</h4>
+            <p className="text-sm">
+              Average: <span className="font-semibold">{Math.round(stats.daysOnMarket.average)} days</span>
+            </p>
+          </div>
+
+          <div>
+            <h4 className="font-semibold text-sm text-muted-foreground mb-1">Bed/Bath</h4>
+            <p className="text-sm">
+              Avg: <span className="font-semibold">{stats.bedrooms.average.toFixed(1)} beds / {stats.bathrooms.average.toFixed(1)} baths</span>
+            </p>
+          </div>
+
+          <div>
+            <h4 className="font-semibold text-sm text-muted-foreground mb-1">Property Size</h4>
+            <p className="text-sm">
+              Avg: <span className="font-semibold">{Math.round(stats.livingArea.average).toLocaleString()} sqft</span>
+              <br />
+              <span className="text-muted-foreground text-xs">
+                Range: {sqftRange.min.toLocaleString()} - {sqftRange.max.toLocaleString()} sqft
+              </span>
+            </p>
+          </div>
+        </div>
+
+        <div className="mt-4 pt-4 border-t text-xs text-muted-foreground italic">
+          This analysis is based on {closedProperties.length} Closed propert{closedProperties.length === 1 ? 'y' : 'ies'} in your selection.
         </div>
       </CardContent>
     </Card>
