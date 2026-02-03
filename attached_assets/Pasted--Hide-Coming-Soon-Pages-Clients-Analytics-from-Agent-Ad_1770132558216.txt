@@ -1,0 +1,226 @@
+# Hide Coming Soon Pages (Clients & Analytics) from Agent/Admin
+
+## TESTING REQUIREMENT
+
+**Before declaring complete, you MUST test with ALL 4 roles:**
+1. Developer → Can see Clients and Analytics in sidebar, can access pages
+2. Super Admin → Can see Clients and Analytics in sidebar, can access pages
+3. Admin → Cannot see Clients or Analytics in sidebar, redirected if accessing directly
+4. Agent → Cannot see Clients or Analytics in sidebar, redirected if accessing directly
+
+**DO NOT declare complete without testing all 4 roles**
+
+---
+
+## REQUIREMENTS
+
+### Sidebar Visibility
+
+| Sidebar Item | Agent | Admin | Super Admin | Developer |
+|--------------|:-----:|:-----:|:-----------:|:---------:|
+| Dashboard | Yes | Yes | Yes | Yes |
+| Properties | Yes | Yes | Yes | Yes |
+| CMAs | Yes | Yes | Yes | Yes |
+| Seller Updates | Yes | Yes | Yes | Yes |
+| Buyer Search | Yes | Yes | Yes | Yes |
+| **Clients** | No | No | Yes | Yes |
+| **Analytics** | No | No | Yes | Yes |
+| Settings | Yes | Yes | Yes | Yes |
+
+### Route Protection
+
+If Agent or Admin tries to access `/clients` or `/analytics` directly via URL:
+- Redirect to `/dashboard`
+- Or show "Access Denied" message
+
+---
+
+## IMPLEMENTATION
+
+### 1. Update Sidebar Navigation
+
+```tsx
+// client/src/components/Sidebar.tsx (or Layout.tsx)
+
+import { usePermissions } from '@/hooks/use-permissions';
+
+export function Sidebar() {
+  const { isSuperAdmin, isDeveloper } = usePermissions();
+  
+  // Coming Soon pages only visible to Super Admin and Developer
+  const canViewComingSoon = isSuperAdmin || isDeveloper;
+
+  return (
+    <nav>
+      {/* Application Section */}
+      <div className="mb-4">
+        <p className="text-xs text-muted-foreground mb-2">Application</p>
+        <NavLink to="/dashboard">Dashboard</NavLink>
+        <NavLink to="/properties">Properties</NavLink>
+        <NavLink to="/cmas">CMAs</NavLink>
+        <NavLink to="/seller-updates">Seller Updates</NavLink>
+        <NavLink to="/buyer-search">Buyer Search</NavLink>
+        
+        {/* Clients - Coming Soon (Super Admin/Developer only) */}
+        {canViewComingSoon && (
+          <NavLink to="/clients">Clients</NavLink>
+        )}
+        
+        {/* Analytics - Coming Soon (Super Admin/Developer only) */}
+        {canViewComingSoon && (
+          <NavLink to="/analytics">Analytics</NavLink>
+        )}
+        
+        <NavLink to="/settings">Settings</NavLink>
+      </div>
+      
+      {/* Admin Section - already protected */}
+      {/* ... */}
+      
+      {/* Follow Up Boss Section */}
+      {/* ... */}
+    </nav>
+  );
+}
+```
+
+### 2. Protect Routes
+
+```tsx
+// client/src/App.tsx or routes.tsx
+
+// Create a wrapper for Coming Soon pages
+function ProtectedComingSoonRoute({ children }) {
+  const { isSuperAdmin, isDeveloper, isLoading } = usePermissions();
+  
+  if (isLoading) return <LoadingSpinner />;
+  
+  if (!isSuperAdmin && !isDeveloper) {
+    return <Navigate to="/dashboard" replace />;
+  }
+  
+  return children;
+}
+
+// Apply to routes
+<Route 
+  path="/clients" 
+  element={
+    <ProtectedComingSoonRoute>
+      <ClientsPage />
+    </ProtectedComingSoonRoute>
+  } 
+/>
+
+<Route 
+  path="/analytics" 
+  element={
+    <ProtectedComingSoonRoute>
+      <AnalyticsPage />
+    </ProtectedComingSoonRoute>
+  } 
+/>
+```
+
+### 3. Alternative: Use Existing ProtectedRoute
+
+If you already have a `ProtectedRoute` component with `minimumRole` prop:
+
+```tsx
+<Route 
+  path="/clients" 
+  element={
+    <ProtectedRoute minimumRole="super_admin">
+      <ClientsPage />
+    </ProtectedRoute>
+  } 
+/>
+
+<Route 
+  path="/analytics" 
+  element={
+    <ProtectedRoute minimumRole="super_admin">
+      <AnalyticsPage />
+    </ProtectedRoute>
+  } 
+/>
+```
+
+Note: This works because Developer has higher permissions than Super Admin in the hierarchy.
+
+---
+
+## OPTIONAL: Add "Coming Soon" Badge in Sidebar
+
+For Developer/Super Admin, show a small badge indicating these are preview features:
+
+```tsx
+{canViewComingSoon && (
+  <NavLink to="/clients" className="flex items-center justify-between">
+    <span>Clients</span>
+    <Badge variant="outline" className="text-xs ml-2">Preview</Badge>
+  </NavLink>
+)}
+
+{canViewComingSoon && (
+  <NavLink to="/analytics" className="flex items-center justify-between">
+    <span>Analytics</span>
+    <Badge variant="outline" className="text-xs ml-2">Preview</Badge>
+  </NavLink>
+)}
+```
+
+---
+
+## TESTING CHECKLIST
+
+### Developer (daryl@spyglassrealty.com):
+- [ ] Sidebar shows "Clients" link
+- [ ] Sidebar shows "Analytics" link
+- [ ] Can access `/clients` page
+- [ ] Can access `/analytics` page
+- [ ] Both pages show "Coming Soon" content
+
+### Super Admin (caleb@spyglassrealty.com):
+- [ ] Sidebar shows "Clients" link
+- [ ] Sidebar shows "Analytics" link
+- [ ] Can access `/clients` page
+- [ ] Can access `/analytics` page
+
+### Admin (test user with admin role):
+- [ ] Sidebar does NOT show "Clients" link
+- [ ] Sidebar does NOT show "Analytics" link
+- [ ] Accessing `/clients` directly → Redirects to dashboard
+- [ ] Accessing `/analytics` directly → Redirects to dashboard
+
+### Agent (test user with agent role):
+- [ ] Sidebar does NOT show "Clients" link
+- [ ] Sidebar does NOT show "Analytics" link
+- [ ] Accessing `/clients` directly → Redirects to dashboard
+- [ ] Accessing `/analytics` directly → Redirects to dashboard
+
+---
+
+## FILES TO MODIFY
+
+```
+client/src/
+├── components/
+│   └── Sidebar.tsx              [MODIFY - hide Clients/Analytics for Agent/Admin]
+└── App.tsx or routes.tsx        [MODIFY - protect routes]
+```
+
+---
+
+## SUMMARY
+
+| Page | Agent | Admin | Super Admin | Developer |
+|------|:-----:|:-----:|:-----------:|:---------:|
+| Clients | Hidden | Hidden | Visible | Visible |
+| Analytics | Hidden | Hidden | Visible | Visible |
+
+These "Coming Soon" pages will be visible only to Super Admin and Developer until the features are built.
+
+---
+
+**REMINDER: Test with all 4 roles to ensure proper visibility!**

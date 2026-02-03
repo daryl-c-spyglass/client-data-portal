@@ -38,6 +38,7 @@ import AdminPage from "@/pages/AdminPage";
 import UserManagement from "@/pages/UserManagement";
 import ActivityLogs from "@/pages/ActivityLogs";
 import Login from "@/pages/Login";
+import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { useEffect } from "react";
 
 function AuthGuard({ children }: { children: React.ReactNode }) {
@@ -114,8 +115,20 @@ function Router() {
       <Route path="/seller-updates/:id/preview" component={SellerUpdatePreview} />
       <Route path="/buyer-search" component={BuyerSearch} />
       <Route path="/embed-code" component={EmbedCodeGenerator} />
-      <Route path="/clients" component={Clients} />
-      <Route path="/analytics" component={Analytics} />
+      <Route path="/clients">
+        {() => (
+          <ProtectedRoute minimumRole="super_admin" fallbackPath="/">
+            <Clients />
+          </ProtectedRoute>
+        )}
+      </Route>
+      <Route path="/analytics">
+        {() => (
+          <ProtectedRoute minimumRole="super_admin" fallbackPath="/">
+            <Analytics />
+          </ProtectedRoute>
+        )}
+      </Route>
       <Route path="/settings" component={Settings} />
       <Route path="/calendar" component={CalendarPage} />
       <Route path="/leads" component={LeadsPage} />

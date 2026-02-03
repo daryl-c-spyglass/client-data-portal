@@ -102,7 +102,16 @@ const calendarItems = [
 export function AppSidebar() {
   const [location] = useLocation();
   const { openChat } = useChat();
-  const { canAccessAdmin } = usePermissions();
+  const { canAccessAdmin, isSuperAdmin, isDeveloper } = usePermissions();
+
+  const canViewComingSoon = isSuperAdmin || isDeveloper;
+
+  const filteredMenuItems = menuItems.filter((item) => {
+    if (item.url === "/clients" || item.url === "/analytics") {
+      return canViewComingSoon;
+    }
+    return true;
+  });
 
   return (
     <Sidebar>
@@ -121,7 +130,7 @@ export function AppSidebar() {
           <SidebarGroupLabel>Application</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
-              {menuItems.map((item) => (
+              {filteredMenuItems.map((item) => (
                 <SidebarMenuItem key={item.title}>
                   <SidebarMenuButton 
                     asChild
