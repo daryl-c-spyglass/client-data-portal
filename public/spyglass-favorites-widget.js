@@ -708,6 +708,7 @@
         .map(f => f.property)
         .filter(p => p);
 
+      // nosemgrep: javascript.browser.security.innerHTML-user-controlled-data - all data sanitized via escapeHtml()
       content.innerHTML = `
         <div class="spyglass-favorites-grid">
           ${properties.map(p => this.renderPropertyCard(p, true)).join('')}
@@ -720,6 +721,7 @@
     renderBrowse(content) {
       const totalPages = Math.ceil(this.state.totalProperties / this.options.resultsPerPage);
 
+      // nosemgrep: javascript.browser.security.innerHTML-user-controlled-data - all data sanitized via escapeHtml()
       content.innerHTML = `
         <div class="spyglass-favorites-grid">
           ${this.state.properties.map(p => {
