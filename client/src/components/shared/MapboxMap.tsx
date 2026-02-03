@@ -69,7 +69,7 @@ function createMarkerElement(marker: MapMarker): HTMLDivElement {
       cursor: pointer;
       transition: transform 0.15s ease;
     `;
-    el.innerHTML = formatPrice(marker.price);
+    el.textContent = formatPrice(marker.price);
     el.addEventListener('mouseenter', () => {
       el.style.transform = 'scale(1.1)';
       el.style.zIndex = '10';
