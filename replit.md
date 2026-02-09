@@ -9,7 +9,7 @@ Preferred communication style: Simple, everyday language.
 ## System Architecture
 
 ### Frontend Architecture
-The frontend is built with React and TypeScript using Vite, utilizing `shadcn/ui` (New York style variant) based on Radix UI for components and Tailwind CSS for styling, supporting light/dark modes. State management uses TanStack Query with aggressive caching, and Wouter for client-side routing. The UI incorporates Spyglass Realty branding with an orange primary color scheme.
+The frontend is built with React and TypeScript using Vite, utilizing `shadcn/ui` (New York style variant) based on Radix UI for components and Tailwind CSS for styling, supporting light/dark modes. State management uses TanStack Query with aggressive caching, and Wouter for client-side routing. The UI incorporates Spyglass Realty branding with an orange primary color scheme. Mapbox is the standard mapping library.
 
 ### Backend Architecture
 The backend is developed with Node.js and Express in TypeScript (ESM), exposing a RESTful API with type-safe request/response handling. It features a flexible storage interface, a built-in rate limiter, and a scheduled daily sync for property data. The API intelligently routes property searches: active/under_contract listings query the Repliers API, while closed/sold listings query the local PostgreSQL database.
@@ -18,91 +18,39 @@ The backend is developed with Node.js and Express in TypeScript (ESM), exposing 
 The platform uses Drizzle ORM with PostgreSQL, adhering to type-safe schema definitions. Core tables include `properties` (RESO Data Dictionary compliant), `media`, `saved_searches`, and `cmas`. Zod schemas are used for runtime validation. Property search performance is optimized with database-level pagination and trigram indexes.
 
 ### UI/UX Decisions
-The UI incorporates Spyglass Realty branding with an orange primary color scheme. `shadcn/ui` (New York style variant) based on Radix UI is used for components, prioritizing visual appeal and functional efficiency. Styling is managed with Tailwind CSS, incorporating custom design tokens and supporting light/dark modes.
-**Mapping Solution**: Mapbox is the standard mapping library for all features across the application. All interactive maps, property visualizations, and location-based features should use Mapbox GL JS. Requires VITE_MAPBOX_TOKEN secret.
-- **Centralized Status Colors**: `client/src/lib/statusColors.ts` - Single source of truth for all property status colors used across the entire portal (maps, cards, tables, badges, charts, PDF exports). Color scheme: Subject=#3b82f6 (blue), Active=#22c55e (green), Under Contract=#f97316 (orange), Closed=#ef4444 (red), Pending=#6b7280 (gray). Includes Tailwind classes, hex values, and helper functions like `getStatusHexFromMLS()` and `getStatusFromMLS()`.
-- **Global Day/Night Mode**: ThemeContext (`client/src/contexts/ThemeContext.tsx`) provides application-wide theme state with localStorage persistence ('cdp-theme'). Maps automatically sync their visual style (streets for light mode, dark for dark mode) when `syncWithTheme={true}` is passed to MapboxMap. CMA map view includes a Streets/Satellite toggle; satellite view remains satellite regardless of theme, while streets view adapts to dark/light theme.
+The UI incorporates Spyglass Realty branding with an orange primary color scheme. `shadcn/ui` (New York style variant) based on Radix UI is used for components. Styling is managed with Tailwind CSS, incorporating custom design tokens and supporting light/dark modes. Mapbox is the standard mapping library. A centralized `statusColors.ts` manages property status colors for consistency across the application. Global Day/Night Mode is managed via `ThemeContext` with localStorage persistence, and maps automatically sync their visual style.
 
 ### Authentication
-- **Google OAuth**: Team-only authentication via Google OAuth (passport-google-oauth20) with domain restriction to @spyglassrealty.com emails or explicitly allowed emails.
-- **Session Management**: PostgreSQL-backed sessions via connect-pg-simple. Cookies configured with `sameSite: 'none'` and `secure: true` for cross-origin iframe support.
-- **Security**: Return URL sanitization prevents open redirect vulnerabilities. CSP headers allow iframe embedding from `*.replit.dev`, `*.replit.app`, `*.onrender.com`, `*.spyglassrealty.com`.
-- **Iframe Embedding (Popup OAuth)**: When embedded in an iframe (e.g., Mission Control / Agent Hub Portal), authentication uses popup-based OAuth flow since Google blocks OAuth redirects in iframes. Implementation in `client/src/lib/iframe.ts` with `isInIframe()` detection and `openAuthPopup()` helper. Server routes: `/auth/google/popup` initiates popup flow, callback uses postMessage to communicate success/error to parent window. Auto dark theme sync when embedded.
-- **4-Tier Role System**: Role-based access control with Developer > Super Admin > Admin > Agent hierarchy.
-  - **Developer**: Highest level access. All Super Admin permissions plus: manage Super Admin roles, delete privileged users, view debug info on Calendar/Leads pages, grant Developer role. Developers: daryl@spyglassrealty.com, ryan@spyglassrealty.com (defined in `DEVELOPER_EMAILS`).
-  - **Super Admin**: Full platform access including user management, presentation library management, company settings. Initial super admin: caleb@spyglassrealty.com (defined in `INITIAL_SUPER_ADMIN_EMAILS` as fallback for first-time setup)
-  - **Admin**: Template creation, presentation library viewing, display settings management
-  - **Agent**: CMA creation, presentations, global slides access, analytics viewing
-  - **Permission Utilities**: `shared/permissions.ts` exports `hasPermission()`, `isAtLeast()`, `normalizeRole()`, `canManageRole()`, `DEVELOPER_EMAILS`, `INITIAL_SUPER_ADMIN_EMAILS` helpers
-  - **Frontend Hook**: `usePermissions()` hook provides `can()`, `isAtLeast()`, role flags (`isDeveloper`, `isSuperAdmin`, `isAdmin`, `isAgent`), `canViewDebug`, `canManageSuperAdmins`
-  - **Backend Middleware**: `requireMinimumRole()` and `requirePermission()` in `server/auth.ts`. Auth middleware checks `isActive` status to block disabled users.
-  - **Protected Routes**: `ProtectedRoute` component wraps pages requiring specific roles/permissions
-  - **RoleBadge Component**: `client/src/components/RoleBadge.tsx` - Visual role badges with icons (Developer=emerald/Code, Super Admin=purple/ShieldCheck, Admin=blue/Shield, Agent=gray/User)
-  - **User Management** (`/admin/users`): Super Admin+ page for viewing all users, changing roles, enabling/disabling accounts, and permanently deleting users. Features: search with Follow Up Boss team member integration (FUB users shown separately if not yet registered), status badges, inline role dropdown for invites (Developer option only visible to Developers), action dropdowns, confirmation dialogs. Protection rules enforced server-side: cannot change own role/status, cannot modify Super Admin/Developer accounts (unless Developer), cannot delete yourself, cannot remove last Developer.
-  - **Permanent User Deletion**: DELETE /api/admin/users/:id endpoint with activity logging (USER_DELETED action with deletedUserEmail, deletedUserName, deletedUserRole details). Foreign key constraint uses ON DELETE SET NULL to preserve activity logs after user deletion.
-  - **Activity Logs** (`/admin/activity-logs`): Audit trail of admin actions (role changes, user enable/disable, user deleted, user invited). Stored in `admin_activity_logs` table with admin/target user info, IP address, previous/new values, details JSONB. Service in `server/admin-activity-service.ts`. Deleted user info preserved in details field when targetUser is NULL.
-  - **User Status Control**: `isActive` boolean on users table enables soft disable. Disabled users cannot log in but data is preserved.
+Google OAuth is used for team-only authentication with domain restriction. Session management is PostgreSQL-backed. Security features include return URL sanitization and CSP headers for iframe embedding. A 4-tier role system (Developer, Super Admin, Admin, Agent) provides role-based access control with permissions managed via utilities and hooks. User management features include role changes, account enabling/disabling, and permanent deletion with activity logging.
 
 ### Technical Implementations
-- **Data Sourcing**: Primary property data from Repliers API (active, pending, closed listings) and MLS Grid API. Repliers API stores MLS SubdivisionName data in `address.neighborhood`.
-- **CMA Two-Query Strategy**: CMA searches use two logical filter paths for active/under_contract listings (local subdivision filtering with multi-page fetching) and closed listings (API-level subdivision filtering and date filtering). Default close date range is 365 days.
-- **Repliers Inventory Sync**: Scheduled daily refresh at 12 AM Central with manual trigger support.
-- **Property Status Handling**: All user-facing status labels strictly follow the RESO Data Dictionary 4-status hierarchy (Active, Active Under Contract, Pending, Closed).
-- **Canonical Data Layer**: Unifies MLS and Repliers listings data with deterministic deduplication, prioritizing MLS > REPLIERS > DATABASE.
-- **AI Assistant**: Conversational property search and CMA intake assistant powered by OpenAI GPT-4o, including voice input and intent detection (`IDX_SEARCH`, `CMA_INTAKE`). Requires user confirmation for CMA creation.
-- **AI Search Assistant**: Natural language search for property criteria in Buyer Search, using OpenAI for parsing and sanitization with RESO-compliant validation.
-- **AI Image Search**: Visual similarity ranking for property listings powered by Repliers AI, integrated into Buyer Search and CMA Builder for finding visually similar comps.
-- **School Filter Architecture**: Repliers API handles school filtering at API level for Active/Under Contract/Pending statuses. Local server-side school filtering is used for Database results (Closed status).
+Primary property data is sourced from Repliers API and MLS Grid API. CMA searches utilize a two-query strategy for active/under_contract vs. closed listings. A daily scheduled refresh syncs Repliers inventory. Property status handling adheres to the RESO Data Dictionary. A canonical data layer unifies and deduplicates listing data. AI features include a conversational property search and CMA intake assistant, natural language search for property criteria, and visual similarity ranking for property listings. School filtering is handled at the API level for active listings and server-side for closed listings.
 
 ### Feature Specifications
 - **IDX Platform**: Comprehensive property browsing, search, and filtering.
-- **CMA Generation**: Tools for creating detailed Comparative Market Analyses with professional report building, agent profiles, customizable sections, company branding, and AI-powered cover letter generation (GPT-4o) and photo selection (Repliers imageInsights API). Includes interactive Mapbox integration for listing visualization and static map URL generation for PDF export.
-- **CMA Property Adjustments**: Full property value adjustment feature for CMA comparisons with configurable adjustment rates (sqft: $50/unit, bedrooms: $10K, bathrooms: $7.5K, pool: $25K, garage: $5K/space, year built: $1K/year, lot size: $2/sqft). Supports per-comparable manual overrides and custom adjustments. Data stored in `cmas.adjustments` JSONB column with types: `CmaAdjustmentRates`, `CmaCompAdjustmentOverrides`, `CmaAdjustmentsData`. Calculation library at `client/src/lib/adjustmentCalculations.ts`. UI component at `client/src/components/AdjustmentsSection.tsx`. Uses `getPropertyId(comp)` helper for consistent comparable identification across storage and preview calculations.
-- **Agent Productivity Tools**: Integrations with Mission Control (ReZen) for production volume reporting and Follow Up Boss (FUB) for calendar events and lead management.
-  - **Role-Based FUB Data Access**: Calendar and Leads pages enforce role-based data visibility:
-    - **Super Admins**: Can view all agents' calendar/leads data via agent dropdown selector
-    - **Admins/Agents**: Restricted to their own data only (matched by portal email → FUB agent email)
-    - Backend enforces filtering server-side via `requireAuth` + role check in `/api/fub/calendar` and `/api/fub/leads`
-    - `getFUBAgentIdByEmail()` helper in `server/followupboss-service.ts` maps portal users to FUB agents
-    - Users without FUB email match see info message with `userFubIdNotFound: true` response flag
-- **Seller Updates**: Automated market update emails with SendGrid integration.
-- **Settings Page**: Management for agent profile, data sync, display preferences, embed codes, and lead capture, including profile photo uploads to object storage.
-- **Admin Panel**: Master admin controls for company branding, custom report pages, and user role management.
+- **CMA Generation**: Tools for creating detailed CMAs with professional reports, customizable sections, branding, AI-powered cover letters and photo selection. Includes interactive Mapbox integration and property value adjustment features.
+- **Agent Productivity Tools**: Integrations with Mission Control (ReZen) and Follow Up Boss (FUB) for reporting, calendar events, and lead management, with role-based data access.
+- **Seller Updates**: Automated market update emails.
+- **Settings Page**: Agent profile, data sync, display preferences, embed codes, and lead capture.
+- **Admin Panel**: Company branding, custom report pages, and user role management.
 - **Market Insights**: Year-over-Year price comparisons and neighborhood-level market statistics.
 - **Property Detail Page**: Enhanced property details with neighborhood reviews and boundary maps.
 - **Search Enhancements**: Autocomplete for cities, zip codes, subdivisions, and elementary schools.
-- **Dynamic Map Layers**: Toggle-able flood zone (FEMA NFHL) and school district (City of Austin GIS) overlays on property maps with interactive legends.
+- **Dynamic Map Layers**: Toggle-able flood zone and school district overlays on property maps.
 
 ## External Dependencies
 
 - **MLS Grid API**: Primary data source for property listings.
 - **Repliers API**: Primary data source for active, pending, and closed property listings.
-- **PostgreSQL**: Persistent data storage, leveraging Neon serverless driver.
+- **PostgreSQL**: Persistent data storage (Neon serverless driver).
 - **Amazon S3**: Storage for media assets.
-- **Replit Object Storage**: Used for CMA listing brochure uploads (GCS-backed with presigned URL flow).
+- **Replit Object Storage**: For CMA listing brochure uploads.
 - **Mission Control (ReZen) API**: For agent production volume reporting.
 - **Follow Up Boss (FUB) API**: For calendar events and lead management.
 - **Google Fonts CDN**: Typography (Inter font family).
-- **Resend**: Email services for seller update notifications.
-- **FEMA NFHL API**: National Flood Hazard Layer data for flood zone overlays.
-- **City of Austin ArcGIS**: School district boundary data for map layers.
-- **Mapbox GL JS**: Standard mapping library for all application features including CMA presentations, property detail pages, and location-based visualizations.
+- **Resend**: Email services.
+- **FEMA NFHL API**: National Flood Hazard Layer data.
+- **City of Austin ArcGIS**: School district boundary data.
+- **Mapbox GL JS**: Standard mapping library.
 - **OpenAI API**: For AI Assistant and AI Search Assistant functionalities (GPT-4o).
-- **WordPress Integration API**: A dedicated API at `/api/wordpress/*` with CORS enabled for `spyglassrealty.org` provides endpoints for listing properties, retrieving single property details, advanced search, and managing user favorites.
-
-## Enterprise Architecture
-
-### Environment Configuration
-- **Config Validation**: `server/config.ts` validates all environment variables at startup using Zod. Required vars cause exit in production, warnings in development. Feature status reported at boot.
-- **Structured Logging**: `server/logger.ts` provides JSON-structured logging in production with automatic redaction of sensitive data (passwords, tokens, keys, authorization headers). Request ID tracking via `x-request-id` header.
-- **Rate Limiting**: API endpoints limited to 500 req/15min, auth endpoints to 30 req/15min. Health check and auth callbacks exempt.
-- **Graceful Shutdown**: SIGTERM/SIGINT handlers close HTTP server and database pool with 10-second forced timeout.
-- **Health Check**: Enhanced `GET /health` validates database connectivity and reports service configuration status.
-
-### Documentation
-- `README.md` - Project overview and setup
-- `ARCHITECTURE.md` - C4-style system design
-- `SECURITY.md` - Data classification and threat model
-- `RUNBOOK.md` - Operations guide and troubleshooting
-- `CHANGELOG.md` - Version history
-- `ADR/` - Architecture Decision Records
+- **WordPress Integration API**: Provides endpoints for listing properties, search, and user favorites.
