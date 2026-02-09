@@ -1,0 +1,470 @@
+## Project Setup — Enterprise Architecture Standards
+
+You are building a production-ready application for Spyglass Realty. Follow these Enterprise Architecture Guidelines strictly.
+
+---
+
+### 🎯 ARCHITECTURE PRINCIPLES (Non-Negotiables)
+
+1. **API-first boundaries** — Services communicate via versioned APIs/contracts
+2. **Least privilege everywhere** — Identity, network, data access
+3. **Everything is observable** — Structured logs + metrics + tracing
+4. **Stateless compute by default** — State lives in managed stores (DB/object)
+5. **Security is a feature** — Threat model for anything with customer data
+6. **Fail safely** — Timeouts, retries, idempotency, circuit breakers
+7. **Cost-aware design** — Budgets, alerts, right-sizing
+
+---
+
+### 📁 REQUIRED FILES — Create These First
+
+Before writing any application code, create these documentation files:
+
+#### 1. README.md
+````markdown
+# [Project Name]
+
+## Overview
+[Brief description of what this app does]
+
+## Quick Start
+```bash
+npm install
+npm run dev
+```
+
+## Environment Variables
+| Variable | Description | Required |
+|----------|-------------|----------|
+| DATABASE_URL | PostgreSQL connection string | Yes |
+| API_KEY | External API key | Yes |
+
+## Deployment
+[Deployment instructions - TBD based on platform choice]
+
+## Architecture
+See [ARCHITECTURE.md](./ARCHITECTURE.md)
+````
+
+#### 2. ARCHITECTURE.md
+````markdown
+# Architecture Overview
+
+## Context Diagram
+[Who uses this system, what external systems it connects to]
+
+## Container Diagram
+- **Frontend**: [Framework] — UI layer
+- **Backend API**: [Framework] — Business logic
+- **Database**: PostgreSQL — Data persistence
+- **External APIs**: [List integrations]
+
+## Key Flows
+1. [Flow 1 description]
+2. [Flow 2 description]
+
+## Data Model
+[Key entities and relationships]
+
+## Non-Functional Requirements
+- Availability: [Target]
+- Response time: [Target]
+- RTO/RPO: [Targets]
+````
+
+#### 3. SECURITY.md
+````markdown
+# Security Overview
+
+## Data Classification
+| Data Type | Classification | Handling |
+|-----------|---------------|----------|
+| User email | Internal | Encrypted at rest |
+| API keys | Restricted | Never logged |
+| Listing data | Public | Standard handling |
+
+## Authentication
+[Auth method used]
+
+## Authorization
+[Role/permission model]
+
+## Threat Model Summary
+[Key threats and mitigations]
+````
+
+#### 4. RUNBOOK.md
+````markdown
+# Operations Runbook
+
+## Health Checks
+- Endpoint: `/health`
+- Expected response: `{ "status": "ok" }`
+
+## Common Issues
+
+### Issue: [Description]
+**Symptoms**: [What you see]
+**Resolution**: [Steps to fix]
+
+## Rollback Procedure
+[How to rollback a deployment]
+
+## Incident Response
+1. Assess impact
+2. Communicate to stakeholders
+3. Mitigate
+4. Root cause analysis
+````
+
+#### 5. ADR/0001-initial-architecture.md
+````markdown
+# ADR 0001: Initial Architecture Decisions
+
+## Status
+Accepted
+
+## Context
+[Why we're making these decisions]
+
+## Decision
+- Framework: [Choice]
+- Database: PostgreSQL
+- Hosting: TBD (Vercel or Render)
+- Auth: [Choice]
+
+## Alternatives Considered
+[Other options evaluated]
+
+## Consequences
+[Impact of this decision]
+
+## Rollback Plan
+[How to reverse if needed]
+````
+
+---
+
+### 🔧 APPLICATION STRUCTURE
+
+Use this folder structure:
+├── README.md
+├── ARCHITECTURE.md
+├── SECURITY.md
+├── RUNBOOK.md
+├── ADR/
+│   └── 0001-initial-architecture.md
+├── src/
+│   ├── api/
+│   │   ├── routes/
+│   │   └── middleware/
+│   ├── services/
+│   ├── models/
+│   ├── utils/
+│   │   ├── logger.js
+│   │   └── errors.js
+│   └── config/
+│       └── index.js
+├── tests/
+├── scripts/
+├── openapi.yaml
+├── .env.example
+└── package.json
+
+---
+
+### 📊 OBSERVABILITY — Structured Logging
+
+Implement structured JSON logging from the start:
+````javascript
+// src/utils/logger.js
+const createLogger = () => {
+  const log = (level, message, meta = {}) => {
+    const entry = {
+      timestamp: new Date().toISOString(),
+      level,
+      message,
+      service: process.env.SERVICE_NAME || 'app',
+      environment: process.env.NODE_ENV || 'development',
+      requestId: meta.requestId || null,
+      ...meta
+    };
+    
+    // Redact sensitive fields
+    if (entry.apiKey) entry.apiKey = '[REDACTED]';
+    if (entry.password) entry.password = '[REDACTED]';
+    if (entry.token) entry.token = '[REDACTED]';
+    
+    console.log(JSON.stringify(entry));
+  };
+
+  return {
+    info: (msg, meta) => log('info', msg, meta),
+    warn: (msg, meta) => log('warn', msg, meta),
+    error: (msg, meta) => log('error', msg, meta),
+    debug: (msg, meta) => log('debug', msg, meta)
+  };
+};
+
+module.exports = { logger: createLogger() };
+````
+
+---
+
+### 🔒 SECURITY BASELINE
+
+#### Environment Variables
+````javascript
+// src/config/index.js
+const requiredEnvVars = [
+  'DATABASE_URL',
+  'NODE_ENV'
+];
+
+const validateEnv = () => {
+  const missing = requiredEnvVars.filter(v => !process.env[v]);
+  if (missing.length > 0) {
+    throw new Error(`Missing required env vars: ${missing.join(', ')}`);
+  }
+};
+
+module.exports = {
+  validateEnv,
+  config: {
+    port: process.env.PORT || 3000,
+    nodeEnv: process.env.NODE_ENV || 'development',
+    databaseUrl: process.env.DATABASE_URL,
+    // Never expose secrets in config object that might be logged
+  }
+};
+````
+
+#### Input Validation
+````javascript
+// Always validate and sanitize inputs
+const validateInput = (schema, data) => {
+  // Use a validation library like Zod, Joi, or express-validator
+  const result = schema.safeParse(data);
+  if (!result.success) {
+    throw new ValidationError(result.error.message);
+  }
+  return result.data;
+};
+````
+
+#### Rate Limiting
+````javascript
+// Implement rate limiting on all public endpoints
+const rateLimit = require('express-rate-limit');
+
+const apiLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 100, // limit each IP to 100 requests per windowMs
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many requests, please try again later.' }
+});
+````
+
+---
+
+### ⚡ RELIABILITY PATTERNS
+
+#### Timeouts
+````javascript
+// All external calls must have timeouts
+const fetchWithTimeout = async (url, options = {}, timeoutMs = 5000) => {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
+  
+  try {
+    const response = await fetch(url, {
+      ...options,
+      signal: controller.signal
+    });
+    return response;
+  } finally {
+    clearTimeout(timeout);
+  }
+};
+````
+
+#### Retry with Backoff
+````javascript
+const retryWithBackoff = async (fn, maxRetries = 3, baseDelay = 1000) => {
+  for (let attempt = 0; attempt < maxRetries; attempt++) {
+    try {
+      return await fn();
+    } catch (error) {
+      if (attempt === maxRetries - 1) throw error;
+      
+      const delay = baseDelay * Math.pow(2, attempt);
+      await new Promise(resolve => setTimeout(resolve, delay));
+    }
+  }
+};
+````
+
+#### Health Check Endpoint
+````javascript
+// Always include a health check endpoint
+app.get('/health', async (req, res) => {
+  try {
+    // Check database connection
+    await db.query('SELECT 1');
+    
+    res.json({
+      status: 'ok',
+      timestamp: new Date().toISOString(),
+      version: process.env.APP_VERSION || '1.0.0'
+    });
+  } catch (error) {
+    res.status(503).json({
+      status: 'unhealthy',
+      error: error.message
+    });
+  }
+});
+````
+
+---
+
+### 📝 API STANDARDS
+
+#### OpenAPI Specification
+Create `openapi.yaml` documenting all endpoints:
+````yaml
+openapi: 3.0.3
+info:
+  title: [Project Name] API
+  version: 1.0.0
+  description: API documentation
+
+servers:
+  - url: http://localhost:3000
+    description: Development
+  - url: https://api.example.com
+    description: Production
+
+paths:
+  /health:
+    get:
+      summary: Health check
+      responses:
+        '200':
+          description: Service is healthy
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: ok
+
+  # Add all your endpoints here
+````
+
+#### Consistent Error Responses
+````javascript
+// src/utils/errors.js
+class AppError extends Error {
+  constructor(message, statusCode, code) {
+    super(message);
+    this.statusCode = statusCode;
+    this.code = code;
+    this.isOperational = true;
+  }
+}
+
+// Error handler middleware
+const errorHandler = (err, req, res, next) => {
+  const statusCode = err.statusCode || 500;
+  const code = err.code || 'INTERNAL_ERROR';
+  
+  // Log error (but not stack trace to user)
+  logger.error('Request error', {
+    requestId: req.id,
+    error: err.message,
+    code,
+    path: req.path
+  });
+  
+  res.status(statusCode).json({
+    error: {
+      message: err.isOperational ? err.message : 'Internal server error',
+      code,
+      requestId: req.id
+    }
+  });
+};
+````
+
+---
+
+### 🚀 DEPLOYMENT PREPARATION
+
+The app should be deployable to either Vercel or Render. Structure accordingly:
+
+#### For Render compatibility:
+- Include `Dockerfile` or use native Node.js
+- Health check endpoint at `/health`
+- Graceful shutdown handling
+- Environment variables via platform
+
+#### For Vercel compatibility:
+- API routes in `/api` directory (if using Vercel serverless)
+- Or standalone server with `vercel.json` config
+- Edge functions for lightweight operations
+````javascript
+// Graceful shutdown (works for both platforms)
+const gracefulShutdown = (server) => {
+  process.on('SIGTERM', () => {
+    logger.info('SIGTERM received, shutting down gracefully');
+    server.close(() => {
+      logger.info('Server closed');
+      process.exit(0);
+    });
+  });
+};
+````
+
+---
+
+### ✅ CHECKLIST BEFORE COMPLETION
+
+Verify these are implemented:
+
+- [ ] README.md with setup instructions
+- [ ] ARCHITECTURE.md with diagrams
+- [ ] SECURITY.md with data classification
+- [ ] RUNBOOK.md with operations guide
+- [ ] ADR/ with initial decisions
+- [ ] openapi.yaml documenting all endpoints
+- [ ] .env.example with all required variables
+- [ ] Structured JSON logging
+- [ ] Health check endpoint
+- [ ] Input validation on all endpoints
+- [ ] Rate limiting configured
+- [ ] Timeouts on external calls
+- [ ] Error handling middleware
+- [ ] Graceful shutdown handling
+- [ ] No secrets in code or logs
+
+---
+
+### 🎨 SPYGLASS BRANDING (If applicable)
+
+Use these brand colors:
+- Primary: #E03103 (Spyglass Orange)
+- Dark: #222222
+- Black: #000000
+
+Fonts:
+- Headings: Playfair Display
+- Body: Lato
+- UI: Poppins
+
+---
+
+Now proceed with implementing the application following these standards.
