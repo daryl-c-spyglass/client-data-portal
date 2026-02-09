@@ -1,0 +1,499 @@
+# Align Client Data Portal with Enterprise Architecture Standards
+
+## OVERVIEW
+
+Audit and update the Client Data Portal codebase to comply with Spyglass Realty Enterprise Architecture Guidelines. This ensures the application is production-ready, secure, observable, and maintainable.
+
+---
+
+## PART 1: REQUIRED DOCUMENTATION FILES
+
+Create or update these files in the repository root:
+
+### 1.1 README.md
+
+Must include:
+- Project overview and purpose
+- How to run locally (one-command setup)
+- How to run tests
+- How to deploy
+- Environment variables list (without values)
+- Team contacts
+
+### 1.2 ARCHITECTURE.md
+
+Create a C4-style architecture document with:
+
+```markdown
+# Client Data Portal Architecture
+
+## Context Diagram
+- Users: Agents, Admins, Super Admins, Developers
+- External Systems: Repliers API (MLS), Follow Up Boss, Google OAuth, Mapbox, OpenAI
+
+## Container Diagram
+- Frontend: React + Vite
+- Backend: Express.js API
+- Database: PostgreSQL
+- External APIs: Repliers, FUB, Mapbox, OpenAI
+
+## Key Components
+- Authentication: Google OAuth with role-based access
+- Property Search: Repliers API integration
+- CMA Builder: Comparative Market Analysis tool
+- Presentation Builder: PDF generation
+- Calendar/Leads: Follow Up Boss integration
+
+## Data Flow
+[Document how data flows between components]
+
+## Deployment
+[Document deployment architecture - TBD: Vercel or Render]
+```
+
+### 1.3 SECURITY.md
+
+```markdown
+# Security Documentation
+
+## Data Classification
+- Public: Property listings (from MLS)
+- Internal: User preferences, saved searches
+- Confidential: User emails, API keys
+- Restricted: Authentication tokens, session data
+
+## Authentication
+- Google OAuth 2.0
+- Restricted to @spyglassrealty.com domain
+
+## Authorization
+- Role-based: Developer > Super Admin > Admin > Agent
+
+## Threat Model Summary
+[Basic threat model]
+
+## PII Handling
+- User emails stored in database
+- No credit card or SSN data
+- Logs redact sensitive information
+```
+
+### 1.4 RUNBOOK.md
+
+```markdown
+# Operations Runbook
+
+## Health Check
+- Endpoint: GET /health
+- Expected: {"status":"ok","timestamp":"..."}
+
+## Common Issues
+
+### App Won't Start
+1. Check DATABASE_URL is set
+2. Check all required env vars are present
+3. Check database is accessible
+
+### Login Not Working
+1. Verify GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET
+2. Check GOOGLE_CALLBACK_URL matches deployment URL
+3. Verify domain is in Google OAuth authorized origins
+
+### Properties Not Loading
+1. Check REPLIERS_API_KEY is valid
+2. Check Repliers API status
+
+### Maps Not Showing
+1. Check VITE_MAPBOX_TOKEN is set
+2. Check Mapbox account status
+
+## Rollback Procedure
+1. Revert to previous Git commit
+2. Redeploy from previous version
+
+## Backup/Restore
+- Database: [Document backup procedure]
+- Restore: [Document restore procedure]
+```
+
+### 1.5 ADR/ Directory
+
+Create `ADR/` directory with template:
+
+```markdown
+# ADR-001: [Decision Title]
+
+## Status
+Accepted | Proposed | Deprecated
+
+## Context
+[Why is this decision needed?]
+
+## Decision
+[What was decided?]
+
+## Alternatives Considered
+[What other options were evaluated?]
+
+## Consequences
+[What are the implications?]
+
+## Rollback Plan
+[How to reverse if needed?]
+```
+
+Create initial ADRs:
+- ADR-001: Use PostgreSQL for data persistence
+- ADR-002: Use Google OAuth for authentication
+- ADR-003: Use Repliers API for MLS data
+- ADR-004: Role-based access control structure
+
+### 1.6 CHANGELOG.md
+
+```markdown
+# Changelog
+
+## [Unreleased]
+- Production deployment preparation
+- Enterprise architecture compliance
+
+## [1.0.0] - 2026-02-06
+- Initial production release
+- Property search and filtering
+- CMA builder with presentation export
+- Role-based access control
+- Follow Up Boss integration
+```
+
+---
+
+## PART 2: SECURITY BASELINE
+
+### 2.1 Secrets Management
+
+Audit and ensure:
+- [ ] No secrets in code (hardcoded API keys, passwords)
+- [ ] No secrets in logs (mask tokens, keys, passwords)
+- [ ] All secrets read from environment variables
+- [ ] .env file in .gitignore
+
+```typescript
+// Add log redaction helper
+function redactSensitive(obj: any): any {
+  const sensitiveKeys = ['password', 'token', 'secret', 'key', 'authorization'];
+  // Implementation to mask sensitive values in logs
+}
+```
+
+### 2.2 Input Validation
+
+Ensure all API endpoints have:
+- [ ] Request body validation (using Zod or similar)
+- [ ] Query parameter validation
+- [ ] Path parameter validation
+
+```typescript
+// Example with Zod
+import { z } from 'zod';
+
+const createCMASchema = z.object({
+  address: z.string().min(1).max(500),
+  propertyType: z.enum(['residential', 'condo', 'commercial']),
+  // ... other fields
+});
+```
+
+### 2.3 Rate Limiting
+
+Add rate limiting to API endpoints:
+
+```typescript
+import rateLimit from 'express-rate-limit';
+
+const apiLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 100, // limit each IP to 100 requests per window
+  message: 'Too many requests, please try again later'
+});
+
+app.use('/api/', apiLimiter);
+```
+
+### 2.4 Authentication/Authorization Audit
+
+Verify:
+- [ ] All API routes require authentication (except /health, /auth/*)
+- [ ] Role checks enforced on protected routes
+- [ ] Session cookies are secure in production
+
+---
+
+## PART 3: OBSERVABILITY BASELINE
+
+### 3.1 Structured Logging
+
+Implement JSON structured logs:
+
+```typescript
+// logger.ts
+import pino from 'pino';
+
+export const logger = pino({
+  level: process.env.LOG_LEVEL || 'info',
+  formatters: {
+    level: (label) => ({ level: label }),
+  },
+  redact: ['req.headers.authorization', 'req.headers.cookie', 'password', 'token', 'secret'],
+});
+
+// Usage
+logger.info({ requestId, userId, action: 'cma_created', cmaId }, 'CMA created successfully');
+```
+
+### 3.2 Request ID / Correlation ID
+
+Add request tracking:
+
+```typescript
+import { v4 as uuidv4 } from 'uuid';
+
+app.use((req, res, next) => {
+  req.requestId = req.headers['x-request-id'] || uuidv4();
+  res.setHeader('x-request-id', req.requestId);
+  next();
+});
+```
+
+### 3.3 Health Check Endpoint
+
+Verify /health endpoint exists and returns:
+
+```json
+{
+  "status": "ok",
+  "timestamp": "2026-02-06T12:00:00.000Z",
+  "version": "1.0.0",
+  "checks": {
+    "database": "ok",
+    "repliers": "ok"
+  }
+}
+```
+
+---
+
+## PART 4: RELIABILITY BASELINE
+
+### 4.1 Timeouts
+
+Add timeouts to all external API calls:
+
+```typescript
+// Repliers API
+const response = await fetch(repliersUrl, {
+  signal: AbortSignal.timeout(10000), // 10 second timeout
+});
+
+// Database queries - use connection pool timeout
+const pool = new Pool({
+  connectionTimeoutMillis: 5000,
+  idleTimeoutMillis: 30000,
+});
+```
+
+### 4.2 Retry with Backoff
+
+Add retry logic for transient failures:
+
+```typescript
+async function fetchWithRetry(url: string, options: RequestInit, maxRetries = 3) {
+  for (let i = 0; i < maxRetries; i++) {
+    try {
+      const response = await fetch(url, {
+        ...options,
+        signal: AbortSignal.timeout(10000),
+      });
+      if (response.ok) return response;
+      if (response.status < 500) throw new Error(`Client error: ${response.status}`);
+    } catch (error) {
+      if (i === maxRetries - 1) throw error;
+      await new Promise(resolve => setTimeout(resolve, Math.pow(2, i) * 1000));
+    }
+  }
+}
+```
+
+### 4.3 Graceful Shutdown
+
+Implement graceful shutdown:
+
+```typescript
+process.on('SIGTERM', async () => {
+  logger.info('SIGTERM received, shutting down gracefully');
+  
+  // Stop accepting new requests
+  server.close(() => {
+    logger.info('HTTP server closed');
+  });
+  
+  // Close database connections
+  await pool.end();
+  logger.info('Database pool closed');
+  
+  process.exit(0);
+});
+```
+
+---
+
+## PART 5: API STANDARDS
+
+### 5.1 Consistent Response Format
+
+Standardize API responses:
+
+```typescript
+// Success response
+{
+  "success": true,
+  "data": { ... },
+  "meta": {
+    "page": 1,
+    "pageSize": 20,
+    "total": 100
+  }
+}
+
+// Error response
+{
+  "success": false,
+  "error": {
+    "code": "VALIDATION_ERROR",
+    "message": "Invalid input",
+    "details": [...]
+  }
+}
+```
+
+### 5.2 Error Handling
+
+Implement centralized error handling:
+
+```typescript
+// Global error handler
+app.use((err: Error, req: Request, res: Response, next: NextFunction) => {
+  logger.error({ 
+    requestId: req.requestId, 
+    error: err.message, 
+    stack: err.stack 
+  }, 'Unhandled error');
+  
+  res.status(500).json({
+    success: false,
+    error: {
+      code: 'INTERNAL_ERROR',
+      message: process.env.NODE_ENV === 'production' 
+        ? 'An unexpected error occurred' 
+        : err.message
+    }
+  });
+});
+```
+
+---
+
+## PART 6: ENVIRONMENT CONFIGURATION
+
+### 6.1 Environment Variable Validation
+
+Create config validation at startup:
+
+```typescript
+// config.ts
+import { z } from 'zod';
+
+const envSchema = z.object({
+  NODE_ENV: z.enum(['development', 'staging', 'production']).default('development'),
+  DATABASE_URL: z.string().url(),
+  SESSION_SECRET: z.string().min(32),
+  GOOGLE_CLIENT_ID: z.string(),
+  GOOGLE_CLIENT_SECRET: z.string(),
+  GOOGLE_CALLBACK_URL: z.string().url().optional(),
+  REPLIERS_API_KEY: z.string(),
+  FUB_API_KEY: z.string().optional(),
+  VITE_MAPBOX_TOKEN: z.string().optional(),
+  MAPBOX_ACCESS_TOKEN: z.string().optional(),
+  OPENAI_API_KEY: z.string().optional(),
+});
+
+export const config = envSchema.parse(process.env);
+```
+
+### 6.2 Environment-Specific Settings
+
+```typescript
+const isProduction = process.env.NODE_ENV === 'production';
+
+// Cookie settings
+cookie: {
+  secure: isProduction,
+  sameSite: isProduction ? 'none' : 'lax',
+  httpOnly: true,
+}
+
+// Logging level
+const logLevel = isProduction ? 'info' : 'debug';
+```
+
+---
+
+## DELIVERABLES CHECKLIST
+
+### Documentation Files
+- [ ] README.md created/updated
+- [ ] ARCHITECTURE.md created
+- [ ] SECURITY.md created
+- [ ] RUNBOOK.md created
+- [ ] ADR/ directory with initial ADRs
+- [ ] CHANGELOG.md created
+
+### Security
+- [ ] No hardcoded secrets in code
+- [ ] Secrets redacted from logs
+- [ ] Input validation on all endpoints
+- [ ] Rate limiting implemented
+- [ ] Auth/authz verified on all routes
+
+### Observability
+- [ ] Structured JSON logging
+- [ ] Request ID tracking
+- [ ] Health check endpoint enhanced
+- [ ] Error logging with context
+
+### Reliability
+- [ ] Timeouts on external calls
+- [ ] Retry logic with backoff
+- [ ] Graceful shutdown handling
+- [ ] Centralized error handling
+
+### API Standards
+- [ ] Consistent response format
+- [ ] Proper error responses
+- [ ] Environment validation at startup
+
+---
+
+## TESTING CHECKLIST
+
+After implementing, verify:
+
+1. App starts without errors
+2. Health check returns full status
+3. Logs are structured JSON (in production mode)
+4. Rate limiting blocks excessive requests
+5. Invalid inputs return proper validation errors
+6. App shuts down gracefully on SIGTERM
+
+---
+
+**Note: Hosting platform (Vercel or Render) will be determined separately. These standards apply regardless of hosting choice.**

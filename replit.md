@@ -89,3 +89,20 @@ The UI incorporates Spyglass Realty branding with an orange primary color scheme
 - **Mapbox GL JS**: Standard mapping library for all application features including CMA presentations, property detail pages, and location-based visualizations.
 - **OpenAI API**: For AI Assistant and AI Search Assistant functionalities (GPT-4o).
 - **WordPress Integration API**: A dedicated API at `/api/wordpress/*` with CORS enabled for `spyglassrealty.org` provides endpoints for listing properties, retrieving single property details, advanced search, and managing user favorites.
+
+## Enterprise Architecture
+
+### Environment Configuration
+- **Config Validation**: `server/config.ts` validates all environment variables at startup using Zod. Required vars cause exit in production, warnings in development. Feature status reported at boot.
+- **Structured Logging**: `server/logger.ts` provides JSON-structured logging in production with automatic redaction of sensitive data (passwords, tokens, keys, authorization headers). Request ID tracking via `x-request-id` header.
+- **Rate Limiting**: API endpoints limited to 500 req/15min, auth endpoints to 30 req/15min. Health check and auth callbacks exempt.
+- **Graceful Shutdown**: SIGTERM/SIGINT handlers close HTTP server and database pool with 10-second forced timeout.
+- **Health Check**: Enhanced `GET /health` validates database connectivity and reports service configuration status.
+
+### Documentation
+- `README.md` - Project overview and setup
+- `ARCHITECTURE.md` - C4-style system design
+- `SECURITY.md` - Data classification and threat model
+- `RUNBOOK.md` - Operations guide and troubleshooting
+- `CHANGELOG.md` - Version history
+- `ADR/` - Architecture Decision Records

@@ -5,6 +5,7 @@ import passport from "passport";
 import ConnectPgSimple from "connect-pg-simple";
 import { Pool } from "@neondatabase/serverless";
 import path from "path";
+import rateLimit from "express-rate-limit";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 import { seedData } from "./seed-data";
@@ -14,61 +15,85 @@ import { startMLSGridScheduledSync, triggerManualSync } from "./mlsgrid-sync";
 import { startEmailScheduler } from "./email-scheduler";
 import { startRepliersScheduledSync, registerRepliersSyncRoutes, triggerRepliersSync } from "./repliers-sync";
 import { registerObjectStorageRoutes } from "./replit_integrations/object_storage";
+import { validateConfig } from "./config";
+import { logger, requestIdMiddleware } from "./logger";
+
+const config = validateConfig();
 
 const app = express();
+const isProduction = config.NODE_ENV === "production";
 
-// Trust proxy - required for secure cookies behind reverse proxies (Render/Replit)
-app.set('trust proxy', process.env.NODE_ENV === 'production' ? 1 : false);
+app.set("trust proxy", isProduction ? 1 : false);
 
-// CSP Headers for iframe embedding (Mission Control / Agent Hub Portal)
-// Must be added BEFORE routes to allow embedding from Replit and Render domains
+app.use(requestIdMiddleware);
+
 app.use((req, res, next) => {
   res.setHeader(
-    'Content-Security-Policy',
+    "Content-Security-Policy",
     "frame-ancestors 'self' https://*.replit.dev https://*.replit.app https://*.onrender.com https://*.spyglassrealty.com"
   );
-  // X-Frame-Options for older browsers (ALLOWALL is not standard, but we handle via CSP)
-  res.removeHeader('X-Frame-Options');
+  res.removeHeader("X-Frame-Options");
   next();
 });
 
-// Serve static files from public folder (logos, widget JS, etc.)
-app.use(express.static(path.join(process.cwd(), 'public')));
+app.use(express.static(path.join(process.cwd(), "public")));
 
-// Cookie parser for lead gate tracking
 app.use(cookieParser());
 
-declare module 'http' {
+declare module "http" {
   interface IncomingMessage {
-    rawBody: unknown
+    rawBody: unknown;
   }
 }
-app.use(express.json({
-  verify: (req, _res, buf) => {
-    req.rawBody = buf;
-  }
-}));
+app.use(
+  express.json({
+    verify: (req, _res, buf) => {
+      req.rawBody = buf;
+    },
+  })
+);
 app.use(express.urlencoded({ extended: false }));
 
-// Configure production-ready session store
+const apiLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 500,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: "Too many requests, please try again later" },
+  skip: (req) => {
+    if (req.path === "/health") return true;
+    if (req.path.startsWith("/auth/")) return true;
+    return false;
+  },
+});
+app.use("/api/", apiLimiter);
+
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 30,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: "Too many authentication attempts, please try again later" },
+});
+app.use("/auth/", authLimiter);
+
 const PgSession = ConnectPgSimple(session);
 
-// In production, always require a persistent session store
-if (process.env.NODE_ENV === "production" && !process.env.DATABASE_URL) {
-  throw new Error("DATABASE_URL is required for production session storage");
-}
+const dbPool = process.env.DATABASE_URL
+  ? new Pool({
+      connectionString: process.env.DATABASE_URL,
+      ssl: isProduction ? { rejectUnauthorized: false } : false,
+      connectionTimeoutMillis: 5000,
+      idleTimeoutMillis: 30000,
+    })
+  : null;
 
-const sessionStore = process.env.DATABASE_URL 
+const sessionStore = dbPool
   ? new PgSession({
-      pool: new Pool({ 
-        connectionString: process.env.DATABASE_URL,
-        ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false
-      }),
+      pool: dbPool,
       createTableIfMissing: true,
     })
   : undefined;
-
-const isProduction = process.env.NODE_ENV === 'production';
 
 app.use(
   session({
@@ -77,8 +102,6 @@ app.use(
     resave: false,
     saveUninitialized: false,
     cookie: {
-      // Production: secure cookies with sameSite 'none' for cross-origin iframe support
-      // Development: allow insecure cookies for local testing
       secure: isProduction,
       httpOnly: true,
       sameSite: isProduction ? "none" : "lax",
@@ -93,14 +116,40 @@ app.use(passport.session());
 setupAuth();
 setupAuthRoutes(app);
 
-// Health check endpoint for Render and load balancers
-app.get('/health', (_req, res) => {
-  res.status(200).json({ status: 'ok', timestamp: new Date().toISOString() });
+app.get("/health", async (_req, res) => {
+  const checks: Record<string, string> = {};
+
+  if (dbPool) {
+    try {
+      await dbPool.query("SELECT 1");
+      checks.database = "ok";
+    } catch {
+      checks.database = "error";
+    }
+  } else {
+    checks.database = "not_configured";
+  }
+
+  checks.repliers = process.env.REPLIERS_API_KEY ? "configured" : "not_configured";
+  checks.google_oauth =
+    process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET
+      ? "configured"
+      : "not_configured";
+
+  const allOk = checks.database !== "error";
+
+  res.status(allOk ? 200 : 503).json({
+    status: allOk ? "ok" : "degraded",
+    timestamp: new Date().toISOString(),
+    version: "1.0.0",
+    environment: config.NODE_ENV,
+    checks,
+  });
 });
 
 app.use((req, res, next) => {
   const start = Date.now();
-  const path = req.path;
+  const reqPath = req.path;
   let capturedJsonResponse: Record<string, any> | undefined = undefined;
 
   const originalResJson = res.json;
@@ -111,8 +160,8 @@ app.use((req, res, next) => {
 
   res.on("finish", () => {
     const duration = Date.now() - start;
-    if (path.startsWith("/api")) {
-      let logLine = `${req.method} ${path} ${res.statusCode} in ${duration}ms`;
+    if (reqPath.startsWith("/api")) {
+      let logLine = `${req.method} ${reqPath} ${res.statusCode} in ${duration}ms`;
       if (capturedJsonResponse) {
         logLine += ` :: ${JSON.stringify(capturedJsonResponse)}`;
       }
@@ -129,68 +178,96 @@ app.use((req, res, next) => {
 });
 
 (async () => {
-  // Initialize MLS Grid sync or seed sample data
   const mlsGridClient = createMLSGridClient();
-  
+
   if (mlsGridClient && process.env.DATABASE_URL) {
-    // Enable scheduled sync at 12:00 AM CST daily
-    console.log('🚀 MLS Grid API configured - enabling scheduled sync');
+    logger.info("MLS Grid API configured - enabling scheduled sync");
     startMLSGridScheduledSync(mlsGridClient);
   } else if (!process.env.MLSGRID_API_TOKEN) {
-    // Seed sample data for development when MLS Grid is not configured
     await seedData();
   }
-  
-  // Start email scheduler for seller updates
+
   if (process.env.DATABASE_URL) {
-    console.log('📧 Starting email scheduler for seller updates...');
+    logger.info("Starting email scheduler for seller updates");
     startEmailScheduler();
   }
-  
-  // Start Repliers inventory scheduled sync (daily at 12 AM CST)
-  console.log('🏠 Starting Repliers inventory scheduled sync...');
+
+  logger.info("Starting Repliers inventory scheduled sync");
   startRepliersScheduledSync();
-  
-  // Register Repliers sync admin routes
+
   registerRepliersSyncRoutes(app);
-  
-  // Register object storage routes for file uploads
   registerObjectStorageRoutes(app);
-  
+
   const server = await registerRoutes(app);
-  
-  // Trigger initial Repliers inventory sync (after routes are registered so client is initialized)
-  triggerRepliersSync().catch(err => {
-    console.error('⚠️ Initial Repliers inventory sync failed:', err.message);
+
+  triggerRepliersSync().catch((err) => {
+    logger.warn("Initial Repliers inventory sync failed", { error: err.message });
   });
 
-  app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
+  app.use((err: any, req: Request, res: Response, _next: NextFunction) => {
     const status = err.status || err.statusCode || 500;
     const message = err.message || "Internal Server Error";
 
-    res.status(status).json({ message });
-    throw err;
+    logger.error("Unhandled error", {
+      requestId: req.requestId,
+      method: req.method,
+      path: req.path,
+      status,
+      error: message,
+      stack: isProduction ? undefined : err.stack,
+    });
+
+    if (!res.headersSent) {
+      res.status(status).json({
+        message: isProduction && status >= 500
+          ? "An unexpected error occurred"
+          : message,
+        requestId: req.requestId,
+      });
+    }
   });
 
-  // importantly only setup vite in development and after
-  // setting up all the other routes so the catch-all route
-  // doesn't interfere with the other routes
   if (app.get("env") === "development") {
     await setupVite(app, server);
   } else {
     serveStatic(app);
   }
 
-  // ALWAYS serve the app on the port specified in the environment variable PORT
-  // Other ports are firewalled. Default to 5000 if not specified.
-  // this serves both the API and the client.
-  // It is the only port that is not firewalled.
-  const port = parseInt(process.env.PORT || '5000', 10);
-  server.listen({
-    port,
-    host: "0.0.0.0",
-    reusePort: true,
-  }, () => {
-    log(`serving on port ${port}`);
-  });
+  const port = parseInt(process.env.PORT || "5000", 10);
+  server.listen(
+    {
+      port,
+      host: "0.0.0.0",
+      reusePort: true,
+    },
+    () => {
+      logger.info(`Server listening on port ${port}`);
+      log(`serving on port ${port}`);
+    }
+  );
+
+  const shutdown = async (signal: string) => {
+    logger.info(`${signal} received, shutting down gracefully`);
+
+    server.close(() => {
+      logger.info("HTTP server closed");
+    });
+
+    if (dbPool) {
+      try {
+        await dbPool.end();
+        logger.info("Database pool closed");
+      } catch (err: any) {
+        logger.error("Error closing database pool", { error: err.message });
+      }
+    }
+
+    setTimeout(() => {
+      logger.warn("Forced shutdown after timeout");
+      process.exit(1);
+    }, 10000);
+  };
+
+  process.on("SIGTERM", () => shutdown("SIGTERM"));
+  process.on("SIGINT", () => shutdown("SIGINT"));
 })();
