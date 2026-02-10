@@ -23,7 +23,7 @@ const config = validateConfig();
 const app = express();
 const isProduction = config.NODE_ENV === "production";
 
-app.set("trust proxy", isProduction ? 1 : false);
+app.set("trust proxy", 1);
 
 app.use(requestIdMiddleware);
 

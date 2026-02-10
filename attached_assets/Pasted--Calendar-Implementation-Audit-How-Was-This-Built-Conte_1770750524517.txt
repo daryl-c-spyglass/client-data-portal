@@ -1,0 +1,110 @@
+### Calendar Implementation Audit - How Was This Built?
+
+**Context:**
+The Calendar page at `/calendar` shows "Unable to Load Calendar - Failed to fetch calendar" with an "Open Google Calendar" fallback button. I need a complete audit of how the Calendar feature was implemented to understand:
+1. What data source it's designed to use
+2. Why it's failing
+3. Whether it's using a shared calendar vs. per-user calendars
+
+---
+
+### AUDIT TASKS (No Changes - Just Report)
+
+#### 1. Calendar Page Component
+**File:** `client/src/pages/calendar.tsx` (or similar)
+
+Report:
+- What API endpoint does it call to fetch calendar data?
+- Is it calling `/api/fub/appointments`, `/api/calendar`, or something else?
+- Does it use the logged-in user's ID or a global calendar?
+- What library is used for rendering? (FullCalendar, react-big-calendar, custom?)
+- Share the main data-fetching hook/function
+
+#### 2. Calendar API Routes
+**File:** `server/routes.ts` (or calendar-specific route file)
+
+Report:
+- What endpoints exist for calendar data?
+  - GET /api/calendar
+  - GET /api/fub/appointments
+  - Others?
+- Do these endpoints use a user-specific FUB ID or a shared API key?
+- Share the route handler code for calendar endpoints
+
+#### 3. FUB Integration for Calendar
+**File:** `server/fubClient.ts`
+
+Report:
+- Is there a method like `getAppointments()` or `getCalendar()`?
+- Does it filter by `userId` parameter?
+- What FUB endpoint does it call? (`/v1/appointments`, `/v1/tasks`, etc.)
+- Share the relevant FUB client methods
+
+#### 4. User-FUB Account Linking
+**Files:** Database schema, auth handlers
+
+Report:
+- Does the `users` table have a `fub_user_id` column?
+- Is there code that auto-links FUB accounts on Google login?
+- What happens if a user doesn't have a linked FUB account?
+- Share the schema definition for the users table
+
+#### 5. Error Handling
+Report:
+- What causes "Failed to fetch calendar" error?
+- Is there error logging showing the actual failure reason?
+- Check server logs for any calendar-related errors
+
+#### 6. "Open Google Calendar" Button
+Report:
+- Where does this button link to?
+- Is it a company-wide shared Google Calendar?
+- Or does it construct a user-specific Google Calendar URL?
+- Share the code for this fallback button
+
+---
+
+### OUTPUT FORMAT
+
+Please provide a comprehensive report:
+```
+## Calendar Implementation Report
+
+### 1. Data Flow
+Client (calendar.tsx) 
+    → calls: [endpoint]
+    → server route: [route handler file/function]
+    → data source: [FUB API / Google Calendar / Database]
+
+### 2. Calendar Page Code
+[code snippet of data fetching]
+
+### 3. API Route Code
+[code snippet of server endpoint]
+
+### 4. FUB Client Method (if applicable)
+[code snippet]
+
+### 5. User Table Schema
+[schema showing fub_user_id column or lack thereof]
+
+### 6. Error Source
+The "Failed to fetch calendar" error occurs because:
+[explanation]
+
+### 7. Google Calendar Fallback
+The "Open Google Calendar" button links to:
+[URL or code]
+
+### 8. Current Architecture Summary
+[Is this designed for FUB appointments? Google Calendar? Both?]
+[Is it per-user or company-wide?]
+```
+
+---
+
+### IMPORTANT
+- DO NOT make any changes - this is audit only
+- Report exactly what you find, even if incomplete
+- Note any missing implementations or TODO comments
+- Share actual code snippets, not summaries

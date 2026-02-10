@@ -304,8 +304,8 @@ export function setupAuthRoutes(app: any) {
             <body>
               <script>
                 if (window.opener) {
-                  window.opener.postMessage({ type: 'AUTH_FAILURE', error: '${errorMessage.replace(/'/g, "\\'")}' }, '*');
-                  window.close();
+                  window.opener.postMessage({ type: 'AUTH_FAILURE', error: '${errorMessage.replace(/'/g, "\\'")}' }, window.location.origin);
+                  setTimeout(function() { window.close(); }, 300);
                 } else {
                   window.location.href = '/login?error=access_denied';
                 }
@@ -331,8 +331,8 @@ export function setupAuthRoutes(app: any) {
               <body>
                 <script>
                   if (window.opener) {
-                    window.opener.postMessage({ type: 'AUTH_FAILURE', error: 'Login failed' }, '*');
-                    window.close();
+                    window.opener.postMessage({ type: 'AUTH_FAILURE', error: 'Login failed' }, window.location.origin);
+                    setTimeout(function() { window.close(); }, 300);
                   } else {
                     window.location.href = '/login?error=login_failed';
                   }
@@ -354,8 +354,8 @@ export function setupAuthRoutes(app: any) {
             <body>
               <script>
                 if (window.opener) {
-                  window.opener.postMessage({ type: 'AUTH_SUCCESS' }, '*');
-                  window.close();
+                  window.opener.postMessage({ type: 'AUTH_SUCCESS' }, window.location.origin);
+                  setTimeout(function() { window.close(); }, 300);
                 } else {
                   window.location.href = '/';
                 }
@@ -385,8 +385,8 @@ export function setupAuthRoutes(app: any) {
       <body>
         <script>
           if (window.opener) {
-            window.opener.postMessage({ type: 'AUTH_FAILURE', error: '${error}' }, '*');
-            window.close();
+            window.opener.postMessage({ type: 'AUTH_FAILURE', error: '${error}' }, window.location.origin);
+            setTimeout(function() { window.close(); }, 300);
           } else {
             window.location.href = '/login?error=${error}';
           }

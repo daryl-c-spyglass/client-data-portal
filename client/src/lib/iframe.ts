@@ -110,14 +110,16 @@ export function openAuthPopup(
 
   // Poll to check if popup was closed without completing auth
   // If closed without a success/error message, treat as user cancellation
+  // Use a grace period after close to allow postMessage to arrive
   const pollClosedInterval = setInterval(() => {
     if (popup.closed) {
       clearInterval(pollClosedInterval);
-      window.removeEventListener('message', handleMessage);
-      // If popup closed without auth completing, treat as cancellation
-      if (!authCompleted) {
-        onError?.('Authentication cancelled');
-      }
+      setTimeout(() => {
+        window.removeEventListener('message', handleMessage);
+        if (!authCompleted) {
+          onError?.('Authentication cancelled');
+        }
+      }, 1000);
     }
   }, 500);
 
