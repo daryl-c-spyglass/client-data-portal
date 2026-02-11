@@ -1,0 +1,25 @@
+{
+  "version": 2,
+  "buildCommand": "npm run build",
+  "outputDirectory": "dist/public",
+  "rewrites": [
+    { "source": "/api/(.*)", "destination": "/api" },
+    { "source": "/auth/(.*)", "destination": "/api" },
+    { "source": "/health", "destination": "/api" },
+    { "source": "/share/(.*)", "destination": "/api" }
+  ],
+  "crons": [
+    {
+      "path": "/api/cron/mls-sync",
+      "schedule": "0 6 * * *"
+    },
+    {
+      "path": "/api/cron/repliers-sync",
+      "schedule": "0 6 * * *"
+    },
+    {
+      "path": "/api/cron/email-scheduler",
+      "schedule": "0 * * * *"
+    }
+  ]
+}

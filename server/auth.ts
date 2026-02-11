@@ -11,6 +11,7 @@ import {
   hasPermission, 
   isAtLeast, 
   normalizeRole,
+  getUserRole,
   isSuperAdminEmail 
 } from "@shared/permissions";
 
@@ -69,11 +70,9 @@ export function setupAuth() {
   if (googleClientId && googleClientSecret) {
     const callbackURL = process.env.GOOGLE_CALLBACK_URL || 
       process.env.GOOGLE_REDIRECT_URI || 
-      (process.env.REPLIT_DOMAINS 
-        ? `https://${process.env.REPLIT_DOMAINS.split(',')[0]}/auth/google/callback`
-        : process.env.REPLIT_DEV_DOMAIN
-          ? `https://${process.env.REPLIT_DEV_DOMAIN}/auth/google/callback`
-          : "http://localhost:5000/auth/google/callback");
+      (process.env.APP_URL
+        ? `${process.env.APP_URL}/auth/google/callback`
+        : "http://localhost:5000/auth/google/callback");
     
     console.log(`🔐 Google OAuth configured with callback: ${callbackURL}`);
     
@@ -104,16 +103,18 @@ export function setupAuth() {
             let user = await storage.getUserByEmail(email);
             
             if (!user) {
-              const assignedRole = isSuperAdminEmail(email) ? "super_admin" : "agent";
+              const isSuperAdmin = isSuperAdminEmail(email);
               user = await storage.createUser({
                 email,
                 firstName: profile.name?.givenName || null,
                 lastName: profile.name?.familyName || null,
                 googleId: profile.id,
                 picture: profile.photos?.[0]?.value || null,
-                role: assignedRole,
+                isAdmin: null,
+                isSuperAdmin: isSuperAdmin,
                 passwordHash: null,
               });
+              const assignedRole = isSuperAdmin ? "super_admin" : "agent";
               console.log(`👤 Created new user: ${email} with role: ${assignedRole}`);
             } else {
               user = await storage.updateUser(user.id, {
@@ -186,7 +187,7 @@ export function requireRole(roles: string[]) {
     }
 
     const user = req.user as User;
-    const userRole = normalizeRole(user.role);
+    const userRole = normalizeRole(user);
     if (!roles.includes(userRole)) {
       return res.status(403).json({ error: "Insufficient permissions" });
     }
@@ -202,7 +203,7 @@ export function requireMinimumRole(minimumRole: UserRole) {
     }
 
     const user = req.user as User;
-    const userRole = normalizeRole(user.role);
+    const userRole = normalizeRole(user);
 
     if (!isAtLeast(userRole, minimumRole)) {
       console.log('[Auth] Access denied:', { 
@@ -224,7 +225,7 @@ export function requirePermission(permission: Permission) {
     }
 
     const user = req.user as User;
-    const userRole = normalizeRole(user.role);
+    const userRole = normalizeRole(user);
 
     if (!hasPermission(userRole, permission)) {
       console.log('[Auth] Permission denied:', { 

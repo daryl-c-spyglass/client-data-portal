@@ -99,10 +99,20 @@ export function getRoleDisplayName(role: UserRole): string {
   return displayNames[role] || 'Agent';
 }
 
-export function normalizeRole(role: string | undefined | null): UserRole {
-  if (role === 'developer' || role === 'super_admin' || role === 'admin' || role === 'agent') {
-    return role;
+export function normalizeRole(user: { isAdmin?: string | boolean; isSuperAdmin?: boolean } | string | undefined | null): UserRole {
+  // Handle legacy string-based role
+  if (typeof user === 'string') {
+    if (user === 'developer' || user === 'super_admin' || user === 'admin' || user === 'agent') {
+      return user;
+    }
+    return 'agent';
   }
+  
+  // Handle new boolean-based role structure
+  if (user && typeof user === 'object') {
+    return getUserRole(user);
+  }
+  
   return 'agent';
 }
 
@@ -129,12 +139,18 @@ export function isSuperAdminEmail(email: string): boolean {
   return INITIAL_SUPER_ADMIN_EMAILS.includes(email.toLowerCase());
 }
 
-export function determineUserRole(user: { email: string; role?: string | null }): UserRole {
-  if (user.role === 'developer') return 'developer';
-  if (user.role === 'super_admin') return 'super_admin';
-  if (user.role === 'admin') return 'admin';
-  if (user.role === 'agent') return 'agent';
+export function getUserRole(user: { isAdmin?: string | boolean; isSuperAdmin?: boolean }): UserRole {
+  if (user.isSuperAdmin) return 'super_admin';
+  if (user.isAdmin && user.isAdmin !== 'false') return 'admin';
+  return 'agent';
+}
+
+export function determineUserRole(user: { email: string; isAdmin?: string | boolean; isSuperAdmin?: boolean }): UserRole {
+  // Check database role flags first
+  if (user.isSuperAdmin) return 'super_admin';
+  if (user.isAdmin && user.isAdmin !== 'false') return 'admin';
   
+  // Fallback to email-based role assignment for developers
   if (DEVELOPER_EMAILS.includes(user.email.toLowerCase())) {
     return 'developer';
   }

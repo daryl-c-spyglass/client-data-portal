@@ -113,7 +113,7 @@ export async function getActivityLogs(filters?: GetActivityLogsFilters) {
   // Get user details for admin and target users
   const userIds = new Set<string>();
   logs.forEach(log => {
-    userIds.add(log.adminUserId);
+    if (log.adminUserId) userIds.add(log.adminUserId);
     if (log.targetUserId) userIds.add(log.targetUserId);
   });
 
@@ -130,7 +130,7 @@ export async function getActivityLogs(filters?: GetActivityLogsFilters) {
 
   return logs.map(log => ({
     ...log,
-    adminUser: userMap.get(log.adminUserId) || null,
+    adminUser: log.adminUserId ? userMap.get(log.adminUserId) || null : null,
     targetUser: log.targetUserId ? userMap.get(log.targetUserId) || null : null,
   }));
 }

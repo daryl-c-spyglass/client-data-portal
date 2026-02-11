@@ -1,9 +1,8 @@
 /**
- * Client for external Replit API integration
- * Base URL: https://home-review-ai-ryan1648.replit.app
+ * Client for external Home Review AI API integration
  */
 
-const EXTERNAL_API_BASE_URL = 'https://home-review-ai-ryan1648.replit.app';
+const EXTERNAL_API_BASE_URL = process.env.EXTERNAL_API_BASE_URL || 'https://home-review-ai-ryan1648.replit.app';
 const API_KEY = process.env.EXTERNAL_API_KEY;
 
 interface ExternalApiResponse<T> {
