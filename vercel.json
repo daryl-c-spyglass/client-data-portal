@@ -1,14 +1,11 @@
 {
   "version": 2,
+  "framework": null,
   "buildCommand": "npm run build",
   "outputDirectory": "dist",
-  "functions": {
-    "dist/index.js": {
-      "runtime": "@vercel/node@3",
-      "maxDuration": 30
-    }
-  },
+  "installCommand": "npm install",
   "rewrites": [
-    { "source": "/(.*)", "destination": "/dist/index.js" }
+    { "source": "/assets/(.*)", "destination": "/public/assets/$1" },
+    { "source": "/(.*)", "destination": "/index.js" }
   ]
 }
