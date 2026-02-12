@@ -1,18 +1,23 @@
 {
   "version": 2,
-  "buildCommand": "npm run build",
-  "installCommand": "npm install",
-  "framework": null,
-  "functions": {
-    "dist/index.js": {
-      "runtime": "@vercel/node@3",
-      "includeFiles": "dist/**"
+  "builds": [
+    {
+      "src": "dist/index.js",
+      "use": "@vercel/node"
+    },
+    {
+      "src": "dist/public/**",
+      "use": "@vercel/static"
     }
-  },
-  "rewrites": [
-    { "source": "/api/(.*)", "destination": "/dist/index.js" },
-    { "source": "/auth/(.*)", "destination": "/dist/index.js" },
-    { "source": "/health", "destination": "/dist/index.js" },
-    { "source": "/(.*)", "destination": "/dist/public/$1" }
+  ],
+  "routes": [
+    {
+      "src": "/assets/(.*)",
+      "dest": "/dist/public/assets/$1"
+    },
+    {
+      "src": "/(.*)",
+      "dest": "/dist/index.js"
+    }
   ]
 }

@@ -233,41 +233,45 @@ app.use((req, res, next) => {
     serveStatic(app);
   }
 
-  const port = parseInt(process.env.PORT || "5000", 10);
-  server.listen(
-    {
-      port,
-      host: "0.0.0.0",
-      reusePort: true,
-    },
-    () => {
-      logger.info(`Server listening on port ${port}`);
-      log(`serving on port ${port}`);
-    }
-  );
-
-  const shutdown = async (signal: string) => {
-    logger.info(`${signal} received, shutting down gracefully`);
-
-    server.close(() => {
-      logger.info("HTTP server closed");
-    });
-
-    if (dbPool) {
-      try {
-        await dbPool.end();
-        logger.info("Database pool closed");
-      } catch (err: any) {
-        logger.error("Error closing database pool", { error: err.message });
+  if (!process.env.VERCEL) {
+    const port = parseInt(process.env.PORT || "5000", 10);
+    server.listen(
+      {
+        port,
+        host: "0.0.0.0",
+        reusePort: true,
+      },
+      () => {
+        logger.info(`Server listening on port ${port}`);
+        log(`serving on port ${port}`);
       }
-    }
+    );
 
-    setTimeout(() => {
-      logger.warn("Forced shutdown after timeout");
-      process.exit(1);
-    }, 10000);
-  };
+    const shutdown = async (signal: string) => {
+      logger.info(`${signal} received, shutting down gracefully`);
 
-  process.on("SIGTERM", () => shutdown("SIGTERM"));
-  process.on("SIGINT", () => shutdown("SIGINT"));
+      server.close(() => {
+        logger.info("HTTP server closed");
+      });
+
+      if (dbPool) {
+        try {
+          await dbPool.end();
+          logger.info("Database pool closed");
+        } catch (err: any) {
+          logger.error("Error closing database pool", { error: err.message });
+        }
+      }
+
+      setTimeout(() => {
+        logger.warn("Forced shutdown after timeout");
+        process.exit(1);
+      }, 10000);
+    };
+
+    process.on("SIGTERM", () => shutdown("SIGTERM"));
+    process.on("SIGINT", () => shutdown("SIGINT"));
+  }
 })();
+
+export default app;
