@@ -4,10 +4,34 @@ import cookieParser from "cookie-parser";
 import passport from "passport";
 import ConnectPgSimple from "connect-pg-simple";
 import { Pool } from "@neondatabase/serverless";
+import fs from "fs";
 import path from "path";
 import rateLimit from "express-rate-limit";
 import { registerRoutes } from "./routes";
-import { setupVite, serveStatic, log } from "./vite";
+// Dynamic import of ./vite to avoid loading Vite/Rollup at module level in production
+// log and serveStatic are inlined here; setupVite is dynamically imported only in dev
+function log(message: string, source = "express") {
+  const formattedTime = new Date().toLocaleTimeString("en-US", {
+    hour: "numeric",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: true,
+  });
+  console.log(`${formattedTime} [${source}] ${message}`);
+}
+
+function serveStatic(app: import("express").Express) {
+  const distPath = path.resolve(import.meta.dirname, "public");
+  if (!fs.existsSync(distPath)) {
+    throw new Error(
+      `Could not find the build directory: ${distPath}, make sure to build the client first`,
+    );
+  }
+  app.use(express.static(distPath));
+  app.use("*", (_req: any, res: any) => {
+    res.sendFile(path.resolve(distPath, "index.html"));
+  });
+}
 import { seedData } from "./seed-data";
 import { setupAuth, setupAuthRoutes } from "./auth";
 import { createMLSGridClient } from "./mlsgrid-client";
@@ -228,6 +252,7 @@ app.use((req, res, next) => {
   });
 
   if (app.get("env") === "development") {
+    const { setupVite } = await import("./vite");
     await setupVite(app, server);
   } else {
     serveStatic(app);
