@@ -2,11 +2,6 @@
   "version": 2,
   "buildCommand": "npm run build",
   "installCommand": "npm install",
-  "functions": {
-    "api/index.mjs": {
-      "runtime": "@vercel/node@3"
-    }
-  },
   "routes": [
     { "src": "/assets/(.*)", "dest": "/dist/public/assets/$1" },
     { "src": "/(.*)", "dest": "/api/index.mjs" }
