@@ -1,3 +1,7 @@
-// Vercel serverless function entry point
-const app = await import('../dist/index.js');
-export default app.default || app;
+export default function handler(req, res) {
+  res.status(200).json({ 
+    message: 'Serverless function working',
+    url: req.url,
+    method: req.method
+  });
+}
