@@ -1,0 +1,151 @@
+I'm migrating the Client Data Portal from Replit to Lovable. Generate a comprehensive handoff document that includes everything needed to continue development.
+
+Create a file called LOVABLE_HANDOFF.md with:
+
+---
+
+## 1. ENVIRONMENT VARIABLES
+
+List ALL environment variables with:
+- Variable name
+- Description/purpose
+- Example format (not actual values)
+- Required vs Optional
+
+---
+
+## 2. DATABASE SCHEMA
+
+Export the complete database schema:
+- All tables
+- All columns with types
+- Relationships/foreign keys
+- Indexes
+
+Include the Drizzle schema file contents.
+
+---
+
+## 3. API ENDPOINTS
+
+Document every API route:
+- Method (GET/POST/PUT/DELETE)
+- Path
+- Request body/params
+- Response format
+- Authentication required (yes/no)
+- Role required (if any)
+
+Format as a table.
+
+---
+
+## 4. PROJECT STRUCTURE
+/client - Frontend React app
+/server - Backend Express API
+/shared - Shared types/schemas
+/db - Database configuration
+
+Expand with all key files and their purposes.
+
+---
+
+## 5. EXTERNAL INTEGRATIONS
+
+Document each integration:
+
+### Repliers API (MLS)
+- Base URL
+- Authentication method
+- Key endpoints used
+- Rate limits
+
+### Follow Up Boss
+- Base URL
+- Authentication method
+- Key endpoints used
+
+### Google OAuth
+- Scopes used
+- Callback flow
+
+### Mapbox
+- Features used (maps, geocoding)
+- Token type (public/secret)
+
+### OpenAI
+- Features used
+- Models used
+
+---
+
+## 6. AUTHENTICATION FLOW
+
+Document the complete auth flow:
+- Login process
+- Session management
+- Role-based access control
+- Protected routes
+
+---
+
+## 7. KEY FEATURES
+
+List all major features with:
+- Feature name
+- Components involved
+- API endpoints used
+- Database tables used
+
+Features to document:
+- Property Search
+- CMA Builder
+- Presentation Builder
+- Calendar Integration
+- Leads Management
+- User Management
+- Admin Dashboard
+
+---
+
+## 8. BUILD AND RUN COMMANDS
+npm install - Install dependencies
+npm run dev - Start development server
+npm run build - Build for production
+npm run start - Start production server
+
+Any other scripts in package.json.
+
+---
+
+## 9. DEPENDENCIES
+
+List key dependencies with their purpose:
+- express - Backend server
+- drizzle-orm - Database ORM
+- react - Frontend framework
+- (continue for all major deps)
+
+---
+
+## 10. KNOWN ISSUES / TECHNICAL DEBT
+
+List any:
+- Bugs not yet fixed
+- Features partially implemented
+- Code that needs refactoring
+- Security improvements needed
+
+---
+
+## 11. DEPLOYMENT CONFIGURATION
+
+What's needed for Vercel deployment:
+- Build command
+- Output directory
+- Environment variables
+- Any special configuration (vercel.json)
+
+---
+
+Output the complete LOVABLE_HANDOFF.md file.
