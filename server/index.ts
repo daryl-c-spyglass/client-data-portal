@@ -18,6 +18,7 @@ import { startRepliersScheduledSync, registerRepliersSyncRoutes, triggerRepliers
 import { registerObjectStorageRoutes } from "./replit_integrations/object_storage";
 import { validateConfig } from "./config";
 import { logger, requestIdMiddleware } from "./logger";
+import { jwtAuthMiddleware } from "./jwt";
 
 const config = validateConfig();
 
@@ -118,8 +119,6 @@ app.use(
 
 app.use(passport.initialize());
 app.use(passport.session());
-
-import { jwtAuthMiddleware } from "./jwt";
 app.use(jwtAuthMiddleware);
 
 setupAuth();
