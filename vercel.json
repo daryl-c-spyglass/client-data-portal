@@ -1,11 +1,14 @@
 {
   "version": 2,
-  "framework": null,
   "buildCommand": "npm run build",
-  "outputDirectory": "dist",
   "installCommand": "npm install",
+  "functions": {
+    "api/index.js": {
+      "includeFiles": "dist/**"
+    }
+  },
   "rewrites": [
-    { "source": "/assets/(.*)", "destination": "/public/assets/$1" },
-    { "source": "/(.*)", "destination": "/index.js" }
+    { "source": "/assets/(.*)", "destination": "/dist/public/assets/$1" },
+    { "source": "/(.*)", "destination": "/api/index.js" }
   ]
 }
