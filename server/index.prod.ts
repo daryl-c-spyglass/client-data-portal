@@ -27,14 +27,15 @@ app.set("trust proxy", 1);
 
 app.use(requestIdMiddleware);
 
-app.use((req, res, next) => {
-  res.setHeader(
-    "Content-Security-Policy",
-    "script-src 'self' 'unsafe-eval'; frame-ancestors 'self' https://*.replit.dev https://*.replit.app https://*.onrender.com https://*.spyglassrealty.com"
-  );
-  res.removeHeader("X-Frame-Options");
-  next();
-});
+// CSP temporarily disabled to diagnose production issues
+// app.use((req, res, next) => {
+//   res.setHeader(
+//     "Content-Security-Policy",
+//     "script-src 'self' 'unsafe-eval'; frame-ancestors 'self' https://*.replit.dev https://*.replit.app https://*.onrender.com https://*.spyglassrealty.com"
+//   );
+//   res.removeHeader("X-Frame-Options");
+//   next();
+// });
 
 app.use(express.static(path.join(process.cwd(), "public")));
 
