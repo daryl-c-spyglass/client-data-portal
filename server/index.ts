@@ -31,7 +31,7 @@ app.use(requestIdMiddleware);
 app.use((req, res, next) => {
   res.setHeader(
     "Content-Security-Policy",
-    "frame-ancestors 'self' https://*.replit.dev https://*.replit.app https://*.onrender.com https://*.spyglassrealty.com"
+    "script-src 'self' 'unsafe-eval'; frame-ancestors 'self' https://*.replit.dev https://*.replit.app https://*.onrender.com https://*.spyglassrealty.com"
   );
   res.removeHeader("X-Frame-Options");
   next();
