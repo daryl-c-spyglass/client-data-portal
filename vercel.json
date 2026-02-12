@@ -4,6 +4,6 @@
   "installCommand": "npm install",
   "routes": [
     { "src": "/assets/(.*)", "dest": "/dist/public/assets/$1" },
-    { "src": "/(.*)", "dest": "/api/index.mjs" }
+    { "src": "/(.*)", "dest": "/api/index.js" }
   ]
 }
