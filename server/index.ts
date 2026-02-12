@@ -8,30 +8,7 @@ import fs from "fs";
 import path from "path";
 import rateLimit from "express-rate-limit";
 import { registerRoutes } from "./routes";
-// Dynamic import of ./vite to avoid loading Vite/Rollup at module level in production
-// log and serveStatic are inlined here; setupVite is dynamically imported only in dev
-function log(message: string, source = "express") {
-  const formattedTime = new Date().toLocaleTimeString("en-US", {
-    hour: "numeric",
-    minute: "2-digit",
-    second: "2-digit",
-    hour12: true,
-  });
-  console.log(`${formattedTime} [${source}] ${message}`);
-}
-
-function serveStatic(app: import("express").Express) {
-  const distPath = path.resolve(import.meta.dirname, "public");
-  if (!fs.existsSync(distPath)) {
-    throw new Error(
-      `Could not find the build directory: ${distPath}, make sure to build the client first`,
-    );
-  }
-  app.use(express.static(distPath));
-  app.use("*", (_req: any, res: any) => {
-    res.sendFile(path.resolve(distPath, "index.html"));
-  });
-}
+import { serveStatic, log } from "./static";
 import { seedData } from "./seed-data";
 import { setupAuth, setupAuthRoutes } from "./auth";
 import { createMLSGridClient } from "./mlsgrid-client";
