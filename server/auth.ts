@@ -13,6 +13,7 @@ import {
   normalizeRole,
   isSuperAdminEmail 
 } from "@shared/permissions";
+import { generateJWT, setJWTCookie, clearJWTCookie } from "./jwt";
 
 const ALLOWED_EMAIL_DOMAIN = process.env.ALLOWED_EMAIL_DOMAIN || "spyglassrealty.com";
 const ALLOWED_EMAILS = process.env.ALLOWED_EMAILS?.split(",").map(e => e.trim().toLowerCase()) || [];
@@ -126,7 +127,8 @@ export function setupAuth() {
               console.log(`👤 Updated existing user: ${email}`);
             }
 
-            return done(null, user);
+            const token = generateJWT(user);
+            return done(null, { user, token });
           } catch (error) {
             console.error("Google OAuth error:", error);
             return done(error as Error);
@@ -135,19 +137,22 @@ export function setupAuth() {
       )
     );
   } else {
-    console.log("⚠️ Google OAuth not configured - missing GOOGLE_CLIENT_ID or GOOGLE_CLIENT_SECRET");
+    console.log("Warning: Google OAuth not configured - missing GOOGLE_CLIENT_ID or GOOGLE_CLIENT_SECRET");
   }
 
-  passport.serializeUser((user: Express.User, done) => {
-    done(null, (user as User).id);
+  // JWT-based auth - serialize/deserialize still needed for passport OAuth flow
+  passport.serializeUser((authResult: Express.User, done) => {
+    const result = authResult as any;
+    done(null, JSON.stringify({ id: result.user?.id || result.id, token: result.token }));
   });
 
-  passport.deserializeUser(async (id: string, done) => {
+  passport.deserializeUser(async (serialized: string, done) => {
     try {
-      const user = await storage.getUser(id);
+      const data = JSON.parse(serialized as string);
+      const user = await storage.getUser(data.id);
       if (user) {
         const { passwordHash, ...safeUser } = user;
-        done(null, safeUser);
+        done(null, { ...safeUser, _token: data.token });
       } else {
         done(null, false);
       }
@@ -287,10 +292,13 @@ export function setupAuthRoutes(app: any) {
   app.get("/auth/google/callback", (req: Request, res: Response, next: NextFunction) => {
     const isPopupAuth = (req.session as any)?.isPopupAuth;
     
-    passport.authenticate("google", (err: Error | null, user: User | false, info: any) => {
+    passport.authenticate("google", (err: Error | null, authResult: any, info: any) => {
       // Clean up session flags
       delete (req.session as any)?.isPopupAuth;
       
+      const user = authResult?.user || authResult;
+      const token = authResult?.token;
+
       // Handle authentication failure
       if (err || !user) {
         const errorMessage = info?.message || "access_denied";
@@ -320,8 +328,8 @@ export function setupAuthRoutes(app: any) {
         }
       }
       
-      // Log in the user
-      req.logIn(user, (loginErr) => {
+      // Log in the user and set JWT cookie
+      req.logIn(authResult, (loginErr) => {
         if (loginErr) {
           if (isPopupAuth) {
             return res.send(`
@@ -343,6 +351,10 @@ export function setupAuthRoutes(app: any) {
             `);
           }
           return res.redirect("/login?error=login_failed");
+        }
+
+        if (token) {
+          setJWTCookie(res, token);
         }
         
         if (isPopupAuth) {
@@ -398,17 +410,20 @@ export function setupAuthRoutes(app: any) {
   });
 
   app.post("/auth/logout", (req: Request, res: Response) => {
+    clearJWTCookie(res);
     req.logout((err) => {
       if (err) {
-        return res.status(500).json({ error: "Logout failed" });
+        console.warn('[Auth] Logout error:', err);
       }
-      req.session.destroy((err) => {
-        if (err) {
-          return res.status(500).json({ error: "Session destruction failed" });
-        }
-        res.clearCookie("connect.sid");
-        res.json({ success: true });
-      });
+      if (req.session) {
+        req.session.destroy((err) => {
+          if (err) {
+            console.warn('[Auth] Session destroy error:', err);
+          }
+        });
+      }
+      res.clearCookie("connect.sid");
+      res.json({ success: true });
     });
   });
 

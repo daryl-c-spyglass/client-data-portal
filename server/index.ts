@@ -119,6 +119,9 @@ app.use(
 app.use(passport.initialize());
 app.use(passport.session());
 
+import { jwtAuthMiddleware } from "./jwt";
+app.use(jwtAuthMiddleware);
+
 setupAuth();
 setupAuthRoutes(app);
 
