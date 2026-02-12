@@ -228,16 +228,49 @@ app.use((req, res, next) => {
     }
   });
 
-  let _originalProcessExit: typeof process.exit | null = null;
   if (app.get("env") === "development") {
-    _originalProcessExit = process.exit.bind(process);
-    process.exit = ((code?: number) => {
-      logger.warn("Intercepted non-fatal Vite pre-transform error (prevented process.exit)");
-      return undefined as never;
-    }) as typeof process.exit;
+    const { createServer: createViteServer, createLogger } = await import("vite");
+    const viteConfigExport = (await import("../vite.config")).default;
+    const resolvedConfig = typeof viteConfigExport === "function"
+      ? await viteConfigExport()
+      : viteConfigExport;
 
-    const { setupVite } = await import("./vite");
-    await setupVite(app, server);
+    const viteLogger = createLogger();
+    const vite = await createViteServer({
+      ...resolvedConfig,
+      configFile: false,
+      customLogger: {
+        ...viteLogger,
+        error: (msg: string, options?: any) => {
+          viteLogger.error(msg, options);
+        },
+      },
+      server: {
+        middlewareMode: true,
+        hmr: { server },
+        allowedHosts: true as const,
+      },
+      appType: "custom",
+    });
+
+    app.use(vite.middlewares);
+    app.use("*", async (req, res, next) => {
+      const url = req.originalUrl;
+      try {
+        const clientTemplate = path.resolve(
+          import.meta.dirname,
+          "..",
+          "client",
+          "index.html",
+        );
+        const template = await fs.promises.readFile(clientTemplate, "utf-8");
+        const page = await vite.transformIndexHtml(url, template);
+        res.status(200).set({ "Content-Type": "text/html" }).end(page);
+      } catch (e) {
+        vite.ssrFixStacktrace(e as Error);
+        next(e);
+      }
+    });
   } else {
     serveStatic(app);
   }
@@ -274,8 +307,7 @@ app.use((req, res, next) => {
 
       setTimeout(() => {
         logger.warn("Forced shutdown after timeout");
-        const exitFn = _originalProcessExit || process.exit;
-        exitFn(1);
+        process.exit(1);
       }, 10000);
     };
 
