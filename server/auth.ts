@@ -148,11 +148,30 @@ export function setupAuth() {
 
   passport.deserializeUser(async (serialized: string, done) => {
     try {
-      const data = JSON.parse(serialized as string);
-      const user = await storage.getUser(data.id);
+      let userId: number;
+      let token: string | undefined;
+
+      if (typeof serialized === 'number') {
+        userId = serialized;
+      } else if (typeof serialized === 'string') {
+        try {
+          const data = JSON.parse(serialized);
+          userId = data.id;
+          token = data.token;
+        } catch {
+          userId = parseInt(serialized, 10);
+          if (isNaN(userId)) {
+            return done(null, false);
+          }
+        }
+      } else {
+        return done(null, false);
+      }
+
+      const user = await storage.getUser(userId);
       if (user) {
         const { passwordHash, ...safeUser } = user;
-        done(null, { ...safeUser, _token: data.token });
+        done(null, token ? { ...safeUser, _token: token } : safeUser);
       } else {
         done(null, false);
       }
