@@ -14,6 +14,7 @@ import { z } from "zod";
 import bcrypt from "bcryptjs";
 import passport from "passport";
 import { requireAuth, requireRole, requireMinimumRole, requirePermission } from "./auth";
+import { requireJWTAuth, requireJWTAuthWithDBCheck } from "./jwt";
 import { getUserRole, isSuperAdminEmail, INITIAL_SUPER_ADMIN_EMAILS } from "@shared/permissions";
 import { fetchExternalUsers, fetchFromExternalApi } from "./external-api";
 import { logAdminActivity, getActivityLogs, type AdminAction } from "./admin-activity-service";
@@ -270,10 +271,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     });
   });
 
-  app.get("/api/auth/me", requireAuth, (req, res) => {
-    // req.user is already sanitized by passport.deserializeUser
-    res.json(req.user);
-  });
+  // Note: /api/auth/me is now defined in auth.ts with JWT auth
 
   // External API integration routes
   app.get("/api/external/users", async (req, res) => {

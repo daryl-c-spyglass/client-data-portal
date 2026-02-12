@@ -1,9 +1,6 @@
 import express, { type Request, Response, NextFunction } from "express";
-import session from "express-session";
 import cookieParser from "cookie-parser";
 import passport from "passport";
-import ConnectPgSimple from "connect-pg-simple";
-import { Pool } from "@neondatabase/serverless";
 import path from "path";
 import { registerRoutes } from "./routes";
 import { serveStatic, log } from "./vite";
@@ -47,43 +44,10 @@ app.use(express.json({
 }));
 app.use(express.urlencoded({ extended: false }));
 
-// Configure production-ready session store
-const PgSession = ConnectPgSimple(session);
-
-// In production, always require a persistent session store
-if (process.env.NODE_ENV === "production" && !process.env.DATABASE_URL) {
-  throw new Error("DATABASE_URL is required for production session storage");
-}
-
-const sessionStore = process.env.DATABASE_URL 
-  ? new PgSession({
-      pool: new Pool({ 
-        connectionString: process.env.DATABASE_URL,
-        ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false
-      }),
-      createTableIfMissing: true,
-    })
-  : undefined;
-
-const isProduction = process.env.NODE_ENV === 'production';
-
-app.use(
-  session({
-    store: sessionStore,
-    secret: process.env.SESSION_SECRET || "development-secret-change-in-production",
-    resave: false,
-    saveUninitialized: false,
-    cookie: {
-      secure: isProduction,
-      httpOnly: true,
-      sameSite: isProduction ? "none" : "lax",
-      maxAge: 1000 * 60 * 60 * 24 * 7,
-    },
-  })
-);
-
+// JWT-based authentication: No session store needed
+// Passport is used only for OAuth strategies, not session management
 app.use(passport.initialize());
-app.use(passport.session());
+// Note: passport.session() is NOT used with JWT auth
 
 setupAuth();
 setupAuthRoutes(app);
