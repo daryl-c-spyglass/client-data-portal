@@ -228,7 +228,14 @@ app.use((req, res, next) => {
     }
   });
 
+  let _originalProcessExit: typeof process.exit | null = null;
   if (app.get("env") === "development") {
+    _originalProcessExit = process.exit.bind(process);
+    process.exit = ((code?: number) => {
+      logger.warn("Intercepted non-fatal Vite pre-transform error (prevented process.exit)");
+      return undefined as never;
+    }) as typeof process.exit;
+
     const { setupVite } = await import("./vite");
     await setupVite(app, server);
   } else {
@@ -267,7 +274,8 @@ app.use((req, res, next) => {
 
       setTimeout(() => {
         logger.warn("Forced shutdown after timeout");
-        process.exit(1);
+        const exitFn = _originalProcessExit || process.exit;
+        exitFn(1);
       }, 10000);
     };
 
