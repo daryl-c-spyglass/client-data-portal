@@ -7,8 +7,8 @@
       "includeFiles": "dist/**"
     }
   },
-  "rewrites": [
-    { "source": "/assets/(.*)", "destination": "/dist/public/assets/$1" },
-    { "source": "/(.*)", "destination": "/api/index.js" }
+  "routes": [
+    { "src": "/assets/(.*)", "dest": "/dist/public/assets/$1" },
+    { "src": "/(.*)", "dest": "/api/index.js" }
   ]
 }
