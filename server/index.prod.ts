@@ -29,10 +29,15 @@ app.use(requestIdMiddleware);
 
 app.use((req, res, next) => {
   res.setHeader(
-    "Content-Security-Policy",
-    "script-src 'self' 'unsafe-eval' 'wasm-unsafe-eval'; frame-ancestors 'self' https://*.replit.dev https://*.replit.app https://*.onrender.com https://*.spyglassrealty.com"
+    'Content-Security-Policy',
+    "default-src 'self'; " +
+    "script-src 'self' 'unsafe-inline' 'unsafe-eval'; " +
+    "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; " +
+    "img-src 'self' data: https: blob:; " +
+    "font-src 'self' data: https://fonts.gstatic.com; " +
+    "connect-src 'self' https:; " +
+    "frame-ancestors 'self' https://*.vercel.app https://*.spyglassrealty.com"
   );
-  res.removeHeader("X-Frame-Options");
   next();
 });
 
