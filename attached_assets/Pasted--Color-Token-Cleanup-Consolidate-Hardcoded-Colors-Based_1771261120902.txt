@@ -1,0 +1,201 @@
+## Color Token Cleanup — Consolidate Hardcoded Colors
+
+Based on the color audit, replace hardcoded hex values with existing design tokens for consistency and maintainability.
+
+---
+
+### Task 1: Add Missing Semantic Tokens
+
+**Update `client/src/index.css`** — Add these tokens to both `:root` (light) and `.dark` sections:
+```css
+/* Light mode - add to :root */
+--success: 142 76% 36%;
+--success-foreground: 0 0% 100%;
+--warning: 45 93% 47%;
+--warning-foreground: 0 0% 0%;
+--info: 217 91% 60%;
+--info-foreground: 0 0% 100%;
+
+/* Dark mode - add to .dark */
+--success: 142 76% 45%;
+--success-foreground: 0 0% 100%;
+--warning: 45 93% 55%;
+--warning-foreground: 0 0% 0%;
+--info: 217 91% 65%;
+--info-foreground: 0 0% 100%;
+```
+
+**Update `tailwind.config.ts`** — Add to the `colors` extend section:
+```ts
+success: {
+  DEFAULT: "hsl(var(--success))",
+  foreground: "hsl(var(--success-foreground))",
+},
+warning: {
+  DEFAULT: "hsl(var(--warning))",
+  foreground: "hsl(var(--warning-foreground))",
+},
+info: {
+  DEFAULT: "hsl(var(--info))",
+  foreground: "hsl(var(--info-foreground))",
+},
+```
+
+---
+
+### Task 2: Replace Hardcoded Brand Orange
+
+Search and replace across all files in `client/src/`:
+
+| Find (hardcoded) | Replace with |
+|------------------|--------------|
+| `bg-[#EF4923]` | `bg-primary` |
+| `text-[#EF4923]` | `text-primary` |
+| `border-[#EF4923]` | `border-primary` |
+| `bg-[#C93B1C]` | `bg-spyglass-orange-hover` |
+| `hover:bg-[#C93B1C]` | `hover:bg-spyglass-orange-hover` |
+| `bg-[#FEF2EF]` | `bg-spyglass-orange-light` |
+| `bg-[#FDE5DF]` | `bg-spyglass-orange-100` |
+| `text-[#C93B1C]` | `text-spyglass-orange-hover` |
+
+**Files likely affected:**
+- `CMAReport.tsx`
+- `CMAStatsView.tsx`
+- `Analytics.tsx`
+- `Clients.tsx`
+- `SearchCriteria.tsx`
+- `PropertyCard.tsx`
+- `StatusBadge.tsx`
+- Any component using brand colors
+
+---
+
+### Task 3: Update statusColors.ts
+
+**File:** `client/src/lib/statusColors.ts`
+
+Update to use CSS variables where possible. Keep the hex values but add comments noting they match design tokens:
+```ts
+export const statusColors = {
+  subject: {
+    bg: 'bg-info', // #3b82f6
+    lightBg: 'bg-info/10',
+    text: 'text-info',
+    hex: '#3b82f6',
+  },
+  active: {
+    bg: 'bg-success', // #22c55e
+    lightBg: 'bg-success/10',
+    text: 'text-success',
+    hex: '#22c55e',
+  },
+  underContract: {
+    bg: 'bg-primary', // #EF4923 (Brand Orange)
+    lightBg: 'bg-spyglass-orange-light',
+    text: 'text-primary',
+    hex: '#EF4923',
+  },
+  closed: {
+    bg: 'bg-destructive', // #ef4444
+    lightBg: 'bg-destructive/10',
+    text: 'text-destructive',
+    hex: '#ef4444',
+  },
+  pending: {
+    bg: 'bg-muted-foreground', // #6b7280
+    lightBg: 'bg-muted',
+    text: 'text-muted-foreground',
+    hex: '#6b7280',
+  },
+};
+```
+
+---
+
+### Task 4: Fix Chart Color Inconsistency
+
+**File:** `client/src/index.css`
+
+Update `--chart-2` and `--chart-4` to maintain consistent hues between light/dark:
+```css
+/* Light mode */
+--chart-2: 220 14% 46%;  /* Neutral slate instead of changing hue */
+--chart-4: 30 80% 55%;   /* Warm orange */
+
+/* Dark mode */
+--chart-2: 220 14% 60%;  /* Same hue, lighter */
+--chart-4: 30 80% 65%;   /* Same hue, lighter */
+```
+
+---
+
+### Task 5: Document the Color System
+
+**Create file:** `client/src/lib/designTokens.ts`
+```ts
+/**
+ * Design Token Reference — Client Data Portal
+ * 
+ * 60-30-10 Color System:
+ * - 60% Dominant: --background, --card, --muted (warm neutrals)
+ * - 30% Secondary: --sidebar, --border, --secondary (structure)
+ * - 10% Accent: --primary (#EF4923 Spyglass Orange)
+ * 
+ * Semantic Colors:
+ * - Primary: Brand orange for CTAs and key actions
+ * - Destructive: Red for delete/danger actions
+ * - Success: Green for positive states
+ * - Warning: Yellow/amber for caution states
+ * - Info: Blue for informational states
+ * 
+ * Property Status Colors:
+ * - Subject: Blue (info)
+ * - Active: Green (success)
+ * - Under Contract: Orange (primary/brand)
+ * - Closed: Red (destructive)
+ * - Pending: Gray (muted)
+ * 
+ * Usage:
+ * - Always use Tailwind classes: bg-primary, text-success, etc.
+ * - Never hardcode hex values in components
+ * - For custom colors, add to tailwind.config.ts first
+ */
+
+export const BRAND_COLORS = {
+  primary: '#EF4923',
+  primaryHover: '#C93B1C',
+  primaryLight: '#FEF2EF',
+} as const;
+
+export const STATUS_HEX = {
+  subject: '#3b82f6',
+  active: '#22c55e',
+  underContract: '#EF4923',
+  closed: '#ef4444',
+  pending: '#6b7280',
+} as const;
+```
+
+---
+
+### Validation
+
+After changes, verify:
+1. Run `npm run build` — no TypeScript/CSS errors
+2. Check Dashboard — colors render correctly in light mode
+3. Toggle dark mode — colors adapt properly
+4. Check CMA Report — status badges display correctly
+5. Check Property cards — Active/Under Contract badges visible
+
+---
+
+### DO NOT CHANGE (Pending Ryan Decision)
+
+**Under Contract color** — Currently uses brand orange (#EF4923), same as primary buttons. This may be intentional for brand consistency. Flag for Ryan to decide if it should be a distinct color (e.g., amber #f59e0b).
+
+### OUT OF SCOPE (Future Cleanup)
+
+- Map popup hardcoded colors (requires HTML string refactor)
+- Print styles (low priority)
+- Flood zone colors (domain-specific, keep hardcoded)
+- School district colors (domain-specific, keep hardcoded)
