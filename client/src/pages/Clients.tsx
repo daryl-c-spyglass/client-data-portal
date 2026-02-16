@@ -86,8 +86,8 @@ export default function Clients() {
 
         <Card className="opacity-75">
           <CardHeader className="flex flex-row items-center gap-3 space-y-0 pb-2">
-            <div className="p-2 bg-[#FEF2EF] dark:bg-[#EF4923]/20 rounded-lg">
-              <Calendar className="h-5 w-5 text-[#EF4923] dark:text-[#F97B5C]" />
+            <div className="p-2 bg-spyglass-orange-light dark:bg-primary/20 rounded-lg">
+              <Calendar className="h-5 w-5 text-primary" />
             </div>
             <div>
               <CardTitle className="text-base">Showing Scheduler</CardTitle>

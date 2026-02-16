@@ -972,7 +972,7 @@ export function CMAReport({
                       'Active': 'text-green-600',
                       'Closed': 'text-red-600',
                       'Active Under Contract': 'text-yellow-600',
-                      'Pending': 'text-[#EF4923]',
+                      'Pending': 'text-primary',
                     };
                     
                     return (
@@ -1979,7 +1979,7 @@ export function CMAReport({
                     'Active': 'bg-green-500',
                     'Closed': 'bg-red-500',
                     'Active Under Contract': 'bg-yellow-500',
-                    'Pending': 'bg-[#EF4923]',
+                    'Pending': 'bg-primary',
                   };
                   
                   return (
@@ -2292,7 +2292,7 @@ export function CMAReport({
                         {hasValidRange ? (
                           <>
                             <div 
-                              className="absolute h-full bg-gradient-to-r from-green-500/40 via-primary/60 to-[#EF4923]/40 rounded-md"
+                              className="absolute h-full bg-gradient-to-r from-green-500/40 via-primary/60 to-primary/40 rounded-md"
                               style={{ left: `${leftPct}%`, right: `${rightPct}%` }}
                             />
                             <div 
@@ -2331,15 +2331,15 @@ export function CMAReport({
                     </p>
                   </div>
 
-                  <div className="p-4 rounded-md bg-[#FEF2EF] dark:bg-[#EF4923]/20 border border-[#FABCAB] dark:border-[#EF4923]/40">
+                  <div className="p-4 rounded-md bg-spyglass-orange-light dark:bg-primary/20 border border-spyglass-orange-200 dark:border-primary/40">
                     <div className="flex items-center gap-2 mb-2">
-                      <TrendingUp className="w-4 h-4 text-[#C93B1C] dark:text-[#F97B5C]" />
-                      <span className="font-medium text-[#C93B1C] dark:text-[#F97B5C]">Maximum Value</span>
+                      <TrendingUp className="w-4 h-4 text-spyglass-orange-hover dark:text-primary" />
+                      <span className="font-medium text-spyglass-orange-hover dark:text-primary">Maximum Value</span>
                     </div>
-                    <p className="text-2xl font-bold text-[#C93B1C] dark:text-[#F97B5C]">
+                    <p className="text-2xl font-bold text-spyglass-orange-hover dark:text-primary">
                       ${pricingSuggestion.maxValuePrice.toLocaleString()}
                     </p>
-                    <p className="text-xs text-[#D9421F]/80 dark:text-[#F97B5C]/80 mt-1">
+                    <p className="text-xs text-spyglass-orange-hover/80 dark:text-primary/80 mt-1">
                       Aggressive pricing for maximum return
                     </p>
                   </div>
@@ -2767,7 +2767,7 @@ export function CMAReport({
                       </div>
                       <div className="flex items-center gap-1">
                         <span className="text-lg">🏠</span>
-                        <div className="w-2 h-2 rounded-sm bg-[#EF4923]"></div>
+                        <div className="w-2 h-2 rounded-sm bg-primary"></div>
                         <span>Pending</span>
                       </div>
                       <div className="flex items-center gap-1">
@@ -3528,7 +3528,7 @@ export function CMAReport({
                       </div>
                       <div className="flex items-center gap-1">
                         <span className="text-lg">🏠</span>
-                        <div className="w-2 h-2 rounded-sm bg-[#EF4923]"></div>
+                        <div className="w-2 h-2 rounded-sm bg-primary"></div>
                         <span>Pending</span>
                       </div>
                       <div className="flex items-center gap-1">

@@ -1215,7 +1215,7 @@ export default function CMAPresentationBuilder() {
                       <div 
                         className={`text-center space-y-4 p-4 rounded-md ${
                           coverPageConfig.background === "gradient" 
-                            ? "bg-gradient-to-br from-[#FEF2EF] to-[#FDE5DF]" 
+                            ? "bg-gradient-to-br from-spyglass-orange-light to-spyglass-orange-100" 
                             : coverPageConfig.background === "property"
                             ? "bg-gray-200"
                             : ""
@@ -1727,7 +1727,7 @@ export default function CMAPresentationBuilder() {
               <div 
                 className={`text-center space-y-4 p-4 rounded-md ${
                   coverPageConfig.background === "gradient" 
-                    ? "bg-gradient-to-br from-[#FEF2EF] to-[#FDE5DF]" 
+                    ? "bg-gradient-to-br from-spyglass-orange-light to-spyglass-orange-100" 
                     : coverPageConfig.background === "property"
                     ? "bg-gray-200"
                     : ""

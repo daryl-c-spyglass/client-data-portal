@@ -41,13 +41,19 @@
   --input: 30 10% 88%;
   --ring: 11 85% 54%;
   --chart-1: 11 85% 54%;
-  --chart-2: 0 0% 20%;
+  --chart-2: 220 14% 46%;
   --spyglass-black: 0 0% 13%;
   --primary-50: 11 85% 95%;
   --primary-100: 11 85% 90%;
   --primary-200: 11 85% 80%;
+  --success: 142 76% 36%;
+  --success-foreground: 0 0% 100%;
+  --warning: 45 93% 47%;
+  --warning-foreground: 0 0% 0%;
+  --info: 217 91% 60%;
+  --info-foreground: 0 0% 100%;
   --chart-3: 142 76% 32%;
-  --chart-4: 30 80% 60%;
+  --chart-4: 30 80% 55%;
   --chart-5: 340 82% 42%;
   --font-sans: Inter, sans-serif;
   --font-serif: Georgia, serif;
@@ -91,6 +97,15 @@
   /* Fallback for older browsers */
   --destructive-border: hsl(var(--destructive));
   --destructive-border: hsl(from hsl(var(--destructive)) h s calc(l + var(--opaque-button-border-intensity)) / alpha);
+
+  --success-border: hsl(var(--success));
+  --success-border: hsl(from hsl(var(--success)) h s calc(l + var(--opaque-button-border-intensity)) / alpha);
+
+  --warning-border: hsl(var(--warning));
+  --warning-border: hsl(from hsl(var(--warning)) h s calc(l + var(--opaque-button-border-intensity)) / alpha);
+
+  --info-border: hsl(var(--info));
+  --info-border: hsl(from hsl(var(--info)) h s calc(l + var(--opaque-button-border-intensity)) / alpha);
 }
 
 .dark {
@@ -129,13 +144,19 @@
   --input: 0 0% 20%;
   --ring: 11 85% 58%;
   --chart-1: 11 85% 58%;
-  --chart-2: 11 90% 62%;
+  --chart-2: 220 14% 60%;
   --spyglass-black: 0 0% 13%;
   --primary-50: 11 85% 15%;
   --primary-100: 11 85% 20%;
   --primary-200: 11 85% 30%;
+  --success: 142 76% 45%;
+  --success-foreground: 0 0% 100%;
+  --warning: 45 93% 55%;
+  --warning-foreground: 0 0% 0%;
+  --info: 217 91% 65%;
+  --info-foreground: 0 0% 100%;
   --chart-3: 142 76% 55%;
-  --chart-4: 280 65% 60%;
+  --chart-4: 30 80% 65%;
   --chart-5: 340 82% 58%;
   --shadow-2xs: 0px 2px 0px 0px hsl(220 15% 5% / 0.00);
   --shadow-xs: 0px 2px 0px 0px hsl(220 15% 5% / 0.00);
@@ -173,6 +194,15 @@
   /* Fallback for older browsers */
   --destructive-border: hsl(var(--destructive));
   --destructive-border: hsl(from hsl(var(--destructive)) h s calc(l + var(--opaque-button-border-intensity)) / alpha);
+
+  --success-border: hsl(var(--success));
+  --success-border: hsl(from hsl(var(--success)) h s calc(l + var(--opaque-button-border-intensity)) / alpha);
+
+  --warning-border: hsl(var(--warning));
+  --warning-border: hsl(from hsl(var(--warning)) h s calc(l + var(--opaque-button-border-intensity)) / alpha);
+
+  --info-border: hsl(var(--info));
+  --info-border: hsl(from hsl(var(--info)) h s calc(l + var(--opaque-button-border-intensity)) / alpha);
 }
 
 @layer base {

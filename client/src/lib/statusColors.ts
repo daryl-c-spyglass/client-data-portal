@@ -12,53 +12,53 @@
 export const STATUS_COLORS = {
   subject: {
     name: 'Subject Property',
-    hex: '#3b82f6',        // Blue
-    bg: 'bg-blue-500',
-    bgLight: 'bg-blue-100',
-    text: 'text-blue-500',
-    textDark: 'text-blue-400',
-    border: 'border-blue-500',
-    ring: 'ring-blue-500',
+    hex: '#3b82f6',
+    bg: 'bg-info',
+    bgLight: 'bg-info/10',
+    text: 'text-info',
+    textDark: 'text-info',
+    border: 'border-info',
+    ring: 'ring-info',
   },
   active: {
     name: 'Active',
-    hex: '#22c55e',        // Green
-    bg: 'bg-green-500',
-    bgLight: 'bg-green-100',
-    text: 'text-green-500',
-    textDark: 'text-green-400',
-    border: 'border-green-500',
-    ring: 'ring-green-500',
+    hex: '#22c55e',
+    bg: 'bg-success',
+    bgLight: 'bg-success/10',
+    text: 'text-success',
+    textDark: 'text-success',
+    border: 'border-success',
+    ring: 'ring-success',
   },
   underContract: {
     name: 'Under Contract',
-    hex: '#EF4923',        // Spyglass Red-Orange (Brand Color)
-    bg: 'bg-[#EF4923]',
-    bgLight: 'bg-[#FEF2EF]',
-    text: 'text-[#EF4923]',
-    textDark: 'text-[#F97B5C]',
-    border: 'border-[#EF4923]',
-    ring: 'ring-[#EF4923]',
+    hex: '#EF4923',
+    bg: 'bg-primary',
+    bgLight: 'bg-spyglass-orange-light',
+    text: 'text-primary',
+    textDark: 'text-primary',
+    border: 'border-primary',
+    ring: 'ring-primary',
   },
   closed: {
     name: 'Closed',
-    hex: '#ef4444',        // Red
-    bg: 'bg-red-500',
-    bgLight: 'bg-red-100',
-    text: 'text-red-500',
-    textDark: 'text-red-400',
-    border: 'border-red-500',
-    ring: 'ring-red-500',
+    hex: '#ef4444',
+    bg: 'bg-destructive',
+    bgLight: 'bg-destructive/10',
+    text: 'text-destructive',
+    textDark: 'text-destructive',
+    border: 'border-destructive',
+    ring: 'ring-destructive',
   },
   pending: {
     name: 'Pending',
-    hex: '#6b7280',        // Gray
-    bg: 'bg-gray-500',
-    bgLight: 'bg-gray-100',
-    text: 'text-gray-500',
-    textDark: 'text-gray-400',
-    border: 'border-gray-500',
-    ring: 'ring-gray-500',
+    hex: '#6b7280',
+    bg: 'bg-muted-foreground',
+    bgLight: 'bg-muted',
+    text: 'text-muted-foreground',
+    textDark: 'text-muted-foreground',
+    border: 'border-muted-foreground',
+    ring: 'ring-muted-foreground',
   },
 } as const;
 
@@ -84,7 +84,7 @@ export function getStatusFromMLS(mlsStatus: string, isSubject: boolean = false):
     case 'pending':
       return 'pending';
     default:
-      return 'active'; // Default fallback
+      return 'active';
   }
 }
 
@@ -108,7 +108,7 @@ export function getStatusHexFromMLS(mlsStatus: string, isSubject: boolean = fals
  */
 export function getStatusBadgeClasses(status: StatusKey): string {
   const colors = STATUS_COLORS[status];
-  return `${colors.bgLight} ${colors.text} dark:bg-opacity-20 dark:${colors.textDark}`;
+  return `${colors.bgLight} ${colors.text}`;
 }
 
 /**

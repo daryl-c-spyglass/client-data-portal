@@ -586,7 +586,7 @@ export function SearchCriteriaForm({ onSearch, initialCriteria = {} }: SearchCri
         <Button 
           type="submit" 
           variant="outline"
-          className="border-[#EF4923] text-[#EF4923] bg-white hover:bg-[#FEF2EF] dark:bg-background dark:hover:bg-[#EF4923]/10"
+          className="border-primary text-primary bg-white hover:bg-spyglass-orange-light dark:bg-background dark:hover:bg-primary/10"
           data-testid="button-search"
         >
           <Search className="w-4 h-4 mr-2" />

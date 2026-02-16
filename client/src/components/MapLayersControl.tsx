@@ -560,7 +560,7 @@ export function MapLayersControl({ position = "topright" }: MapLayersControlProp
           <span className="font-medium text-sm text-gray-700 dark:text-gray-300">Layers</span>
           {enabledCount > 0 && (
             <span 
-              className="flex items-center justify-center h-5 min-w-[20px] px-1.5 text-xs font-medium bg-[#EF4923] text-white rounded-full"
+              className="flex items-center justify-center h-5 min-w-[20px] px-1.5 text-xs font-medium bg-primary text-primary-foreground rounded-full"
               data-testid="badge-layers-count"
             >
               {enabledCount}

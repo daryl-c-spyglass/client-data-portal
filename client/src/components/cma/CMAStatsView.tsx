@@ -19,6 +19,7 @@ import {
   SUBJECT_COLOR,
 } from '@/lib/cma-data-utils';
 import { STATUS_COLORS } from '@/lib/statusColors';
+import { BRAND_COLORS } from '@/lib/designTokens';
 
 interface CMAStatsViewProps {
   properties: any[];
@@ -187,7 +188,7 @@ function PriceComparisonChart({ properties, subjectProperty, onPropertyClick }: 
                       <p className="font-medium text-gray-900 dark:text-white">
                         {data.fullAddress}
                       </p>
-                      <p className="text-[#EF4923] font-semibold">
+                      <p className="text-primary font-semibold">
                         Price: ${data.price.toLocaleString()}
                       </p>
                     </div>
@@ -198,7 +199,7 @@ function PriceComparisonChart({ properties, subjectProperty, onPropertyClick }: 
                 {chartData.map((entry, index) => (
                   <Cell 
                     key={index} 
-                    fill={entry.isSubject ? SUBJECT_COLOR : '#EF4923'} 
+                    fill={entry.isSubject ? SUBJECT_COLOR : BRAND_COLORS.primary} 
                   />
                 ))}
               </Bar>
@@ -211,7 +212,7 @@ function PriceComparisonChart({ properties, subjectProperty, onPropertyClick }: 
             <span className="text-sm text-muted-foreground">Subject Property</span>
           </div>
           <div className="flex items-center gap-2">
-            <div className="w-3 h-3 rounded" style={{ backgroundColor: '#EF4923' }} />
+            <div className="w-3 h-3 rounded" style={{ backgroundColor: BRAND_COLORS.primary }} />
             <span className="text-sm text-muted-foreground">Comparables</span>
           </div>
         </div>
@@ -267,9 +268,9 @@ function CMAMarketReviewSection({
             <h4 className="font-semibold text-sm text-muted-foreground mb-1">Market Overview</h4>
             <p className="text-sm">
               Based on {properties.length} comparable properties, the average price is{' '}
-              <span className="font-semibold text-[#EF4923]">{formatPrice(stats.price.average)}</span>{' '}
+              <span className="font-semibold text-primary">{formatPrice(stats.price.average)}</span>{' '}
               with a median of{' '}
-              <span className="font-semibold text-[#EF4923]">{formatPrice(stats.price.median)}</span>.
+              <span className="font-semibold text-primary">{formatPrice(stats.price.median)}</span>.
               Prices range from {formatPrice(priceRange.min)} to {formatPrice(priceRange.max)}.
             </p>
           </div>
@@ -278,7 +279,7 @@ function CMAMarketReviewSection({
             <h4 className="font-semibold text-sm text-muted-foreground mb-1">Price Per Square Foot</h4>
             <p className="text-sm">
               Average price per square foot is{' '}
-              <span className="font-semibold text-[#EF4923]">${Math.round(stats.pricePerSqFt.average)}</span>{' '}
+              <span className="font-semibold text-primary">${Math.round(stats.pricePerSqFt.average)}</span>{' '}
               across comparable properties. This ranges from ${pricePerSqftRange.min} to ${pricePerSqftRange.max}/sqft.
             </p>
           </div>
@@ -383,7 +384,7 @@ function DaysOnMarketSection({ closedProperties, onPropertyClick }: { closedProp
             <span className="text-sm font-normal text-muted-foreground ml-2">DAYS ON MARKET</span>
           </div>
           <div>
-            <span className="text-3xl font-bold text-[#EF4923]">{avgListPricePercent.toFixed(2)}%</span>
+            <span className="text-3xl font-bold text-primary">{avgListPricePercent.toFixed(2)}%</span>
             <span className="text-sm font-normal text-muted-foreground ml-2">OF LIST PRICE</span>
           </div>
         </div>
@@ -591,7 +592,7 @@ function AveragePricePerSqftSection({
                   <p className="text-xs text-blue-500">
                     Subject: {getPropertyAddress(subjectProperty)}
                   </p>
-                  <p className="font-semibold text-[#EF4923]">
+                  <p className="font-semibold text-primary">
                     ${subjectPricePerSqft} / sq. ft.
                   </p>
                 </div>
@@ -625,7 +626,7 @@ function AveragePricePerSqftSection({
                       <p className="font-medium text-sm truncate">
                         {getPropertyAddress(property)}
                       </p>
-                      <p className="font-semibold text-[#EF4923]">
+                      <p className="font-semibold text-primary">
                         ${pricePerSqft} / sq. ft.
                       </p>
                     </div>
@@ -637,11 +638,11 @@ function AveragePricePerSqftSection({
 
           <div className="flex-1">
             <div className="mb-4">
-              <span className="text-4xl font-bold text-[#EF4923]">${avgPricePerSqft}</span>
+              <span className="text-4xl font-bold text-primary">${avgPricePerSqft}</span>
               <span className="text-xl text-muted-foreground ml-1">/ Sq. Ft.</span>
               <p className="text-sm text-muted-foreground mt-2">
                 Comparable homes sold for an average of{' '}
-                <span className="font-semibold text-[#EF4923]">${avgPricePerSqft}</span>/sq. ft. 
+                <span className="font-semibold text-primary">${avgPricePerSqft}</span>/sq. ft. 
                 Many factors such as location, use of space, condition, quality, and amenities 
                 determine the market value per square foot.
               </p>

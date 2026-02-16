@@ -237,7 +237,7 @@ export function NeighborhoodReview({ neighborhoodName, city, months = 6 }: Neigh
               <span>Active ({listings.active.length})</span>
             </div>
             <div className="flex items-center gap-1">
-              <div className="w-3 h-3 rounded-full bg-[#EF4923]"></div>
+              <div className="w-3 h-3 rounded-full bg-primary"></div>
               <span>Pending ({listings.underContract.length})</span>
             </div>
             <div className="flex items-center gap-1">
