@@ -1,0 +1,86 @@
+## INQUIRY ONLY — Saved Search & New Listing Alerts Infrastructure
+
+⚠️ THIS IS AN INQUIRY ONLY — DO NOT MAKE ANY CHANGES
+
+We're scoping a feature where:
+1. Agent saves a search with specific criteria
+2. Search is linked to a client
+3. System automatically emails the client when new listings match the saved criteria
+
+Before designing this feature, I need to understand what currently exists.
+
+---
+
+### Question 1: Current Search Functionality
+
+Please show me the current Buyer Search implementation:
+- Where is the search criteria defined? (types/interfaces)
+- What fields can agents search by? (price, beds, baths, location, etc.)
+- Is there already a "Save Search" button or concept?
+
+**Check files:**
+- `client/src/pages/BuyerSearch.tsx` or similar
+- `shared/schema.ts` — any saved search tables?
+- `server/routes.ts` — any `/api/saved-searches` endpoints?
+
+---
+
+### Question 2: Client Management
+
+How are clients currently stored and linked to agents?
+- Is there a `clients` table in the database schema?
+- How is client email stored?
+- Is there a relationship between agents and their clients?
+
+**Check files:**
+- `shared/schema.ts` — clients table definition
+- `server/storage.ts` — client CRUD operations
+- Follow Up Boss integration — do we pull clients from there?
+
+---
+
+### Question 3: Email Infrastructure
+
+What email sending capability exists?
+- Is there an email service configured (SendGrid, Resend, etc.)?
+- Are there existing email templates?
+- Is there a `/api/email` or notification system?
+
+**Check files:**
+- `server/email.ts` or similar
+- `.env` or secrets — any email API keys?
+- `package.json` — email-related dependencies?
+
+---
+
+### Question 4: Scheduled Jobs / Cron
+
+What automation infrastructure exists?
+- Are there cron jobs set up (Vercel crons, node-cron)?
+- What does the existing `/api/cron/mls-sync` do?
+- How often is new listing data pulled from Repliers?
+
+**Check files:**
+- `vercel.json` — crons section
+- `server/cron/` or similar directory
+- Any scheduler implementations
+
+---
+
+### Question 5: New Listing Detection
+
+How would we know when a "new" listing hits the market?
+- Is there a `createdAt` or `listDate` field from Repliers?
+- Do we store listings locally or always fetch from API?
+- Is there a way to compare "yesterday's listings" vs "today's listings"?
+
+---
+
+### Please provide:
+
+1. **Code snippets** showing existing relevant implementations
+2. **Database schema** for any related tables (clients, saved searches if exists)
+3. **Gaps identified** — what's missing that would need to be built
+4. **Existing patterns** we should follow for consistency
+
+⚠️ REMINDER: Inquiry only — do not create files or make changes. Just report findings.
