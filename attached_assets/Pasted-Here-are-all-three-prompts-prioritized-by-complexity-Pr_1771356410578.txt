@@ -1,0 +1,421 @@
+Here are all three prompts, prioritized by complexity:
+
+---
+
+## Prompt 1: URL Cleanup (LOW effort — 1-2 hours)
+
+```
+## URL Path Cleanup — Fix Inconsistencies
+
+### Task 1: Remove/Secure Debug Endpoints
+
+These endpoints should be removed from production or protected with admin auth:
+
+**Files to update:** `server/routes.ts`
+
+| Endpoint | Action |
+|----------|--------|
+| `/api/properties/inventory/debug` | Remove or add admin auth check |
+| `/api/mlsgrid/test` | Remove or add admin auth check |
+| `/api/repliers/test` | Remove or add admin auth check |
+| `/api/rezen/mock/production` | Remove or add admin auth check |
+| `/api/debug/listings/*` | Remove or add admin auth check |
+
+**Option A (Remove):**
+Delete the route handlers entirely if not needed.
+
+**Option B (Secure):**
+Wrap with admin check:
+```typescript
+app.get("/api/debug/listings/*", requireAuth, requireAdmin, async (req, res) => {
+  // existing handler
+});
+```
+
+---
+
+### Task 2: Fix Singular/Plural Inconsistencies
+
+| Current | Change To | Files Affected |
+|---------|-----------|----------------|
+| `/api/cma/draft` | `/api/cmas/draft` | server/routes.ts, any frontend calls |
+| `/api/cma/report-sections` | `/api/cmas/report-sections` | server/routes.ts, any frontend calls |
+| `/api/agent/profile` | `/api/agents/me/profile` OR keep as-is | Optional — self-referencing is acceptable |
+
+**For each change:**
+1. Update route definition in `server/routes.ts`
+2. Search frontend for API calls to old path
+3. Update frontend calls to new path
+4. Test the endpoint works
+
+---
+
+### Task 3: Fix Non-RESTful Nesting (Optional)
+
+| Current | Better Structure | 
+|---------|------------------|
+| `/api/media/property/:listingId` | `/api/properties/:listingId/media` |
+
+This is optional — only do if it doesn't break existing integrations.
+
+---
+
+### Validation
+
+After changes:
+1. Run `npm run build` — no errors
+2. Test affected endpoints in browser/Postman
+3. Verify frontend pages still load data correctly
+
+### DO NOT CHANGE (Acceptable patterns)
+
+These verb-in-path routes are acceptable for action endpoints:
+- `/api/seller-updates/:id/send-test` — POST action
+- `/api/seller-updates/:id/toggle-active` — POST action  
+- `/api/lead-gate/track-view` — POST action
+- `/api/ai/generate-cover-letter` — POST action
+- `/api/cmas/:id/email-share` — POST action
+```
+
+---
+
+## Prompt 2: Saved Search & New Listing Alerts (MEDIUM effort — 3-5 days)
+
+```
+## Saved Search & New Listing Alerts — Phase 1 Implementation
+
+⚠️ Note: Some decisions pending client input. Implement with defaults noted below.
+
+---
+
+### Task 1: Extend savedSearches Schema
+
+**File:** `shared/schema.ts`
+
+Add these fields to the `savedSearches` table:
+
+```typescript
+export const savedSearches = pgTable("saved_searches", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull(), // Make required — the agent who created it
+  name: text("name").notNull(),
+  criteria: json("criteria").notNull(),
+  
+  // NEW FIELDS
+  clientName: text("client_name"),
+  clientEmail: text("client_email"),
+  emailFrequency: text("email_frequency").default("daily"), // "daily" | "weekly" | "none"
+  isActive: boolean("is_active").default(true),
+  lastSentAt: timestamp("last_sent_at"),
+  nextSendAt: timestamp("next_send_at"),
+  lastListingIds: json("last_listing_ids").default([]), // Track seen listings for diff
+  
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+```
+
+Run migration after schema update.
+
+---
+
+### Task 2: Enable Save Search Button & Add Modal
+
+**File:** `client/src/pages/BuyerSearch.tsx`
+
+1. Remove `disabled` from the Save Search button (around line 1216)
+
+2. Create save search modal with fields:
+   - Search Name (required)
+   - Client Name (optional)
+   - Client Email (optional — required if alerts enabled)
+   - Enable Alerts toggle
+   - Frequency dropdown (Daily / Weekly) — show only if alerts enabled
+
+3. On save, POST to `/api/searches` with full payload
+
+**Modal component:** Create `client/src/components/SaveSearchModal.tsx`
+
+```typescript
+interface SaveSearchFormData {
+  name: string;
+  clientName?: string;
+  clientEmail?: string;
+  enableAlerts: boolean;
+  emailFrequency: "daily" | "weekly";
+}
+```
+
+---
+
+### Task 3: Update API Endpoints
+
+**File:** `server/routes.ts`
+
+Update POST `/api/searches`:
+- Accept new fields (clientName, clientEmail, emailFrequency, isActive)
+- Calculate `nextSendAt` based on frequency
+- Validate email format if alerts enabled
+
+Add new endpoints:
+```typescript
+// Toggle alert active status
+PATCH /api/searches/:id/alerts
+Body: { isActive: boolean }
+
+// Get saved searches for current user
+GET /api/searches/my
+Returns: searches where userId = current user
+
+// Manual trigger for testing
+POST /api/searches/:id/send-alert (admin only)
+```
+
+---
+
+### Task 4: Create Alert Email Template
+
+**File:** `server/email-templates/new-listing-alert.ts`
+
+Create template similar to seller update email:
+- Spyglass branding
+- "X new listings match your saved search: [Search Name]"
+- Property cards with photo, price, beds/baths, address
+- "View All Matches" button linking to buyer search with criteria
+- Agent contact info in footer
+
+---
+
+### Task 5: Create Alert Scheduler
+
+**File:** `server/saved-search-scheduler.ts`
+
+Follow the pattern from `seller-update-scheduler.ts`:
+
+```typescript
+import cron from "node-cron";
+
+// Run daily at 8 AM Central (before seller updates at 9 AM)
+cron.schedule("0 8 * * *", async () => {
+  await processDueSavedSearchAlerts();
+});
+
+async function processDueSavedSearchAlerts() {
+  // 1. Get saved searches where isActive = true AND nextSendAt <= now
+  // 2. For each search:
+  //    a. Query Repliers with saved criteria
+  //    b. Filter to listings NOT in lastListingIds (new only)
+  //    c. If new listings found, send email
+  //    d. Update lastListingIds, lastSentAt, nextSendAt
+  // 3. Log results
+}
+```
+
+---
+
+### Task 6: Add "My Saved Searches" UI
+
+**File:** Create `client/src/pages/SavedSearches.tsx`
+
+- List all saved searches for current user
+- Show: name, client, frequency, last sent, active status
+- Actions: Edit, Delete, Toggle Active, Send Now (test)
+- Add to sidebar navigation under "Buyer Search"
+
+---
+
+### Defaults (Pending Client Decisions)
+
+| Setting | Default | Can Change Later |
+|---------|---------|------------------|
+| Frequency options | Daily, Weekly | Yes |
+| Agent CC'd | No | Yes — add ccAgent field |
+| Unsubscribe link | No | Yes — add token-based unsubscribe |
+| Multiple searches per client | Yes | N/A |
+
+---
+
+### Validation
+
+1. Save a search with alerts enabled
+2. Verify email sends (use send-test endpoint)
+3. Verify scheduler runs and detects new listings
+4. Verify listing diff works (doesn't re-send same listings)
+```
+
+---
+
+## Prompt 3: AI Assistant Enhancements (MEDIUM effort — 2-3 days)
+
+```
+## AI Assistant Enhancements — Expand Capabilities
+
+### Current State (from inquiry)
+- GPT-4o model
+- ChatAssistant.tsx floating bubble (lower left)
+- 5 endpoints: /api/chat, /api/chat/status, /api/ai/generate-cover-letter, /api/ai/generate-default-cover-letter, /api/cma/draft
+- Basic chat + CMA cover letter generation
+
+---
+
+### Task 1: Add Context-Aware Assistance
+
+**File:** `client/src/components/ChatAssistant.tsx`
+
+Pass current page context to the AI:
+
+```typescript
+interface ChatContext {
+  currentPage: string; // "dashboard" | "cma" | "buyer-search" | "properties" | etc.
+  cmaId?: string;
+  propertyId?: string;
+  searchCriteria?: SearchFilters;
+  selectedProperties?: Property[];
+}
+```
+
+Update the chat API call to include context, so AI can give relevant suggestions.
+
+---
+
+### Task 2: Add Quick Action Buttons
+
+Below the chat input, add contextual quick actions based on current page:
+
+**Dashboard:**
+- "Summarize my activity today"
+- "What CMAs need attention?"
+
+**CMA Page:**
+- "Generate cover letter"
+- "Suggest comparable adjustments"
+- "Explain market trends for this area"
+
+**Buyer Search:**
+- "Summarize these search results"
+- "What's the average price in this area?"
+- "Compare these properties"
+
+**Property Detail:**
+- "Analyze this property"
+- "What's the estimated value?"
+- "Find similar properties"
+
+---
+
+### Task 3: Add New AI Endpoints
+
+**File:** `server/routes.ts`
+
+```typescript
+// Property Analysis
+POST /api/ai/analyze-property
+Body: { propertyId: string }
+Returns: AI analysis of property (value estimate, pros/cons, market position)
+
+// Market Summary
+POST /api/ai/market-summary
+Body: { criteria: SearchFilters }
+Returns: AI summary of market conditions for given criteria
+
+// CMA Narrative
+POST /api/ai/cma-narrative
+Body: { cmaId: string }
+Returns: AI-generated market analysis narrative for CMA report
+
+// Compare Properties
+POST /api/ai/compare-properties
+Body: { propertyIds: string[] }
+Returns: AI comparison of selected properties
+
+// Search Suggestions
+POST /api/ai/search-suggestions
+Body: { clientNeeds: string }
+Returns: Suggested search criteria based on natural language input
+```
+
+---
+
+### Task 4: Update System Prompt
+
+**File:** `server/openai.ts` or wherever system prompt is defined
+
+Enhance system prompt with:
+
+```typescript
+const systemPrompt = `You are an AI assistant for Spyglass Realty's Mission Control platform.
+
+You help real estate agents with:
+- Analyzing properties and market conditions
+- Creating CMAs (Comparative Market Analysis)
+- Understanding MLS data and trends
+- Writing client communications
+- Interpreting search results
+
+You have access to:
+- Austin/Central Texas MLS data (ACTRIS)
+- Property details, photos, and history
+- Market statistics and trends
+- CMA reports and comparables
+
+Always be helpful, accurate, and professional. When discussing property values or market predictions, note these are estimates and recommend professional appraisal for official valuations.
+
+Current context: {context}
+`;
+```
+
+---
+
+### Task 5: Add Chat History Persistence (Optional)
+
+**Schema addition:**
+```typescript
+export const chatHistory = pgTable("chat_history", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull(),
+  messages: json("messages").notNull(), // Array of { role, content }
+  context: json("context"), // Page context when chat started
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+```
+
+This allows users to continue previous conversations.
+
+---
+
+### Task 6: UI Improvements
+
+**File:** `client/src/components/ChatAssistant.tsx`
+
+- Add minimize/expand toggle
+- Add "New Chat" button
+- Show typing indicator while AI responds
+- Add copy button for AI responses
+- Add thumbs up/down feedback buttons
+- Improve mobile responsiveness
+
+---
+
+### Validation
+
+1. Open AI Assistant on different pages — verify context changes
+2. Test quick action buttons trigger correct prompts
+3. Test new endpoints return useful responses
+4. Verify chat history persists (if implemented)
+5. Test on mobile — verify usable
+```
+
+---
+
+## Priority Order
+
+| # | Prompt | Effort | Impact | Recommendation |
+|---|--------|--------|--------|----------------|
+| 1 | URL Cleanup | Low (1-2 hrs) | Low | Do first — quick win |
+| 2 | AI Assistant | Medium (2-3 days) | Medium | Do second — enhances existing feature |
+| 3 | Saved Search Alerts | Medium (3-5 days) | High | Do third — new feature, needs Ryan's input |
+
+---
+
+Want me to send any of these to Replit now, or wait until you're ready to start each one?

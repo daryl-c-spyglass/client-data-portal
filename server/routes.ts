@@ -1943,8 +1943,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Debug endpoint for inventory data validation (development only)
-  app.get("/api/properties/inventory/debug", async (req, res) => {
+  // Debug endpoint for inventory data validation (admin only)
+  app.get("/api/properties/inventory/debug", requireAuth, requireMinimumRole("admin"), async (req, res) => {
     try {
       const debugData = await getInventoryDebugData();
       res.json(debugData);
@@ -2235,7 +2235,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/media/property/:listingId", async (req, res) => {
+  app.get("/api/properties/:listingId/media", async (req, res) => {
     try {
       const media = await storage.getMediaByResourceKey(req.params.listingId);
       res.json(media);
@@ -2312,6 +2312,76 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(cmas);
     } catch (error) {
       res.status(500).json({ error: "Failed to fetch CMAs" });
+    }
+  });
+
+  // Get CMA report sections (available sections for presentation builder)
+  app.get("/api/cmas/report-sections", async (req, res) => {
+    try {
+      const { CMA_REPORT_SECTIONS } = await import("@shared/schema");
+      res.json(CMA_REPORT_SECTIONS);
+    } catch (error: any) {
+      console.error("[Report Sections] Error:", error.message);
+      res.status(500).json({ error: "Failed to fetch report sections" });
+    }
+  });
+
+  // CMA Draft endpoint - creates a draft CMA from AI-collected criteria
+  app.post("/api/cmas/draft", async (req, res) => {
+    try {
+      const { area, sqftMin, sqftMax, yearBuiltMin, yearBuiltMax, stories } = req.body;
+
+      if (!area || typeof area !== "string" || area.trim().length === 0) {
+        res.status(400).json({ error: "Area is required (neighborhood, zip code, or subdivision)" });
+        return;
+      }
+
+      if (sqftMin !== undefined && sqftMax !== undefined && sqftMin > sqftMax) {
+        res.status(400).json({ error: "Minimum square footage cannot be greater than maximum" });
+        return;
+      }
+      if (yearBuiltMin !== undefined && yearBuiltMax !== undefined && yearBuiltMin > yearBuiltMax) {
+        res.status(400).json({ error: "Minimum year built cannot be greater than maximum" });
+        return;
+      }
+
+      if (stories !== undefined && stories !== "any" && ![1, 2, 3].includes(stories)) {
+        res.status(400).json({ error: "Stories must be 1, 2, 3, or 'any'" });
+        return;
+      }
+
+      const searchCriteria = {
+        area: area.trim(),
+        sqftMin: sqftMin || null,
+        sqftMax: sqftMax || null,
+        yearBuiltMin: yearBuiltMin || null,
+        yearBuiltMax: yearBuiltMax || null,
+        stories: stories || null,
+        createdVia: "ai_assistant",
+      };
+
+      const user = req.user as any;
+      const userId = user?.id || null;
+
+      const draftName = `CMA Draft - ${area.trim()}`;
+      const cmaData = {
+        name: draftName,
+        userId,
+        comparablePropertyIds: [],
+        searchCriteria,
+        notes: "Draft created via AI Assistant. Add subject property and comparables to complete.",
+      };
+
+      const cma = await storage.createCma(cmaData);
+      
+      res.status(201).json({
+        draftId: cma.id,
+        url: `/cma/${cma.id}`,
+        message: `CMA draft created for ${area.trim()}`,
+      });
+    } catch (error: any) {
+      console.error("[CMA Draft] Error:", error.message);
+      res.status(500).json({ error: "Failed to create CMA draft" });
     }
   });
 
@@ -3292,8 +3362,8 @@ This email was sent by ${senderName} (${senderEmail}) via the Spyglass Realty Cl
     }
   });
 
-  // MLS Grid diagnostic endpoint - test API connection (no auth required for diagnostics)
-  app.get("/api/mlsgrid/test", async (req, res) => {
+  // MLS Grid diagnostic endpoint - test API connection (admin only)
+  app.get("/api/mlsgrid/test", requireAuth, requireMinimumRole("admin"), async (req, res) => {
     try {
       if (!mlsGridClient) {
         res.status(503).json({ 
@@ -3339,8 +3409,8 @@ This email was sent by ${senderName} (${senderEmail}) via the Spyglass Realty Cl
     }
   });
 
-  // Repliers API diagnostic endpoint - test connection and capabilities
-  app.get("/api/repliers/test", async (req, res) => {
+  // Repliers API diagnostic endpoint - test connection and capabilities (admin only)
+  app.get("/api/repliers/test", requireAuth, requireMinimumRole("admin"), async (req, res) => {
     try {
       if (!repliersClient) {
         res.status(503).json({ 
@@ -5911,7 +5981,7 @@ OUTPUT JSON:
   // ============================================================
   // GET /api/rezen/mock/production?agentId=agent_ryan_001&startDate=2025-11-18&endDate=2025-12-18
   // Returns sample ReZen data for testing the Reports/Mission Control UI
-  app.get("/api/rezen/mock/production", async (req, res) => {
+  app.get("/api/rezen/mock/production", requireAuth, requireMinimumRole("admin"), async (req, res) => {
     try {
       const { agentId, startDate, endDate } = req.query as Record<string, string>;
       
@@ -7091,77 +7161,13 @@ OUTPUT JSON:
     }
   });
 
-  // CMA Draft endpoint - creates a draft CMA from AI-collected criteria
-  app.post("/api/cma/draft", async (req, res) => {
-    try {
-      const { area, sqftMin, sqftMax, yearBuiltMin, yearBuiltMax, stories } = req.body;
-
-      // Validate required field
-      if (!area || typeof area !== "string" || area.trim().length === 0) {
-        res.status(400).json({ error: "Area is required (neighborhood, zip code, or subdivision)" });
-        return;
-      }
-
-      // Validate numeric ranges
-      if (sqftMin !== undefined && sqftMax !== undefined && sqftMin > sqftMax) {
-        res.status(400).json({ error: "Minimum square footage cannot be greater than maximum" });
-        return;
-      }
-      if (yearBuiltMin !== undefined && yearBuiltMax !== undefined && yearBuiltMin > yearBuiltMax) {
-        res.status(400).json({ error: "Minimum year built cannot be greater than maximum" });
-        return;
-      }
-
-      // Validate stories
-      if (stories !== undefined && stories !== "any" && ![1, 2, 3].includes(stories)) {
-        res.status(400).json({ error: "Stories must be 1, 2, 3, or 'any'" });
-        return;
-      }
-
-      // Build search criteria object
-      const searchCriteria = {
-        area: area.trim(),
-        sqftMin: sqftMin || null,
-        sqftMax: sqftMax || null,
-        yearBuiltMin: yearBuiltMin || null,
-        yearBuiltMax: yearBuiltMax || null,
-        stories: stories || null,
-        createdVia: "ai_assistant",
-      };
-
-      // Get user ID if authenticated
-      const user = req.user as any;
-      const userId = user?.id || null;
-
-      // Create draft CMA record
-      const draftName = `CMA Draft - ${area.trim()}`;
-      const cmaData = {
-        name: draftName,
-        userId,
-        comparablePropertyIds: [],
-        searchCriteria,
-        notes: "Draft created via AI Assistant. Add subject property and comparables to complete.",
-      };
-
-      const cma = await storage.createCma(cmaData);
-      
-      res.status(201).json({
-        draftId: cma.id,
-        url: `/cma/${cma.id}`,
-        message: `CMA draft created for ${area.trim()}`,
-      });
-    } catch (error: any) {
-      console.error("[CMA Draft] Error:", error.message);
-      res.status(500).json({ error: "Failed to create CMA draft" });
-    }
-  });
 
   // ========================================
   // DEBUG ENDPOINTS - Canonical Data Layer
   // ========================================
   
-  // Debug: Get sample listings from Repliers with raw fields
-  app.get("/api/debug/listings/sample", async (req, res) => {
+  // Debug: Get sample listings from Repliers with raw fields (admin only)
+  app.get("/api/debug/listings/sample", requireAuth, requireMinimumRole("admin"), async (req, res) => {
     try {
       const { CanonicalListingService } = await import("./data/listings");
       const count = parseInt(req.query.count as string) || 25;
@@ -7190,8 +7196,8 @@ OUTPUT JSON:
     }
   });
   
-  // Debug: Get dedupe report showing potential duplicates
-  app.get("/api/debug/listings/dedupe-report", async (req, res) => {
+  // Debug: Get dedupe report showing potential duplicates (admin only)
+  app.get("/api/debug/listings/dedupe-report", requireAuth, requireMinimumRole("admin"), async (req, res) => {
     try {
       const { CanonicalListingService } = await import("./data/listings");
       const sampleSize = parseInt(req.query.size as string) || 100;
@@ -7217,8 +7223,8 @@ OUTPUT JSON:
     }
   });
   
-  // Debug: Fetch canonical listings with filters
-  app.get("/api/debug/listings/canonical", async (req, res) => {
+  // Debug: Fetch canonical listings with filters (admin only)
+  app.get("/api/debug/listings/canonical", requireAuth, requireMinimumRole("admin"), async (req, res) => {
     try {
       const { CanonicalListingService } = await import("./data/listings");
       
@@ -8062,17 +8068,6 @@ OUTPUT JSON:
     } catch (error: any) {
       console.error("[CMA Brochure] Error fetching:", error.message);
       res.status(500).json({ error: "Failed to fetch brochure" });
-    }
-  });
-
-  // Get CMA report sections (available sections for presentation builder)
-  app.get("/api/cma/report-sections", async (req, res) => {
-    try {
-      const { CMA_REPORT_SECTIONS } = await import("@shared/schema");
-      res.json(CMA_REPORT_SECTIONS);
-    } catch (error: any) {
-      console.error("[Report Sections] Error:", error.message);
-      res.status(500).json({ error: "Failed to fetch report sections" });
     }
   });
 

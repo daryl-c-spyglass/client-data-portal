@@ -257,7 +257,7 @@ export function ChatAssistant({ propertyContext }: ChatAssistantProps) {
 
   const createCmaDraftMutation = useMutation({
     mutationFn: async (criteria: CmaCriteria) => {
-      const response = await apiRequest("/api/cma/draft", "POST", criteria);
+      const response = await apiRequest("/api/cmas/draft", "POST", criteria);
       
       if (!response.ok) {
         const error = await response.json();
