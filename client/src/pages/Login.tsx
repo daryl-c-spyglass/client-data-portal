@@ -85,7 +85,7 @@ export default function Login() {
           </div>
           <CardTitle className="text-2xl font-bold">Spyglass Realty</CardTitle>
           <CardDescription>
-            MLS Grid IDX Platform
+            Client Data Portal
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">

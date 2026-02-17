@@ -6,7 +6,7 @@ import type { SellerUpdate } from "@shared/schema";
 // SendGrid configuration (optional - if not configured, emails will be logged instead)
 const SENDGRID_API_KEY = process.env.SENDGRID_API_KEY;
 const FROM_EMAIL = process.env.FROM_EMAIL || "updates@mlsgrid-idx.com";
-const FROM_NAME = process.env.FROM_NAME || "MLS Grid IDX Platform";
+const FROM_NAME = process.env.FROM_NAME || "Spyglass Realty";
 
 interface EmailSendResult {
   success: boolean;

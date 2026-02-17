@@ -171,7 +171,7 @@ export default function App() {
                               <SidebarTrigger data-testid="button-sidebar-toggle" />
                               <div className="flex items-center gap-4">
                                 <div className="text-sm text-muted-foreground hidden sm:block">
-                                  MLS Grid IDX Platform
+                                  Mission Control | Client Data Portal
                                 </div>
                                 <UserRoleBadge className="hidden md:flex" />
                                 <ThemeToggle />

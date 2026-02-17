@@ -2511,7 +2511,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           <a href="${shareUrl}" style="display: inline-block; background-color: #F37216; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold;">View Full CMA Report</a>
           
           <p style="margin-top: 30px; font-size: 12px; color: #666;">
-            This email was sent by ${senderName} (${senderEmail}) via the MLS Grid IDX Platform.
+            This email was sent by ${senderName} (${senderEmail}) via the Spyglass Realty Client Data Portal.
           </p>
         </div>
       `;
@@ -2531,13 +2531,13 @@ ${avgPrice > 0 ? `Average Price: $${Math.round(avgPrice).toLocaleString()}` : ''
 
 View the full report: ${shareUrl}
 
-This email was sent by ${senderName} (${senderEmail}) via the MLS Grid IDX Platform.
+This email was sent by ${senderName} (${senderEmail}) via the Spyglass Realty Client Data Portal.
       `;
 
       // Send via SendGrid if configured, otherwise log
       const SENDGRID_API_KEY = process.env.SENDGRID_API_KEY;
-      const FROM_EMAIL = process.env.FROM_EMAIL || "updates@mlsgrid-idx.com";
-      const FROM_NAME = process.env.FROM_NAME || "MLS Grid IDX Platform";
+      const FROM_EMAIL = process.env.FROM_EMAIL || "updates@spyglassrealty.com";
+      const FROM_NAME = process.env.FROM_NAME || "Spyglass Realty";
 
       if (SENDGRID_API_KEY) {
         const response = await fetch('https://api.sendgrid.com/v3/mail/send', {
@@ -3518,7 +3518,7 @@ This email was sent by ${senderName} (${senderEmail}) via the MLS Grid IDX Platf
         properties,
         total: result['@odata.count'] || properties.length,
         hasMore: properties.length === params.limit,
-        source: 'MLS Grid IDX',
+        source: 'MLS Grid',
       });
     } catch (error: any) {
       console.error('[MLS Grid Search] Error:', error.message);

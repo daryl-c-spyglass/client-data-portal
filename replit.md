@@ -1,7 +1,7 @@
-# MLS Grid IDX/CMA Platform
+# Mission Control | Client Data Portal
 
 ## Overview
-This project is a professional real estate IDX (Internet Data Exchange) platform integrated with the MLS Grid API. Its primary purpose is to empower real estate agents with tools for property searching, generating Comparative Market Analyses (CMAs), and sharing market insights with clients. The platform aims to combine comprehensive property browsing with robust, productivity-focused workflow features to streamline real estate operations, aspiring to be a leading tool in the real estate market.
+This project is Spyglass Realty's centralized Client Data Portal — a professional real estate IDX (Internet Data Exchange) platform integrated with the MLS Grid API. Its primary purpose is to empower real estate agents with tools for property searching, generating Comparative Market Analyses (CMAs), and sharing market insights with clients. The platform aims to combine comprehensive property browsing with robust, productivity-focused workflow features to streamline real estate operations, aspiring to be a leading tool in the real estate market.
 
 ## User Preferences
 Preferred communication style: Simple, everyday language.
