@@ -1,0 +1,739 @@
+Here are the Replit prompts organized by priority:
+
+---
+
+## Prompt 1: Repository Documentation (HIGH Priority)
+
+```
+## Enterprise Architecture Compliance — Repository Documentation
+
+Per Spyglass Enterprise Architecture Guidelines v2.0 Section 6, create the required documentation files.
+
+⚠️ INQUIRY FIRST: Before creating files, gather information about the current system.
+
+---
+
+### Step 1: Gather System Information
+
+Review these files and report:
+- `package.json` — dependencies and scripts
+- `server/routes.ts` — all API endpoints
+- `shared/schema.ts` — database schema
+- `server/app.ts` — middleware and configuration
+- `client/src/App.tsx` — frontend routes
+- Any existing README.md
+
+---
+
+### Step 2: Create /docs Directory Structure
+
+```
+/docs/
+├── ARCHITECTURE.md
+├── SECURITY.md
+├── RUNBOOK.md
+├── CHANGELOG.md
+└── ADR/
+    ├── 000-template.md
+    ├── 001-jwt-authentication.md
+    ├── 002-vercel-deployment.md
+    └── 003-repliers-mls-integration.md
+```
+
+---
+
+### Step 3: Create ARCHITECTURE.md
+
+Include:
+
+```markdown
+# Client Data Portal — Architecture
+
+## Overview
+Mission Control / Client Data Portal is Spyglass Realty's centralized platform for IDX property search, CMAs, and client management.
+
+## Project Classification
+- **Type:** Web App (per EA Guidelines S16.1)
+- **Owner:** [Project Owner Name]
+- **Last Updated:** [Date]
+
+## C4 Model
+
+### Context Diagram
+Who uses it and what external systems it connects to:
+- Users: Agents, Admins
+- External: Repliers API (MLS), Google OAuth, OpenAI, Follow Up Boss, Resend (email)
+
+### Container Diagram
+```
+┌─────────────────────────────────────────────────────────┐
+│                    Client Data Portal                    │
+├─────────────────┬─────────────────┬─────────────────────┤
+│   Frontend      │   Backend API   │   Background Jobs   │
+│   (React/Vite)  │   (Express.js)  │   (node-cron)       │
+│   Vercel CDN    │   Vercel        │   Vercel            │
+│                 │   Serverless    │   Serverless        │
+└────────┬────────┴────────┬────────┴──────────┬──────────┘
+         │                 │                   │
+         └────────────────┬┴───────────────────┘
+                          │
+              ┌───────────┴───────────┐
+              │   PostgreSQL (Neon)   │
+              └───────────────────────┘
+```
+
+### Technology Stack
+| Layer | Technology | Purpose |
+|-------|------------|---------|
+| Frontend | React, Vite, TypeScript, Tailwind | User interface |
+| Backend | Express.js, TypeScript | API server |
+| Database | PostgreSQL (Neon) | Data persistence |
+| ORM | Drizzle | Database queries |
+| Auth | Google OAuth, JWT | Authentication |
+| Email | Resend | Transactional email |
+| MLS Data | Repliers API | Property listings |
+| AI | OpenAI GPT-4o | Content generation |
+| Hosting | Vercel | Frontend + Serverless |
+| Maps | Mapbox | Property visualization |
+
+### Data Flow
+[Document how data flows through the system]
+
+### API Endpoints Summary
+[List all /api/* routes grouped by resource]
+
+### Database Schema Summary
+[List all tables with key relationships]
+```
+
+---
+
+### Step 4: Create SECURITY.md
+
+```markdown
+# Client Data Portal — Security Documentation
+
+## Data Classification
+
+| Data Type | Classification | Storage | Notes |
+|-----------|---------------|---------|-------|
+| Agent emails | Internal | PostgreSQL | Google OAuth |
+| Client emails | Confidential | PostgreSQL | Seller Updates, Saved Searches |
+| Property data | Public | Repliers API | MLS public data |
+| CMA reports | Internal | PostgreSQL | Agent work product |
+| Session tokens | Restricted | JWT cookies | 7-day expiry |
+| API keys | Restricted | Environment vars | Never logged |
+
+## Authentication & Authorization
+
+- **Method:** Google OAuth 2.0 + JWT tokens
+- **Session:** Stateless JWT, 7-day expiry, httpOnly cookies
+- **Roles:** Super Admin, Admin, Agent (pending finalization)
+
+## Threat Model Summary
+
+| Threat | Likelihood | Impact | Mitigation |
+|--------|------------|--------|------------|
+| Auth bypass | Low | Severe | JWT verification on all protected routes |
+| SQL injection | Low | Severe | Parameterized queries via Drizzle ORM |
+| XSS | Medium | Major | React escaping, CSP headers |
+| CSRF | Low | Major | SameSite cookies, origin validation |
+| Data exposure | Medium | Major | Role-based access, audit logging |
+| API abuse | Medium | Minor | Rate limiting (pending) |
+
+## Security Controls
+
+- [ ] TLS everywhere (Vercel HTTPS)
+- [ ] Secrets in environment variables
+- [ ] Input validation on API endpoints
+- [ ] CSP headers configured
+- [ ] No PII in logs
+- [ ] Dependency vulnerability scanning (pending)
+
+## Incident Response
+
+See RUNBOOK.md for incident procedures.
+```
+
+---
+
+### Step 5: Create RUNBOOK.md
+
+```markdown
+# Client Data Portal — Operations Runbook
+
+## Quick Links
+- **Production:** https://client-data-portal-nine.vercel.app
+- **Vercel Dashboard:** https://vercel.com/ryan-4655s-projects/client-data-portal
+- **GitHub Repo:** https://github.com/daryl-c-spyglass/client-data-portal
+- **Replit (Dev):** [Replit URL]
+
+## Health Checks
+
+| Endpoint | Expected | Action if Failed |
+|----------|----------|------------------|
+| / | 200 OK, React app loads | Check Vercel deployment |
+| /api/health | 200 OK | Check serverless function |
+| /api/auth/me | 401 or 200 | Auth system working |
+
+## Common Incidents
+
+### 1. White Screen / App Not Loading
+**Symptoms:** Blank page, console errors
+**Causes:** CSP blocking scripts, build failure, serverless timeout
+**Resolution:**
+1. Check Vercel deployment logs
+2. Verify CSP headers in vercel.json
+3. Check browser console for errors
+4. Rollback to previous deployment if needed
+
+### 2. Authentication Failures
+**Symptoms:** Can't log in, redirect loops
+**Causes:** JWT secret mismatch, Google OAuth config, cookie issues
+**Resolution:**
+1. Verify JWT_SECRET in Vercel env vars
+2. Check Google OAuth redirect URIs
+3. Clear cookies and retry
+4. Check server logs for auth errors
+
+### 3. MLS Data Not Loading
+**Symptoms:** Empty property lists, API errors
+**Causes:** Repliers API down, rate limits, invalid query
+**Resolution:**
+1. Check Repliers API status
+2. Verify REPLIERS_API_KEY
+3. Check server logs for API errors
+4. Test with simple query to isolate issue
+
+### 4. Email Not Sending
+**Symptoms:** Seller updates not delivered
+**Causes:** Resend API issues, invalid email, template error
+**Resolution:**
+1. Check Resend dashboard for failures
+2. Verify RESEND_API_KEY
+3. Check email template rendering
+4. Test with manual send endpoint
+
+## Rollback Procedure
+
+1. Go to Vercel Dashboard → Deployments
+2. Find last working deployment
+3. Click "..." → "Promote to Production"
+4. Verify app is working
+5. Investigate failed deployment
+
+## Scheduled Jobs
+
+| Job | Schedule | Purpose |
+|-----|----------|---------|
+| Seller Update Emails | Daily 9 AM CT | Send market updates to clients |
+| MLS Sync | Daily 6 AM CT | Refresh property cache |
+
+## Environment Variables
+
+| Variable | Purpose | Where Set |
+|----------|---------|-----------|
+| DATABASE_URL | PostgreSQL connection | Vercel |
+| JWT_SECRET | Token signing | Vercel |
+| GOOGLE_CLIENT_ID | OAuth | Vercel |
+| GOOGLE_CLIENT_SECRET | OAuth | Vercel |
+| REPLIERS_API_KEY | MLS data | Vercel |
+| OPENAI_API_KEY | AI features | Vercel |
+| RESEND_API_KEY | Email | Vercel |
+
+## Contacts
+
+| Role | Name | Contact |
+|------|------|---------|
+| Project Owner | Ryan Rodenbeck | Slack |
+| Developer | Daryl C. | Slack |
+```
+
+---
+
+### Step 6: Create ADR Template and Initial ADRs
+
+**docs/ADR/000-template.md:**
+```markdown
+# ADR-NNN: [Title]
+
+## Status
+[Proposed | Accepted | Deprecated | Superseded]
+
+## Context
+[What is the issue we're addressing?]
+
+## Decision
+[What is the change we're making?]
+
+## Alternatives Considered
+[What other options were evaluated?]
+
+## Consequences
+[What are the results of this decision?]
+
+## Rollback Plan
+[How do we undo this if needed?]
+```
+
+**docs/ADR/001-jwt-authentication.md:**
+```markdown
+# ADR-001: JWT Authentication for Serverless Deployment
+
+## Status
+Accepted
+
+## Context
+Session-based authentication using express-session and PostgreSQL session store was incompatible with Vercel serverless deployment. Cold starts and stateless functions couldn't maintain session state.
+
+## Decision
+Replace session-based auth with JWT tokens stored in httpOnly cookies. Tokens are signed with HS256 algorithm and have 7-day expiry.
+
+## Alternatives Considered
+1. **Keep sessions with external Redis** — Added complexity and cost
+2. **Auth0/Clerk managed auth** — Vendor lock-in, migration effort
+3. **JWT in localStorage** — XSS vulnerability
+
+## Consequences
+- Stateless auth works in serverless
+- Token contains user info (no DB lookup per request)
+- Logout requires client-side cookie clearing (no server-side invalidation)
+- Token refresh not implemented (7-day hard expiry)
+
+## Rollback Plan
+Revert to session-based auth if moving to always-on hosting (Render).
+```
+
+**docs/ADR/002-vercel-deployment.md:**
+```markdown
+# ADR-002: Vercel for Production Hosting
+
+## Status
+Accepted
+
+## Context
+Needed production hosting for React frontend + Express.js API. Options evaluated: Render, Vercel, Railway.
+
+## Decision
+Use Vercel with serverless functions for API routes. Frontend served via Vercel CDN.
+
+## Alternatives Considered
+1. **Render** — Always-on containers, good but higher cost for low traffic
+2. **Railway** — Similar to Render
+3. **Self-hosted** — Maintenance burden
+
+## Consequences
+- Fast global CDN for frontend
+- Cold starts on API routes (mitigated by edge caching)
+- Required JWT auth migration (ADR-001)
+- Required CSP headers in vercel.json
+
+## Rollback Plan
+Move to Render if serverless limitations become blocking.
+```
+
+---
+
+### Step 7: Create openapi.yaml Stub
+
+Create `docs/openapi.yaml` with all current API endpoints documented. Use the route audit from earlier to populate this.
+
+---
+
+### Validation
+
+After creating all files:
+1. Verify all files exist in /docs/
+2. Links and formatting are correct
+3. Information is accurate to current system state
+4. Commit with message: "Add EA-compliant documentation (S6)"
+```
+
+---
+
+## Prompt 2: Risk Register (HIGH Priority)
+
+```
+## Enterprise Architecture Compliance — Risk Assessment
+
+Per Spyglass Enterprise Architecture Guidelines v2.0 Section 17, create a Risk Register for the Client Data Portal.
+
+---
+
+### Create: /docs/RISK_REGISTER.md
+
+```markdown
+# Client Data Portal — Risk Register
+
+**Project:** Client Data Portal (Mission Control)
+**Type:** Web App
+**Last Updated:** [Date]
+**Owner:** [Project Owner]
+
+## Risk Scoring Matrix
+
+| Likelihood / Impact | Negligible | Minor | Major | Severe |
+|---------------------|------------|-------|-------|--------|
+| Almost Certain | Medium | High | Critical | Critical |
+| Likely | Low | Medium | High | Critical |
+| Possible | Low | Medium | High | High |
+| Unlikely | Low | Low | Medium | Medium |
+| Rare | Low | Low | Low | Medium |
+
+## Active Risks
+
+| ID | Risk | Category | Likelihood | Impact | Level | Mitigation | Owner |
+|----|------|----------|------------|--------|-------|------------|-------|
+| R-001 | Authentication bypass allows unauthorized access | Security | Unlikely | Severe | Medium | JWT verification middleware on all protected routes, role checks | Dev |
+| R-002 | MLS data exposed to unauthorized users | Data | Possible | Major | High | Role-based access, agent can only see own CMAs | Dev |
+| R-003 | AI generates inaccurate property descriptions or prices | AI-Specific | Likely | Major | High | Human review required before publishing, disclaimer text | Dev |
+| R-004 | Repliers API offline, property search nonfunctional | Integration | Possible | Major | High | Graceful degradation message, cache recent searches | Dev |
+| R-005 | OpenAI API offline, AI features unavailable | Integration | Possible | Minor | Medium | Fallback to manual entry, clear error message | Dev |
+| R-006 | PII (client emails) exposed in logs | Data | Possible | Major | High | Log redaction, audit logging configuration | Dev |
+| R-007 | Debug endpoints expose internal data | Security | Possible | Major | High | Remove or secure with admin auth | Dev |
+| R-008 | Email notification storm (duplicate sends) | Operational | Unlikely | Minor | Low | Idempotency checks, rate limiting on email sends | Dev |
+| R-009 | Unauthorized role escalation | Security | Unlikely | Severe | Medium | Server-side role validation, audit log for role changes | Dev |
+| R-010 | Database credentials exposed | Security | Rare | Severe | Medium | Environment variables only, no secrets in code | Dev |
+
+## AI-Specific Risk Assessment (Section 17.5)
+
+**AI Feature:** AI Assistant (ChatAssistant.tsx)
+**Model:** GPT-4o
+
+| Question | Answer |
+|----------|--------|
+| What can it read? | User context (current page), CMA data, property data. Classification: Internal. |
+| What can it write? | Generated text responses only. No direct database writes. |
+| What can it send externally? | Sends prompts to OpenAI API. No email/Slack from AI directly. |
+| What if it hallucinates? | Could generate inaccurate property info. Mitigation: User must copy/use content manually. |
+| What if it goes offline? | AI Assistant shows error, app continues working. Non-critical feature. |
+| What if it loops? | Rate limiting on API calls. Max tokens per request. |
+| Human owner? | [Developer Name] |
+
+## Mitigation Status
+
+| ID | Mitigation | Status | Target Date |
+|----|------------|--------|-------------|
+| R-001 | JWT middleware | ✅ Complete | - |
+| R-002 | Role-based access | ⚠️ In Progress | TBD |
+| R-003 | Human review workflow | ✅ Complete | - |
+| R-004 | Graceful degradation | ❌ Not Started | TBD |
+| R-005 | AI fallback | ❌ Not Started | TBD |
+| R-006 | Log redaction | ❌ Not Started | TBD |
+| R-007 | Secure debug endpoints | ❌ Not Started | TBD |
+| R-008 | Email idempotency | ⚠️ Partial | TBD |
+| R-009 | Role audit logging | ❌ Not Started | TBD |
+| R-010 | Secrets management | ✅ Complete | - |
+
+## Review Schedule
+
+- Monthly review of active risks
+- Update after any security incident
+- Update after major feature releases
+```
+
+---
+
+### Validation
+
+1. All risks scored using the matrix
+2. AI-specific assessment completed
+3. Mitigation status tracked
+4. Commit with message: "Add Risk Register (EA S17)"
+```
+
+---
+
+## Prompt 3: AI Pre-Flight Checklist (HIGH Priority)
+
+```
+## Enterprise Architecture Compliance — AI Pre-Flight Checklist
+
+Per Spyglass Enterprise Architecture Guidelines v2.0 Appendix D, complete the AI Pre-Flight Checklist for the AI Assistant feature.
+
+---
+
+### Step 1: Audit Current AI Implementation
+
+**INQUIRY ONLY — Report findings:**
+
+1. Find the AI Assistant component and all related files
+2. List all API endpoints that use OpenAI
+3. Document what data is sent to OpenAI
+4. Check for rate limiting
+5. Check for audit logging
+6. Check for error handling
+
+---
+
+### Step 2: Create /docs/AI_PREFLIGHT_CHECKLIST.md
+
+```markdown
+# AI Pre-Flight Checklist — AI Assistant
+
+**Feature:** AI Assistant (Chat bubble)
+**Component:** ChatAssistant.tsx
+**Model:** GPT-4o
+**Date:** [Date]
+**Owner:** [Developer Name]
+
+## Checklist
+
+| # | Item | Status | Notes |
+|---|------|--------|-------|
+| 1 | Agent/bot name, purpose, human owner documented | ⬜ | Name: AI Assistant. Purpose: Help agents with property analysis, CMA content, search assistance. Owner: [Name] |
+| 2 | Project type classified | ⬜ | AI feature within Web App |
+| 3 | All read permissions listed | ⬜ | Reads: Current page context, CMA data (if on CMA page), property data, user info |
+| 4 | All write permissions listed | ⬜ | Writes: None directly. Generated content copied by user. |
+| 5 | External communication capabilities | ⬜ | Sends prompts to OpenAI API only. No email/Slack/social. |
+| 6 | Risk assessment completed | ⬜ | See RISK_REGISTER.md R-003, R-005 |
+| 7 | Least-privilege credentials | ⬜ | Uses single OPENAI_API_KEY. No admin access. |
+| 8 | Audit logging for AI actions | ⬜ | [Status: Implement if missing] |
+| 9 | Kill switch exists | ⬜ | [Can disable via feature flag or env var?] |
+| 10 | Rate limits configured | ⬜ | [Check if rate limiting exists] |
+| 11 | Human-in-the-loop for high-risk | ✅ | All AI output requires user to manually use it |
+| 12 | Hallucination handling defined | ⬜ | [Document: What happens if AI gives wrong info?] |
+| 13 | Fallback if offline | ⬜ | [Document: Error message shown, feature disabled] |
+| 14 | No secrets sent to LLM | ⬜ | [Audit: What context is sent in prompts?] |
+| 15 | Dev/prod separation | ✅ | Same API key but separate deployments |
+| 16 | Business process documented | ⬜ | [Document AI Assistant usage workflow] |
+| 17 | Change request submitted | ⬜ | N/A for existing feature; required for enhancements |
+| 18 | Project owner approval | ⬜ | [Get sign-off] |
+
+## Data Sent to OpenAI
+
+| Data Type | Classification | Sent to LLM? | Justified? |
+|-----------|---------------|--------------|------------|
+| User name | Internal | ⬜ Check | |
+| Current page URL | Internal | ⬜ Check | |
+| Property addresses | Public | ⬜ Check | Yes - public MLS data |
+| Property prices | Public | ⬜ Check | Yes - public MLS data |
+| Client emails | Confidential | ❌ Must NOT | |
+| Agent personal info | Internal | ⬜ Check | |
+
+## Approval
+
+| Role | Name | Date | Signature |
+|------|------|------|-----------|
+| Developer | | | |
+| Project Owner | | | |
+```
+
+---
+
+### Step 3: Implement Missing Controls
+
+Based on audit findings, implement:
+
+1. **Audit Logging** — Log all AI requests with timestamp, user, prompt summary (redacted)
+2. **Rate Limiting** — Max 10 requests per minute per user
+3. **Kill Switch** — Environment variable `AI_ASSISTANT_ENABLED=true/false`
+4. **Error Handling** — Graceful message when OpenAI unavailable
+
+---
+
+### Validation
+
+1. All 18 checklist items addressed
+2. Data audit completed
+3. Missing controls implemented
+4. Owner approval obtained
+5. Commit with message: "Complete AI Pre-Flight Checklist (EA App D)"
+```
+
+---
+
+## Prompt 4: Security Cleanup — Debug Endpoints (MEDIUM Priority)
+
+```
+## Enterprise Architecture Compliance — Security Cleanup
+
+Per Spyglass EA Guidelines S5.3 (Security Baseline), remove or secure debug endpoints.
+
+---
+
+### Task: Remove or Secure Debug Endpoints
+
+From the URL audit, these endpoints were flagged:
+
+| Endpoint | Action |
+|----------|--------|
+| `/api/properties/inventory/debug` | Remove OR require admin auth |
+| `/api/mlsgrid/test` | Remove OR require admin auth |
+| `/api/repliers/test` | Remove OR require admin auth |
+| `/api/rezen/mock/production` | Remove OR require admin auth |
+| `/api/debug/listings/*` | Remove OR require admin auth |
+
+---
+
+### Option A: Remove Endpoints (Recommended for Production)
+
+In `server/routes.ts`, delete or comment out the route handlers for these endpoints.
+
+---
+
+### Option B: Secure with Admin Auth
+
+If endpoints are needed for debugging, wrap with admin check:
+
+```typescript
+import { requireAuth, requireAdmin } from "./middleware/auth";
+
+// Before (insecure)
+app.get("/api/debug/listings", async (req, res) => {
+  // handler
+});
+
+// After (secured)
+app.get("/api/debug/listings", requireAuth, requireAdmin, async (req, res) => {
+  // handler
+});
+```
+
+Ensure `requireAdmin` middleware exists and checks user role.
+
+---
+
+### Additional Security Tasks
+
+1. **Audit input validation** — Review all POST/PUT endpoints for proper validation
+2. **Log redaction** — Ensure no PII (emails, names) in server logs
+3. **Rate limiting** — Add rate limiting to public endpoints (if not exists)
+
+---
+
+### Validation
+
+1. Debug endpoints removed or secured
+2. Test admin-secured endpoints require login + admin role
+3. Verify production app still works
+4. Commit with message: "Secure debug endpoints (EA S5.3)"
+```
+
+---
+
+## Prompt 5: Business Process Documentation (MEDIUM Priority)
+
+```
+## Enterprise Architecture Compliance — Business Process Maps
+
+Per Spyglass EA Guidelines Section 19, document key business processes.
+
+---
+
+### Create: /docs/processes/
+
+```
+/docs/processes/
+├── CMA_CREATION.md
+├── SELLER_UPDATE.md
+├── BUYER_SEARCH_ALERT.md
+└── USER_ONBOARDING.md
+```
+
+---
+
+### Process 1: CMA Creation
+
+```markdown
+# Process: CMA Creation
+
+## Metadata
+| Field | Value |
+|-------|-------|
+| Process Name | CMA Creation |
+| Category | Core Business |
+| Owner | [Agent / System] |
+| Related Projects | Client Data Portal |
+| Version | 1.0 |
+| Last Updated | [Date] |
+
+## Trigger
+Agent clicks "Create CMA" from dashboard or property page.
+
+## Actors
+- Agent (Human)
+- Client Data Portal (System)
+- Repliers API (External)
+- OpenAI (External, optional)
+
+## Pre-Conditions
+- Agent is logged in
+- Agent has "create CMA" permission
+
+## Steps
+
+| # | Step | Actor | Type | Notes |
+|---|------|-------|------|-------|
+| 1 | Click "Create CMA" | Agent | Manual | |
+| 2 | Enter subject property address | Agent | Manual | |
+| 3 | Search and validate address | System | Automated | Calls Repliers API |
+| 4 | Display subject property details | System | Automated | |
+| 5 | Set search criteria for comparables | Agent | Manual | Beds, baths, radius, etc. |
+| 6 | Fetch comparable properties | System | Automated | Calls Repliers API |
+| 7 | Select comparables (3-6) | Agent | Manual | |
+| 8 | Adjust comparable values | Agent | Manual | Optional |
+| 9 | Generate cover letter | Agent/AI | AI-Assisted | Optional, uses OpenAI |
+| 10 | Review and finalize | Agent | Manual | |
+| 11 | Save CMA | System | Automated | Writes to database |
+| 12 | Share with client (optional) | Agent | Manual | Email or share link |
+
+## Exception Paths
+
+| Step | Exception | Handling |
+|------|-----------|----------|
+| 3 | Address not found | Show error, allow manual entry |
+| 6 | No comparables found | Widen search criteria prompt |
+| 9 | OpenAI unavailable | Skip AI, manual cover letter |
+
+## Outputs
+- Saved CMA record in database
+- Shareable CMA link
+- PDF export (optional)
+
+## Success Metrics
+- CMA created within 10 minutes
+- At least 3 comparables selected
+- Client views shared CMA
+
+## SLA
+N/A (agent-driven, no time requirement)
+```
+
+---
+
+### Process 2: Seller Update (Existing Automation)
+
+Document the automated seller update email process similarly.
+
+---
+
+### Process 3: Saved Search Alert (Future)
+
+Document the planned saved search → new listing alert workflow.
+
+---
+
+### Validation
+
+1. All core processes documented
+2. Steps marked as Manual/Automated/AI-Assisted
+3. Exception paths defined
+4. Commit with message: "Add business process documentation (EA S19)"
+```
+
+---
+
+## Summary: Prompt Priority
+
+| # | Prompt | Priority | Effort | EA Section |
+|---|--------|----------|--------|------------|
+| 1 | Repository Documentation | HIGH | 2-3 hours | S6 |
+| 2 | Risk Register | HIGH | 1-2 hours | S17 |
+| 3 | AI Pre-Flight Checklist | HIGH | 1-2 hours | App D |
+| 4 | Security Cleanup | MEDIUM | 1 hour | S5.3 |
+| 5 | Business Process Maps | MEDIUM | 2 hours | S19 |
+
+---
+
+Which prompt would you like to start with, or should I combine them into a single comprehensive prompt?
