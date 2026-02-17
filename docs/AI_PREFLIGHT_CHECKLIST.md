@@ -18,9 +18,9 @@
 | 5 | External communication capabilities | Done | Sends prompts to OpenAI API only. No email/Slack/social media actions from AI. |
 | 6 | Risk assessment completed | Done | See RISK_REGISTER.md R-003, R-005 |
 | 7 | Least-privilege credentials | Done | Uses single OPENAI_API_KEY. No admin access. No database write access from AI. |
-| 8 | Audit logging for AI actions | Pending | Server logs include request info; structured audit logging not yet implemented |
-| 9 | Kill switch exists | Partial | Can disable by removing OPENAI_API_KEY; formal feature flag not yet implemented |
-| 10 | Rate limits configured | Partial | OpenAI API has built-in rate limits; per-user rate limiting not yet implemented |
+| 8 | Audit logging for AI actions | Done | All AI endpoints log `[AI Audit]` entries with user ID, prompt length, timestamp |
+| 9 | Kill switch exists | Done | `AI_ASSISTANT_ENABLED` env var; set to `false` to disable all AI endpoints with 503 response |
+| 10 | Rate limits configured | Done | AI-specific rate limiter: 10 requests/minute on `/api/chat`, `/api/ai/*`, `/api/cmas/draft` |
 | 11 | Human-in-the-loop for high-risk | Done | All AI output requires user to manually copy, paste, or otherwise use the content |
 | 12 | Hallucination handling defined | Done | AI output is advisory only; property data comes from MLS (authoritative source), not AI |
 | 13 | Fallback if offline | Done | `/api/chat/status` endpoint checks availability; error message shown in chat UI |
@@ -76,13 +76,13 @@ in chat bubble                          (streamed back)
 | API keys / secrets | Restricted | No | Never sent -- environment variables only |
 | Session tokens | Restricted | No | Never sent -- httpOnly cookies only |
 
-## Missing Controls — Action Items
+## Implemented Controls
 
-| Item | Priority | Status | Target |
-|------|----------|--------|--------|
-| Structured audit logging for AI requests | Medium | Not Started | TBD |
-| Per-user rate limiting (10 req/min) | Medium | Not Started | TBD |
-| Feature flag kill switch (`AI_ASSISTANT_ENABLED`) | Low | Not Started | TBD |
+| Item | Priority | Status | Implementation |
+|------|----------|--------|----------------|
+| Structured audit logging for AI requests | Medium | Done | `[AI Audit]` log entries in all AI route handlers (server/routes.ts) |
+| Per-user rate limiting (10 req/min) | Medium | Done | `aiRateLimiter` in server/index.ts, applied to `/api/chat`, `/api/ai/`, `/api/cmas/draft` |
+| Feature flag kill switch (`AI_ASSISTANT_ENABLED`) | Medium | Done | Middleware in server/index.ts, returns 503 when set to `false` |
 | Token usage monitoring/alerting | Low | Not Started | TBD |
 
 ## Approval

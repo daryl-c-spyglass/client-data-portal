@@ -8,6 +8,11 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 - Enterprise Architecture documentation suite (ARCHITECTURE.md, SECURITY.md, RUNBOOK.md, ADR templates, RISK_REGISTER.md, AI_PREFLIGHT_CHECKLIST.md, business process maps)
+- OpenAPI 3.0 specification (docs/openapi.yaml)
+- AI security controls: kill switch (`AI_ASSISTANT_ENABLED`), rate limiting (10 req/min), audit logging (`[AI Audit]` prefix)
+- Date fields added to all Architecture Decision Records
+- Clawd added to RUNBOOK contacts
+- Documentation table and EA compliance section in README.md
 
 ## [2026-02-17] — URL Cleanup & Security Hardening
 

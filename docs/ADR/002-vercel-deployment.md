@@ -3,6 +3,9 @@
 ## Status
 Accepted
 
+## Date
+2026-02-13
+
 ## Context
 Needed production hosting for a React frontend + Express.js API application. The platform serves a small team of real estate agents (low-traffic, internal tool). Key requirements: easy deployment, HTTPS, reasonable cost, CDN for static assets.
 

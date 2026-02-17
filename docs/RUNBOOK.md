@@ -138,5 +138,6 @@
 
 | Role | Name | Contact |
 |------|------|---------|
-| Project Owner | Ryan Rodenbeck | Slack |
-| Developer | Daryl C. | Slack |
+| Project Owner | Ryan Rodenbeck | Slack: @ryan |
+| Developer | Daryl C. | Slack: @daryl |
+| AI Collaborator | Clawd | Slack: @clawd |

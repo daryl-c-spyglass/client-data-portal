@@ -91,13 +91,37 @@ See [RUNBOOK.md](RUNBOOK.md) for deployment procedures and troubleshooting.
 
 ## Documentation
 
-- [ARCHITECTURE.md](ARCHITECTURE.md) - System design and data flow
-- [SECURITY.md](SECURITY.md) - Security policies and data classification
-- [RUNBOOK.md](RUNBOOK.md) - Operations guide and troubleshooting
-- [CHANGELOG.md](CHANGELOG.md) - Version history
-- [ADR/](ADR/) - Architecture Decision Records
+| Document | Description |
+|----------|-------------|
+| [ARCHITECTURE.md](docs/ARCHITECTURE.md) | System architecture and technology stack |
+| [SECURITY.md](docs/SECURITY.md) | Security controls and data classification |
+| [RUNBOOK.md](docs/RUNBOOK.md) | Operations and incident response |
+| [RISK_REGISTER.md](docs/RISK_REGISTER.md) | Active risks and mitigations |
+| [AI_PREFLIGHT_CHECKLIST.md](docs/AI_PREFLIGHT_CHECKLIST.md) | AI feature compliance checklist |
+| [openapi.yaml](docs/openapi.yaml) | API documentation (OpenAPI 3.0) |
+| [CHANGELOG.md](docs/CHANGELOG.md) | Version history |
+| [ADR/](docs/ADR/) | Architecture Decision Records |
+| [processes/](docs/processes/) | Business process documentation |
 
-## Team
+## Enterprise Architecture Compliance
 
-- Spyglass Realty Engineering Team
-- Contact: engineering@spyglassrealty.com
+This project follows Spyglass Enterprise Architecture Guidelines v2.0.
+
+- **Project Type:** Web App (S16.1)
+- **Risk Level:** Medium-High (S17)
+- **Last Review:** 2026-02-17
+
+## Environments
+
+| Environment | URL |
+|-------------|-----|
+| Production | https://client-data-portal-nine.vercel.app |
+| Development | Replit |
+
+## Contacts
+
+| Role | Name | Contact |
+|------|------|---------|
+| Project Owner | Ryan Rodenbeck | Slack: @ryan |
+| Developer | Daryl C. | Slack: @daryl |
+| AI Collaborator | Clawd | Slack: @clawd |

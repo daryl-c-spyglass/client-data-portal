@@ -3,6 +3,9 @@
 ## Status
 Accepted
 
+## Date
+2026-01-15
+
 ## Context
 The platform requires access to MLS (Multiple Listing Service) property data for property search, CMA generation, and market analytics. Direct MLS access (RETS/RESO Web API) requires IDX licensing and complex data management. A third-party data provider was needed to simplify integration.
 

@@ -84,6 +84,29 @@ const authLimiter = rateLimit({
 });
 app.use("/auth/", authLimiter);
 
+const aiRateLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: "Too many AI requests. Please wait a moment before trying again." },
+});
+app.use("/api/chat", aiRateLimiter);
+app.use("/api/ai/", aiRateLimiter);
+app.use("/api/cmas/draft", aiRateLimiter);
+
+const AI_ENABLED = process.env.AI_ASSISTANT_ENABLED !== 'false';
+
+app.use(["/api/chat", "/api/ai/", "/api/cmas/draft"], (req: Request, res: Response, next: NextFunction) => {
+  if (!AI_ENABLED) {
+    return res.status(503).json({ 
+      error: "AI Assistant is temporarily disabled by administrator.",
+      disabled: true
+    });
+  }
+  next();
+});
+
 const PgSession = ConnectPgSimple(session);
 
 const dbPool = process.env.DATABASE_URL

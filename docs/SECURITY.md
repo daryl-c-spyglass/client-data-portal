@@ -72,9 +72,11 @@
 | Debug endpoints secured | Complete | Admin auth required (Feb 2026) |
 | Admin activity logging | Complete | Role changes, user management logged |
 | Google OAuth domain restriction | Complete | Limits registration to authorized domains |
+| AI audit logging | Complete | `[AI Audit]` entries on all AI endpoints |
+| AI kill switch | Complete | `AI_ASSISTANT_ENABLED` env var (503 when disabled) |
+| AI rate limiting | Complete | 10 req/min on `/api/chat`, `/api/ai/*`, `/api/cmas/draft` |
 | No PII in server logs | Partial | Log redaction not fully audited |
 | Dependency vulnerability scanning | Not Started | Planned |
-| Rate limiting on public endpoints | Not Started | Planned |
 | API key rotation procedures | Not Started | Planned |
 
 ## Security Headers

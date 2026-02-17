@@ -1,0 +1,985 @@
+openapi: 3.0.3
+info:
+  title: Client Data Portal API
+  description: |
+    Mission Control / Client Data Portal - Spyglass Realty's centralized platform
+    for IDX property search, CMAs, seller updates, and client management.
+  version: 1.0.0
+  contact:
+    name: Spyglass Realty Development
+servers:
+  - url: https://client-data-portal-nine.vercel.app
+    description: Production
+  - url: http://localhost:5000
+    description: Development (Replit)
+
+paths:
+  /api/health:
+    get:
+      summary: Health check
+      tags: [System]
+      responses:
+        '200':
+          description: Service healthy
+
+  /api/auth/me:
+    get:
+      summary: Get current authenticated user
+      tags: [Authentication]
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          description: User info
+        '401':
+          description: Not authenticated
+
+  /api/auth/logout:
+    post:
+      summary: Log out (clear JWT cookie)
+      tags: [Authentication]
+      responses:
+        '200':
+          description: Logged out
+
+  /api/properties/search:
+    get:
+      summary: Search active/pending properties via Repliers
+      tags: [Properties]
+      parameters:
+        - name: city
+          in: query
+          schema:
+            type: string
+        - name: minPrice
+          in: query
+          schema:
+            type: number
+        - name: maxPrice
+          in: query
+          schema:
+            type: number
+        - name: minBeds
+          in: query
+          schema:
+            type: integer
+        - name: minBaths
+          in: query
+          schema:
+            type: integer
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [active, under_contract]
+        - name: pageNum
+          in: query
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Property search results
+
+  /api/properties/sold:
+    get:
+      summary: Search closed/sold properties from local database
+      tags: [Properties]
+      responses:
+        '200':
+          description: Sold property results
+
+  /api/properties/{id}:
+    get:
+      summary: Get property detail
+      tags: [Properties]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Property detail
+        '404':
+          description: Property not found
+
+  /api/properties/{listingId}/media:
+    get:
+      summary: Get property media/photos
+      tags: [Properties]
+      parameters:
+        - name: listingId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Media list
+
+  /api/properties/search/polygon:
+    post:
+      summary: Search properties within a map polygon
+      tags: [Properties]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                polygon:
+                  type: array
+                  items:
+                    type: array
+                    items:
+                      type: number
+      responses:
+        '200':
+          description: Properties within polygon
+
+  /api/cmas:
+    get:
+      summary: List CMAs for current user
+      tags: [CMAs]
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          description: CMA list
+    post:
+      summary: Create new CMA
+      tags: [CMAs]
+      security:
+        - cookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                subjectProperty:
+                  type: object
+      responses:
+        '201':
+          description: CMA created
+
+  /api/cmas/report-sections:
+    get:
+      summary: Get available report sections
+      tags: [CMAs]
+      responses:
+        '200':
+          description: List of report sections
+
+  /api/cmas/draft:
+    post:
+      summary: Create CMA draft from AI conversation criteria
+      tags: [CMAs]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        '201':
+          description: Draft CMA created
+
+  /api/cmas/{id}:
+    get:
+      summary: Get CMA detail
+      tags: [CMAs]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: CMA detail
+        '404':
+          description: CMA not found
+    patch:
+      summary: Update CMA
+      tags: [CMAs]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: CMA updated
+    put:
+      summary: Replace CMA
+      tags: [CMAs]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: CMA replaced
+    delete:
+      summary: Delete CMA
+      tags: [CMAs]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: CMA deleted
+
+  /api/cmas/{id}/share:
+    post:
+      summary: Create shareable link for CMA
+      tags: [CMAs]
+      responses:
+        '200':
+          description: Share token created
+    delete:
+      summary: Remove share link
+      tags: [CMAs]
+      responses:
+        '200':
+          description: Share removed
+
+  /api/cmas/{id}/email-share:
+    post:
+      summary: Email CMA share link to client
+      tags: [CMAs]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                recipientEmail:
+                  type: string
+      responses:
+        '200':
+          description: Email sent
+
+  /api/cmas/{id}/adjustments:
+    get:
+      summary: Get CMA adjustments
+      tags: [CMAs]
+      responses:
+        '200':
+          description: Adjustments data
+    put:
+      summary: Update CMA adjustments
+      tags: [CMAs]
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          description: Adjustments updated
+
+  /api/cmas/{id}/report-config:
+    get:
+      summary: Get CMA report configuration
+      tags: [CMAs]
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          description: Report config
+    put:
+      summary: Update CMA report configuration
+      tags: [CMAs]
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          description: Report config updated
+
+  /api/cmas/{id}/statistics:
+    get:
+      summary: Get CMA statistics
+      tags: [CMAs]
+      responses:
+        '200':
+          description: CMA statistics
+
+  /api/cmas/{id}/brochure:
+    get:
+      summary: Get CMA brochure
+      tags: [CMAs]
+      responses:
+        '200':
+          description: Brochure data
+    post:
+      summary: Upload CMA brochure
+      tags: [CMAs]
+      security:
+        - cookieAuth: []
+      responses:
+        '201':
+          description: Brochure uploaded
+    delete:
+      summary: Delete CMA brochure
+      tags: [CMAs]
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          description: Brochure deleted
+
+  /api/share/cma/{token}:
+    get:
+      summary: View shared CMA (public, no auth)
+      tags: [CMAs]
+      parameters:
+        - name: token
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Shared CMA data
+        '404':
+          description: Share not found
+
+  /api/chat:
+    post:
+      summary: AI Assistant chat
+      tags: [AI]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                messages:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      role:
+                        type: string
+                        enum: [user, assistant]
+                      content:
+                        type: string
+                propertyContext:
+                  type: object
+      responses:
+        '200':
+          description: AI response
+        '503':
+          description: AI not configured or disabled
+
+  /api/chat/status:
+    get:
+      summary: Check AI service availability
+      tags: [AI]
+      responses:
+        '200':
+          description: AI status
+
+  /api/ai/generate-cover-letter:
+    post:
+      summary: Generate CMA cover letter using AI
+      tags: [AI]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                context:
+                  type: object
+                tone:
+                  type: string
+                  enum: [professional, friendly, confident]
+      responses:
+        '200':
+          description: Generated cover letter
+        '503':
+          description: AI not configured
+
+  /api/ai/generate-default-cover-letter:
+    post:
+      summary: Generate default cover letter template
+      tags: [AI]
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          description: Generated default cover letter
+
+  /api/ai/parse-natural-language:
+    post:
+      summary: Parse natural language into search criteria
+      tags: [AI]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                prompt:
+                  type: string
+      responses:
+        '200':
+          description: Parsed search criteria
+
+  /api/ai/sanitize-repliers-nlp:
+    post:
+      summary: Sanitize NLP output for Repliers API compatibility
+      tags: [AI]
+      responses:
+        '200':
+          description: Sanitized search parameters
+
+  /api/seller-updates:
+    get:
+      summary: List seller updates
+      tags: [Seller Updates]
+      responses:
+        '200':
+          description: Seller update list
+    post:
+      summary: Create seller update
+      tags: [Seller Updates]
+      responses:
+        '201':
+          description: Seller update created
+
+  /api/seller-updates/{id}:
+    get:
+      summary: Get seller update detail
+      tags: [Seller Updates]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Seller update detail
+    patch:
+      summary: Update seller update
+      tags: [Seller Updates]
+      responses:
+        '200':
+          description: Updated
+    delete:
+      summary: Delete seller update
+      tags: [Seller Updates]
+      responses:
+        '200':
+          description: Deleted
+
+  /api/seller-updates/{id}/send-test:
+    post:
+      summary: Send test email for seller update
+      tags: [Seller Updates]
+      responses:
+        '200':
+          description: Test email sent
+
+  /api/seller-updates/{id}/toggle-active:
+    post:
+      summary: Toggle seller update active status
+      tags: [Seller Updates]
+      responses:
+        '200':
+          description: Status toggled
+
+  /api/seller-updates/{id}/preview:
+    get:
+      summary: Preview seller update email
+      tags: [Seller Updates]
+      responses:
+        '200':
+          description: Email preview HTML
+
+  /api/seller-updates/{id}/history:
+    get:
+      summary: Get send history for seller update
+      tags: [Seller Updates]
+      responses:
+        '200':
+          description: Send history
+
+  /api/searches:
+    get:
+      summary: List saved searches
+      tags: [Saved Searches]
+      responses:
+        '200':
+          description: Saved search list
+    post:
+      summary: Create saved search
+      tags: [Saved Searches]
+      responses:
+        '201':
+          description: Saved search created
+
+  /api/searches/{id}:
+    get:
+      summary: Get saved search detail
+      tags: [Saved Searches]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Saved search detail
+    delete:
+      summary: Delete saved search
+      tags: [Saved Searches]
+      responses:
+        '200':
+          description: Deleted
+
+  /api/admin/users:
+    get:
+      summary: List all users
+      tags: [Admin]
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          description: User list
+
+  /api/admin/users/invite:
+    post:
+      summary: Invite new user
+      tags: [Admin]
+      security:
+        - cookieAuth: []
+      responses:
+        '201':
+          description: User invited
+
+  /api/admin/users/{id}/role:
+    put:
+      summary: Change user role
+      tags: [Admin]
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          description: Role updated
+
+  /api/admin/users/{id}/status:
+    put:
+      summary: Enable/disable user account
+      tags: [Admin]
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          description: Status updated
+
+  /api/admin/users/{id}:
+    delete:
+      summary: Delete user account
+      tags: [Admin]
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          description: User deleted
+
+  /api/admin/activity-logs:
+    get:
+      summary: Get admin activity logs
+      tags: [Admin]
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          description: Activity log entries
+
+  /api/admin/company-settings:
+    get:
+      summary: Get company settings
+      tags: [Admin]
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          description: Company settings
+    put:
+      summary: Update company settings
+      tags: [Admin]
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          description: Settings updated
+
+  /api/admin/custom-pages:
+    get:
+      summary: List custom report pages
+      tags: [Admin]
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          description: Custom pages list
+    post:
+      summary: Create custom report page
+      tags: [Admin]
+      security:
+        - cookieAuth: []
+      responses:
+        '201':
+          description: Page created
+
+  /api/admin/custom-pages/{id}:
+    put:
+      summary: Update custom report page
+      tags: [Admin]
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          description: Page updated
+    delete:
+      summary: Delete custom report page
+      tags: [Admin]
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          description: Page deleted
+
+  /api/agent/profile:
+    get:
+      summary: Get current agent's profile
+      tags: [Agent]
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          description: Agent profile
+    put:
+      summary: Update agent profile
+      tags: [Agent]
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          description: Profile updated
+
+  /api/display-preferences:
+    get:
+      summary: Get display preferences
+      tags: [Settings]
+      responses:
+        '200':
+          description: Display preferences
+    put:
+      summary: Update display preferences
+      tags: [Settings]
+      responses:
+        '200':
+          description: Preferences updated
+
+  /api/lead-gate/settings:
+    get:
+      summary: Get lead gate settings
+      tags: [Settings]
+      responses:
+        '200':
+          description: Lead gate settings
+    put:
+      summary: Update lead gate settings
+      tags: [Settings]
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          description: Settings updated
+
+  /api/dashboard/active-properties:
+    get:
+      summary: Dashboard active property statistics
+      tags: [Dashboard]
+      responses:
+        '200':
+          description: Active property stats
+
+  /api/dashboard/recent-sold:
+    get:
+      summary: Dashboard recent sold properties
+      tags: [Dashboard]
+      responses:
+        '200':
+          description: Recent sold stats
+
+  /api/dashboard/dom-analytics:
+    get:
+      summary: Days on market analytics
+      tags: [Dashboard]
+      responses:
+        '200':
+          description: DOM analytics
+
+  /api/stats/dashboard:
+    get:
+      summary: General dashboard statistics
+      tags: [Statistics]
+      responses:
+        '200':
+          description: Dashboard stats
+
+  /api/stats/cmas-by-month:
+    get:
+      summary: CMA creation statistics by month
+      tags: [Statistics]
+      responses:
+        '200':
+          description: Monthly CMA stats
+
+  /api/stats/listings-by-month:
+    get:
+      summary: Listing statistics by month
+      tags: [Statistics]
+      responses:
+        '200':
+          description: Monthly listing stats
+
+  /api/fub/status:
+    get:
+      summary: Follow Up Boss connection status
+      tags: [Follow Up Boss]
+      responses:
+        '200':
+          description: FUB status
+
+  /api/fub/leads:
+    get:
+      summary: Get leads from Follow Up Boss
+      tags: [Follow Up Boss]
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          description: Lead list
+
+  /api/fub/calendar:
+    get:
+      summary: Get calendar events from Follow Up Boss
+      tags: [Follow Up Boss]
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          description: Calendar events
+
+  /api/rezen/production:
+    get:
+      summary: Get agent production data from Mission Control
+      tags: [ReZen]
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          description: Production data
+
+  /api/rezen/status:
+    get:
+      summary: ReZen API connection status
+      tags: [ReZen]
+      responses:
+        '200':
+          description: ReZen status
+
+  /api/sync:
+    post:
+      summary: Trigger manual MLS sync
+      tags: [System]
+      responses:
+        '200':
+          description: Sync started
+
+  /api/sync/status:
+    get:
+      summary: Get MLS sync status
+      tags: [System]
+      responses:
+        '200':
+          description: Sync status
+
+  /api/autocomplete/cities:
+    get:
+      summary: Autocomplete city names
+      tags: [Autocomplete]
+      parameters:
+        - name: q
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: City suggestions
+
+  /api/autocomplete/postalCodes:
+    get:
+      summary: Autocomplete postal codes
+      tags: [Autocomplete]
+      responses:
+        '200':
+          description: Postal code suggestions
+
+  /api/autocomplete/subdivisions:
+    get:
+      summary: Autocomplete subdivision names
+      tags: [Autocomplete]
+      responses:
+        '200':
+          description: Subdivision suggestions
+
+  /api/autocomplete/elementarySchools:
+    get:
+      summary: Autocomplete elementary school names
+      tags: [Autocomplete]
+      responses:
+        '200':
+          description: School suggestions
+
+  /api/repliers/listings:
+    get:
+      summary: Search listings via Repliers API
+      tags: [Repliers]
+      responses:
+        '200':
+          description: Listing results
+
+  /api/repliers/nlp:
+    post:
+      summary: Natural language property search via Repliers
+      tags: [Repliers]
+      responses:
+        '200':
+          description: NLP search results
+
+  /api/homereview/neighborhoods/search:
+    get:
+      summary: Search neighborhoods
+      tags: [Neighborhoods]
+      responses:
+        '200':
+          description: Neighborhood results
+
+  /api/homereview/properties:
+    get:
+      summary: Get neighborhood properties
+      tags: [Neighborhoods]
+      responses:
+        '200':
+          description: Property list
+
+  /api/map-layers/flood-zones:
+    get:
+      summary: Get flood zone overlay data
+      tags: [Map Layers]
+      responses:
+        '200':
+          description: Flood zone GeoJSON
+
+  /api/map-layers/school-districts:
+    get:
+      summary: Get school district overlay data
+      tags: [Map Layers]
+      responses:
+        '200':
+          description: School district GeoJSON
+
+  /api/wordpress/properties:
+    get:
+      summary: Property listing for WordPress widget
+      tags: [WordPress]
+      responses:
+        '200':
+          description: Property list
+
+  /api/wordpress/search:
+    get:
+      summary: Property search for WordPress widget
+      tags: [WordPress]
+      responses:
+        '200':
+          description: Search results
+
+  /api/wordpress/favorites/{userId}:
+    get:
+      summary: Get user favorites
+      tags: [WordPress]
+      responses:
+        '200':
+          description: Favorite list
+
+components:
+  securitySchemes:
+    cookieAuth:
+      type: apiKey
+      in: cookie
+      name: auth_token
+      description: JWT token in httpOnly cookie
+
+tags:
+  - name: Authentication
+    description: User authentication via Google OAuth
+  - name: Properties
+    description: Property search and details (IDX)
+  - name: CMAs
+    description: Comparative Market Analysis
+  - name: AI
+    description: AI Assistant and content generation (GPT-4o)
+  - name: Seller Updates
+    description: Automated seller market update emails
+  - name: Saved Searches
+    description: Saved property search criteria
+  - name: Admin
+    description: User management and company settings (Super Admin / Admin)
+  - name: Agent
+    description: Agent profile management
+  - name: Settings
+    description: Display preferences and lead gate settings
+  - name: Dashboard
+    description: Dashboard analytics and statistics
+  - name: Statistics
+    description: Platform usage statistics
+  - name: Follow Up Boss
+    description: CRM integration
+  - name: ReZen
+    description: Mission Control production reporting
+  - name: Autocomplete
+    description: Search autocomplete suggestions
+  - name: Repliers
+    description: Direct Repliers MLS API access
+  - name: Neighborhoods
+    description: Neighborhood data and reviews
+  - name: Map Layers
+    description: Map overlay data (flood zones, school districts)
+  - name: WordPress
+    description: WordPress integration endpoints
+  - name: System
+    description: Health checks, sync, and system status

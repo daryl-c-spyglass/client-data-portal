@@ -3,6 +3,9 @@
 ## Status
 Accepted
 
+## Date
+2026-02-13
+
 ## Context
 Session-based authentication using express-session and PostgreSQL session store was incompatible with Vercel serverless deployment. Cold starts and stateless functions couldn't reliably maintain session state. The application needed a stateless authentication mechanism that works across serverless function invocations.
 

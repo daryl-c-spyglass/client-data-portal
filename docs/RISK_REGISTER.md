@@ -65,7 +65,7 @@
 | R-002 | Role-based access control | Complete | 4-tier role system active |
 | R-003 | Human-in-the-loop for AI output | Complete | All AI output requires manual user action |
 | R-004 | Graceful degradation for Repliers | Partial | Error messages shown; local cache for closed listings |
-| R-005 | AI fallback messaging | Partial | Error messages shown; manual entry available |
+| R-005 | AI fallback messaging | Complete | Error messages shown; kill switch via `AI_ASSISTANT_ENABLED` env var; rate limiting active |
 | R-006 | Log redaction audit | Not Started | Needs audit of all console.log/error statements |
 | R-007 | Secure debug endpoints | Complete | Admin auth added Feb 2026 |
 | R-008 | Email send idempotency | Complete | Send history tracking, daily-only cadence |
@@ -73,6 +73,9 @@
 | R-010 | Secrets management | Complete | All secrets in environment variables |
 | R-011 | API key rotation procedures | Not Started | Document rotation process |
 | R-012 | Sync monitoring | Partial | Status endpoint exists; alerting not configured |
+| R-NEW | AI rate limiting | Complete | 10 req/min per IP on all AI endpoints (server/index.ts) |
+| R-NEW | AI audit logging | Complete | All AI requests logged with `[AI Audit]` prefix, user ID, timestamp |
+| R-NEW | AI kill switch | Complete | `AI_ASSISTANT_ENABLED=false` disables all AI endpoints with 503 |
 
 ## Review Schedule
 

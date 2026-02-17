@@ -4221,6 +4221,9 @@ This email was sent by ${senderName} (${senderEmail}) via the Spyglass Realty Cl
         res.status(400).json({ error: "userPrompt is required" });
         return;
       }
+
+      const sanitizeUserId = (req as any).user?.id || 'anonymous';
+      console.log(`[AI Audit] sanitize-repliers-nlp | user=${sanitizeUserId} | promptLen=${userPrompt.length} | ${new Date().toISOString()}`);
       
       // Parse the Repliers URL to extract params
       let parsedParams: Record<string, string> = {};
@@ -4418,7 +4421,8 @@ OUTPUT JSON:
         return;
       }
       
-      console.log(`🤖 [OpenAI NLP] Parsing: "${prompt.slice(0, 50)}..."`);
+      const nlpUserId = (req as any).user?.id || 'anonymous';
+      console.log(`[AI Audit] parse-natural-language | user=${nlpUserId} | promptLen=${prompt.length} | ${new Date().toISOString()}`);
       
       // Fetch valid subdivisions for matching
       let validSubdivisions: string[] = [];
@@ -7045,6 +7049,9 @@ OUTPUT JSON:
         return;
       }
 
+      const userId = (req as any).user?.id || 'anonymous';
+      console.log(`[AI Audit] chat | user=${userId} | messages=${messages.length} | hasContext=${!!propertyContext} | ${new Date().toISOString()}`);
+
       const response = await getChatResponse(messages, propertyContext);
       res.json(response);
     } catch (error: any) {
@@ -7089,6 +7096,9 @@ OUTPUT JSON:
         res.status(400).json({ error: "Tone must be professional, friendly, or confident" });
         return;
       }
+
+      const covUserId = (req as any).user?.id || 'anonymous';
+      console.log(`[AI Audit] generate-cover-letter | user=${covUserId} | tone=${tone} | ${new Date().toISOString()}`);
 
       const coverLetter = await generateCoverLetter(context, tone);
       res.json({ coverLetter });
@@ -7144,6 +7154,7 @@ OUTPUT JSON:
         existingCoverLetter: existingCoverLetter || undefined,
       };
 
+      console.log(`[AI Audit] generate-default-cover-letter | user=${userId} | tone=${tone} | ${new Date().toISOString()}`);
       console.log('[AI] Generating default cover letter:', {
         userId,
         tone,
