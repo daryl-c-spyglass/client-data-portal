@@ -1,0 +1,134 @@
+## Four Tasks: Title Change + AI Assistant + Color Tokens + URL Audit
+
+---
+
+### Task 1: Change Browser Tab Title & Meta Tags
+
+✅ **IMPLEMENT THIS CHANGE**
+
+Change the page title from:
+- Current: "MLS Grid IDX - Professional Real Estate CMA Platform"
+- New: "Mission Control | Client Data Portal"
+
+**Files to update:**
+- `client/index.html` — update `<title>` tag
+- Update any `<meta>` tags (description, og:title, og:description)
+- Check for React Helmet or dynamic title settings in components
+
+**New values:**
+```html
+<title>Mission Control | Client Data Portal</title>
+<meta name="description" content="Spyglass Realty's centralized platform for IDX property search, CMAs, and client management.">
+<meta property="og:title" content="Mission Control | Client Data Portal">
+<meta property="og:description" content="Spyglass Realty's centralized platform for IDX property search, CMAs, and client management.">
+```
+
+Also check:
+- `manifest.json` or PWA config for app name
+- Any hardcoded "MLS Grid IDX" strings in components
+
+---
+
+### Task 2: AI Assistant — INQUIRY ONLY
+
+⚠️ **DO NOT MAKE CHANGES — Just report what exists**
+
+The "AI Assistant" button in the lower left corner — I need to understand:
+
+1. **What does it currently do?** Show me the component code
+2. **What OpenAI integration exists?**
+   - Which endpoints use OpenAI?
+   - What's the current functionality? (chat, analysis, content generation?)
+3. **Where is the AI Assistant component located?** (file path)
+4. **What OpenAI model is configured?** (gpt-4, gpt-4o, gpt-3.5-turbo, etc.)
+5. **What prompts/system messages are used?**
+6. **What context is passed to the AI?** (user info, property data, CMA data?)
+
+**Check files:**
+- Component rendering the "AI Assistant" button
+- `server/openai.ts` or `server/ai.ts` or similar
+- Any `/api/ai/*` or `/api/chat/*` routes in `server/routes.ts`
+- `package.json` for openai dependency version
+
+**Report:** Current AI capabilities and what data/context it has access to
+
+---
+
+### Task 3: Color Token Cleanup — STATUS CHECK ONLY
+
+⚠️ **DO NOT MAKE CHANGES — Just confirm status**
+
+Earlier we audited the color system (60-30-10 rule). Confirm current state:
+
+1. **Hardcoded hex values still present?** Search for:
+   - `bg-[#EF4923]` → should be `bg-primary`
+   - `bg-[#FEF2EF]` → should be `bg-spyglass-orange-light`
+   - `bg-[#FDE5DF]` → should be `bg-spyglass-orange-100`
+   - `bg-[#C93B1C]` → should be `bg-spyglass-orange-hover`
+   - `text-[#EF4923]` → should be `text-primary`
+
+2. **Semantic tokens exist?** Check `client/src/index.css` for:
+   - `--success` (green)
+   - `--warning` (yellow/amber)
+   - `--info` (blue)
+
+3. **Documentation file exists?** Check for `client/src/lib/designTokens.ts`
+
+**Report as:**
+Hardcoded colors found: X instances across Y files
+Semantic tokens: ✅ Exist / ❌ Missing
+Design tokens documentation: ✅ Exists / ❌ Missing
+
+---
+
+### Task 4: URL Path Structure Audit — INQUIRY ONLY
+
+⚠️ **DO NOT MAKE CHANGES — Just report current state**
+
+Audit the current URL/route structure against REST best practices.
+
+**Check frontend routes in:**
+- `client/src/App.tsx` or router configuration
+- `client/src/main.tsx`
+- Any React Router route definitions
+
+**Check API routes in:**
+- `server/routes.ts`
+- All `/api/*` endpoint definitions
+
+**Report in this format:**
+
+**Frontend Routes:**
+| Current Path | Convention? | Issue (if any) |
+|--------------|-------------|----------------|
+| /dashboard | ✅ | - |
+| /cma/:id/presentation | ✅ | - |
+| /CMA_Report | ❌ | Uppercase + underscore |
+
+**API Routes:**
+| Current Path | Convention? | Issue (if any) |
+|--------------|-------------|----------------|
+| /api/properties | ✅ | - |
+| /api/get_user | ❌ | Use /api/users/:id |
+
+**Best practice checklist — flag violations:**
+- [ ] All paths lowercase
+- [ ] Hyphens (not underscores) for multi-word paths
+- [ ] RESTful structure: `/resource/:id/sub-resource`
+- [ ] No file extensions (.html, .json)
+- [ ] Consistent pluralization (`/users` not `/user`)
+- [ ] No verbs in paths (use HTTP methods instead)
+- [ ] UUIDs or slugs for identifiers
+
+---
+
+### Summary
+
+| Task | Action | 
+|------|--------|
+| 1. Browser Title | ✅ IMPLEMENT |
+| 2. AI Assistant | 🔍 INQUIRY ONLY |
+| 3. Color Tokens | 🔍 STATUS CHECK |
+| 4. URL Structure | 🔍 AUDIT ONLY |
+
+Please complete Task 1 and report findings for Tasks 2-4.
