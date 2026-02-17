@@ -1,0 +1,74 @@
+## Three Updates: Browser Title + AI Assistant Inquiry + Color Token Status
+
+---
+
+### Task 1: Change Browser Tab Title & Meta Tags
+
+**IMPLEMENT THIS CHANGE**
+
+Change the page title from:
+- Current: "MLS Grid IDX - Professional Real Estate CMA Platform"
+- New: "Mission Control | Client Data Portal"
+
+**Files to update:**
+- `client/index.html` — update `<title>` tag
+- Update any `<meta>` tags (description, og:title, og:description)
+- Check for React Helmet or dynamic title settings
+
+**New values:**
+```html
+<title>Mission Control | Client Data Portal</title>
+<meta name="description" content="Spyglass Realty's centralized platform for IDX property search, CMAs, and client management.">
+<meta property="og:title" content="Mission Control | Client Data Portal">
+<meta property="og:description" content="Spyglass Realty's centralized platform for IDX property search, CMAs, and client management.">
+```
+
+Also check `manifest.json` or PWA config for app name references.
+
+---
+
+### Task 2: AI Assistant — INQUIRY ONLY
+
+⚠️ DO NOT MAKE CHANGES — Just report what exists
+
+The "AI Assistant" button in the lower left corner — I need to understand:
+
+1. **What does it currently do?** Show me the component code
+2. **What OpenAI integration exists?**
+   - Which endpoints use OpenAI?
+   - What's the current functionality? (chat, analysis, content generation?)
+3. **Where is the AI Assistant component located?**
+4. **What OpenAI model is configured?** (gpt-4, gpt-3.5-turbo, etc.)
+5. **What prompts/system messages are used?**
+
+**Check files:**
+- Component rendering the "AI Assistant" button
+- `server/openai.ts` or similar
+- Any `/api/ai/*` or `/api/chat/*` routes
+- `package.json` for openai dependency version
+
+**Report:** Current AI capabilities and potential enhancement areas
+
+---
+
+### Task 3: Color Token Cleanup — STATUS CHECK ONLY
+
+⚠️ DO NOT MAKE CHANGES — Just confirm status
+
+Earlier we audited the color system (60-30-10 rule). Confirm:
+
+1. Has the color token cleanup been implemented yet?
+2. Are hardcoded hex values still present in components?
+   - `bg-[#EF4923]` → should be `bg-primary`
+   - `bg-[#FEF2EF]` → should be `bg-spyglass-orange-light`
+3. Do the semantic tokens exist? (`--success`, `--warning`, `--info`)
+4. Is there a `designTokens.ts` documentation file?
+
+**Just report current state — no changes needed yet.**
+
+---
+
+### Summary of Actions:
+- Task 1: ✅ IMPLEMENT (title change)
+- Task 2: 🔍 INQUIRY ONLY (AI Assistant)
+- Task 3: 🔍 STATUS CHECK ONLY (color tokens)
