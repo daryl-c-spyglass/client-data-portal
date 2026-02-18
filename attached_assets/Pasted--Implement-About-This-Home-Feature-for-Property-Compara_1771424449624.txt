@@ -1,0 +1,241 @@
+## Implement "About This Home" Feature for Property Comparables
+
+Port the "About This Home" description feature from Contract Conduit to Client Data Portal. This displays property descriptions with smart paragraph formatting in property detail modals.
+
+---
+
+### PHASE 1: INQUIRY — Find Existing Files
+
+Before making changes, locate and report:
+
+1. **Backend Repliers mapping** — Find where Repliers API data is transformed for properties/comparables
+   - Check `server/routes.ts` for CMA search-properties endpoint
+   - Look for where listing data is mapped (photos, beds, baths, etc.)
+   - Report the line numbers and current field mappings
+
+2. **Type definitions** — Find the property/comparable interfaces
+   - Check `shared/schema.ts` or `shared/types.ts`
+   - Look for interfaces like `Property`, `CMAComparable`, `Listing`, etc.
+   - Report if `description` field already exists
+
+3. **Property Detail Modals** — Find all modals that show property details
+   - Check `client/src/components/` for PropertyDetailModal or similar
+   - Look in CMA-related components
+   - Look in property search/listing components
+   - Report all files that display property details in a modal
+
+4. **Current modal structure** — Show the JSX structure where beds/baths/sqft are displayed
+   - This is where "About This Home" will be inserted (after stats, before features)
+
+**Report findings before proceeding to Phase 2.**
+
+---
+
+### PHASE 2: Backend — Add Description to Repliers Mapping
+
+**File:** `server/routes.ts` (or wherever Repliers data is transformed)
+
+Find the section that maps Repliers API response to your property/comparable objects. Add the `description` field:
+```typescript
+// In the Repliers listing transformation, add:
+description: listing.details?.description || listing.remarks || '',
+```
+
+This should be added alongside other fields like `photos`, `beds`, `baths`, etc.
+
+**Example context (your actual code may differ):**
+```typescript
+return {
+  mlsNumber: listing.mlsNumber,
+  address: listing.address?.streetAddress,
+  price: listing.listPrice,
+  beds: listing.details?.beds || 0,
+  baths: listing.details?.baths || 0,
+  sqft: listing.details?.sqft || 0,
+  photos: listing.photos || [],
+  description: listing.details?.description || listing.remarks || '',  // ADD THIS
+  // ... other fields
+};
+```
+
+---
+
+### PHASE 3: Type Definitions — Add Description Field
+
+**File:** `shared/schema.ts` or wherever property types are defined
+
+Add `description?: string;` to the relevant interfaces:
+```typescript
+// Add to Property interface (if exists)
+export interface Property {
+  // ... existing fields
+  description?: string;
+}
+
+// Add to CMAComparable interface (if exists)
+export interface CMAComparable {
+  // ... existing fields
+  description?: string;
+}
+
+// Add to any Listing or PropertyDetail interfaces
+```
+
+---
+
+### PHASE 4: Frontend — Add "About This Home" Component
+
+**Files to update:** All property detail modals found in Phase 1
+
+Add this JSX block **after** the beds/baths/sqft stats section and **before** any features/amenities section:
+```tsx
+{/* About This Home - Property Description */}
+{property.description && property.description.trim() !== '' && (
+  <div className="mt-6 mb-6 pt-4 border-t border-gray-200 dark:border-gray-700">
+    <h3 className="text-lg font-semibold mb-3 text-gray-900 dark:text-gray-100">
+      About This Home
+    </h3>
+    <div className="text-sm text-gray-600 dark:text-gray-400 leading-7 space-y-4">
+      {(() => {
+        const text = property.description.trim();
+        
+        // First try splitting on actual newlines (some MLS data has these)
+        const byNewlines = text.split(/\n\n+|\r\n\r\n+/).filter(p => p.trim());
+        if (byNewlines.length > 1) {
+          return byNewlines.map((paragraph, i) => (
+            <p key={i}>{paragraph.trim()}</p>
+          ));
+        }
+        
+        // If no newlines (continuous MLS text), chunk into ~4-sentence paragraphs
+        // This prevents a wall of text that's hard to read
+        const sentences = text.match(/[^.!?]+[.!?]+/g) || [text];
+        const chunks: string[] = [];
+        for (let i = 0; i < sentences.length; i += 4) {
+          chunks.push(sentences.slice(i, i + 4).join(' ').trim());
+        }
+        
+        return chunks.map((chunk, i) => (
+          <p key={i}>{chunk}</p>
+        ));
+      })()}
+    </div>
+  </div>
+)}
+```
+
+**Important:** Replace `property` with whatever variable name your modal uses (e.g., `listing`, `selectedProperty`, `comparable`, etc.)
+
+---
+
+### PHASE 5: Optional — Create Reusable Component
+
+If multiple modals need this, create a reusable component:
+
+**Create:** `client/src/components/PropertyDescription.tsx`
+```tsx
+interface PropertyDescriptionProps {
+  description?: string;
+  className?: string;
+}
+
+export function PropertyDescription({ description, className = '' }: PropertyDescriptionProps) {
+  if (!description || description.trim() === '') {
+    return null;
+  }
+
+  const text = description.trim();
+  
+  // First try splitting on actual newlines
+  const byNewlines = text.split(/\n\n+|\r\n\r\n+/).filter(p => p.trim());
+  
+  let paragraphs: string[];
+  
+  if (byNewlines.length > 1) {
+    paragraphs = byNewlines.map(p => p.trim());
+  } else {
+    // Chunk continuous text into ~4-sentence paragraphs
+    const sentences = text.match(/[^.!?]+[.!?]+/g) || [text];
+    paragraphs = [];
+    for (let i = 0; i < sentences.length; i += 4) {
+      paragraphs.push(sentences.slice(i, i + 4).join(' ').trim());
+    }
+  }
+
+  return (
+    <div className={`mt-6 mb-6 pt-4 border-t border-gray-200 dark:border-gray-700 ${className}`}>
+      <h3 className="text-lg font-semibold mb-3 text-gray-900 dark:text-gray-100">
+        About This Home
+      </h3>
+      <div className="text-sm text-gray-600 dark:text-gray-400 leading-7 space-y-4">
+        {paragraphs.map((paragraph, i) => (
+          <p key={i}>{paragraph}</p>
+        ))}
+      </div>
+    </div>
+  );
+}
+```
+
+**Usage in modals:**
+```tsx
+import { PropertyDescription } from '@/components/PropertyDescription';
+
+// In the modal JSX:
+<PropertyDescription description={property.description} />
+```
+
+---
+
+### PHASE 6: Verify Data Flow
+
+Test the complete data pipeline:
+
+1. **API Response** — Check that Repliers returns `details.description` or `remarks`
+```bash
+   # Add console.log in routes.ts to verify:
+   console.log('Description from Repliers:', listing.details?.description || listing.remarks);
+```
+
+2. **Database Storage** — If comparables are stored in DB, verify description is saved
+   
+3. **Frontend Display** — Verify description appears in modal
+   - Check for very long descriptions (should be chunked into paragraphs)
+   - Check for descriptions with existing line breaks (should preserve them)
+   - Check for empty/missing descriptions (should not render the section)
+
+---
+
+### ACCEPTANCE CRITERIA
+
+1. Property detail modals display "About This Home" section when description exists
+2. Long continuous text is automatically chunked into readable paragraphs (4 sentences each)
+3. Text with existing line breaks preserves the original paragraph structure
+4. Empty or missing descriptions do not show the section (no empty box)
+5. Dark mode styling works correctly
+6. Works in all property modals:
+   - CMA comparable detail modal
+   - Property search result modal
+   - Any other property detail views
+
+---
+
+### FILES LIKELY TO BE MODIFIED
+
+Based on Contract Conduit implementation:
+- `server/routes.ts` — Add description to Repliers mapping
+- `shared/schema.ts` — Add description to type definitions
+- `client/src/components/cma/PropertyDetailModal.tsx` — Main CMA modal
+- `client/src/components/PropertyDetailModal.tsx` — If exists
+- Any CMA presentation builder modals
+
+---
+
+### COMMIT MESSAGE
+Add "About This Home" property description to detail modals
+
+Add description field to Repliers API mapping (details.description || remarks)
+Add description to property/comparable type definitions
+Implement smart paragraph chunking for continuous MLS text
+Support both newline-separated and continuous text formats
+Add to all property detail modals

@@ -517,6 +517,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         photos: string[];
         subdivision: string | null;
         daysOnMarket: number | null;
+        description: string | null;
       }
 
       let allResults: NormalizedProperty[] = [];
