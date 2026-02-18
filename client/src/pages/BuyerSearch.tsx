@@ -10,6 +10,7 @@ import { cn } from "@/lib/utils";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { STATUS_COLORS, getStatusConfig } from "@/lib/statusColors";
+import { SearchAutocomplete } from "@/components/SearchAutocomplete";
 
 interface AutocompleteInputProps {
   placeholder?: string;
@@ -1334,34 +1335,22 @@ export default function BuyerSearch() {
 
                 <Separator />
                 
-                {/* Quick Search - Address/MLS/Keyword */}
+                {/* Quick Search - Address/MLS/Keyword with Autocomplete */}
                 <div className="space-y-3">
                   <Label className="text-base font-semibold flex items-center gap-2">
                     <Search className="w-4 h-4" />
                     Quick Search
                   </Label>
-                  <div className="relative">
-                    <Input
-                      placeholder="Address, MLS#, or keywords..."
-                      value={filters.keywordSearch || ''}
-                      onChange={(e) => updateFilter('keywordSearch', e.target.value || undefined)}
-                      data-testid="input-keyword-search"
-                      className="pr-10"
-                    />
-                    {filters.keywordSearch && (
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="absolute right-1 top-1/2 -translate-y-1/2 h-7 w-7"
-                        onClick={() => updateFilter('keywordSearch', undefined)}
-                        data-testid="button-clear-keyword-search"
-                      >
-                        <X className="w-4 h-4" />
-                      </Button>
-                    )}
-                  </div>
+                  <SearchAutocomplete
+                    value={filters.keywordSearch || ''}
+                    onChange={(val) => updateFilter('keywordSearch', val || undefined)}
+                    onSelect={(suggestion) => {
+                      updateFilter('keywordSearch', suggestion.address || suggestion.mlsNumber);
+                    }}
+                    placeholder="Address, MLS#, or keywords..."
+                  />
                   <p className="text-xs text-muted-foreground">
-                    Search by address (e.g., "2500 Spring Creek"), MLS number, or keywords. Fuzzy matching is enabled.
+                    Search by address (e.g., "2500 Spring Creek"), MLS number, or keywords. Suggestions appear as you type.
                   </p>
                 </div>
 

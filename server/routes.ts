@@ -1978,6 +1978,77 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/properties/autocomplete", async (req, res) => {
+    try {
+      const query = ((req.query.q || req.query.search) as string || '').trim();
+      if (query.length < 3) {
+        res.json({ suggestions: [] });
+        return;
+      }
+
+      const client = getRepliersClient();
+      if (!client) {
+        res.json({ suggestions: [] });
+        return;
+      }
+
+      const isMlsNumber = /^(ACT|MLS)/i.test(query) || /^\d{5,}$/.test(query);
+
+      const searchParams: any = {
+        resultsPerPage: 8,
+        standardStatus: 'Active',
+        type: 'Sale',
+        fields: 'mlsNumber,address,listPrice,standardStatus,details',
+      };
+
+      if (isMlsNumber) {
+        searchParams.search = query;
+        searchParams.searchFields = 'mlsNumber';
+      } else {
+        searchParams.search = query;
+        searchParams.searchFields = 'address.streetNumber,address.streetName,address.city';
+        searchParams.fuzzySearch = true;
+      }
+
+      const response = await client.searchListings(searchParams);
+
+      const suggestions = (response.listings || []).map((listing: any) => {
+        const addr = listing.address || {};
+        const details = listing.details || {};
+        const streetParts = [addr.streetNumber, addr.streetName, addr.streetSuffix].filter(Boolean).join(' ');
+        const cityState = [addr.city, addr.state].filter(Boolean).join(', ');
+        const zip = addr.zip || '';
+
+        const rawBeds = details.bedrooms ?? details.numBedrooms ?? listing.bedroomsTotal ?? null;
+        const rawBaths = details.bathrooms ?? details.numBathrooms ?? listing.bathroomsTotalInteger ?? null;
+        const rawSqft = details.sqft ?? listing.livingArea ?? null;
+        const beds = typeof rawBeds === 'number' ? rawBeds : (typeof rawBeds === 'string' ? parseInt(rawBeds, 10) || null : null);
+        const baths = Array.isArray(rawBaths) ? null : (typeof rawBaths === 'number' ? rawBaths : (typeof rawBaths === 'string' ? parseFloat(rawBaths) || null : null));
+        const sqft = typeof rawSqft === 'number' ? rawSqft : (typeof rawSqft === 'string' ? parseInt(rawSqft, 10) || null : null);
+
+        return {
+          id: listing.mlsNumber,
+          type: isMlsNumber ? 'mls' : 'address',
+          label: streetParts || listing.mlsNumber,
+          sublabel: `${cityState} ${zip} | MLS# ${listing.mlsNumber}`.trim(),
+          mlsNumber: listing.mlsNumber,
+          address: streetParts,
+          city: addr.city || '',
+          price: listing.listPrice,
+          status: listing.standardStatus || 'Active',
+          beds,
+          baths,
+          sqft,
+        };
+      });
+
+      res.json({ suggestions });
+    } catch (error: any) {
+      console.error('Property autocomplete error:', error.message);
+      res.json({ suggestions: [] });
+    }
+  });
+
   app.get("/api/properties/:id", async (req, res) => {
     try {
       const { id } = req.params;

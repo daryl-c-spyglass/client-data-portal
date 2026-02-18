@@ -35,7 +35,7 @@ Primary property data is sourced from Repliers API and MLS Grid API. CMA searche
 - **Admin Panel**: Company branding, custom report pages, and user role management.
 - **Market Insights**: Year-over-Year price comparisons and neighborhood-level market statistics.
 - **Property Detail Page**: Enhanced property details with neighborhood reviews and boundary maps.
-- **Search Enhancements**: Autocomplete for cities, zip codes, subdivisions, and elementary schools.
+- **Search Enhancements**: Autocomplete for cities, zip codes, subdivisions, elementary schools, and Quick Search (address/MLS# property autocomplete with debounced suggestions via `/api/properties/autocomplete`).
 - **Dynamic Map Layers**: Toggle-able flood zone and school district overlays on property maps.
 
 ## External Dependencies

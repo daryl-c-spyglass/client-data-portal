@@ -1,0 +1,264 @@
+## Add Autocomplete to Quick Search in Buyer Search
+
+### CONTEXT
+
+On the Buyer Search page (`/buyer-search`), the "Quick Search" input allows users to search by address, MLS#, or keywords. Currently it requires the user to type and click "Apply" or press Enter.
+
+**Enhancement:** Add autocomplete suggestions that appear as the user types, showing matching addresses and MLS numbers from Repliers API.
+
+---
+
+### PHASE 1: INQUIRY — Find Existing Implementation
+
+Before making changes, locate and report:
+
+1. **Find the Quick Search component**
+   - Which file contains the Buyer Search page?
+   - Where is the Quick Search input defined?
+   - How does the current search work (what API endpoint, what parameters)?
+
+2. **Check for existing autocomplete components**
+   - Is there an existing autocomplete/combobox component in the codebase?
+   - Check for uses of Radix UI Combobox, Shadcn Combobox, or custom autocomplete
+   - Check if there's already an address search elsewhere (CMA, property search)
+
+3. **Check Repliers API capabilities**
+   - Is there an autocomplete/suggestions endpoint?
+   - Or do we need to use the standard search with a query parameter?
+
+**Report findings before proceeding.**
+
+---
+
+### PHASE 2: Implement Autocomplete
+
+**Option A: If Repliers has autocomplete endpoint**
+
+Use the dedicated autocomplete endpoint for suggestions.
+
+**Option B: Use standard search with debouncing**
+
+Query the property search endpoint with debounced input:
+```typescript
+// Debounced search for suggestions
+const [query, setQuery] = useState('');
+const [suggestions, setSuggestions] = useState([]);
+const [isLoading, setIsLoading] = useState(false);
+const [showSuggestions, setShowSuggestions] = useState(false);
+
+// Debounce the search
+useEffect(() => {
+  if (query.length < 3) {
+    setSuggestions([]);
+    return;
+  }
+
+  const timer = setTimeout(async () => {
+    setIsLoading(true);
+    try {
+      // Call API with partial query
+      const response = await fetch(`/api/properties/search?q=${encodeURIComponent(query)}&limit=10`);
+      const data = await response.json();
+      
+      // Format suggestions
+      const formatted = data.listings?.map((listing: any) => ({
+        id: listing.mlsNumber,
+        label: listing.address?.streetAddress || listing.mlsNumber,
+        sublabel: `${listing.address?.city}, ${listing.address?.state} | MLS# ${listing.mlsNumber}`,
+        mlsNumber: listing.mlsNumber,
+        address: listing.address?.streetAddress,
+      })) || [];
+      
+      setSuggestions(formatted);
+    } catch (error) {
+      console.error('Autocomplete error:', error);
+      setSuggestions([]);
+    } finally {
+      setIsLoading(false);
+    }
+  }, 300); // 300ms debounce
+
+  return () => clearTimeout(timer);
+}, [query]);
+```
+
+---
+
+### PHASE 3: Create Autocomplete UI Component
+
+Create or update the Quick Search input with dropdown suggestions:
+```tsx
+<div className="relative">
+  {/* Input */}
+  <Input
+    value={query}
+    onChange={(e) => {
+      setQuery(e.target.value);
+      setShowSuggestions(true);
+    }}
+    onFocus={() => setShowSuggestions(true)}
+    onBlur={() => {
+      // Delay to allow click on suggestion
+      setTimeout(() => setShowSuggestions(false), 200);
+    }}
+    placeholder="Address, MLS#, or keywords..."
+    className="w-full"
+  />
+
+  {/* Loading indicator */}
+  {isLoading && (
+    <div className="absolute right-3 top-1/2 -translate-y-1/2">
+      <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+    </div>
+  )}
+
+  {/* Suggestions dropdown */}
+  {showSuggestions && suggestions.length > 0 && (
+    <div className="absolute z-50 w-full mt-1 bg-background border border-border rounded-md shadow-lg max-h-[300px] overflow-y-auto">
+      {suggestions.map((suggestion) => (
+        <button
+          key={suggestion.id}
+          type="button"
+          className="w-full px-4 py-3 text-left hover:bg-muted focus:bg-muted transition-colors border-b border-border last:border-b-0"
+          onClick={() => {
+            setQuery(suggestion.address || suggestion.mlsNumber);
+            setShowSuggestions(false);
+            // Optionally trigger search immediately
+            handleSearch(suggestion.mlsNumber);
+          }}
+        >
+          <div className="font-medium text-sm">{suggestion.label}</div>
+          <div className="text-xs text-muted-foreground">{suggestion.sublabel}</div>
+        </button>
+      ))}
+    </div>
+  )}
+
+  {/* No results message */}
+  {showSuggestions && query.length >= 3 && !isLoading && suggestions.length === 0 && (
+    <div className="absolute z-50 w-full mt-1 bg-background border border-border rounded-md shadow-lg p-4 text-center text-sm text-muted-foreground">
+      No matching properties found
+    </div>
+  )}
+</div>
+```
+
+---
+
+### PHASE 4: Suggestion Types
+
+The autocomplete should support different result types:
+```typescript
+interface Suggestion {
+  id: string;
+  type: 'address' | 'mls' | 'keyword';
+  label: string;           // Primary display text
+  sublabel: string;        // Secondary info (city, state, MLS#)
+  mlsNumber?: string;      // For direct navigation
+  address?: string;        // Full address
+}
+
+// Display with icons based on type
+{suggestion.type === 'address' && <MapPin className="h-4 w-4 mr-2" />}
+{suggestion.type === 'mls' && <Hash className="h-4 w-4 mr-2" />}
+```
+
+---
+
+### PHASE 5: Behavior Requirements
+
+1. **Minimum characters:** Start showing suggestions after 3 characters typed
+2. **Debounce:** 300ms delay to avoid excessive API calls
+3. **Loading state:** Show spinner while fetching
+4. **Keyboard navigation:** 
+   - Arrow up/down to navigate suggestions
+   - Enter to select highlighted suggestion
+   - Escape to close dropdown
+5. **Click to select:** Clicking a suggestion fills the input and optionally triggers search
+6. **Click outside:** Close dropdown when clicking outside
+7. **MLS# detection:** If input looks like MLS# (starts with ACT, numbers only), prioritize MLS search
+
+---
+
+### PHASE 6: API Endpoint (if needed)
+
+If a dedicated autocomplete endpoint doesn't exist, create one:
+```typescript
+// server/routes.ts
+
+// GET /api/properties/autocomplete?q=123+main
+app.get('/api/properties/autocomplete', requireAuth, async (req, res) => {
+  const query = req.query.q as string;
+  
+  if (!query || query.length < 3) {
+    return res.json({ suggestions: [] });
+  }
+
+  try {
+    // Check if query looks like MLS number
+    const isMlsNumber = /^ACT/i.test(query) || /^\d+$/.test(query);
+
+    let params: any = {
+      resultsPerPage: 10,
+      status: 'A,U', // Active and Under Contract
+    };
+
+    if (isMlsNumber) {
+      params.mlsNumber = query;
+    } else {
+      params.search = query; // Address/keyword search
+    }
+
+    const response = await repliersApi.getListings(params);
+
+    const suggestions = response.listings?.map((listing: any) => ({
+      id: listing.mlsNumber,
+      type: isMlsNumber ? 'mls' : 'address',
+      label: listing.address?.streetAddress || listing.mlsNumber,
+      sublabel: `${listing.address?.city || ''}, ${listing.address?.state || ''} ${listing.address?.zip || ''} | MLS# ${listing.mlsNumber}`,
+      mlsNumber: listing.mlsNumber,
+      address: listing.address?.streetAddress,
+      price: listing.listPrice,
+    })) || [];
+
+    res.json({ suggestions });
+  } catch (error) {
+    console.error('Autocomplete error:', error);
+    res.status(500).json({ error: 'Failed to fetch suggestions' });
+  }
+});
+```
+
+---
+
+### ACCEPTANCE CRITERIA
+
+1. User types in Quick Search field, suggestions appear after 3+ characters
+2. Suggestions show address and MLS# for each matching property
+3. Suggestions update as user continues typing (debounced)
+4. Clicking a suggestion fills the input
+5. Pressing Enter on a suggestion triggers the search
+6. Dropdown closes when clicking outside or pressing Escape
+7. Loading spinner shows while fetching suggestions
+8. "No results" message shows when no matches found
+9. Works with both address searches and MLS# searches
+10. Keyboard navigation (up/down arrows) works
+
+---
+
+### FILES LIKELY AFFECTED
+
+- `client/src/pages/BuyerSearch.tsx` — Main page with Quick Search input
+- `server/routes.ts` — Add autocomplete endpoint if needed
+- Possibly create: `client/src/components/SearchAutocomplete.tsx` — Reusable component
+
+---
+
+### COMMIT MESSAGE
+Add autocomplete suggestions to Buyer Search Quick Search
+
+Add debounced autocomplete as user types (300ms)
+Show address and MLS# suggestions from Repliers API
+Support keyboard navigation and click selection
+Add loading state and "no results" feedback
+Create /api/properties/autocomplete endpoint
