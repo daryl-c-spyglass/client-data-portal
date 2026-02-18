@@ -1,0 +1,121 @@
+## INQUIRY ONLY — Audit Buyer Search Fields and Repliers API Mapping
+
+### CONTEXT
+
+The Buyer Search page has many filter fields requiring extensive scrolling. Before improving the UI/UX, we need to understand:
+1. What fields currently exist
+2. Which fields actually map to Repliers API parameters
+3. Which fields are used vs. unused
+4. How the search query is built
+
+---
+
+### TASK 1: List All Current Filter Fields
+
+Find and document every filter field in the Buyer Search UI:
+
+**File:** `client/src/pages/BuyerSearch.tsx`
+
+Create a complete inventory:
+#Field NameInput TypeSectionRequired?1Status (Active, Under Contract, Closed)ToggleStatusNo2............
+
+Group by section (e.g., Status, Location, Price, Property Details, Features, etc.)
+
+---
+
+### TASK 2: Map Fields to Repliers API Parameters
+
+For each field, document:
+1. What Repliers API parameter it maps to
+2. Whether the mapping is confirmed working
+3. Any transformation applied (e.g., UI value → API value)
+
+Check against:
+- Repliers API documentation
+- The actual API call being made in the code
+- `server/routes.ts` or wherever the Repliers query is built
+UI FieldRepliers ParameterMapping Confirmed?NotesStatus: Activestatus=AYesBeds MinminBedsYesPooldetails.pool?Needs verification
+
+---
+
+### TASK 3: Identify Unused or Non-Functional Fields
+
+Find any fields that:
+1. Exist in UI but don't map to any API parameter
+2. Map to API but Repliers doesn't support that filter
+3. Are always ignored in the query builder
+
+---
+
+### TASK 4: Document Current Search Flow
+
+Explain how the search works:
+
+1. User fills filters → Where is state stored?
+2. User clicks "Search Properties" → What function is called?
+3. How is the API query built? (show the query builder logic)
+4. What endpoint is called? (`/api/repliers/listings`? `/api/properties/search`?)
+5. How are results displayed?
+
+---
+
+### TASK 5: Analyze Field Usage Patterns
+
+If possible, identify:
+1. Which fields are most commonly used (based on code defaults or logic)
+2. Which fields are "advanced" and rarely needed
+3. Which fields have the most impact on search results
+
+---
+
+### TASK 6: Document UI Structure
+
+Describe the current layout:
+
+1. How are filters organized? (single column, sections, tabs?)
+2. What is the scroll depth? (how many viewport heights?)
+3. Are there any collapsible sections?
+4. Is there a "Show More Filters" / "Advanced" toggle?
+
+---
+
+### REPORT FORMAT
+Buyer Search Audit Report
+1. Filter Field Inventory
+Total fields: [number]
+[table of all fields]
+2. Repliers API Mapping
+Fields with confirmed mapping: [number]
+Fields with unconfirmed mapping: [number]
+Fields with no mapping: [number]
+[mapping table]
+3. Non-Functional Fields
+[list any fields that don't work]
+4. Search Flow
+[step by step explanation with code references]
+5. Field Categories by Importance
+Essential (always visible):
+
+[list]
+
+Common (frequently used):
+
+[list]
+
+Advanced (rarely used):
+
+[list]
+
+6. Current UI Structure
+Layout: [description]
+Scroll depth: [estimate]
+Collapsible sections: [yes/no]
+Mobile responsive: [yes/no]
+7. Recommendations for UI/UX Improvement
+[initial thoughts based on findings]
+
+---
+
+### DO NOT MAKE ANY CHANGES
+
+This is an audit only. Report findings for UI/UX planning.
