@@ -8,10 +8,10 @@ interface RepliersConfig {
 }
 
 interface ListingsSearchParams {
-  status?: string;  // Legacy: A=Available, U=Unavailable
-  standardStatus?: string;  // RESO-compliant: Active, Pending, Closed, Active Under Contract, etc.
-  lastStatus?: string;  // Detailed sub-status (use with status, not standardStatus)
-  type?: string;  // Sale or Lease - use 'Sale' to exclude rental/lease listings
+  status?: string;
+  standardStatus?: string;
+  lastStatus?: string;
+  type?: string;
   minPrice?: number;
   maxPrice?: number;
   minBeds?: number;
@@ -26,27 +26,31 @@ interface ListingsSearchParams {
   city?: string;
   postalCode?: string;
   neighborhood?: string;
-  subdivision?: string;  // MLS Subdivision field - distinct from neighborhood
+  subdivision?: string;
   minLat?: number;
   maxLat?: number;
   minLng?: number;
   maxLng?: number;
+  lat?: number;
+  long?: number;
+  radius?: number;
   pageNum?: number;
   resultsPerPage?: number;
   sortBy?: string;
   fields?: string;
   class?: string;
-  // Keyword/address search params
-  search?: string;  // Free-text search (address, MLS#, keywords)
-  searchFields?: string;  // Comma-separated fields to search in (e.g., address.streetName,address.streetNumber)
-  fuzzySearch?: boolean;  // Enable typo tolerance
-  // Date range filters
-  minSoldDate?: string;  // Minimum sold date in YYYY-MM-DD format for Closed listings
-  maxSoldDate?: string;  // Maximum sold date in YYYY-MM-DD format
-  // Raw MLS field filters - use contains: prefix for partial matching
-  rawElementarySchool?: string;  // Filters using raw.ElementarySchool=contains:{value}
-  rawMiddleSchool?: string;      // Filters using raw.MiddleOrJuniorSchool=contains:{value}
-  rawHighSchool?: string;        // Filters using raw.HighSchool=contains:{value}
+  search?: string;
+  searchFields?: string;
+  fuzzySearch?: boolean;
+  minSoldDate?: string;
+  maxSoldDate?: string;
+  minYearBuilt?: number;
+  maxYearBuilt?: number;
+  minGarageSpaces?: number;
+  minStories?: number;
+  minListDate?: string;
+  maxListDate?: string;
+  rawFilters?: Record<string, string>;
 }
 
 interface RepliersListing {
@@ -415,6 +419,9 @@ class RepliersClient {
     if (params.postalCode) queryParams.append('zip', params.postalCode);
     if (params.neighborhood) queryParams.append('neighborhood', params.neighborhood);
     if (params.subdivision) queryParams.append('subdivision', params.subdivision);
+    if (params.lat) queryParams.append('lat', params.lat.toString());
+    if (params.long) queryParams.append('long', params.long.toString());
+    if (params.radius) queryParams.append('radius', params.radius.toString());
     if (params.minLat) queryParams.append('minLat', params.minLat.toString());
     if (params.maxLat) queryParams.append('maxLat', params.maxLat.toString());
     if (params.minLng) queryParams.append('minLng', params.minLng.toString());
@@ -424,25 +431,21 @@ class RepliersClient {
     if (params.sortBy) queryParams.append('sortBy', params.sortBy);
     if (params.fields) queryParams.append('fields', params.fields);
     if (params.class) queryParams.append('class', normalizeRepliersClass(params.class));
-    // Keyword/address search params
     if (params.search) queryParams.append('search', params.search);
     if (params.searchFields) queryParams.append('searchFields', params.searchFields);
     if (params.fuzzySearch) queryParams.append('fuzzySearch', 'true');
-    
-    // Date range filters for sold/closed listings
     if (params.minSoldDate) queryParams.append('minSoldDate', params.minSoldDate);
     if (params.maxSoldDate) queryParams.append('maxSoldDate', params.maxSoldDate);
-    
-    // Raw MLS field filters - use contains: prefix for partial matching per Repliers API
-    // Reference: https://api.repliers.io/listings?raw.ElementarySchool=contains:{input}
-    if (params.rawElementarySchool) {
-      queryParams.append('raw.ElementarySchool', `contains:${params.rawElementarySchool}`);
-    }
-    if (params.rawMiddleSchool) {
-      queryParams.append('raw.MiddleOrJuniorSchool', `contains:${params.rawMiddleSchool}`);
-    }
-    if (params.rawHighSchool) {
-      queryParams.append('raw.HighSchool', `contains:${params.rawHighSchool}`);
+    if (params.minYearBuilt) queryParams.append('minYearBuilt', params.minYearBuilt.toString());
+    if (params.maxYearBuilt) queryParams.append('maxYearBuilt', params.maxYearBuilt.toString());
+    if (params.minGarageSpaces) queryParams.append('minGarageSpaces', params.minGarageSpaces.toString());
+    if (params.minStories) queryParams.append('minStories', params.minStories.toString());
+    if (params.minListDate) queryParams.append('minListDate', params.minListDate);
+    if (params.maxListDate) queryParams.append('maxListDate', params.maxListDate);
+    if (params.rawFilters) {
+      for (const [key, value] of Object.entries(params.rawFilters)) {
+        queryParams.append(key, value);
+      }
     }
 
     try {

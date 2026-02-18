@@ -1,0 +1,479 @@
+## Wire Buyer Search Fields to Repliers API — Based on Cross-Match Testing
+
+### REFERENCE DOCUMENT
+docs/REPLIERS_API_CROSS_MATCH_REPORT.md
+
+### CONTEXT
+
+API testing revealed:
+- 80+ UI filter fields exist, only ~15 were wired
+- Many "standard" params are IGNORED (subdivision, county, schoolDistrict, pool, etc.)
+- Raw field filtering (`raw.FieldName=contains:value`) is the correct approach
+- Bounding box (minLat/maxLat) is ignored — must use lat/long/radius
+- Multi-value city/zip returns 0 — needs parallel queries
+
+---
+
+## PHASE 1: Audit Current Query Builder
+
+**INQUIRY FIRST:** Find and report the current query builder:
+
+1. Where is the Repliers search query built? (server/routes.ts?)
+2. What parameters are currently being passed?
+3. How is the map/geographic filtering currently implemented?
+4. How are multi-value fields (cities, zips) currently handled?
+
+Report the current code before making changes.
+
+---
+
+## PHASE 2: Update Query Builder with Confirmed Working Parameters
+
+### 2.1 Native Parameters (Confirmed Working)
+```typescript
+// These work as native API parameters
+if (filters.minYearBuilt) params.minYearBuilt = filters.minYearBuilt;
+if (filters.maxYearBuilt) params.maxYearBuilt = filters.maxYearBuilt;
+if (filters.minGarageSpaces) params.minGarageSpaces = filters.minGarageSpaces;
+if (filters.minStories) params.minStories = filters.minStories;
+if (filters.minListDate) params.minListDate = filters.minListDate;
+if (filters.maxListDate) params.maxListDate = filters.maxListDate;
+if (filters.listingType === 'sale') params.type = 'sale';
+if (filters.listingType === 'lease') params.type = 'lease';
+```
+
+### 2.2 Raw Field Filtering (The Big Fix)
+
+Replace ignored standard params with raw field equivalents:
+```typescript
+// SUBDIVISION — `subdivision` param is IGNORED, use raw field
+if (filters.subdivision) {
+  params['raw.SubdivisionName'] = `contains:${filters.subdivision}`;
+}
+
+// COUNTY — `county` param is IGNORED, use raw field
+if (filters.county) {
+  params['raw.CountyOrParish'] = `contains:${filters.county}`;
+}
+
+// SCHOOL DISTRICT — `schoolDistrict` param is IGNORED, use raw field
+if (filters.schoolDistrict) {
+  params['raw.HighSchoolDistrict'] = `contains:${filters.schoolDistrict}`;
+}
+
+// INDIVIDUAL SCHOOLS
+if (filters.elementarySchool) {
+  params['raw.ElementarySchool'] = `contains:${filters.elementarySchool}`;
+}
+if (filters.middleSchool) {
+  params['raw.MiddleOrJuniorSchool'] = `contains:${filters.middleSchool}`;
+}
+if (filters.highSchool) {
+  params['raw.HighSchool'] = `contains:${filters.highSchool}`;
+}
+```
+
+### 2.3 Boolean Feature Flags (Use raw.*YN=true)
+```typescript
+// POOL — `pool` and `hasPool` params are IGNORED
+if (filters.hasPool) {
+  params['raw.PoolPrivateYN'] = 'true';
+  // Alternative: params['raw.PoolFeatures'] = 'contains:Pool';
+}
+
+// NEW CONSTRUCTION — `newConstruction` param is IGNORED
+if (filters.newConstruction) {
+  params['raw.NewConstructionYN'] = 'true';  // Use true/false, NOT "Yes"/"No"
+}
+
+// WATERFRONT — `waterfront` param is IGNORED
+if (filters.waterfront) {
+  params['raw.WaterfrontYN'] = 'true';
+}
+
+// HORSE PROPERTY
+if (filters.horseProperty) {
+  params['raw.HorseYN'] = 'true';
+}
+```
+
+### 2.4 Feature Text Search
+```typescript
+// COMMUNITY FEATURES (gated, golf course, etc.)
+if (filters.gatedCommunity) {
+  params['raw.CommunityFeatures'] = 'contains:Gated';
+}
+if (filters.golfCourse) {
+  params['raw.CommunityFeatures'] = 'contains:Golf';
+}
+
+// PARKING FEATURES
+if (filters.attachedGarage) {
+  params['raw.ParkingFeatures'] = 'contains:Attached';
+}
+
+// VIEW
+if (filters.hasView) {
+  params['raw.View'] = 'contains:'; // Will match any view
+}
+if (filters.viewType) {
+  params['raw.View'] = `contains:${filters.viewType}`;
+}
+```
+
+---
+
+## PHASE 3: Fix Geographic Filtering (Critical Bug)
+
+### Current (BROKEN):
+```typescript
+// This is SILENTLY IGNORED by Repliers API
+params.minLat = bounds.south;
+params.maxLat = bounds.north;
+params.minLng = bounds.west;
+params.maxLng = bounds.east;
+```
+
+### Fixed (Use lat/long/radius):
+```typescript
+// Convert bounding box to center + radius
+function boundingBoxToRadius(bounds: {
+  north: number;
+  south: number;
+  east: number;
+  west: number;
+}): { lat: number; long: number; radius: number } {
+  // Calculate center point
+  const lat = (bounds.north + bounds.south) / 2;
+  const long = (bounds.east + bounds.west) / 2;
+  
+  // Calculate radius in km (distance from center to corner)
+  const latDiff = Math.abs(bounds.north - bounds.south) / 2;
+  const longDiff = Math.abs(bounds.east - bounds.west) / 2;
+  
+  // Approximate km per degree at Austin's latitude (~30°)
+  const kmPerDegreeLat = 111;
+  const kmPerDegreeLong = 96; // cos(30°) * 111
+  
+  const radiusLat = latDiff * kmPerDegreeLat;
+  const radiusLong = longDiff * kmPerDegreeLong;
+  
+  // Use the larger radius to ensure full coverage
+  const radius = Math.ceil(Math.max(radiusLat, radiusLong));
+  
+  return { lat, long, radius };
+}
+
+// In the query builder:
+if (filters.bounds) {
+  const { lat, long, radius } = boundingBoxToRadius(filters.bounds);
+  params.lat = lat;
+  params.long = long;
+  params.radius = radius;
+}
+
+// If using map polygon (GeoJSON), that still works:
+if (filters.mapPolygon) {
+  params.map = filters.mapPolygon;
+}
+```
+
+---
+
+## PHASE 4: Handle Multi-Value Fields (Parallel Queries)
+
+Multi-value city/zip returns 0 results. Must use parallel queries:
+```typescript
+// Multi-city search with parallel queries
+async function searchWithMultipleLocations(
+  baseParams: Record<string, any>,
+  cities?: string[],
+  zips?: string[]
+): Promise<{ listings: Listing[]; count: number }> {
+  
+  // If single values, use normal query
+  if ((!cities || cities.length <= 1) && (!zips || zips.length <= 1)) {
+    if (cities?.[0]) baseParams.city = cities[0];
+    if (zips?.[0]) baseParams.zip = zips[0];
+    return await fetchFromRepliers(baseParams);
+  }
+
+  // Multiple values — parallel queries
+  const queries: Promise<any>[] = [];
+  
+  if (cities && cities.length > 1) {
+    for (const city of cities) {
+      queries.push(fetchFromRepliers({ ...baseParams, city }));
+    }
+  } else if (zips && zips.length > 1) {
+    for (const zip of zips) {
+      queries.push(fetchFromRepliers({ ...baseParams, zip }));
+    }
+  }
+
+  const results = await Promise.all(queries);
+  
+  // Merge and deduplicate by mlsNumber
+  const seen = new Set<string>();
+  const merged: Listing[] = [];
+  let totalCount = 0;
+  
+  for (const result of results) {
+    totalCount += result.count || 0;
+    for (const listing of result.listings || []) {
+      if (!seen.has(listing.mlsNumber)) {
+        seen.add(listing.mlsNumber);
+        merged.push(listing);
+      }
+    }
+  }
+  
+  return { listings: merged, count: merged.length };
+}
+```
+
+---
+
+## PHASE 5: Post-Filtering for Unsupported Parameters
+
+These params are ignored by API — filter results server-side:
+```typescript
+function postFilterListings(
+  listings: Listing[],
+  filters: BuyerSearchFilters
+): Listing[] {
+  return listings.filter(listing => {
+    
+    // LOT SIZE (API ignores minLotSize/maxLotSize)
+    if (filters.minLotSize) {
+      const lotSqft = listing.raw?.LotSizeSquareFeet || 
+                      listing.details?.lotSizeArea || 0;
+      if (lotSqft < filters.minLotSize) return false;
+    }
+    if (filters.maxLotSize) {
+      const lotSqft = listing.raw?.LotSizeSquareFeet || 
+                      listing.details?.lotSizeArea || 0;
+      if (lotSqft > filters.maxLotSize) return false;
+    }
+
+    // LOT ACRES
+    if (filters.minLotAcres) {
+      const acres = listing.raw?.LotSizeAcres || 
+                    (listing.raw?.LotSizeSquareFeet ? listing.raw.LotSizeSquareFeet / 43560 : 0);
+      if (acres < filters.minLotAcres) return false;
+    }
+
+    // HOA FEE (API ignores maxHoaFee)
+    if (filters.maxHoaFee !== undefined) {
+      const hoaFee = listing.raw?.AssociationFee || 0;
+      if (hoaFee > filters.maxHoaFee) return false;
+    }
+    if (filters.noHoa) {
+      const hoaFee = listing.raw?.AssociationFee || 0;
+      if (hoaFee > 0) return false;
+    }
+
+    // DAYS ON MARKET
+    if (filters.maxDaysOnMarket) {
+      const dom = listing.raw?.DaysOnMarket || 
+                  listing.details?.daysOnMarket || 0;
+      if (dom > filters.maxDaysOnMarket) return false;
+    }
+
+    return true;
+  });
+}
+
+// Usage in route handler:
+let result = await searchRepliers(params);
+if (needsPostFiltering(filters)) {
+  result.listings = postFilterListings(result.listings, filters);
+  result.count = result.listings.length;
+}
+```
+
+---
+
+## PHASE 6: Update Filter Interface Types
+
+**File:** `shared/types.ts` or wherever BuyerSearchFilters is defined
+```typescript
+interface BuyerSearchFilters {
+  // === STATUS ===
+  statusActive?: boolean;
+  statusUnderContract?: boolean;
+  statusClosed?: boolean;
+  
+  // === LISTING TYPE ===
+  listingType?: 'sale' | 'lease';
+  
+  // === PRICE ===
+  minPrice?: number;
+  maxPrice?: number;
+  
+  // === BEDS/BATHS ===
+  minBeds?: number;
+  maxBeds?: number;
+  minBaths?: number;
+  maxBaths?: number;
+  
+  // === SIZE ===
+  minSqft?: number;
+  maxSqft?: number;
+  minLotSize?: number;      // Post-filtered (API ignores)
+  maxLotSize?: number;      // Post-filtered (API ignores)
+  minLotAcres?: number;     // Post-filtered
+  
+  // === YEAR BUILT (Works) ===
+  minYearBuilt?: number;
+  maxYearBuilt?: number;
+  
+  // === GARAGE (Works) ===
+  minGarageSpaces?: number;
+  
+  // === STORIES (Works) ===
+  minStories?: number;
+  maxStories?: number;
+  
+  // === PROPERTY TYPE ===
+  propertyType?: string;
+  propertySubType?: string;
+  
+  // === LOCATION (Single value only) ===
+  city?: string;
+  cities?: string[];        // Parallel queries
+  zip?: string;
+  zips?: string[];          // Parallel queries
+  subdivision?: string;     // Maps to raw.SubdivisionName
+  county?: string;          // Maps to raw.CountyOrParish
+  
+  // === SCHOOLS (Work via raw fields) ===
+  schoolDistrict?: string;  // Maps to raw.HighSchoolDistrict
+  elementarySchool?: string;
+  middleSchool?: string;
+  highSchool?: string;
+  
+  // === FEATURES (Work via raw.*YN=true) ===
+  hasPool?: boolean;
+  newConstruction?: boolean;
+  waterfront?: boolean;
+  horseProperty?: boolean;
+  gatedCommunity?: boolean;
+  golfCourse?: boolean;
+  
+  // === HOA (Post-filtered) ===
+  maxHoaFee?: number;
+  noHoa?: boolean;
+  
+  // === DATES (Work) ===
+  minListDate?: string;
+  maxListDate?: string;
+  
+  // === DAYS ON MARKET (Post-filtered) ===
+  maxDaysOnMarket?: number;
+  
+  // === GEOGRAPHIC ===
+  bounds?: {
+    north: number;
+    south: number;
+    east: number;
+    west: number;
+  };
+  latitude?: number;
+  longitude?: number;
+  radius?: number;          // km
+  mapPolygon?: number[][][];
+  
+  // === SEARCH ===
+  search?: string;
+  mlsNumber?: string;
+}
+```
+
+---
+
+## PHASE 7: Connect UI Fields to New Parameters
+
+**File:** `client/src/pages/BuyerSearch.tsx`
+
+Ensure each UI filter field updates the correct state property that maps to the working API parameter.
+
+For each filter section, verify:
+1. UI input updates correct state field
+2. State field is included in API request
+3. API request uses correct parameter format (raw.* for most)
+
+---
+
+## ACCEPTANCE CRITERIA
+
+### Native Parameters
+- [ ] Year Built filter works (results change with minYearBuilt/maxYearBuilt)
+- [ ] Garage Spaces filter works (results scale correctly)
+- [ ] Stories filter works
+- [ ] List Date filter works
+
+### Raw Field Parameters
+- [ ] Subdivision filter works (via raw.SubdivisionName)
+- [ ] County filter works (via raw.CountyOrParish)
+- [ ] School District filter works (via raw.HighSchoolDistrict)
+- [ ] Elementary/Middle/High School filters work
+- [ ] Pool filter works (via raw.PoolPrivateYN or raw.PoolFeatures)
+- [ ] New Construction filter works (via raw.NewConstructionYN=true)
+- [ ] Waterfront filter works (via raw.WaterfrontYN=true)
+
+### Geographic Filtering
+- [ ] Map pan/zoom updates search results (using lat/long/radius, NOT bounding box)
+- [ ] Drawn polygon filtering still works
+
+### Multi-Value Handling
+- [ ] Multiple cities search returns combined results (parallel queries)
+- [ ] Multiple zips search returns combined results
+
+### Post-Filtering
+- [ ] Lot Size filter works (post-filtered)
+- [ ] HOA Fee filter works (post-filtered)
+- [ ] Days on Market filter works (post-filtered)
+
+---
+
+## FILES TO MODIFY
+
+- `server/routes.ts` — Query builder, parallel queries, post-filtering
+- `client/src/pages/BuyerSearch.tsx` — UI filter state mapping
+- `shared/types.ts` — Filter interface definitions
+
+---
+
+## TESTING
+
+After implementation, test each filter:
+```bash
+# Test subdivision (should NOT equal baseline 29,753)
+curl "https://api.repliers.io/listings?raw.SubdivisionName=contains:Shady%20Hollow&resultsPerPage=1" \
+  -H "REPLIERS-API-KEY: $REPLIERS_API_KEY" | jq '.count'
+
+# Test school district
+curl "https://api.repliers.io/listings?raw.HighSchoolDistrict=contains:Austin%20ISD&resultsPerPage=1" \
+  -H "REPLIERS-API-KEY: $REPLIERS_API_KEY" | jq '.count'
+
+# Test new construction
+curl "https://api.repliers.io/listings?raw.NewConstructionYN=true&resultsPerPage=1" \
+  -H "REPLIERS-API-KEY: $REPLIERS_API_KEY" | jq '.count'
+```
+
+---
+
+## COMMIT MESSAGE
+Wire 40+ Buyer Search fields to Repliers API
+
+Replace ignored params with raw.* field filtering
+Add subdivision via raw.SubdivisionName (not subdivision)
+Add county via raw.CountyOrParish
+Add schools via raw.HighSchoolDistrict, raw.ElementarySchool, etc.
+Add features via raw.*YN=true (pool, waterfront, new construction)
+Fix geographic filtering: bounding box -> lat/long/radius
+Add parallel queries for multi-city/zip search
+Add post-filtering for lot size, HOA fee, days on market
+
+Ref: docs/REPLIERS_API_CROSS_MATCH_REPORT.md

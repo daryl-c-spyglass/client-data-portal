@@ -667,47 +667,64 @@ export default function BuyerSearch() {
   const buildRepliersQueryString = () => {
     const params = new URLSearchParams();
     
-    // Status mapping for Repliers API
+    const addRawFilter = (field: string, value: string | undefined, mode?: string) => {
+      if (!value) return;
+      const operator = mode === 'Not' ? 'notContains:' : 'contains:';
+      params.set(`raw.${field}`, `${operator}${value}`);
+    };
+    
+    const setRawBool = (field: string, value: string | undefined) => {
+      if (value === 'yes') params.set(`raw.${field}`, 'true');
+      else if (value === 'no') params.set(`raw.${field}`, 'false');
+    };
+
     if (filters.statusActive) params.set('status', 'A');
     if (filters.statusUnderContract) params.set('status', 'U');
     if (filters.statusClosed) params.set('status', 'S');
     
-    // Price filters
     if (filters.minPrice) params.set('minPrice', String(filters.minPrice));
     if (filters.maxPrice) params.set('maxPrice', String(filters.maxPrice));
     
-    // Beds/Baths
     if (filters.minBeds) params.set('minBeds', String(filters.minBeds));
     if (filters.maxBeds) params.set('maxBeds', String(filters.maxBeds));
     if (filters.minTotalBaths) params.set('minBaths', String(filters.minTotalBaths));
     if (filters.maxTotalBaths) params.set('maxBaths', String(filters.maxTotalBaths));
     
-    // Size
+    if (filters.minFullBaths) params.set('minFullBaths', String(filters.minFullBaths));
+    if (filters.maxFullBaths) params.set('maxFullBaths', String(filters.maxFullBaths));
+    if (filters.minHalfBaths) params.set('minHalfBaths', String(filters.minHalfBaths));
+    if (filters.maxHalfBaths) params.set('maxHalfBaths', String(filters.maxHalfBaths));
+    
+    if (filters.minMainLevelBeds) params.set('minMainLevelBeds', String(filters.minMainLevelBeds));
+    if (filters.maxMainLevelBeds) params.set('maxMainLevelBeds', String(filters.maxMainLevelBeds));
+    
     if (filters.minLivingArea) params.set('minSqft', String(filters.minLivingArea));
     if (filters.maxLivingArea) params.set('maxSqft', String(filters.maxLivingArea));
     
-    // Location
-    if (filters.city) {
-      const cities = filters.city.split(',').map(c => c.trim()).filter(c => c);
-      if (cities.length > 0) params.set('city', cities[0]);
-    }
-    if (filters.postalCode) {
-      const zips = filters.postalCode.split(',').map(z => z.trim()).filter(z => z);
-      if (zips.length > 0) params.set('postalCode', zips[0]);
-    }
-    // Subdivision filter - maps to 'subdivision' parameter for local filtering
-    if (filters.subdivision) {
-      const subdivisions = filters.subdivision.split(',').map(s => s.trim()).filter(s => s);
-      if (subdivisions.length > 0) params.set('subdivision', subdivisions[0]);
+    if (filters.minYearBuilt) params.set('minYearBuilt', String(filters.minYearBuilt));
+    if (filters.maxYearBuilt) params.set('maxYearBuilt', String(filters.maxYearBuilt));
+    if (filters.minGarageSpaces) params.set('minGarageSpaces', String(filters.minGarageSpaces));
+    if (filters.maxGarageSpaces) params.set('maxGarageSpaces', String(filters.maxGarageSpaces));
+    if (filters.minTotalParkingSpaces) params.set('minTotalParkingSpaces', String(filters.minTotalParkingSpaces));
+    if (filters.maxTotalParkingSpaces) params.set('maxTotalParkingSpaces', String(filters.maxTotalParkingSpaces));
+    
+    if (filters.levels) {
+      const levelsNum = parseInt(filters.levels);
+      if (!isNaN(levelsNum)) params.set('minStories', String(levelsNum));
     }
     
-    // Property type - map to Repliers class values (residential, condo, commercial)
-    // Also pass propertySubType for server-side filtering since Repliers' class filter is too broad
+    if (filters.city) params.set('city', filters.city.trim());
+    if (filters.postalCode) params.set('postalCode', filters.postalCode.trim());
+    
+    addRawFilter('SubdivisionName', filters.subdivision, filters.subdivisionMode);
+    addRawFilter('CountyOrParish', filters.county, filters.countyMode);
+    
+    if (filters.mlsNumber) params.set('search', filters.mlsNumber.trim());
+    if (filters.mlsAreas) addRawFilter('MLSAreaMajor', filters.mlsAreas, filters.mlsAreasMode);
+    
     if (filters.propertySubType) {
       const subType = filters.propertySubType.toLowerCase();
-      // Pass original value for server-side filtering
       params.set('propertySubType', filters.propertySubType);
-      // Also set class filter to reduce initial results
       if (subType === 'single family' || subType === 'townhouse') {
         params.set('propertyType', 'residential');
       } else if (subType === 'condo') {
@@ -717,30 +734,125 @@ export default function BuyerSearch() {
       }
     }
     
-    // Street address filters (server-side filtering with geocoding)
-    if (filters.streetName) {
-      params.set('streetName', filters.streetName.trim());
-    }
-    if (filters.streetNumber) {
-      params.set('streetNumber', filters.streetNumber.trim());
-    }
+    if (filters.streetName) params.set('streetName', filters.streetName.trim());
+    if (filters.streetNumber) params.set('streetNumber', filters.streetNumber.trim());
+    if (filters.streetNumberMin) params.set('streetNumberMin', String(filters.streetNumberMin));
+    if (filters.streetNumberMax) params.set('streetNumberMax', String(filters.streetNumberMax));
+    if (filters.unitNumber) addRawFilter('UnitNumber', filters.unitNumber, filters.unitNumberMode);
+    if (filters.streetList) params.set('streetList', filters.streetList.trim());
     
-    // Keyword/address search with fuzzy matching
-    if (filters.keywordSearch) {
+    if (filters.keywordSearch && !filters.mlsNumber) {
       params.set('search', filters.keywordSearch.trim());
-      // Search across address fields and MLS number
       params.set('searchFields', 'address.streetNumber,address.streetName,mlsNumber');
       if (filters.fuzzySearch !== false) {
-        params.set('fuzzySearch', 'true'); // Enable by default for typo tolerance
+        params.set('fuzzySearch', 'true');
       }
     }
     
-    // Transaction type (Sale vs Lease) - default to 'sale' to exclude rentals
+    if (filters.publicRemarks && !filters.keywordSearch && !filters.mlsNumber) {
+      params.set('search', filters.publicRemarks.trim());
+    }
+    
     if (filters.listingType && filters.listingType !== 'all') {
       params.set('type', filters.listingType);
     }
     
-    // Sort - Repliers requires specific format like listPriceAsc or listPriceDesc
+    if (filters.minListDate) params.set('minListDate', filters.minListDate);
+    if (filters.maxListDate) params.set('maxListDate', filters.maxListDate);
+    if (filters.dateRangeFrom) params.set('minSoldDate', filters.dateRangeFrom);
+    if (filters.dateRangeTo) params.set('maxSoldDate', filters.dateRangeTo);
+    
+    if (filters.priceDrop === 'yes' && filters.priceDropDateFrom) {
+      params.set('priceDropDateFrom', filters.priceDropDateFrom);
+    }
+    if (filters.priceDrop === 'yes' && filters.priceDropDateTo) {
+      params.set('priceDropDateTo', filters.priceDropDateTo);
+    }
+    
+    addRawFilter('ElementarySchool', filters.elementarySchool, filters.elementarySchoolMode);
+    addRawFilter('MiddleOrJuniorSchool', filters.middleSchool, filters.middleSchoolMode);
+    addRawFilter('HighSchool', filters.highSchool, filters.highSchoolMode);
+    addRawFilter('HighSchoolDistrict', filters.schoolDistrict, filters.schoolDistrictMode);
+    
+    if (filters.minLotSizeSqFt) params.set('minLotSizeSqFt', String(filters.minLotSizeSqFt));
+    if (filters.maxLotSizeSqFt) params.set('maxLotSizeSqFt', String(filters.maxLotSizeSqFt));
+    if (filters.minLotSizeAcres) params.set('minLotSizeAcres', String(filters.minLotSizeAcres));
+    if (filters.maxLotSizeAcres) params.set('maxLotSizeAcres', String(filters.maxLotSizeAcres));
+    
+    if (filters.hoa === 'no') {
+      params.set('noHoa', 'true');
+    } else if (filters.hoa) {
+      const hoaMax = parseFloat(filters.hoa);
+      if (!isNaN(hoaMax)) params.set('maxHoaFee', String(hoaMax));
+    }
+    
+    setRawBool('PoolPrivateYN', filters.privatePool);
+    addRawFilter('PoolFeatures', filters.poolFeatures, filters.poolFeaturesMode);
+    
+    setRawBool('WaterfrontYN', filters.waterfront);
+    addRawFilter('WaterfrontFeatures', filters.waterfrontFeatures, filters.waterfrontFeaturesMode);
+    
+    if (filters.view === 'yes') {
+      addRawFilter('View', 'None', 'Not');
+    }
+    addRawFilter('View', filters.viewFeatures, filters.viewFeaturesMode);
+    
+    setRawBool('HorseYN', filters.horse);
+    addRawFilter('HorseAmenities', filters.horseAmenities, filters.horseAmenitiesMode);
+    
+    addRawFilter('CommunityFeatures', filters.communityFeatures, filters.communityFeaturesMode);
+    addRawFilter('ParkingFeatures', filters.parkingFeatures, filters.parkingFeaturesMode);
+    
+    addRawFilter('Heating', filters.heating, filters.heatingMode);
+    addRawFilter('Cooling', filters.cooling, filters.coolingMode);
+    addRawFilter('WaterSource', filters.waterSource, filters.waterSourceMode);
+    addRawFilter('Sewer', filters.sewer, filters.sewerMode);
+    addRawFilter('Utilities', filters.utilities, filters.utilitiesMode);
+    
+    addRawFilter('InteriorFeatures', filters.interiorFeatures, filters.interiorFeaturesMode);
+    addRawFilter('Flooring', filters.flooring, filters.flooringMode);
+    addRawFilter('FireplaceFeatures', filters.fireplaceFeatures, filters.fireplaceMode);
+    addRawFilter('WindowFeatures', filters.windowFeatures, filters.windowFeaturesMode);
+    addRawFilter('AccessibilityFeatures', filters.accessibilityFeatures, filters.accessibilityFeaturesMode);
+    addRawFilter('SecurityFeatures', filters.securityFeatures, filters.securityFeaturesMode);
+    
+    addRawFilter('ExteriorFeatures', filters.exteriorFeatures, filters.exteriorFeaturesMode);
+    addRawFilter('FoundationDetails', filters.foundation, filters.foundationMode);
+    addRawFilter('LotFeatures', filters.lotFeatures, filters.lotFeaturesMode);
+    addRawFilter('Fencing', filters.fencing, filters.fencingMode);
+    addRawFilter('PatioAndPorchFeatures', filters.patioAndPorchFeatures, filters.patioAndPorchFeaturesMode);
+    addRawFilter('SpaFeatures', filters.spaFeatures, filters.spaFeaturesMode);
+    
+    addRawFilter('ConstructionMaterials', filters.propertyCondition, filters.propertyConditionMode);
+    
+    addRawFilter('GreenEnergyEfficient', filters.greenEnergyEfficient, filters.greenEnergyEfficientMode);
+    addRawFilter('GreenSustainability', filters.greenSustainability, filters.greenSustainabilityMode);
+    if (filters.greenBuildingVerificationType) {
+      addRawFilter('GreenBuildingVerificationType', filters.greenBuildingVerificationType);
+    }
+    addRawFilter('GreenVerificationStatus', filters.greenVerificationStatus, filters.greenVerificationStatusMode);
+    if (filters.greenVerificationRating) {
+      addRawFilter('GreenVerificationRating', filters.greenVerificationRating);
+    }
+    if (filters.greenVerificationYear) {
+      addRawFilter('GreenVerificationYear', String(filters.greenVerificationYear));
+    }
+    
+    addRawFilter('SpecialListingConditions', filters.specialListingConditions, filters.specialListingConditionsMode);
+    addRawFilter('ShowingRequirements', filters.showingRequirements, filters.showingRequirementsMode);
+    addRawFilter('Possession', filters.possession, filters.possessionMode);
+    addRawFilter('AcceptableFinancing', filters.acceptableFinancing, filters.acceptableFinancingMode);
+    if (filters.occupantType) addRawFilter('OccupantType', filters.occupantType);
+    if (filters.flexListing) addRawFilter('FlexibleShowingRequirements', filters.flexListing);
+    
+    if (filters.primaryBedOnMain === 'yes') {
+      addRawFilter('MainLevelBedrooms', '1');
+    }
+
+    if (filters.contingency === 'yes') {
+      addRawFilter('ContingentDate', 'null', 'Not');
+    }
+    
     params.set('sortBy', 'listPriceDesc');
     
     return params.toString();

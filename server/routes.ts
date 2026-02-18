@@ -4009,11 +4009,32 @@ This email was sent by ${senderName} (${senderEmail}) via the Spyglass Realty Cl
 
       const params: any = {};
       
-      // Server-side filters (Repliers doesn't support these directly)
       const propertySubTypeFilter = req.query.propertySubType as string | undefined;
       const streetNameFilter = req.query.streetName as string | undefined;
       const streetNumberFilter = req.query.streetNumber as string | undefined;
+      
+      const minLotSizeSqFt = req.query.minLotSizeSqFt ? parseFloat(req.query.minLotSizeSqFt as string) : undefined;
+      const maxLotSizeSqFt = req.query.maxLotSizeSqFt ? parseFloat(req.query.maxLotSizeSqFt as string) : undefined;
+      const minLotSizeAcres = req.query.minLotSizeAcres ? parseFloat(req.query.minLotSizeAcres as string) : undefined;
+      const maxLotSizeAcres = req.query.maxLotSizeAcres ? parseFloat(req.query.maxLotSizeAcres as string) : undefined;
+      const maxHoaFee = req.query.maxHoaFee ? parseFloat(req.query.maxHoaFee as string) : undefined;
+      const noHoa = req.query.noHoa === 'true';
+      const maxDaysOnMarket = req.query.maxDaysOnMarket ? parseInt(req.query.maxDaysOnMarket as string) : undefined;
+      const minDaysOnMarket = req.query.minDaysOnMarket ? parseInt(req.query.minDaysOnMarket as string) : undefined;
+      const minFullBaths = req.query.minFullBaths ? parseInt(req.query.minFullBaths as string) : undefined;
+      const maxFullBaths = req.query.maxFullBaths ? parseInt(req.query.maxFullBaths as string) : undefined;
+      const minHalfBaths = req.query.minHalfBaths ? parseInt(req.query.minHalfBaths as string) : undefined;
+      const maxHalfBaths = req.query.maxHalfBaths ? parseInt(req.query.maxHalfBaths as string) : undefined;
+      const minMainLevelBeds = req.query.minMainLevelBeds ? parseInt(req.query.minMainLevelBeds as string) : undefined;
+      const maxMainLevelBeds = req.query.maxMainLevelBeds ? parseInt(req.query.maxMainLevelBeds as string) : undefined;
+      const maxGarageSpaces = req.query.maxGarageSpaces ? parseInt(req.query.maxGarageSpaces as string) : undefined;
+      const minTotalParkingSpaces = req.query.minTotalParkingSpaces ? parseInt(req.query.minTotalParkingSpaces as string) : undefined;
+      const maxTotalParkingSpaces = req.query.maxTotalParkingSpaces ? parseInt(req.query.maxTotalParkingSpaces as string) : undefined;
+      const streetNumberMin = req.query.streetNumberMin ? parseInt(req.query.streetNumberMin as string) : undefined;
+      const streetNumberMax = req.query.streetNumberMax ? parseInt(req.query.streetNumberMax as string) : undefined;
+      
       const needsServerSideFiltering = !!(propertySubTypeFilter || streetNameFilter || streetNumberFilter);
+      const needsPostFiltering = !!(minLotSizeSqFt || maxLotSizeSqFt || minLotSizeAcres || maxLotSizeAcres || maxHoaFee || noHoa || maxDaysOnMarket || minDaysOnMarket || minFullBaths || maxFullBaths || minHalfBaths || maxHalfBaths || minMainLevelBeds || maxMainLevelBeds || maxGarageSpaces || minTotalParkingSpaces || maxTotalParkingSpaces || streetNumberMin || streetNumberMax);
       
       const requestedResultsPerPage = req.query.resultsPerPage 
         ? parseInt(req.query.resultsPerPage as string) 
@@ -4029,54 +4050,106 @@ This email was sent by ${senderName} (${senderEmail}) via the Spyglass Realty Cl
       if (req.query.minSqft) params.minSqft = parseInt(req.query.minSqft as string);
       if (req.query.maxSqft) params.maxSqft = parseInt(req.query.maxSqft as string);
       if (req.query.propertyType) params.propertyType = req.query.propertyType as string;
-      if (req.query.city) params.city = req.query.city as string;
-      if (req.query.postalCode) params.postalCode = req.query.postalCode as string;
       if (req.query.neighborhood) params.neighborhood = req.query.neighborhood as string;
       if (req.query.pageNum) params.pageNum = parseInt(req.query.pageNum as string);
       if (req.query.sortBy) params.sortBy = req.query.sortBy as string;
       if (req.query.class) params.class = req.query.class as string;
-      // Keyword/address search params
       if (req.query.search) params.search = req.query.search as string;
       if (req.query.searchFields) params.searchFields = req.query.searchFields as string;
       if (req.query.fuzzySearch === 'true') params.fuzzySearch = true;
+      if (req.query.minYearBuilt) params.minYearBuilt = parseInt(req.query.minYearBuilt as string);
+      if (req.query.maxYearBuilt) params.maxYearBuilt = parseInt(req.query.maxYearBuilt as string);
+      if (req.query.minGarageSpaces) params.minGarageSpaces = parseInt(req.query.minGarageSpaces as string);
+      if (req.query.minStories) params.minStories = parseInt(req.query.minStories as string);
+      if (req.query.minListDate) params.minListDate = req.query.minListDate as string;
+      if (req.query.maxListDate) params.maxListDate = req.query.maxListDate as string;
+      if (req.query.minSoldDate) params.minSoldDate = req.query.minSoldDate as string;
+      if (req.query.maxSoldDate) params.maxSoldDate = req.query.maxSoldDate as string;
+      if (req.query.type) params.type = req.query.type as string;
+
+      const rawFilters: Record<string, string> = {};
+      for (const [key, value] of Object.entries(req.query)) {
+        if (key.startsWith('raw.') && typeof value === 'string') {
+          rawFilters[key] = value;
+        }
+      }
+      if (Object.keys(rawFilters).length > 0) {
+        params.rawFilters = rawFilters;
+      }
       
-      // If filtering by street address, try to geocode and use bounding box
       if (streetNameFilter && isMapboxConfigured()) {
         try {
-          // Build address string for geocoding
           const addressParts = [streetNameFilter];
           if (req.query.city) addressParts.push(req.query.city as string);
           if (req.query.postalCode) addressParts.push(req.query.postalCode as string);
-          addressParts.push('TX'); // Default to Texas
+          addressParts.push('TX');
           
           const geocodeResult = await geocodeAddress(addressParts.join(', '));
           if (geocodeResult && geocodeResult.latitude && geocodeResult.longitude) {
-            // Create a tight bounding box (~0.01 degrees = ~1km radius)
-            const delta = 0.01;
-            params.minLat = geocodeResult.latitude - delta;
-            params.maxLat = geocodeResult.latitude + delta;
-            params.minLng = geocodeResult.longitude - delta;
-            params.maxLng = geocodeResult.longitude + delta;
-            console.log(`Geocoded "${addressParts.join(', ')}" to lat/lng bounding box: ${params.minLat},${params.maxLat},${params.minLng},${params.maxLng}`);
+            params.lat = geocodeResult.latitude;
+            params.long = geocodeResult.longitude;
+            params.radius = 1;
+            console.log(`Geocoded "${addressParts.join(', ')}" to lat/long/radius: ${params.lat},${params.long},${params.radius}km`);
           }
         } catch (geocodeError) {
           console.log('Geocoding failed for street address search, will filter server-side:', geocodeError);
         }
       }
       
-      // If filtering by server-side params, fetch more results to ensure enough after filtering
-      params.resultsPerPage = needsServerSideFiltering 
-        ? Math.min(requestedResultsPerPage * 4, 200) 
-        : requestedResultsPerPage;
+      const fetchMultiplier = (needsServerSideFiltering || needsPostFiltering) ? 4 : 1;
+      params.resultsPerPage = Math.min(requestedResultsPerPage * fetchMultiplier, 200);
 
-      const response = await client.searchListings(params);
+      const cityParam = req.query.city as string | undefined;
+      const postalCodeParam = req.query.postalCode as string | undefined;
+      const cities = cityParam ? cityParam.split(',').map(c => c.trim()).filter(c => c) : [];
+      const zips = postalCodeParam ? postalCodeParam.split(',').map(z => z.trim()).filter(z => z) : [];
       
-      let standardizedProperties = response.listings.map(listing => 
+      let response;
+      
+      if (cities.length > 1) {
+        const results = await Promise.all(
+          cities.map(city => client.searchListings({ ...params, city }))
+        );
+        const seen = new Set<string>();
+        const merged: any[] = [];
+        let totalCount = 0;
+        for (const r of results) {
+          totalCount += r.count || 0;
+          for (const listing of r.listings || []) {
+            if (!seen.has(listing.mlsNumber)) {
+              seen.add(listing.mlsNumber);
+              merged.push(listing);
+            }
+          }
+        }
+        response = { listings: merged, count: totalCount, currentPage: 1, numPages: 1, resultsPerPage: merged.length };
+      } else if (zips.length > 1) {
+        const results = await Promise.all(
+          zips.map(zip => client.searchListings({ ...params, postalCode: zip }))
+        );
+        const seen = new Set<string>();
+        const merged: any[] = [];
+        let totalCount = 0;
+        for (const r of results) {
+          totalCount += r.count || 0;
+          for (const listing of r.listings || []) {
+            if (!seen.has(listing.mlsNumber)) {
+              seen.add(listing.mlsNumber);
+              merged.push(listing);
+            }
+          }
+        }
+        response = { listings: merged, count: totalCount, currentPage: 1, numPages: 1, resultsPerPage: merged.length };
+      } else {
+        if (cities.length === 1) params.city = cities[0];
+        if (zips.length === 1) params.postalCode = zips[0];
+        response = await client.searchListings(params);
+      }
+      
+      let standardizedProperties = response.listings.map((listing: any) => 
         client.mapToStandardProperty(listing)
       );
       
-      // Apply server-side propertySubType filter using centralized guard
-      // This excludes Land/Lots when Single Family is selected
       if (propertySubTypeFilter) {
         const beforeCount = standardizedProperties.length;
         standardizedProperties = filterByPropertySubtype(standardizedProperties, propertySubTypeFilter);
@@ -4085,36 +4158,99 @@ This email was sent by ${senderName} (${senderEmail}) via the Spyglass Realty Cl
         }
       }
       
-      // Apply server-side street name filter
       if (streetNameFilter) {
         const streetLower = streetNameFilter.toLowerCase().trim();
-        standardizedProperties = standardizedProperties.filter(prop => {
+        standardizedProperties = standardizedProperties.filter((prop: any) => {
           const propStreetName = (prop.streetName || '').toLowerCase().trim();
           const propAddress = (prop.unparsedAddress || prop.address || '').toLowerCase();
           return propStreetName.includes(streetLower) || propAddress.includes(streetLower);
         });
       }
       
-      // Apply server-side street number filter (exact match)
       if (streetNumberFilter) {
         const targetNumber = streetNumberFilter.trim();
-        standardizedProperties = standardizedProperties.filter(prop => {
+        standardizedProperties = standardizedProperties.filter((prop: any) => {
           const propStreetNumber = (prop.streetNumber || '').trim();
           return propStreetNumber === targetNumber;
         });
       }
       
-      // Limit to requested count after all filtering
-      if (needsServerSideFiltering) {
+      if (needsPostFiltering) {
+        const beforeCount = standardizedProperties.length;
+        standardizedProperties = standardizedProperties.filter((prop: any) => {
+          if (minLotSizeSqFt || maxLotSizeSqFt) {
+            const lotSqft = prop.lotSizeSquareFeet || prop.lotSize || 0;
+            if (minLotSizeSqFt && lotSqft < minLotSizeSqFt) return false;
+            if (maxLotSizeSqFt && lotSqft > maxLotSizeSqFt) return false;
+          }
+          if (minLotSizeAcres || maxLotSizeAcres) {
+            const lotSqft = prop.lotSizeSquareFeet || prop.lotSize || 0;
+            const acres = lotSqft / 43560;
+            if (minLotSizeAcres && acres < minLotSizeAcres) return false;
+            if (maxLotSizeAcres && acres > maxLotSizeAcres) return false;
+          }
+          if (maxHoaFee !== undefined) {
+            const hoaFee = parseFloat(prop.hoaFee || '0') || 0;
+            if (hoaFee > maxHoaFee) return false;
+          }
+          if (noHoa) {
+            const hoaFee = parseFloat(prop.hoaFee || '0') || 0;
+            if (hoaFee > 0) return false;
+          }
+          if (maxDaysOnMarket !== undefined) {
+            const dom = prop.daysOnMarket || 0;
+            if (dom > maxDaysOnMarket) return false;
+          }
+          if (minDaysOnMarket !== undefined) {
+            const dom = prop.daysOnMarket || 0;
+            if (dom < minDaysOnMarket) return false;
+          }
+          if (minFullBaths !== undefined || maxFullBaths !== undefined) {
+            const fb = prop.bathroomsFull || 0;
+            if (minFullBaths !== undefined && fb < minFullBaths) return false;
+            if (maxFullBaths !== undefined && fb > maxFullBaths) return false;
+          }
+          if (minHalfBaths !== undefined || maxHalfBaths !== undefined) {
+            const hb = prop.bathroomsHalf || 0;
+            if (minHalfBaths !== undefined && hb < minHalfBaths) return false;
+            if (maxHalfBaths !== undefined && hb > maxHalfBaths) return false;
+          }
+          if (minMainLevelBeds !== undefined || maxMainLevelBeds !== undefined) {
+            const mlb = prop.mainLevelBedrooms || 0;
+            if (minMainLevelBeds !== undefined && mlb < minMainLevelBeds) return false;
+            if (maxMainLevelBeds !== undefined && mlb > maxMainLevelBeds) return false;
+          }
+          if (maxGarageSpaces !== undefined) {
+            const gs = prop.garageSpaces || 0;
+            if (gs > maxGarageSpaces) return false;
+          }
+          if (minTotalParkingSpaces !== undefined || maxTotalParkingSpaces !== undefined) {
+            const ps = prop.parkingSpaces || prop.garageSpaces || 0;
+            if (minTotalParkingSpaces !== undefined && ps < minTotalParkingSpaces) return false;
+            if (maxTotalParkingSpaces !== undefined && ps > maxTotalParkingSpaces) return false;
+          }
+          if (streetNumberMin !== undefined || streetNumberMax !== undefined) {
+            const sn = parseInt(prop.streetNumber || '0') || 0;
+            if (streetNumberMin !== undefined && sn < streetNumberMin) return false;
+            if (streetNumberMax !== undefined && sn > streetNumberMax) return false;
+          }
+          return true;
+        });
+        if (beforeCount !== standardizedProperties.length) {
+          console.log(`[Properties Search] Post-filter: ${beforeCount} -> ${standardizedProperties.length}`);
+        }
+      }
+      
+      if (needsServerSideFiltering || needsPostFiltering) {
         standardizedProperties = standardizedProperties.slice(0, requestedResultsPerPage);
       }
 
       res.json({
         properties: standardizedProperties,
-        total: needsServerSideFiltering ? standardizedProperties.length : response.count,
+        total: (needsServerSideFiltering || needsPostFiltering) ? standardizedProperties.length : response.count,
         page: response.currentPage,
         totalPages: response.numPages,
-        resultsPerPage: needsServerSideFiltering ? standardizedProperties.length : response.resultsPerPage,
+        resultsPerPage: (needsServerSideFiltering || needsPostFiltering) ? standardizedProperties.length : response.resultsPerPage,
       });
     } catch (error: any) {
       console.error("Repliers listings error:", error.message);
