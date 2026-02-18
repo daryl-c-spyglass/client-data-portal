@@ -5,6 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import { VisuallyHidden } from '@radix-ui/react-visually-hidden';
 import { cn } from '@/lib/utils';
 import { formatPrice, normalizeStatus } from '@/lib/cma-data-utils';
+import { PropertyDescription } from '@/components/PropertyDescription';
 import type { Property } from '@shared/schema';
 
 interface PropertyDetailModalProps {
@@ -243,6 +244,8 @@ export function PropertyDetailModal({
               )}
             </div>
           )}
+
+          <PropertyDescription description={(property as any).description || property.publicRemarks} />
         </div>
       </DialogContent>
     </Dialog>

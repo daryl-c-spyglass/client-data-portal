@@ -38,6 +38,7 @@ import {
   Loader2
 } from "lucide-react";
 import { Link, useLocation } from "wouter";
+import { PropertyDescription } from "@/components/PropertyDescription";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import type { Cma, Property } from "@shared/schema";
@@ -494,7 +495,8 @@ function PropertyDetailModal({
             </div>
           </div>
           
-          {/* MLS Number */}
+          <PropertyDescription description={property.publicRemarks || (property as any).description} />
+
           {property.listingId && (
             <div className="text-xs text-muted-foreground border-t pt-3">
               MLS #: {property.listingId}
