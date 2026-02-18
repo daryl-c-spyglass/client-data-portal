@@ -1,0 +1,112 @@
+## Fix Stale Repliers Error Banner in Buyer Search
+
+### PROBLEM
+
+The "Data Source Unavailable" banner persists even when Repliers API is working. This happens because:
+1. A previous query failed (timeout, network issue, cold start)
+2. `repliersError` from React Query stays `true`
+3. The banner shows until a new successful query overwrites the error state
+4. Users see "API offline" message incorrectly
+
+### CURRENT CODE (line 830 in BuyerSearch.tsx)
+```tsx
+const isApiUnavailable = useRepliers 
+  ? (repliersHealthStatus?.repliersConfigured === false || repliersError)
+  : (healthStatus?.available === false || isError);
+```
+
+### FIX OPTIONS
+
+**Option A: Clear error on new search attempt (Recommended)**
+
+Reset error state when user triggers a new search:
+```tsx
+// When search is triggered, the loading state should take precedence over stale error
+const isApiUnavailable = useRepliers 
+  ? (repliersHealthStatus?.repliersConfigured === false || (repliersError && !isRepliersLoading))
+  : (healthStatus?.available === false || (isError && !isLoading));
+```
+
+**Option B: Add retry/refetch on error**
+
+Add automatic retry or a "Retry" button when error occurs:
+```tsx
+// In the banner component
+{isApiUnavailable && (
+  <div className="...">
+    <span>Data Source Unavailable: The Repliers API is currently offline.</span>
+    <Button 
+      variant="outline" 
+      size="sm" 
+      onClick={() => refetchRepliersHealth()}
+    >
+      Retry
+    </Button>
+  </div>
+)}
+```
+
+**Option C: Use staleTime and error reset in React Query**
+
+Configure React Query to be more forgiving:
+```tsx
+const { data, error, refetch } = useQuery({
+  queryKey: ['repliers-listings', searchParams],
+  queryFn: fetchListings,
+  retry: 2,                    // Retry failed requests
+  retryDelay: 1000,           // Wait 1 second between retries
+  staleTime: 30000,           // Consider data fresh for 30 seconds
+  refetchOnWindowFocus: false, // Don't refetch on tab focus
+});
+```
+
+**Option D: Only show banner on health check failure, not query failure**
+
+Separate "API configured" from "query failed":
+```tsx
+// Only show "unavailable" if health check says not configured
+// Show different message for query errors
+const isApiUnavailable = repliersHealthStatus?.repliersConfigured === false;
+const hasQueryError = repliersError && !isRepliersLoading;
+
+{isApiUnavailable && (
+  <Banner variant="error">API not configured</Banner>
+)}
+
+{!isApiUnavailable && hasQueryError && (
+  <Banner variant="warning">
+    Search failed. <Button onClick={refetch}>Try again</Button>
+  </Banner>
+)}
+```
+
+---
+
+### RECOMMENDED IMPLEMENTATION
+
+Combine Options A and D:
+
+1. Only show "Data Source Unavailable" when `repliersConfigured === false`
+2. Show a different, less alarming message for transient query errors
+3. Include a retry button for query failures
+4. Don't show error banner while a new query is loading
+
+---
+
+### ACCEPTANCE CRITERIA
+
+1. Banner does NOT show when API is working but previous query failed
+2. Banner shows only when health check confirms API is not configured
+3. Query failures show a retry option instead of "offline" message
+4. Loading state clears any previous error display
+5. Users can recover from errors without page refresh
+
+---
+
+### FILES TO MODIFY
+
+- `client/src/pages/BuyerSearch.tsx` — lines 830 and 1183
+
+---
+
+### COMMIT MESSAGE

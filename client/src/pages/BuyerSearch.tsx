@@ -146,6 +146,7 @@ import {
   Sparkles,
   Wand2,
   Trash2,
+  RefreshCw,
 } from "lucide-react";
 import { Textarea } from "@/components/ui/textarea";
 import { PropertyCard } from "@/components/PropertyCard";
@@ -828,8 +829,11 @@ export default function BuyerSearch() {
       ? (mlsGridResponse?.total || 0) 
       : (homeReviewResponse?.total || 0);
   const isApiUnavailable = useRepliers 
-    ? (repliersHealthStatus?.repliersConfigured === false || repliersError)
-    : (healthStatus?.available === false || isError);
+    ? (repliersHealthStatus?.repliersConfigured === false)
+    : (healthStatus?.available === false);
+  const hasQueryError = useRepliers
+    ? (repliersError && !repliersLoading)
+    : (isError && !homeReviewLoading);
   const dataSource = useRepliers ? 'Repliers (MLS Data with Coordinates)' : 'HomeReview (Active & Sold Data)';
 
   const [geocodedCoords, setGeocodedCoords] = useState<Map<string, { latitude: number; longitude: number }>>(new Map());
@@ -1179,15 +1183,41 @@ export default function BuyerSearch() {
 
   return (
     <div className="space-y-6">
-      {/* API Status Banner */}
+      {/* API Not Configured Banner */}
       {isApiUnavailable && (
-        <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700 rounded-md p-4">
+        <div className="bg-destructive/10 border border-destructive/30 rounded-md p-4" data-testid="banner-api-unavailable">
           <div className="flex items-center gap-2">
-            <AlertCircle className="w-5 h-5 text-amber-600 dark:text-amber-400" />
-            <p className="text-sm text-amber-800 dark:text-amber-200">
-              <strong>Data Source Unavailable:</strong> {useRepliers ? 'The Repliers API' : 'The HomeReview API'} is currently offline. 
-              Property search may not return results until the service is restored.
+            <AlertCircle className="w-5 h-5 text-destructive shrink-0" />
+            <p className="text-sm text-destructive">
+              <strong>Data Source Unavailable:</strong> {useRepliers ? 'The Repliers API' : 'The HomeReview API'} is not configured. 
+              Property search will not return results until the service is set up.
             </p>
+          </div>
+        </div>
+      )}
+
+      {/* Transient Query Error Banner */}
+      {!isApiUnavailable && hasQueryError && (
+        <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700 rounded-md p-4" data-testid="banner-query-error">
+          <div className="flex items-center justify-between gap-2 flex-wrap">
+            <div className="flex items-center gap-2">
+              <AlertCircle className="w-5 h-5 text-amber-600 dark:text-amber-400 shrink-0" />
+              <p className="text-sm text-amber-800 dark:text-amber-200">
+                <strong>Search failed:</strong> The last search request did not complete successfully. This is usually temporary.
+              </p>
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                if (useRepliers) refetchRepliers();
+                else refetchHomeReview();
+              }}
+              data-testid="button-retry-search"
+            >
+              <RefreshCw className="w-4 h-4 mr-1.5" />
+              Retry
+            </Button>
           </div>
         </div>
       )}
