@@ -1,0 +1,88 @@
+## FIX — Mapbox Map Not Rendering (API Working, Display Issue)
+
+### CONTEXT
+
+- Mapbox token is valid and working
+- Network requests to api.mapbox.com return 200 OK
+- Fonts, tiles, and styles are loading successfully
+- But the map container appears empty/blank on the page
+
+This is a CSS/rendering issue, not a token issue.
+
+---
+
+### DIAGNOSE
+
+**1. Find the map container in PropertyDetail**
+
+Search for the Location section and the MapboxMap component usage.
+
+**2. Check for height issues**
+
+Mapbox requires an explicit height on the container. If the container has `height: 0` or no height set, the map won't be visible even though it's initialized.
+
+Look for:
+```tsx
+<MapboxMap 
+  // ... props
+  className="..."  // Does this have height?
+  style={{ height: ??? }}  // Is height explicitly set?
+/>
+```
+
+**3. Common causes:**
+
+- Container has `height: auto` or no height (map needs explicit px or viewport height)
+- Parent container has `overflow: hidden` with 0 height
+- Map container has `display: none` or `visibility: hidden`
+- Flexbox/grid parent not giving the map space
+
+---
+
+### LIKELY FIX
+
+Ensure the map container has an explicit height:
+```tsx
+// In PropertyDetail.tsx, Location section:
+<div className="h-[400px] w-full">  {/* Explicit height required */}
+  <MapboxMap
+    latitude={property.latitude}
+    longitude={property.longitude}
+    // ... other props
+    className="h-full w-full rounded-lg"
+  />
+</div>
+```
+
+Or with inline style:
+```tsx
+<MapboxMap
+  // ... props
+  style={{ height: '400px', width: '100%' }}
+/>
+```
+
+---
+
+### TASKS
+
+1. Find the MapboxMap usage in PropertyDetail.tsx (Location section)
+2. Check what height is set on the map container
+3. If height is missing or 0, add explicit height (e.g., `h-[400px]` or `style={{ height: '400px' }}`)
+4. Verify the map renders after the fix
+
+---
+
+### ACCEPTANCE CRITERIA
+
+1. Map visibly renders in the Location section
+2. Map shows the property location with a marker
+3. Map is responsive but has minimum height of 300-400px
+
+---
+
+### COMMIT MESSAGE
+Fix Mapbox map not rendering in Location section
+
+Add explicit height to map container
+Map was initializing but invisible due to 0-height container

@@ -419,26 +419,24 @@ export function PropertyDetail({
           </CardHeader>
           <CardContent>
             {hasCoordinates ? (
-              <div className="aspect-video rounded-md overflow-hidden">
-                <MapboxMap
-                  markers={[{
-                    id: String(property.id || property.listingId || 'property'),
-                    latitude: Number(property.latitude),
-                    longitude: Number(property.longitude),
-                    price: Number(property.listPrice) || Number(property.closePrice) || 0,
-                    label: property.unparsedAddress || '',
-                    status: (property.standardStatus as MapMarker['status']) || 'Active',
-                    isSubject: false
-                  }]}
-                  center={[Number(property.longitude), Number(property.latitude)]}
-                  zoom={15}
-                  height="100%"
-                  showLegend={false}
-                  interactive={true}
-                  syncWithTheme={true}
-                  currentTheme={theme}
-                />
-              </div>
+              <MapboxMap
+                markers={[{
+                  id: String(property.id || property.listingId || 'property'),
+                  latitude: Number(property.latitude),
+                  longitude: Number(property.longitude),
+                  price: Number(property.listPrice) || Number(property.closePrice) || 0,
+                  label: property.unparsedAddress || '',
+                  status: (property.standardStatus as MapMarker['status']) || 'Active',
+                  isSubject: false
+                }]}
+                center={[Number(property.longitude), Number(property.latitude)]}
+                zoom={15}
+                height="400px"
+                showLegend={false}
+                interactive={true}
+                syncWithTheme={true}
+                currentTheme={theme}
+              />
             ) : (
               <div className="aspect-video bg-muted rounded-md flex items-center justify-center">
                 <div className="text-center text-muted-foreground">
