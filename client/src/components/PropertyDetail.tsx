@@ -24,6 +24,7 @@ import {
   Bug
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { usePermissions } from "@/hooks/use-permissions";
 import type { Property, Media } from "@shared/schema";
 import type { PhotoGalleryData } from "@shared/types/photos";
 import { RoomTypeTabs } from "@/components/property/RoomTypeTabs";
@@ -69,6 +70,7 @@ export function PropertyDetail({
   photoInsights
 }: PropertyDetailProps) {
   const { theme } = useTheme();
+  const { canViewDebug } = usePermissions();
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [saved, setSaved] = useState(false);
   const [linkCopied, setLinkCopied] = useState(false);
@@ -448,8 +450,7 @@ export function PropertyDetail({
           </CardContent>
         </Card>
 
-        {/* Dev-only Location Debug Panel */}
-        {import.meta.env.DEV && debugData && (
+        {canViewDebug && debugData && (
           <Collapsible open={debugOpen} onOpenChange={setDebugOpen}>
             <CollapsibleTrigger asChild>
               <Button variant="ghost" size="sm" className="flex items-center gap-2 text-xs text-muted-foreground">

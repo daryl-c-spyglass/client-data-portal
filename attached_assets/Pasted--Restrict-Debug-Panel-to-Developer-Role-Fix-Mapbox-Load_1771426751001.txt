@@ -1,0 +1,143 @@
+## Restrict Debug Panel to Developer Role & Fix Mapbox Loading
+
+---
+
+### ISSUE 1: Restrict Location Debug Panel to Developer Only
+
+The Location Debug panel should only be visible to users with the "developer" role (Daryl).
+
+**TASK:** Find the Location Debug section and wrap it with a role check.
+
+**Step 1:** Find the debug panel
+Search for "Location Debug", "Raw Subdivision Fields", or "Data Source" in the codebase.
+
+**Step 2:** Add role restriction
+```tsx
+// Import the auth context/hook (however your app handles it)
+import { useAuth } from '@/hooks/useAuth'; // or wherever
+
+// In the component:
+const { user } = useAuth();
+
+// Wrap the debug section - only show to developer role
+{user?.role === 'developer' && (
+  <div className="location-debug">
+    {/* existing debug content */}
+  </div>
+)}
+```
+
+**Alternative:** If you want to restrict by specific email:
+```tsx
+{user?.email === 'daryl@spyglassrealty.com' && (
+  <div className="location-debug">
+    {/* existing debug content */}
+  </div>
+)}
+```
+
+**Alternative:** If you want developer OR super_admin:
+```tsx
+{['developer', 'super_admin'].includes(user?.role) && (
+  <div className="location-debug">
+    {/* existing debug content */}
+  </div>
+)}
+```
+
+---
+
+### ISSUE 2: Mapbox Token Not Loading
+
+The VITE_MAPBOX_TOKEN is configured but the map shows "Mapbox token not configured".
+
+**Diagnose the issue:**
+
+**Check 1:** Verify the token is being read
+Add a temporary console.log in the map component:
+```tsx
+console.log('Mapbox token:', import.meta.env.VITE_MAPBOX_TOKEN);
+```
+
+**Check 2:** Common causes and fixes
+
+**Cause A: Server restart required**
+- Vite environment variables are loaded at build time
+- After adding a new VITE_* variable, you must restart the dev server
+- Stop and restart the Replit app
+
+**Cause B: Variable name mismatch**
+Check the component is using the correct variable name:
+```tsx
+// Correct for Vite:
+const mapboxToken = import.meta.env.VITE_MAPBOX_TOKEN;
+
+// WRONG (Node.js style, won't work in Vite frontend):
+const mapboxToken = process.env.VITE_MAPBOX_TOKEN;
+const mapboxToken = process.env.MAPBOX_ACCESS_TOKEN;
+```
+
+**Cause C: Conditional check is too strict**
+Find the "not configured" message and check the condition:
+```tsx
+// Find code like this:
+if (!mapboxToken) {
+  return <div>Mapbox token not configured</div>;
+}
+
+// The token might be undefined, null, or empty string
+// Add logging to see what's happening:
+console.log('Token value:', mapboxToken, 'Type:', typeof mapboxToken);
+```
+
+**Cause D: Token defined in wrong file**
+Make sure VITE_MAPBOX_TOKEN is in Replit Secrets (the lock icon), NOT in a .env file that might be gitignored.
+
+**Check 3:** Verify in Replit Secrets
+1. Click the lock icon (Secrets) in Replit
+2. Confirm `VITE_MAPBOX_TOKEN` exists (exact spelling, case-sensitive)
+3. Confirm the value starts with `pk.` (Mapbox public tokens start with pk.)
+
+**Check 4:** Hard restart
+1. Stop the Replit app completely
+2. In Shell, run: `kill 1` (forces full restart)
+3. Start the app again
+4. Check if map loads
+
+---
+
+### ACCEPTANCE CRITERIA
+
+1. Location Debug panel only visible when logged in as developer role
+2. Other users (agent, admin, super_admin) do NOT see the debug panel
+3. Mapbox map loads correctly with the configured token
+4. If Mapbox genuinely fails, error is logged to console for debugging
+
+---
+
+### FILES LIKELY AFFECTED
+
+For debug panel:
+- `client/src/pages/PropertyDetail.tsx`
+- `client/src/components/PropertyDetailModal.tsx`
+- Search for "Location Debug" text
+
+For Mapbox:
+- `client/src/components/Map.tsx`
+- `client/src/components/PropertyMap.tsx`
+- Search for "VITE_MAPBOX_TOKEN" or "mapbox"
+
+---
+
+### COMMIT MESSAGE
+Restrict Location Debug panel to developer role only
+
+Add role check to hide debug panel from non-developer users
+Debug Mapbox token loading issue
+
+
+
+Quick Mapbox troubleshooting:
+Try this in your browser console on that page:
+javascriptconsole.log(import.meta.env.VITE_MAPBOX_TOKEN);
+If it shows undefined, the variable isn't being loaded — restart the Replit app completely. If it shows the token value, the issue is in how the component checks for it.
