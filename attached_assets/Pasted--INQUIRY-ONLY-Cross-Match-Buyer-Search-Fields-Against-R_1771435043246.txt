@@ -1,0 +1,195 @@
+## INQUIRY ONLY — Cross-Match Buyer Search Fields Against Repliers API
+
+### OBJECTIVE
+
+Test which filter parameters the Repliers API actually supports. We need to verify before wiring up UI fields.
+
+---
+
+### TASK 1: Get Repliers API Aggregates
+
+The Repliers API has an aggregates endpoint that reveals available filter fields. Test this:
+```bash
+# Get available aggregates/facets from Repliers
+curl -s "https://api.repliers.io/listings?resultsPerPage=1&aggregates=true" \
+  -H "REPLIERS-API-KEY: $REPLIERS_API_KEY" | jq '.aggregates | keys'
+```
+
+This should return a list of available filter fields. Report the full list.
+
+---
+
+### TASK 2: Test Specific Parameters
+
+For each parameter below, run a test query and report if it works (returns filtered results) or fails (error or ignored):
+
+**Property Details:**
+```bash
+# Year Built
+curl -s "https://api.repliers.io/listings?minYearBuilt=2020&resultsPerPage=1" \
+  -H "REPLIERS-API-KEY: $REPLIERS_API_KEY" | jq '.count'
+
+curl -s "https://api.repliers.io/listings?maxYearBuilt=2000&resultsPerPage=1" \
+  -H "REPLIERS-API-KEY: $REPLIERS_API_KEY" | jq '.count'
+
+# Lot Size
+curl -s "https://api.repliers.io/listings?minLotSize=10000&resultsPerPage=1" \
+  -H "REPLIERS-API-KEY: $REPLIERS_API_KEY" | jq '.count'
+
+curl -s "https://api.repliers.io/listings?minLotSizeAcres=1&resultsPerPage=1" \
+  -H "REPLIERS-API-KEY: $REPLIERS_API_KEY" | jq '.count'
+
+# Garage
+curl -s "https://api.repliers.io/listings?minGarageSpaces=2&resultsPerPage=1" \
+  -H "REPLIERS-API-KEY: $REPLIERS_API_KEY" | jq '.count'
+
+curl -s "https://api.repliers.io/listings?garage=true&resultsPerPage=1" \
+  -H "REPLIERS-API-KEY: $REPLIERS_API_KEY" | jq '.count'
+
+# Stories
+curl -s "https://api.repliers.io/listings?stories=1&resultsPerPage=1" \
+  -H "REPLIERS-API-KEY: $REPLIERS_API_KEY" | jq '.count'
+
+curl -s "https://api.repliers.io/listings?minStories=2&resultsPerPage=1" \
+  -H "REPLIERS-API-KEY: $REPLIERS_API_KEY" | jq '.count'
+```
+
+**Features/Amenities:**
+```bash
+# Pool
+curl -s "https://api.repliers.io/listings?pool=true&resultsPerPage=1" \
+  -H "REPLIERS-API-KEY: $REPLIERS_API_KEY" | jq '.count'
+
+curl -s "https://api.repliers.io/listings?hasPool=true&resultsPerPage=1" \
+  -H "REPLIERS-API-KEY: $REPLIERS_API_KEY" | jq '.count'
+
+# Waterfront
+curl -s "https://api.repliers.io/listings?waterfront=true&resultsPerPage=1" \
+  -H "REPLIERS-API-KEY: $REPLIERS_API_KEY" | jq '.count'
+
+# New Construction
+curl -s "https://api.repliers.io/listings?newConstruction=true&resultsPerPage=1" \
+  -H "REPLIERS-API-KEY: $REPLIERS_API_KEY" | jq '.count'
+
+# Gated Community
+curl -s "https://api.repliers.io/listings?gatedCommunity=true&resultsPerPage=1" \
+  -H "REPLIERS-API-KEY: $REPLIERS_API_KEY" | jq '.count'
+```
+
+**Location:**
+```bash
+# Multiple Cities
+curl -s "https://api.repliers.io/listings?city=Austin,Round%20Rock&resultsPerPage=1" \
+  -H "REPLIERS-API-KEY: $REPLIERS_API_KEY" | jq '.count'
+
+# Multiple Zips
+curl -s "https://api.repliers.io/listings?zip=78759,78758&resultsPerPage=1" \
+  -H "REPLIERS-API-KEY: $REPLIERS_API_KEY" | jq '.count'
+
+# Subdivision
+curl -s "https://api.repliers.io/listings?subdivision=Shady%20Hollow&resultsPerPage=1" \
+  -H "REPLIERS-API-KEY: $REPLIERS_API_KEY" | jq '.count'
+
+# County
+curl -s "https://api.repliers.io/listings?county=Travis&resultsPerPage=1" \
+  -H "REPLIERS-API-KEY: $REPLIERS_API_KEY" | jq '.count'
+```
+
+**Schools:**
+```bash
+# School District
+curl -s "https://api.repliers.io/listings?schoolDistrict=Austin%20ISD&resultsPerPage=1" \
+  -H "REPLIERS-API-KEY: $REPLIERS_API_KEY" | jq '.count'
+
+# Elementary School
+curl -s "https://api.repliers.io/listings?elementarySchool=*&resultsPerPage=1" \
+  -H "REPLIERS-API-KEY: $REPLIERS_API_KEY" | jq '.count'
+```
+
+**HOA:**
+```bash
+# HOA Fee
+curl -s "https://api.repliers.io/listings?maxHoaFee=500&resultsPerPage=1" \
+  -H "REPLIERS-API-KEY: $REPLIERS_API_KEY" | jq '.count'
+
+curl -s "https://api.repliers.io/listings?hoaFee=0&resultsPerPage=1" \
+  -H "REPLIERS-API-KEY: $REPLIERS_API_KEY" | jq '.count'
+```
+
+**Date Filters:**
+```bash
+# List Date
+curl -s "https://api.repliers.io/listings?minListDate=2025-01-01&resultsPerPage=1" \
+  -H "REPLIERS-API-KEY: $REPLIERS_API_KEY" | jq '.count'
+
+# Sold Date
+curl -s "https://api.repliers.io/listings?minSoldDate=2025-01-01&status=C&resultsPerPage=1" \
+  -H "REPLIERS-API-KEY: $REPLIERS_API_KEY" | jq '.count'
+
+# Days on Market
+curl -s "https://api.repliers.io/listings?maxDaysOnMarket=30&resultsPerPage=1" \
+  -H "REPLIERS-API-KEY: $REPLIERS_API_KEY" | jq '.count'
+```
+
+**Advanced Operators:**
+```bash
+# Contains prefix (per Repliers docs)
+curl -s "https://api.repliers.io/listings?contains:features=pool&resultsPerPage=1" \
+  -H "REPLIERS-API-KEY: $REPLIERS_API_KEY" | jq '.count'
+
+# Not prefix
+curl -s "https://api.repliers.io/listings?not:propertyType=Condo&resultsPerPage=1" \
+  -H "REPLIERS-API-KEY: $REPLIERS_API_KEY" | jq '.count'
+
+# Operator (AND/OR for multi-value)
+curl -s "https://api.repliers.io/listings?city=Austin,Round%20Rock&operator=or&resultsPerPage=1" \
+  -H "REPLIERS-API-KEY: $REPLIERS_API_KEY" | jq '.count'
+```
+
+---
+
+### TASK 3: Check a Sample Listing for Available Fields
+
+Get a single listing and examine all available fields:
+```bash
+curl -s "https://api.repliers.io/listings?resultsPerPage=1&status=A" \
+  -H "REPLIERS-API-KEY: $REPLIERS_API_KEY" | jq '.listings[0] | keys'
+```
+
+Then drill into details:
+```bash
+curl -s "https://api.repliers.io/listings?resultsPerPage=1&status=A" \
+  -H "REPLIERS-API-KEY: $REPLIERS_API_KEY" | jq '.listings[0].details | keys'
+```
+
+---
+
+### REPORT FORMAT
+Repliers API Parameter Cross-Match Report
+1. Aggregates Available
+[list from aggregates query]
+2. Parameter Test Results
+ParameterTest QueryResultNotesminYearBuiltminYearBuilt=2020Works/Ignored/Errorcount: XmaxYearBuiltmaxYearBuilt=2000Works/Ignored/Errorcount: XminLotSizeminLotSize=10000Works/Ignored/Errorcount: X............
+3. Listing Fields Available
+[list of all fields in a listing object]
+4. Details Fields Available
+[list of all fields in listing.details]
+5. Summary
+Confirmed Working:
+
+[list]
+
+Not Supported:
+
+[list]
+
+Needs Alternative Approach:
+
+[list with suggested workaround]
+
+
+---
+
+### DO NOT MAKE ANY CHANGES
+
+This is API verification only. Report findings for implementation planning.
