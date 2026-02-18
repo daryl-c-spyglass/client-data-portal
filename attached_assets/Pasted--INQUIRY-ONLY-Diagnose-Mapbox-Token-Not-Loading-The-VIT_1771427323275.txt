@@ -1,0 +1,72 @@
+## INQUIRY ONLY — Diagnose Mapbox Token Not Loading
+
+The VITE_MAPBOX_TOKEN is configured in both Replit Secrets and Vercel Environment Variables, but:
+- Replit dev shows: "Mapbox token not configured"
+- Vercel production shows: Empty Location section
+
+---
+
+### DIAGNOSTIC TASKS
+
+**1. Find and report the Mapbox component**
+- Search for files importing `mapbox-gl` or `react-map-gl`
+- Search for `VITE_MAPBOX_TOKEN` or `MAPBOX` in the codebase
+- Report all files that reference Mapbox
+
+**2. Show exactly how the token is being accessed**
+- Find the line(s) where the token is read
+- Copy the exact code (is it `import.meta.env.VITE_MAPBOX_TOKEN`?)
+
+**3. Check for typos or mismatches**
+- Is the variable name exactly `VITE_MAPBOX_TOKEN`?
+- Are there multiple places checking for different variable names?
+- Is there a fallback chain that might be failing?
+
+**4. Add temporary diagnostic logging**
+In the map component, add these console.logs and report what they output:
+```typescript
+console.log('=== MAPBOX DIAGNOSTIC ===');
+console.log('VITE_MAPBOX_TOKEN exists:', !!import.meta.env.VITE_MAPBOX_TOKEN);
+console.log('VITE_MAPBOX_TOKEN length:', import.meta.env.VITE_MAPBOX_TOKEN?.length);
+console.log('VITE_MAPBOX_TOKEN starts with pk.:', import.meta.env.VITE_MAPBOX_TOKEN?.startsWith('pk.'));
+console.log('All VITE_ env vars:', Object.keys(import.meta.env).filter(k => k.startsWith('VITE_')));
+console.log('=========================');
+```
+
+**5. Run the app and report console output**
+- Open the browser console
+- Navigate to a property detail page
+- Copy the diagnostic output
+
+**6. Check the conditional rendering logic**
+- What condition determines whether to show the map vs error message vs nothing?
+- Copy that conditional block
+
+---
+
+### REPORT FORMAT
+Files using Mapbox:
+
+[list files]
+
+Token access code (exact):
+[paste the line]
+Variable name expected: VITE_MAPBOX_TOKEN
+Variable name in Secrets: [confirm exact name]
+Diagnostic console output:
+[paste output]
+Conditional render logic:
+[paste code block]
+Suspected cause:
+[your assessment]
+
+---
+
+### AFTER DIAGNOSIS
+
+If the diagnostic shows the token is undefined despite being in Secrets:
+1. Try renaming the secret (delete and re-add with exact name `VITE_MAPBOX_TOKEN`)
+2. Restart the Replit app completely (kill 1 in shell)
+3. For Vercel: trigger a new deployment after confirming env var
+
+Report findings before making any fixes.
