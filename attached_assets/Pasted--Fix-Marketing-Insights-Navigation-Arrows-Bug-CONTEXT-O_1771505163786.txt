@@ -1,0 +1,101 @@
+## Fix Marketing Insights Navigation Arrows Bug
+
+### CONTEXT
+
+On the Dashboard page, the Marketing Insights section has navigation arrows at the bottom left that appear broken/malformed. They show as disconnected arrow icons instead of styled navigation buttons.
+
+**Location:** Dashboard → Marketing Insights section → Bottom left pagination/navigation
+
+**Screenshot shows:** `<->` or disconnected arrows that don't look like proper UI buttons
+
+---
+
+### TASK 1: Find the Component
+
+Search for:
+- Marketing Insights component
+- Dashboard charts carousel/slider
+- Pagination or navigation arrows in dashboard
+
+Likely files:
+- `client/src/pages/Dashboard.tsx`
+- `client/src/components/dashboard/MarketingInsights.tsx`
+- `client/src/components/charts/` directory
+
+---
+
+### TASK 2: Identify the Issue
+
+Common causes:
+1. **Icon library not loading** — Lucide/Heroicons not imported properly
+2. **Missing CSS** — Arrow buttons missing styling
+3. **Broken component** — Carousel/slider navigation not rendering correctly
+4. **Unicode arrows** — Using text arrows instead of icon components
+
+---
+
+### TASK 3: Fix the Navigation
+
+**If using text arrows, replace with icons:**
+```tsx
+import { ChevronLeft, ChevronRight } from 'lucide-react';
+
+// Replace text arrows with icon components
+<button onClick={handlePrev} className="p-2 rounded-full hover:bg-muted">
+  <ChevronLeft className="h-5 w-5" />
+</button>
+<button onClick={handleNext} className="p-2 rounded-full hover:bg-muted">
+  <ChevronRight className="h-5 w-5" />
+</button>
+```
+
+**If using a carousel library, check configuration:**
+```tsx
+// Embla, Swiper, or similar
+<Carousel
+  opts={{
+    align: "start",
+    loop: true,
+  }}
+>
+  <CarouselContent>
+    {/* charts */}
+  </CarouselContent>
+  <CarouselPrevious /> {/* Should render styled button */}
+  <CarouselNext />
+</Carousel>
+```
+
+**If arrows are positioned incorrectly:**
+```tsx
+// Ensure proper positioning
+<div className="relative">
+  <div className="absolute bottom-4 left-4 flex items-center gap-2">
+    <Button variant="outline" size="icon" onClick={handlePrev}>
+      <ChevronLeft className="h-4 w-4" />
+    </Button>
+    <Button variant="outline" size="icon" onClick={handleNext}>
+      <ChevronRight className="h-4 w-4" />
+    </Button>
+  </div>
+</div>
+```
+
+---
+
+### ACCEPTANCE CRITERIA
+
+1. Navigation arrows display as proper styled buttons
+2. Arrows are visually consistent with the rest of the UI
+3. Clicking arrows navigates between charts correctly
+4. Hover states work properly
+5. No broken/disconnected icons
+
+---
+
+### COMMIT MESSAGE
+Fix Marketing Insights navigation arrows styling
+
+Replace broken arrow icons with proper Lucide icons
+Add proper button styling and hover states
+Ensure carousel navigation works correctly

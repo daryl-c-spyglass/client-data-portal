@@ -8,8 +8,6 @@ import {
   Carousel,
   CarouselContent,
   CarouselItem,
-  CarouselNext,
-  CarouselPrevious,
   type CarouselApi,
 } from "@/components/ui/carousel";
 import {
@@ -24,7 +22,7 @@ import {
   LineChart,
   Line,
 } from "recharts";
-import { TrendingUp, BarChart3, Maximize2, X, Database, Cloud } from "lucide-react";
+import { TrendingUp, BarChart3, Maximize2, X, Database, Cloud, ChevronLeft, ChevronRight } from "lucide-react";
 
 interface ListingsByMonth {
   month: string;
@@ -464,15 +462,33 @@ export function MarketingInsightsCarousel({
                 </CarouselItem>
               ))}
             </CarouselContent>
-            <CarouselPrevious className="left-2" data-testid="button-carousel-prev" />
-            <CarouselNext className="right-2" data-testid="button-carousel-next" />
           </Carousel>
           
-          <CarouselIndicator
-            count={CHART_SLIDES.length}
-            activeIndex={activeIndex}
-            onSelect={handleIndicatorSelect}
-          />
+          <div className="flex items-center justify-between gap-2 mt-4">
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={() => carouselApi?.scrollPrev()}
+                data-testid="button-carousel-prev"
+              >
+                <ChevronLeft className="h-4 w-4" />
+              </Button>
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={() => carouselApi?.scrollNext()}
+                data-testid="button-carousel-next"
+              >
+                <ChevronRight className="h-4 w-4" />
+              </Button>
+            </div>
+            <CarouselIndicator
+              count={CHART_SLIDES.length}
+              activeIndex={activeIndex}
+              onSelect={handleIndicatorSelect}
+            />
+          </div>
         </CardContent>
       </Card>
 
