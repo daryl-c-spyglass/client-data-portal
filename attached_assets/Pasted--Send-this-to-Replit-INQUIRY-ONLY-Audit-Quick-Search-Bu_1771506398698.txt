@@ -1,0 +1,229 @@
+## Send this to Replit:
+
+```
+## INQUIRY ONLY — Audit Quick Search & Buyer Search UI/UX
+
+### CONTEXT
+
+Two areas to audit:
+1. **Quick Search** — Understand the autocomplete flow and behavior
+2. **Buyer Search UI/UX** — Understand filter organization, scroll depth, and user flow issues
+
+**Page:** `/buyer-search`
+
+---
+
+## PART 1: Quick Search Component Audit
+
+### QUESTIONS TO ANSWER
+
+**1. Find the Quick Search Component**
+
+- Which file contains the Quick Search input?
+- Is it a separate component or inline in BuyerSearch.tsx?
+- What library is used for autocomplete (custom, Radix, Shadcn Combobox, etc.)?
+
+**2. Autocomplete Data Source**
+
+- What API endpoint provides the suggestions?
+- What parameters are sent (query, limit, etc.)?
+- What fields are returned (address, mlsNumber, price, city, etc.)?
+- How is the search query formatted for the API?
+
+**3. Current Behavior on User Actions**
+
+Document exactly what happens for each action:
+
+| Action | What Happens? |
+|--------|---------------|
+| User types in input | ? |
+| User clicks a suggestion | ? |
+| User presses Enter without selecting | ? |
+| User presses Enter after selecting | ? |
+| User clears the input (X button) | ? |
+
+**4. State Management**
+
+- Where is the Quick Search value stored? (local state, URL params, context?)
+- How does it interact with other filters?
+- What state changes when a suggestion is selected?
+
+**5. Integration with Search Execution**
+
+- Does selecting a suggestion auto-trigger a search?
+- Or does it just fill a filter that requires clicking "Search Properties"?
+- Is there a difference between address search vs MLS# search?
+- Does selecting a suggestion navigate to property detail, or stay on search page?
+
+**6. Filter Chip Behavior**
+
+- How is the `keywordSearch: ...` filter chip generated?
+- What parameter does it map to in the API request?
+- Can user remove it by clicking X?
+
+---
+
+## PART 2: Buyer Search UI/UX Audit
+
+### QUESTIONS TO ANSWER
+
+**1. Filter Sections Inventory**
+
+List ALL filter sections in order from top to bottom:
+
+```
+| # | Section Name | Fields Count | Collapsed by Default? |
+|---|--------------|--------------|----------------------|
+| 1 | Quick Search | 1 | No |
+| 2 | Status | 3 | No |
+| 3 | ... | ... | ... |
+```
+
+**2. Total Scroll Depth**
+
+- How many pixels/viewport heights to see ALL filters?
+- Count total number of filter fields
+- Count number of filter sections
+
+**3. Required vs Optional Fields**
+
+- Are ANY fields required to execute a search?
+- Or can user search with zero filters applied?
+- What is the minimum action to get results?
+
+**4. Search Button Location**
+
+- Where is the "Search Properties" button located?
+- Is it visible without scrolling?
+- Is there a sticky/fixed search button?
+- Does the user need to scroll back up to click search after filling filters?
+
+**5. Filter Priority Analysis**
+
+Categorize filters by likely usage frequency:
+
+**Essential (used almost every search):**
+- [list]
+
+**Common (used frequently):**
+- [list]
+
+**Advanced (used rarely):**
+- [list]
+
+**6. Collapsible Sections**
+
+- Are filter sections collapsible?
+- If yes, which are expanded by default?
+- If no, should they be?
+
+**7. Mobile Experience**
+
+- How does the filter panel behave on mobile?
+- Is it a sidebar, full-screen overlay, or inline?
+- Can users easily access search results while adjusting filters?
+
+**8. Current Pain Points**
+
+Based on the code structure, identify:
+- Do users have to scroll past rarely-used filters to find common ones?
+- Is there a "Show More" / "Advanced Filters" toggle?
+- Are related filters grouped logically?
+- Is there visual hierarchy distinguishing important filters?
+
+**9. AI-Powered "Describe Your Ideal Home" Feature**
+
+- Is this feature functional?
+- What does it do when user types a natural language query?
+- Does it auto-fill filters or search directly?
+
+---
+
+## REPORT FORMAT
+
+```
+## Buyer Search Audit Report
+
+### PART 1: Quick Search
+
+**Component Location:**
+- File: [path]
+- Lines: [range]
+- Library: [custom/Radix/Shadcn]
+
+**Autocomplete API:**
+- Endpoint: [/api/...]
+- Debounce: [ms]
+- Response fields: [list]
+
+**User Action Behaviors:**
+| Action | Handler | Result |
+|--------|---------|--------|
+| Type | [func] | [behavior] |
+| Select | [func] | [behavior] |
+| Enter | [func] | [behavior] |
+| Clear | [func] | [behavior] |
+
+**Does selecting suggestion auto-search?** [yes/no]
+**Does it navigate to property detail?** [yes/no]
+
+---
+
+### PART 2: UI/UX Analysis
+
+**Filter Inventory:**
+- Total sections: [#]
+- Total fields: [#]
+- Scroll depth: [~X viewport heights]
+
+**Filter Sections (top to bottom):**
+| # | Section | Fields | Collapsed? | Priority |
+|---|---------|--------|------------|----------|
+| 1 | [name] | [#] | [yes/no] | [Essential/Common/Advanced] |
+| ... | ... | ... | ... | ... |
+
+**Search Button:**
+- Location: [top/bottom/sticky]
+- Visible without scroll: [yes/no]
+
+**Collapsible Sections:** [yes/no]
+**Advanced Filters Toggle:** [yes/no]
+**Mobile Filter Panel:** [sidebar/overlay/inline]
+
+**AI Describe Feature:**
+- Functional: [yes/no]
+- Behavior: [description]
+
+---
+
+### PART 3: Identified UX Issues
+
+1. [Issue description]
+2. [Issue description]
+3. ...
+
+---
+
+### PART 4: Recommendations
+
+Based on findings, initial recommendations for UI/UX improvements:
+
+1. [Recommendation]
+2. [Recommendation]
+3. ...
+```
+
+---
+
+### DO NOT MAKE ANY CHANGES
+
+This is an audit only. Report findings for planning the UI/UX redesign.
+```
+
+---
+
+This comprehensive audit will give us:
+1. Complete understanding of Quick Search behavior
+2. Full inventory of all filter sections and fields
+3. Pain points with current scroll/layout
+4. Data to plan the UI/UX improvements (collapsible sections, priority ordering, sticky search button, etc.)
