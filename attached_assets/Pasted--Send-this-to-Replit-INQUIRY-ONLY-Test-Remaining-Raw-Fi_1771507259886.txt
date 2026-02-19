@@ -1,0 +1,309 @@
+## Send this to Replit:
+
+```
+## INQUIRY ONLY — Test Remaining Raw Fields for ACTRIS Data Availability
+
+### CONTEXT
+
+We confirmed many raw.* fields work with Repliers API, but some fields (InteriorFeatures, ExteriorFeatures, Flooring, FireplaceYN) are NOT populated for ACTRIS MLS.
+
+Before the UI/UX redesign, we need to verify which of the ~30+ "Advanced" filter fields actually have data in ACTRIS.
+
+**Goal:** Identify filters with no data so we can remove them from the UI (reduce clutter).
+
+---
+
+### TASK: Test Each Raw Field for Data Availability
+
+For each field below, run a test to see if it returns results different from baseline (29,753):
+
+```bash
+# Set baseline
+echo "Baseline count (no filter):"
+curl -s "https://api.repliers.io/listings?resultsPerPage=1&status=A&type=sale" \
+  -H "REPLIERS-API-KEY: $REPLIERS_API_KEY" | jq '.count'
+```
+
+---
+
+### TEST GROUP 1: Interior/Exterior Features
+
+```bash
+echo "=== Interior/Exterior Features ==="
+
+echo "InteriorFeatures (any value):"
+curl -s "https://api.repliers.io/listings?raw.InteriorFeatures=contains:a&resultsPerPage=1" \
+  -H "REPLIERS-API-KEY: $REPLIERS_API_KEY" | jq '.count'
+
+echo "ExteriorFeatures (any value):"
+curl -s "https://api.repliers.io/listings?raw.ExteriorFeatures=contains:a&resultsPerPage=1" \
+  -H "REPLIERS-API-KEY: $REPLIERS_API_KEY" | jq '.count'
+
+echo "Flooring (any value):"
+curl -s "https://api.repliers.io/listings?raw.Flooring=contains:a&resultsPerPage=1" \
+  -H "REPLIERS-API-KEY: $REPLIERS_API_KEY" | jq '.count'
+
+echo "FireplaceYN=true:"
+curl -s "https://api.repliers.io/listings?raw.FireplaceYN=true&resultsPerPage=1" \
+  -H "REPLIERS-API-KEY: $REPLIERS_API_KEY" | jq '.count'
+
+echo "FireplaceFeatures (any value):"
+curl -s "https://api.repliers.io/listings?raw.FireplaceFeatures=contains:a&resultsPerPage=1" \
+  -H "REPLIERS-API-KEY: $REPLIERS_API_KEY" | jq '.count'
+```
+
+---
+
+### TEST GROUP 2: Spa/Window/Accessibility/Security
+
+```bash
+echo "=== Spa/Window/Accessibility/Security ==="
+
+echo "SpaYN=true:"
+curl -s "https://api.repliers.io/listings?raw.SpaYN=true&resultsPerPage=1" \
+  -H "REPLIERS-API-KEY: $REPLIERS_API_KEY" | jq '.count'
+
+echo "SpaFeatures (any value):"
+curl -s "https://api.repliers.io/listings?raw.SpaFeatures=contains:a&resultsPerPage=1" \
+  -H "REPLIERS-API-KEY: $REPLIERS_API_KEY" | jq '.count'
+
+echo "WindowFeatures (any value):"
+curl -s "https://api.repliers.io/listings?raw.WindowFeatures=contains:a&resultsPerPage=1" \
+  -H "REPLIERS-API-KEY: $REPLIERS_API_KEY" | jq '.count'
+
+echo "AccessibilityFeatures (any value):"
+curl -s "https://api.repliers.io/listings?raw.AccessibilityFeatures=contains:a&resultsPerPage=1" \
+  -H "REPLIERS-API-KEY: $REPLIERS_API_KEY" | jq '.count'
+
+echo "SecurityFeatures (any value):"
+curl -s "https://api.repliers.io/listings?raw.SecurityFeatures=contains:a&resultsPerPage=1" \
+  -H "REPLIERS-API-KEY: $REPLIERS_API_KEY" | jq '.count'
+```
+
+---
+
+### TEST GROUP 3: Foundation/Lot/Patio/Roof
+
+```bash
+echo "=== Foundation/Lot/Patio/Roof ==="
+
+echo "FoundationDetails (any value):"
+curl -s "https://api.repliers.io/listings?raw.FoundationDetails=contains:a&resultsPerPage=1" \
+  -H "REPLIERS-API-KEY: $REPLIERS_API_KEY" | jq '.count'
+
+echo "LotFeatures (any value):"
+curl -s "https://api.repliers.io/listings?raw.LotFeatures=contains:a&resultsPerPage=1" \
+  -H "REPLIERS-API-KEY: $REPLIERS_API_KEY" | jq '.count'
+
+echo "PatioAndPorchFeatures (any value):"
+curl -s "https://api.repliers.io/listings?raw.PatioAndPorchFeatures=contains:a&resultsPerPage=1" \
+  -H "REPLIERS-API-KEY: $REPLIERS_API_KEY" | jq '.count'
+
+echo "Roof (any value):"
+curl -s "https://api.repliers.io/listings?raw.Roof=contains:a&resultsPerPage=1" \
+  -H "REPLIERS-API-KEY: $REPLIERS_API_KEY" | jq '.count'
+
+echo "ConstructionMaterials (any value):"
+curl -s "https://api.repliers.io/listings?raw.ConstructionMaterials=contains:a&resultsPerPage=1" \
+  -H "REPLIERS-API-KEY: $REPLIERS_API_KEY" | jq '.count'
+```
+
+---
+
+### TEST GROUP 4: Green/Energy Features
+
+```bash
+echo "=== Green/Energy Features ==="
+
+echo "GreenEnergyEfficient (any value):"
+curl -s "https://api.repliers.io/listings?raw.GreenEnergyEfficient=contains:a&resultsPerPage=1" \
+  -H "REPLIERS-API-KEY: $REPLIERS_API_KEY" | jq '.count'
+
+echo "GreenSustainability (any value):"
+curl -s "https://api.repliers.io/listings?raw.GreenSustainability=contains:a&resultsPerPage=1" \
+  -H "REPLIERS-API-KEY: $REPLIERS_API_KEY" | jq '.count'
+
+echo "GreenEnergyGeneration (any value):"
+curl -s "https://api.repliers.io/listings?raw.GreenEnergyGeneration=contains:a&resultsPerPage=1" \
+  -H "REPLIERS-API-KEY: $REPLIERS_API_KEY" | jq '.count'
+
+echo "GreenWaterConservation (any value):"
+curl -s "https://api.repliers.io/listings?raw.GreenWaterConservation=contains:a&resultsPerPage=1" \
+  -H "REPLIERS-API-KEY: $REPLIERS_API_KEY" | jq '.count'
+
+echo "ElectricOnPropertyYN=true:"
+curl -s "https://api.repliers.io/listings?raw.ElectricOnPropertyYN=true&resultsPerPage=1" \
+  -H "REPLIERS-API-KEY: $REPLIERS_API_KEY" | jq '.count'
+```
+
+---
+
+### TEST GROUP 5: Appliances/Laundry
+
+```bash
+echo "=== Appliances/Laundry ==="
+
+echo "Appliances (any value):"
+curl -s "https://api.repliers.io/listings?raw.Appliances=contains:a&resultsPerPage=1" \
+  -H "REPLIERS-API-KEY: $REPLIERS_API_KEY" | jq '.count'
+
+echo "LaundryFeatures (any value):"
+curl -s "https://api.repliers.io/listings?raw.LaundryFeatures=contains:a&resultsPerPage=1" \
+  -H "REPLIERS-API-KEY: $REPLIERS_API_KEY" | jq '.count'
+```
+
+---
+
+### TEST GROUP 6: Financial/Legal/Conditions
+
+```bash
+echo "=== Financial/Legal/Conditions ==="
+
+echo "SpecialListingConditions (any value):"
+curl -s "https://api.repliers.io/listings?raw.SpecialListingConditions=contains:a&resultsPerPage=1" \
+  -H "REPLIERS-API-KEY: $REPLIERS_API_KEY" | jq '.count'
+
+echo "AcceptableFinancing (any value):"
+curl -s "https://api.repliers.io/listings?raw.AcceptableFinancing=contains:a&resultsPerPage=1" \
+  -H "REPLIERS-API-KEY: $REPLIERS_API_KEY" | jq '.count'
+
+echo "Possession (any value):"
+curl -s "https://api.repliers.io/listings?raw.Possession=contains:a&resultsPerPage=1" \
+  -H "REPLIERS-API-KEY: $REPLIERS_API_KEY" | jq '.count'
+
+echo "OccupantType (any value):"
+curl -s "https://api.repliers.io/listings?raw.OccupantType=contains:a&resultsPerPage=1" \
+  -H "REPLIERS-API-KEY: $REPLIERS_API_KEY" | jq '.count'
+
+echo "CurrentUse (any value):"
+curl -s "https://api.repliers.io/listings?raw.CurrentUse=contains:a&resultsPerPage=1" \
+  -H "REPLIERS-API-KEY: $REPLIERS_API_KEY" | jq '.count'
+
+echo "Contingency (any value):"
+curl -s "https://api.repliers.io/listings?raw.Contingency=contains:a&resultsPerPage=1" \
+  -H "REPLIERS-API-KEY: $REPLIERS_API_KEY" | jq '.count'
+```
+
+---
+
+### TEST GROUP 7: Additional Property Features
+
+```bash
+echo "=== Additional Property Features ==="
+
+echo "AttachedGarageYN=true:"
+curl -s "https://api.repliers.io/listings?raw.AttachedGarageYN=true&resultsPerPage=1" \
+  -H "REPLIERS-API-KEY: $REPLIERS_API_KEY" | jq '.count'
+
+echo "CarportYN=true:"
+curl -s "https://api.repliers.io/listings?raw.CarportYN=true&resultsPerPage=1" \
+  -H "REPLIERS-API-KEY: $REPLIERS_API_KEY" | jq '.count'
+
+echo "GatedCommunityYN=true:"
+curl -s "https://api.repliers.io/listings?raw.GatedCommunityYN=true&resultsPerPage=1" \
+  -H "REPLIERS-API-KEY: $REPLIERS_API_KEY" | jq '.count'
+
+echo "SeniorCommunityYN=true:"
+curl -s "https://api.repliers.io/listings?raw.SeniorCommunityYN=true&resultsPerPage=1" \
+  -H "REPLIERS-API-KEY: $REPLIERS_API_KEY" | jq '.count'
+
+echo "GolfCourseYN=true:"
+curl -s "https://api.repliers.io/listings?raw.GolfCourseYN=true&resultsPerPage=1" \
+  -H "REPLIERS-API-KEY: $REPLIERS_API_KEY" | jq '.count'
+
+echo "ViewYN=true:"
+curl -s "https://api.repliers.io/listings?raw.ViewYN=true&resultsPerPage=1" \
+  -H "REPLIERS-API-KEY: $REPLIERS_API_KEY" | jq '.count'
+```
+
+---
+
+### TEST GROUP 8: Sample Listing Field Inspection
+
+Get a sample listing and check which raw fields have values:
+
+```bash
+echo "=== Sample Listing Raw Fields ==="
+
+# Get one listing with all raw fields
+curl -s "https://api.repliers.io/listings?resultsPerPage=1&status=A&type=sale" \
+  -H "REPLIERS-API-KEY: $REPLIERS_API_KEY" | jq '.listings[0].raw | to_entries | map(select(.value != null and .value != "" and .value != [])) | from_entries | keys'
+```
+
+Get another listing to compare:
+
+```bash
+# Get a different listing (page 2)
+curl -s "https://api.repliers.io/listings?resultsPerPage=1&pageNum=100&status=A&type=sale" \
+  -H "REPLIERS-API-KEY: $REPLIERS_API_KEY" | jq '.listings[0].raw | to_entries | map(select(.value != null and .value != "" and .value != [])) | from_entries | keys'
+```
+
+---
+
+### REPORT FORMAT
+
+```
+## ACTRIS Raw Field Availability Report
+
+### Baseline Count: [X]
+
+### Test Results
+
+| Field | Test Query | Count | Has Data? |
+|-------|------------|-------|-----------|
+| InteriorFeatures | contains:a | [X] | Yes/No |
+| ExteriorFeatures | contains:a | [X] | Yes/No |
+| Flooring | contains:a | [X] | Yes/No |
+| FireplaceYN | =true | [X] | Yes/No |
+| FireplaceFeatures | contains:a | [X] | Yes/No |
+| SpaYN | =true | [X] | Yes/No |
+| SpaFeatures | contains:a | [X] | Yes/No |
+| WindowFeatures | contains:a | [X] | Yes/No |
+| AccessibilityFeatures | contains:a | [X] | Yes/No |
+| SecurityFeatures | contains:a | [X] | Yes/No |
+| FoundationDetails | contains:a | [X] | Yes/No |
+| LotFeatures | contains:a | [X] | Yes/No |
+| PatioAndPorchFeatures | contains:a | [X] | Yes/No |
+| Roof | contains:a | [X] | Yes/No |
+| ConstructionMaterials | contains:a | [X] | Yes/No |
+| GreenEnergyEfficient | contains:a | [X] | Yes/No |
+| GreenSustainability | contains:a | [X] | Yes/No |
+| Appliances | contains:a | [X] | Yes/No |
+| LaundryFeatures | contains:a | [X] | Yes/No |
+| SpecialListingConditions | contains:a | [X] | Yes/No |
+| AcceptableFinancing | contains:a | [X] | Yes/No |
+| Possession | contains:a | [X] | Yes/No |
+| OccupantType | contains:a | [X] | Yes/No |
+| AttachedGarageYN | =true | [X] | Yes/No |
+| CarportYN | =true | [X] | Yes/No |
+| GatedCommunityYN | =true | [X] | Yes/No |
+| SeniorCommunityYN | =true | [X] | Yes/No |
+| GolfCourseYN | =true | [X] | Yes/No |
+| ViewYN | =true | [X] | Yes/No |
+
+### Summary
+
+**Fields WITH Data (keep in UI):**
+- [list]
+
+**Fields WITHOUT Data (remove from UI):**
+- [list]
+
+**Fields with Sample Raw Data (from listing inspection):**
+- [list all populated raw field names]
+```
+
+---
+
+### DO NOT MAKE ANY CHANGES
+
+This is an audit only. Report findings for UI cleanup planning.
+```
+
+---
+
+This will tell us exactly which of the 30+ advanced filters have actual data in ACTRIS, so we can:
+
+1. **Keep filters with data** — Include in collapsed "Advanced" section
+2. **Remove filters without data** — Eliminate UI clutter entirely
+3. **Make the UI/UX redesign focused** — Only show what actually works
