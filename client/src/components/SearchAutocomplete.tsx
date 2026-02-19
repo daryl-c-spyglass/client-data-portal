@@ -22,6 +22,7 @@ interface SearchAutocompleteProps {
   value: string;
   onChange: (value: string) => void;
   onSelect?: (suggestion: Suggestion) => void;
+  onSearch?: () => void;
   placeholder?: string;
   className?: string;
 }
@@ -30,6 +31,7 @@ export function SearchAutocomplete({
   value,
   onChange,
   onSelect,
+  onSearch,
   placeholder = "Address, MLS#, or keywords...",
   className = "",
 }: SearchAutocompleteProps) {
@@ -106,6 +108,18 @@ export function SearchAutocomplete({
   );
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      if (showDropdown && highlightIndex >= 0 && highlightIndex < suggestions.length) {
+        selectSuggestion(suggestions[highlightIndex]);
+      } else {
+        setShowDropdown(false);
+        setSuggestions([]);
+        onSearch?.();
+      }
+      return;
+    }
+
     if (!showDropdown || suggestions.length === 0) return;
 
     switch (e.key) {
@@ -120,12 +134,6 @@ export function SearchAutocomplete({
         setHighlightIndex((prev) =>
           prev > 0 ? prev - 1 : suggestions.length - 1
         );
-        break;
-      case "Enter":
-        if (highlightIndex >= 0 && highlightIndex < suggestions.length) {
-          e.preventDefault();
-          selectSuggestion(suggestions[highlightIndex]);
-        }
         break;
       case "Escape":
         setShowDropdown(false);

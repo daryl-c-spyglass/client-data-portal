@@ -1,0 +1,479 @@
+Excellent data. Here's the actionable summary:
+
+---
+
+## ACTRIS Field Availability Summary
+
+### Remove from UI (12 fields with zero data)
+
+| Field | Reason |
+|-------|--------|
+| FireplaceYN | 0 results — use FireplaceFeatures instead |
+| SpaYN | 0 results — use SpaFeatures instead |
+| GreenEnergyGeneration | 0 results |
+| GreenWaterConservation | 0 results |
+| ElectricOnPropertyYN | 0 results |
+| LaundryFeatures | 0 results |
+| AcceptableFinancing | 0 results |
+| AttachedGarageYN | 0 results — use ParkingFeatures instead |
+| CarportYN | 0 results |
+| GatedCommunityYN | 0 results — use CommunityFeatures instead |
+| SeniorCommunityYN | 0 results |
+| GolfCourseYN | 0 results — use CommunityFeatures instead |
+
+### Keep in UI — High Priority (>40% coverage, 15 fields)
+
+| Field | Coverage | Notes |
+|-------|----------|-------|
+| LotFeatures | 81% | Keep prominently |
+| FoundationDetails | 70% | Keep |
+| Cooling | 70% | Keep |
+| Heating | 69% | Keep |
+| Appliances | 68% | Keep |
+| ParkingFeatures | 68% | Keep |
+| InteriorFeatures | 67% | Keep |
+| CommunityFeatures | 57% | Keep |
+| Fencing | 52% | Keep |
+| Flooring | 51% | Keep |
+| ConstructionMaterials | 51% | Keep |
+| ExteriorFeatures | 49% | Keep |
+| PatioAndPorchFeatures | 47% | Keep |
+| OccupantType | 47% | Keep |
+| WindowFeatures | 43% | Keep |
+
+### Keep in UI — Medium Priority (10-40% coverage, 6 fields)
+
+| Field | Coverage |
+|-------|----------|
+| Sewer | 23% |
+| SecurityFeatures | 21% |
+| GreenEnergyEfficient | 19% |
+| FireplaceFeatures | 17% |
+| Roof | 16% |
+| WaterSource | 12% |
+| AccessibilityFeatures | 11% |
+
+### Keep in UI — Low Priority (<10% coverage, 6 fields)
+
+| Field | Coverage | Notes |
+|-------|----------|-------|
+| Possession | 9% | Useful when populated |
+| GreenSustainability | 7% | Niche |
+| CurrentUse | 4% | Mostly for land/commercial |
+| SpaFeatures | 1.5% | Luxury niche |
+| Contingency | <1% | Rare but useful |
+| SpecialListingConditions | 100% | Always populated |
+
+---
+
+## Updated Filter Count
+
+| Category | Before | After (Remove Empty) |
+|----------|--------|---------------------|
+| Total UI Filters | 70+ | ~58 |
+| Filters to Remove | — | 12 |
+| High Coverage (keep visible) | — | 15 |
+| Medium Coverage (collapse) | — | 7 |
+| Low Coverage (advanced) | — | 6 |
+
+---
+
+## Updated UI/UX Redesign Prompt
+
+```
+## Buyer Search UI/UX Redesign — With Field Cleanup
+
+### REFERENCE DOCUMENTS
+- Buyer Search Audit Report (February 19, 2026)
+- ACTRIS Raw Field Availability Report (February 19, 2026)
+
+### CONTEXT
+
+Audit findings:
+1. Search button buried after 70 filter sections (~8-10 viewport scroll)
+2. No collapsible sections — all filters always expanded
+3. 12 filter fields have ZERO data in ACTRIS — should be removed
+4. Boolean YN fields mostly empty — ACTRIS uses text/list fields instead
+
+---
+
+## PHASE 1: Remove Empty Filters (Zero Data in ACTRIS)
+
+**Remove these 12 filters entirely from the UI:**
+
+```tsx
+// DELETE these filter sections - they have zero data in ACTRIS MLS
+
+// Boolean YN fields that are never populated:
+- FireplaceYN (use FireplaceFeatures instead)
+- SpaYN (use SpaFeatures instead)
+- AttachedGarageYN (use ParkingFeatures instead)
+- CarportYN
+- GatedCommunityYN (use CommunityFeatures contains:Gated instead)
+- SeniorCommunityYN
+- GolfCourseYN (use CommunityFeatures contains:Golf instead)
+- ElectricOnPropertyYN
+- ViewYN (only 1 listing - use View text field instead)
+
+// Text fields that are never populated:
+- LaundryFeatures
+- AcceptableFinancing
+- GreenEnergyGeneration
+- GreenWaterConservation
+```
+
+**File:** `client/src/pages/BuyerSearch.tsx`
+
+Search for and remove the JSX sections that render these filters.
+
+---
+
+## PHASE 2: Sticky Search Button (CRITICAL)
+
+**Problem:** Users must scroll past 58+ filter sections to reach "Search Properties"
+
+**Fix:** Make the search button sticky at the bottom of the filter panel
+
+```tsx
+{/* Filter Panel Container */}
+<div className="flex flex-col h-full">
+  
+  {/* Scrollable Filter Content */}
+  <div className="flex-1 overflow-y-auto px-4 pb-4">
+    {/* All filter sections here */}
+  </div>
+  
+  {/* Sticky Search Button - Always visible at bottom */}
+  <div className="sticky bottom-0 left-0 right-0 bg-background border-t p-4 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.1)]">
+    <Button 
+      onClick={handleSearch} 
+      className="w-full bg-primary hover:bg-primary/90"
+      size="lg"
+    >
+      <Search className="mr-2 h-4 w-4" />
+      Search Properties
+      {activeFilterCount > 0 && (
+        <Badge variant="secondary" className="ml-2 bg-white/20">
+          {activeFilterCount}
+        </Badge>
+      )}
+    </Button>
+    
+    {activeFilterCount > 0 && (
+      <Button 
+        variant="ghost" 
+        size="sm" 
+        onClick={handleClearAll}
+        className="w-full mt-2 text-muted-foreground"
+      >
+        Clear All Filters
+      </Button>
+    )}
+  </div>
+</div>
+```
+
+---
+
+## PHASE 3: Collapsible Filter Sections
+
+**Group filters into collapsible accordions based on ACTRIS data coverage:**
+
+```tsx
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion";
+
+const filterGroups = [
+  {
+    id: "core",
+    label: "Core Filters",
+    defaultOpen: true,
+    filters: [
+      "status",           // Active/Under Contract/Closed
+      "listingType",      // Sale/Lease
+      "price",            // Min/Max
+      "beds",             // Min/Max
+      "baths",            // Min/Max (total)
+      "sqft",             // Min/Max
+    ]
+  },
+  {
+    id: "location",
+    label: "Location",
+    defaultOpen: true,
+    filters: [
+      "city",
+      "zip",
+      "subdivision",
+      "county",
+      "mlsAreas",
+    ]
+  },
+  {
+    id: "schools",
+    label: "Schools",
+    defaultOpen: false,
+    filters: [
+      "schoolDistrict",
+      "elementarySchool",
+      "middleSchool",
+      "highSchool",
+    ]
+  },
+  {
+    id: "property",
+    label: "Property Details",
+    defaultOpen: false,
+    filters: [
+      "propertySubType",
+      "yearBuilt",
+      "lotSize",          // Combine sqft + acres into one with toggle
+      "garage",
+      "stories",
+      "primaryOnMain",
+    ]
+  },
+  {
+    id: "features",
+    label: "Features & Amenities",
+    defaultOpen: false,
+    badge: "High coverage",
+    filters: [
+      // 68%+ coverage - most useful
+      "appliances",
+      "parkingFeatures",
+      "interiorFeatures",
+      "communityFeatures",
+      "cooling",
+      "heating",
+    ]
+  },
+  {
+    id: "outdoor",
+    label: "Outdoor & Lot",
+    defaultOpen: false,
+    filters: [
+      // 47-81% coverage
+      "lotFeatures",
+      "fencing",
+      "exteriorFeatures",
+      "patioAndPorchFeatures",
+      "pool",              // PoolFeatures, not PoolYN
+      "waterfront",        // WaterfrontFeatures
+      "view",              // View text field
+    ]
+  },
+  {
+    id: "construction",
+    label: "Construction & Systems",
+    defaultOpen: false,
+    filters: [
+      // 16-70% coverage
+      "foundationDetails",
+      "constructionMaterials",
+      "roof",
+      "flooring",
+      "windowFeatures",
+      "utilities",
+      "waterSource",
+      "sewer",
+    ]
+  },
+  {
+    id: "advanced",
+    label: "Advanced Filters",
+    defaultOpen: false,
+    badge: `${advancedFilterCount} filters`,
+    filters: [
+      // Lower coverage but still useful
+      "securityFeatures",
+      "accessibilityFeatures",
+      "fireplaceFeatures",
+      "greenEnergyEfficient",
+      "greenSustainability",
+      "spaFeatures",
+      "horseProperty",
+      "horseAmenities",
+      "propertyCondition",
+      "hoa",
+      "occupantType",
+      "possession",
+      "specialListingConditions",
+      "contingency",
+      "currentUse",
+    ]
+  },
+  {
+    id: "dates",
+    label: "Date Filters",
+    defaultOpen: false,
+    filters: [
+      "listDate",
+      "closeDate",
+      "daysOnMarket",
+      "priceDrop",
+    ]
+  }
+];
+
+// Render
+<Accordion 
+  type="multiple" 
+  defaultValue={["core", "location"]}
+  className="space-y-2"
+>
+  {filterGroups.map((group) => (
+    <AccordionItem 
+      key={group.id} 
+      value={group.id} 
+      className="border rounded-lg bg-card"
+    >
+      <AccordionTrigger className="px-4 py-3 hover:no-underline">
+        <div className="flex items-center justify-between w-full pr-2">
+          <span className="font-medium text-sm">{group.label}</span>
+          <div className="flex items-center gap-2">
+            {group.badge && (
+              <Badge variant="outline" className="text-xs">
+                {group.badge}
+              </Badge>
+            )}
+            {getActiveFilterCount(group.filters) > 0 && (
+              <Badge variant="secondary" className="text-xs">
+                {getActiveFilterCount(group.filters)} active
+              </Badge>
+            )}
+          </div>
+        </div>
+      </AccordionTrigger>
+      <AccordionContent className="px-4 pb-4 space-y-4">
+        {renderFiltersForGroup(group.filters)}
+      </AccordionContent>
+    </AccordionItem>
+  ))}
+</Accordion>
+```
+
+---
+
+## PHASE 4: Quick Search & AI Auto-Execute
+
+**Quick Search Enter key:**
+
+```tsx
+// In SearchAutocomplete.tsx
+if (e.key === 'Enter') {
+  e.preventDefault();
+  
+  if (highlightedIndex >= 0 && suggestions[highlightedIndex]) {
+    handleSelect(suggestions[highlightedIndex]);
+  } else if (inputValue.trim().length >= 3) {
+    // Execute search with typed text
+    onSearch?.(inputValue.trim());
+  }
+}
+```
+
+**AI auto-search after filling filters:**
+
+```tsx
+const handleAIParse = async (prompt: string) => {
+  const result = await parseNaturalLanguage(prompt);
+  
+  if (result.filters) {
+    applyAIFilters(result.filters);
+    
+    // Auto-execute search after brief delay
+    setTimeout(() => {
+      handleExecuteSearch();
+    }, 500);
+  }
+};
+```
+
+---
+
+## PHASE 5: Fix Boolean Filters That Have No Data
+
+**Replace yes/no selects with text search for fields where YN is empty:**
+
+```tsx
+// BEFORE (broken - GatedCommunityYN has 0 data):
+<Select value={gatedCommunity} onChange={setGatedCommunity}>
+  <option value="">Any</option>
+  <option value="yes">Yes</option>
+  <option value="no">No</option>
+</Select>
+
+// AFTER (works - search CommunityFeatures for "Gated"):
+<div className="flex items-center gap-2">
+  <Checkbox 
+    checked={hasGatedCommunity}
+    onCheckedChange={setHasGatedCommunity}
+  />
+  <Label>Gated Community</Label>
+</div>
+// Maps to: raw.CommunityFeatures=contains:Gated
+```
+
+**Apply this pattern to:**
+- Gated Community → CommunityFeatures contains:Gated
+- Golf Course → CommunityFeatures contains:Golf
+- Senior Community → CommunityFeatures contains:Senior
+- Attached Garage → ParkingFeatures contains:Attached
+- Fireplace → FireplaceFeatures (any value)
+- Spa → SpaFeatures (any value)
+
+---
+
+## ACCEPTANCE CRITERIA
+
+1. [ ] 12 empty filters removed from UI
+2. [ ] Search button sticky at bottom, always visible
+3. [ ] Filters grouped into 9 collapsible accordion sections
+4. [ ] Core + Location expanded by default
+5. [ ] Other sections collapsed by default
+6. [ ] Active filter count badge on each section
+7. [ ] Enter key in Quick Search executes search
+8. [ ] AI "Describe" auto-executes search after filling filters
+9. [ ] Boolean filters converted to text search where YN is empty
+10. [ ] Lot Size sqft/acres combined into one field with unit toggle
+
+---
+
+## FILES TO MODIFY
+
+- `client/src/pages/BuyerSearch.tsx` — Main restructure, remove empty filters
+- `client/src/components/SearchAutocomplete.tsx` — Enter key handler
+- `server/routes.ts` — Update mappings for converted boolean filters
+
+---
+
+## COMMIT MESSAGE
+
+```
+Redesign Buyer Search UI/UX with ACTRIS field cleanup
+
+- Remove 12 filters with zero data in ACTRIS MLS
+- Add sticky search button at bottom of filter panel
+- Group filters into 9 collapsible accordion sections
+- Convert broken boolean filters to text search
+- Add Enter key support in Quick Search
+- Auto-execute search after AI fills filters
+
+Based on ACTRIS Raw Field Availability Report
+```
+```
+
+---
+
+This prompt now incorporates the ACTRIS data findings:
+- Removes 12 dead filters
+- Keeps 27 working filters organized by coverage %
+- Converts broken boolean filters to working text searches
+- Adds the critical UX fixes (sticky button, collapsible sections, Enter key, AI auto-search)
+
+Ready to send to Replit?
