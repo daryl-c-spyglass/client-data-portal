@@ -22,7 +22,7 @@ import {
   LineChart,
   Line,
 } from "recharts";
-import { TrendingUp, BarChart3, Maximize2, X, Database, Cloud, ChevronLeft, ChevronRight } from "lucide-react";
+import { TrendingUp, BarChart3, Maximize2, X, Database, Cloud } from "lucide-react";
 
 interface ListingsByMonth {
   month: string;
@@ -464,31 +464,11 @@ export function MarketingInsightsCarousel({
             </CarouselContent>
           </Carousel>
           
-          <div className="flex items-center justify-between gap-2 mt-4">
-            <div className="flex items-center gap-2">
-              <Button
-                variant="outline"
-                size="icon"
-                onClick={() => carouselApi?.scrollPrev()}
-                data-testid="button-carousel-prev"
-              >
-                <ChevronLeft className="h-4 w-4" />
-              </Button>
-              <Button
-                variant="outline"
-                size="icon"
-                onClick={() => carouselApi?.scrollNext()}
-                data-testid="button-carousel-next"
-              >
-                <ChevronRight className="h-4 w-4" />
-              </Button>
-            </div>
-            <CarouselIndicator
-              count={CHART_SLIDES.length}
-              activeIndex={activeIndex}
-              onSelect={handleIndicatorSelect}
-            />
-          </div>
+          <CarouselIndicator
+            count={CHART_SLIDES.length}
+            activeIndex={activeIndex}
+            onSelect={handleIndicatorSelect}
+          />
         </CardContent>
       </Card>
 

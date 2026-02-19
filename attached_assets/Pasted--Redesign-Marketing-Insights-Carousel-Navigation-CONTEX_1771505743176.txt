@@ -1,0 +1,207 @@
+## Redesign Marketing Insights Carousel Navigation
+
+### CONTEXT
+
+The Marketing Insights card on the Dashboard has:
+- Navigation arrows (< >) on bottom left — looks awkward
+- Small indicator dots on bottom right
+
+**Requested change:** Remove the arrows entirely and replace with a full-width carousel indicator bar at the bottom of the card.
+
+---
+
+### CURRENT STATE
+┌─────────────────────────────────────────────────────┐
+│  Marketing Insights                       3 Charts  │
+│  Last updated: 2/19/2026                            │
+├─────────────────────────────────────────────────────┤
+│                                                     │
+│   [Chart 1]              [Chart 2]                  │
+│                                                     │
+├─────────────────────────────────────────────────────┤
+│  [<] [>]                              ● ○ ○        │  ← Remove arrows, extend indicators
+└─────────────────────────────────────────────────────┘
+
+### DESIRED STATE
+┌─────────────────────────────────────────────────────┐
+│  Marketing Insights                       3 Charts  │
+│  Last updated: 2/19/2026                            │
+├─────────────────────────────────────────────────────┤
+│                                                     │
+│   [Chart 1]              [Chart 2]                  │
+│                                                     │
+├─────────────────────────────────────────────────────┤
+│         ━━━━━━━━━━━━    ────────    ────────        │  ← Full-width indicator bar
+└─────────────────────────────────────────────────────┘
+
+---
+
+### TASK: Update the Carousel Navigation
+
+**File:** Find the Marketing Insights component (likely `Dashboard.tsx` or `MarketingInsights.tsx`)
+
+**Changes:**
+
+1. **Remove the arrow buttons entirely**
+
+2. **Create full-width indicator bar:**
+```tsx
+{/* Carousel Indicators - Full Width */}
+<div className="flex justify-center items-center gap-2 pt-4 pb-2 w-full">
+  {charts.map((_, index) => (
+    <button
+      key={index}
+      onClick={() => setCurrentSlide(index)}
+      className={cn(
+        "h-1 rounded-full transition-all duration-300",
+        currentSlide === index 
+          ? "w-12 bg-primary" 
+          : "w-8 bg-muted-foreground/30 hover:bg-muted-foreground/50"
+      )}
+      aria-label={`Go to chart ${index + 1}`}
+    />
+  ))}
+</div>
+```
+
+3. **Alternative: Line-style indicators (like in screenshot)**
+```tsx
+{/* Line-style Carousel Indicators */}
+<div className="flex justify-center items-center gap-3 pt-4 pb-2 w-full">
+  {charts.map((_, index) => (
+    <button
+      key={index}
+      onClick={() => setCurrentSlide(index)}
+      className={cn(
+        "h-0.5 rounded-full transition-all duration-300",
+        currentSlide === index 
+          ? "w-16 bg-primary" 
+          : "w-16 bg-gray-200 hover:bg-gray-300"
+      )}
+      aria-label={`Go to chart ${index + 1}`}
+    />
+  ))}
+</div>
+```
+
+4. **If using Shadcn Carousel:**
+```tsx
+<Carousel className="w-full">
+  <CarouselContent>
+    {/* charts */}
+  </CarouselContent>
+  
+  {/* Remove these: */}
+  {/* <CarouselPrevious /> */}
+  {/* <CarouselNext /> */}
+  
+  {/* Add custom indicators instead */}
+  <div className="flex justify-center gap-2 mt-4">
+    {Array.from({ length: chartCount }).map((_, i) => (
+      <button
+        key={i}
+        onClick={() => api?.scrollTo(i)}
+        className={cn(
+          "h-1 rounded-full transition-all",
+          current === i ? "w-12 bg-primary" : "w-8 bg-muted"
+        )}
+      />
+    ))}
+  </div>
+</Carousel>
+```
+
+5. **Enable swipe/drag navigation (optional):**
+
+If using Embla Carousel (which Shadcn uses), swipe is enabled by default. Users can drag to navigate without needing arrow buttons.
+
+---
+
+### COMPLETE COMPONENT EXAMPLE
+```tsx
+import { useState } from 'react';
+import { cn } from '@/lib/utils';
+
+export function MarketingInsights() {
+  const [currentSlide, setCurrentSlide] = useState(0);
+  
+  const charts = [
+    { id: 'inventory', component: <InventoryByStatus /> },
+    { id: 'trend', component: <ListingsTrend /> },
+    { id: 'price', component: <PriceDistribution /> },
+  ];
+
+  return (
+    <div className="rounded-lg border bg-card p-6">
+      {/* Header */}
+      <div className="flex items-center justify-between mb-4">
+        <div>
+          <h2 className="text-lg font-semibold flex items-center gap-2">
+            <TrendingUp className="h-5 w-5" />
+            Marketing Insights
+          </h2>
+          <p className="text-sm text-muted-foreground">
+            Last updated: {lastUpdated}
+          </p>
+        </div>
+        <span className="text-sm text-muted-foreground">
+          {charts.length} Charts
+        </span>
+      </div>
+
+      {/* Charts Container */}
+      <div className="relative overflow-hidden">
+        <div 
+          className="flex transition-transform duration-300"
+          style={{ transform: `translateX(-${currentSlide * 100}%)` }}
+        >
+          {charts.map((chart) => (
+            <div key={chart.id} className="w-full flex-shrink-0">
+              {chart.component}
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Full-Width Carousel Indicators */}
+      <div className="flex justify-center items-center gap-3 pt-6">
+        {charts.map((_, index) => (
+          <button
+            key={index}
+            onClick={() => setCurrentSlide(index)}
+            className={cn(
+              "h-1 rounded-full transition-all duration-300 ease-in-out",
+              currentSlide === index 
+                ? "w-16 bg-primary" 
+                : "w-12 bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600"
+            )}
+            aria-label={`View chart ${index + 1}`}
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
+```
+
+---
+
+### ACCEPTANCE CRITERIA
+
+1. Arrow buttons (< >) are completely removed
+2. Carousel indicators span centered at the bottom of the card
+3. Clicking an indicator navigates to that chart
+4. Active indicator is visually distinct (wider, primary color)
+5. Inactive indicators have hover state
+6. Swipe/drag navigation still works (if carousel library supports it)
+7. Smooth transition between slides
+
+---
+
+### COMMIT MESSAGE
+Redesign Marketing Insights carousel navigation
+
+Remove arrow buttons from bottom left
+Add full-width centered indicator bar
+Active indicator shows wider with primary color
+Cleaner, more modern carousel navigation
