@@ -1,11 +1,14 @@
 import { neighborhoodBoundaries, properties, type Property } from '@shared/schema';
 import { eq, and, gte } from 'drizzle-orm';
-import { drizzle } from 'drizzle-orm/node-postgres';
-import pg from 'pg';
-const { Pool } = pg;
+import { drizzle } from 'drizzle-orm/neon-serverless';
+import { Pool, neonConfig } from '@neondatabase/serverless';
+import ws from 'ws';
 import { getRepliersClient, LocationWithBoundary } from './repliers-client';
 
-let _pool: pg.Pool | null = null;
+neonConfig.webSocketConstructor = ws;
+
+// Memoize pool to avoid connection leaks
+let _pool: Pool | null = null;
 let _db: ReturnType<typeof drizzle> | null = null;
 
 function getDb() {
@@ -13,7 +16,7 @@ function getDb() {
     throw new Error('DATABASE_URL not configured');
   }
   if (!_pool) {
-    _pool = new Pool({ connectionString: process.env.DATABASE_URL, ssl: { rejectUnauthorized: false } });
+    _pool = new Pool({ connectionString: process.env.DATABASE_URL });
     _db = drizzle(_pool);
   }
   return _db!;

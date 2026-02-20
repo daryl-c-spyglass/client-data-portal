@@ -1,14 +1,16 @@
 import { MLSGridClient } from './mlsgrid-client';
 import { storage } from './storage';
 import type { InsertProperty, InsertMedia, SyncMetadata } from '@shared/schema';
-import { drizzle } from 'drizzle-orm/node-postgres';
-import pg from "pg";
-const { Pool } = pg;
+import { drizzle } from 'drizzle-orm/neon-serverless';
+import { Pool, neonConfig } from "@neondatabase/serverless";
 import { eq } from "drizzle-orm";
 import { syncMetadata } from '@shared/schema';
+import ws from "ws";
+
+neonConfig.webSocketConstructor = ws;
 
 // Database connection for sync metadata
-const pool = process.env.DATABASE_URL ? new Pool({ connectionString: process.env.DATABASE_URL, ssl: { rejectUnauthorized: false } }) : null;
+const pool = process.env.DATABASE_URL ? new Pool({ connectionString: process.env.DATABASE_URL }) : null;
 const db = pool ? drizzle(pool) : null;
 
 export class MLSGridSyncService {

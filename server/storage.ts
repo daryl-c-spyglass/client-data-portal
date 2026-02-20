@@ -50,10 +50,12 @@ import {
   cmaReportConfigs
 } from "@shared/schema";
 import { randomUUID } from "crypto";
-import { drizzle } from "drizzle-orm/node-postgres";
-import pg from "pg";
-const { Pool } = pg;
+import { drizzle } from "drizzle-orm/neon-serverless";
+import { Pool, neonConfig } from "@neondatabase/serverless";
 import { eq, and, gte, lte, inArray, ilike, or, sql as drizzleSql } from "drizzle-orm";
+import ws from "ws";
+
+neonConfig.webSocketConstructor = ws;
 
 export interface IStorage {
   // User operations
@@ -1043,7 +1045,7 @@ export class DbStorage implements IStorage {
   constructor(connectionString: string) {
     const pool = new Pool({ 
       connectionString,
-      ssl: { rejectUnauthorized: false }
+      ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false
     });
     this.db = drizzle(pool, { schema: { users, properties, media, savedSearches, cmas } });
   }
