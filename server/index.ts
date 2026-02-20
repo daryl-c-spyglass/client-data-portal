@@ -3,7 +3,8 @@ import session from "express-session";
 import cookieParser from "cookie-parser";
 import passport from "passport";
 import ConnectPgSimple from "connect-pg-simple";
-import { Pool } from "@neondatabase/serverless";
+import pg from "pg";
+const { Pool } = pg;
 import fs from "fs";
 import path from "path";
 import rateLimit from "express-rate-limit";
@@ -112,7 +113,7 @@ const PgSession = ConnectPgSimple(session);
 const dbPool = process.env.DATABASE_URL
   ? new Pool({
       connectionString: process.env.DATABASE_URL,
-      ssl: isProduction ? { rejectUnauthorized: false } : false,
+      ssl: { rejectUnauthorized: false },
       connectionTimeoutMillis: 5000,
       idleTimeoutMillis: 30000,
     })
