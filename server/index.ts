@@ -118,6 +118,12 @@ const dbPool = process.env.DATABASE_URL
     })
   : null;
 
+if (dbPool) {
+  dbPool.on("error", (err: Error) => {
+    logger.error("Database pool error (non-fatal)", { error: err.message });
+  });
+}
+
 const sessionStore = dbPool
   ? new PgSession({
       pool: dbPool,
