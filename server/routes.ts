@@ -7820,11 +7820,12 @@ OUTPUT JSON:
     try {
       const userId = req.user!.id;
       const { cmaReportTemplates } = await import("@shared/schema");
-      const { drizzle } = await import("drizzle-orm/neon-serverless");
-      const { Pool } = await import("@neondatabase/serverless");
+      const { drizzle } = await import("drizzle-orm/node-postgres");
+      const pgMod = await import("pg");
+      const { Pool } = pgMod.default;
       const { eq, desc } = await import("drizzle-orm");
       
-      const pool = new Pool({ connectionString: process.env.DATABASE_URL });
+      const pool = new Pool({ connectionString: process.env.DATABASE_URL, ssl: { rejectUnauthorized: false } });
       const db = drizzle(pool);
       
       const templates = await db
@@ -7880,11 +7881,12 @@ OUTPUT JSON:
       const validConfig = configResult.data || {};
       
       const { cmaReportTemplates } = await import("@shared/schema");
-      const { drizzle } = await import("drizzle-orm/neon-serverless");
-      const { Pool } = await import("@neondatabase/serverless");
+      const { drizzle } = await import("drizzle-orm/node-postgres");
+      const pgMod = await import("pg");
+      const { Pool } = pgMod.default;
       const { eq, and } = await import("drizzle-orm");
       
-      const pool = new Pool({ connectionString: process.env.DATABASE_URL });
+      const pool = new Pool({ connectionString: process.env.DATABASE_URL, ssl: { rejectUnauthorized: false } });
       const db = drizzle(pool);
       
       // If setting as default, unset any existing default
@@ -7927,11 +7929,12 @@ OUTPUT JSON:
       const { id } = req.params;
       
       const { cmaReportTemplates } = await import("@shared/schema");
-      const { drizzle } = await import("drizzle-orm/neon-serverless");
-      const { Pool } = await import("@neondatabase/serverless");
+      const { drizzle } = await import("drizzle-orm/node-postgres");
+      const pgMod = await import("pg");
+      const { Pool } = pgMod.default;
       const { eq, and } = await import("drizzle-orm");
       
-      const pool = new Pool({ connectionString: process.env.DATABASE_URL });
+      const pool = new Pool({ connectionString: process.env.DATABASE_URL, ssl: { rejectUnauthorized: false } });
       const db = drizzle(pool);
       
       const result = await db
@@ -7954,11 +7957,12 @@ OUTPUT JSON:
     try {
       const userId = req.user!.id;
       const { cmaReportTemplates } = await import("@shared/schema");
-      const { drizzle } = await import("drizzle-orm/neon-serverless");
-      const { Pool } = await import("@neondatabase/serverless");
+      const { drizzle } = await import("drizzle-orm/node-postgres");
+      const pgMod = await import("pg");
+      const { Pool } = pgMod.default;
       const { eq, and } = await import("drizzle-orm");
       
-      const pool = new Pool({ connectionString: process.env.DATABASE_URL });
+      const pool = new Pool({ connectionString: process.env.DATABASE_URL, ssl: { rejectUnauthorized: false } });
       const db = drizzle(pool);
       
       const [template] = await db
@@ -7978,9 +7982,10 @@ OUTPUT JSON:
   app.get("/api/admin/users", requireAuth, requireMinimumRole("super_admin"), async (req, res) => {
     try {
       const result = await import("@shared/schema").then(async (schema) => {
-        const { drizzle } = await import("drizzle-orm/neon-serverless");
-        const { Pool } = await import("@neondatabase/serverless");
-        const pool = new Pool({ connectionString: process.env.DATABASE_URL });
+        const { drizzle } = await import("drizzle-orm/node-postgres");
+        const pgMod = await import("pg");
+        const { Pool } = pgMod.default;
+        const pool = new Pool({ connectionString: process.env.DATABASE_URL, ssl: { rejectUnauthorized: false } });
         const db = drizzle(pool);
         const users = await db.select().from(schema.users);
         return users.map(u => ({
@@ -8042,10 +8047,11 @@ OUTPUT JSON:
       // Protection: Cannot demote the last Developer
       if (targetUser.role === "developer" && newRole !== "developer") {
         const schema = await import("@shared/schema");
-        const { drizzle } = await import("drizzle-orm/neon-serverless");
-        const { Pool } = await import("@neondatabase/serverless");
+        const { drizzle } = await import("drizzle-orm/node-postgres");
+        const pgMod = await import("pg");
+        const { Pool } = pgMod.default;
         const { eq, sql } = await import("drizzle-orm");
-        const pool = new Pool({ connectionString: process.env.DATABASE_URL });
+        const pool = new Pool({ connectionString: process.env.DATABASE_URL, ssl: { rejectUnauthorized: false } });
         const db = drizzle(pool);
         const developerCount = await db.select({ count: sql<number>`count(*)` })
           .from(schema.users)
@@ -8162,10 +8168,11 @@ OUTPUT JSON:
       // Protection: Cannot delete the last Developer
       if (targetUser.role === "developer") {
         const schema = await import("@shared/schema");
-        const { drizzle } = await import("drizzle-orm/neon-serverless");
-        const { Pool } = await import("@neondatabase/serverless");
+        const { drizzle } = await import("drizzle-orm/node-postgres");
+        const pgMod = await import("pg");
+        const { Pool } = pgMod.default;
         const { eq, sql } = await import("drizzle-orm");
-        const pool = new Pool({ connectionString: process.env.DATABASE_URL });
+        const pool = new Pool({ connectionString: process.env.DATABASE_URL, ssl: { rejectUnauthorized: false } });
         const db = drizzle(pool);
         const developerCount = await db.select({ count: sql<number>`count(*)` })
           .from(schema.users)

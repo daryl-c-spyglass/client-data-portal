@@ -1,14 +1,12 @@
 import { adminActivityLogs, users } from "@shared/schema";
 import { eq, desc, and, gte, lte } from "drizzle-orm";
-import { drizzle } from "drizzle-orm/neon-serverless";
-import { Pool, neonConfig } from "@neondatabase/serverless";
+import { drizzle } from "drizzle-orm/node-postgres";
+import pg from "pg";
+const { Pool: PgPool } = pg;
 import type { Request } from "express";
-import ws from "ws";
-
-neonConfig.webSocketConstructor = ws;
 
 function getDb() {
-  const pool = new Pool({ connectionString: process.env.DATABASE_URL! });
+  const pool = new PgPool({ connectionString: process.env.DATABASE_URL!, ssl: { rejectUnauthorized: false } });
   return drizzle(pool);
 }
 
