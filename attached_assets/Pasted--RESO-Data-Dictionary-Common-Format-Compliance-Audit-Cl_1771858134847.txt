@@ -1,0 +1,445 @@
+# RESO Data Dictionary & Common Format Compliance Audit
+
+## Client Data Portal (IDX + CMA on Replit)
+
+**Project:** Client Data Portal (Mission Control)
+**MLS:** ACTRIS
+**Data Source:** Repliers API
+**Standards Reference:**
+- RESO Data Dictionary v2.0: https://ddwiki.reso.org/display/DDW/RESO+Data+Dictionary+Wiki
+- RESO Common Format (RCF): https://www.reso.org/reso-common-format/
+- RESO Web API: https://www.reso.org/reso-web-api/
+
+---
+
+## CONTEXT
+
+RESO (Real Estate Standards Organization) defines the industry standard for real estate data terminology, field names, status values, and data transport formats. Our Client Data Portal uses Repliers as the data source, which returns its own field names (e.g., `soldPrice`, `soldDate`, `simpleDaysOnMarket`). We do NOT rename internal variables or API field names — but every **user-facing label, column header, PDF text, tooltip, badge, filter label, and chart axis** must use RESO-compliant terminology.
+
+Additionally, the RESO Common Format (RCF) defines how listing data should be structured for transport and interoperability. While we don't need full RCF compliance for internal use, we should align our data structures and terminology with RCF conventions where practical.
+
+**CRITICAL RULE: Change DISPLAY LABELS ONLY. Never rename TypeScript variables, interface properties, database columns, or API field names.**
+
+---
+
+## PHASE 1: RESO Data Dictionary — Field Label Audit
+
+### 1A. Run Full Diagnostic
+
+Run ALL of these grep commands and capture the output. This is the complete inventory of every non-compliant label in the codebase.
+
+```bash
+echo "============================================"
+echo "RESO DATA DICTIONARY COMPLIANCE AUDIT"
+echo "Client Data Portal — $(date)"
+echo "============================================"
+
+echo ""
+echo "=== 1. PRICE LABELS ==="
+echo "--- Sold Price / Sale Price (should be 'Close Price') ---"
+grep -rn '"Sold Price"\|"Sale Price"\|Sold Price:\|Sale Price:\|>Sold Price<\|>Sale Price<' client/src/ server/ --include="*.tsx" --include="*.ts" --include="*.html" | grep -v node_modules | grep -v '.test.' | head -30
+
+echo ""
+echo "--- Listing Price / Ask Price (should be 'List Price') ---"
+grep -rn '"Listing Price"\|"Ask Price"\|Listing Price:\|Ask Price:' client/src/ server/ --include="*.tsx" --include="*.ts" | grep -v node_modules | head -20
+
+echo ""
+echo "--- Original Price (should be 'Original List Price') ---"
+grep -rn '"Original Price"\|Original Price:' client/src/ server/ --include="*.tsx" --include="*.ts" | grep -v node_modules | grep -v "Original List Price" | head -20
+
+echo ""
+echo "=== 2. DATE LABELS ==="
+echo "--- Sold Date / Closing Date (should be 'Close Date') ---"
+grep -rn '"Sold Date"\|"Closing Date"\|Sold Date:\|Closing Date:' client/src/ server/ --include="*.tsx" --include="*.ts" | grep -v node_modules | head -20
+
+echo ""
+echo "--- Listed / List Date (should be 'Listing Date' or 'On Market Date') ---"
+grep -rn '"Listed:"\|"List Date"\|>Listed<\|Listed Date' client/src/ server/ --include="*.tsx" --include="*.ts" | grep -v node_modules | grep -v "Listing Date" | head -20
+
+echo ""
+echo "=== 3. STATUS LABELS ==="
+echo "--- 'Sold' status text (RESO uses 'Closed') ---"
+grep -rn "'Sold'\|\"Sold\"\|>Sold<\|status.*Sold\|Sold.*status" client/src/ --include="*.tsx" --include="*.ts" | grep -v soldPrice | grep -v soldDate | grep -v soldCount | grep -v node_modules | head -30
+
+echo ""
+echo "--- 'For Sale' status text (RESO uses 'Active') ---"
+grep -rn '"For Sale"\|>For Sale<' client/src/ --include="*.tsx" --include="*.ts" | grep -v node_modules | head -10
+
+echo ""
+echo "--- 'Under Contract' without 'Active' prefix (RESO uses 'Active Under Contract') ---"
+grep -rn '"Under Contract"\|>Under Contract<' client/src/ --include="*.tsx" --include="*.ts" | grep -v "Active Under Contract" | grep -v node_modules | head -10
+
+echo ""
+echo "=== 4. PROPERTY FIELD LABELS ==="
+echo "--- Square Footage / Square Feet (should be 'Living Area' or 'SqFt' abbreviation) ---"
+grep -rn '"Square Footage"\|"Square Feet"\|Square Footage:\|Square Feet:' client/src/ server/ --include="*.tsx" --include="*.ts" | grep -v node_modules | head -15
+
+echo ""
+echo "--- Bedrooms (should be 'Bedrooms' or 'Beds' — RESO field is 'BedroomsTotal') ---"
+grep -rn '"# of Bedrooms"\|"Number of Bedrooms"\|"Bedroom Count"' client/src/ --include="*.tsx" --include="*.ts" | grep -v node_modules | head -10
+
+echo ""
+echo "--- Bathrooms (should be 'Bathrooms' or 'Baths' — RESO field is 'BathroomsTotalInteger') ---"
+grep -rn '"# of Bathrooms"\|"Number of Bathrooms"\|"Bathroom Count"' client/src/ --include="*.tsx" --include="*.ts" | grep -v node_modules | head -10
+
+echo ""
+echo "--- Lot Size (RESO uses 'Lot Size Area' with units, or 'Lot Size Acres') ---"
+grep -rn '"Lot Size"\|"Lot Sq"\|lotSize' client/src/ --include="*.tsx" --include="*.ts" | grep -v node_modules | head -10
+
+echo ""
+echo "=== 5. DAYS ON MARKET ==="
+echo "--- DOM variations (acceptable: 'Days on Market', 'DOM', 'CDOM') ---"
+grep -rn '"Days On Market"\|"Days on market"\|"Market Time"\|"Time on Market"' client/src/ server/ --include="*.tsx" --include="*.ts" | grep -v node_modules | head -10
+
+echo ""
+echo "=== 6. AGENT/OFFICE LABELS ==="
+echo "--- Listing Agent (RESO: 'List Agent') ---"
+grep -rn '"Listing Agent"\|Listing Agent:' client/src/ --include="*.tsx" --include="*.ts" | grep -v node_modules | grep -v "ListingAgent" | head -10
+
+echo ""
+echo "--- Selling Agent (RESO: 'Buyer Agent' or 'Co-List Agent') ---"
+grep -rn '"Selling Agent"\|Selling Agent:' client/src/ --include="*.tsx" --include="*.ts" | grep -v node_modules | head -10
+
+echo ""
+echo "--- Listing Office (RESO: 'List Office') ---"
+grep -rn '"Listing Office"\|Listing Office:' client/src/ --include="*.tsx" --include="*.ts" | grep -v node_modules | grep -v "ListingOffice" | head -10
+
+echo ""
+echo "=== 7. PROPERTY TYPE / CLASS ==="
+echo "--- Property Type used for sub-type (RESO: Property Type = class, Property Sub Type = specific) ---"
+grep -rn '"Property Type"\|Property Type:' client/src/ --include="*.tsx" --include="*.ts" | grep -v node_modules | head -15
+
+echo ""
+echo "=== 8. DATE FORMAT CHECK ==="
+echo "--- Non-standard date formatters (should use MM/DD/YYYY consistently) ---"
+grep -rn 'toLocaleDateString\|\.toDateString\|moment(' client/src/components/ --include="*.tsx" --include="*.ts" | grep -v node_modules | head -15
+
+echo ""
+echo "=== 9. MLS NUMBER LABEL ==="
+echo "--- MLS# / MLS Number (RESO: 'ListingId' or 'MLS #' for display) ---"
+grep -rn '"MLS Number"\|"MLS ID"\|"Listing ID"\|"MLS No"' client/src/ --include="*.tsx" --include="*.ts" | grep -v node_modules | head -10
+
+echo ""
+echo "=== 10. PDF / SHARE LINK / CMA REPORT LABELS ==="
+echo "--- Check PDF generation files ---"
+grep -rn '"Sold Price"\|"Sale Price"\|"Sold Date"\|"Closing Date"\|"Square Feet"\|"Original Price"\|"Listing Price"' client/src/components/cma* client/src/components/CMA* client/src/pages/share* --include="*.tsx" --include="*.ts" 2>/dev/null | grep -v node_modules | head -20
+
+echo ""
+echo "=== 11. CHART AXIS / LEGEND LABELS ==="
+grep -rn '"Sold Price"\|"Sale Price"\|"Sold Date"\|"Square Feet"\|"Listing Price"' client/src/components/*chart* client/src/components/*Chart* client/src/components/*widget* client/src/components/*Widget* --include="*.tsx" --include="*.ts" 2>/dev/null | grep -v node_modules | head -15
+
+echo ""
+echo "=== 12. TABLE COLUMN HEADERS ==="
+grep -rn '"Sold Price"\|"Sale Price"\|"Sold Date"\|"Closing Date"\|"Square Feet"\|"Original Price"' client/src/pages/ --include="*.tsx" --include="*.ts" | grep -v node_modules | head -15
+
+echo ""
+echo "============================================"
+echo "AUDIT COMPLETE — Review findings above"
+echo "============================================"
+```
+
+### 1B. RESO Data Dictionary — Complete Label Mapping
+
+For every non-compliant label found, apply the correct RESO term. Here is the authoritative mapping:
+
+#### Price Fields
+
+| Current (Non-RESO) | RESO Data Dictionary Term | Notes |
+|---|---|---|
+| "Sold Price" | **"Close Price"** | RESO field: `ClosePrice` |
+| "Sale Price" | **"Close Price"** | Same as above |
+| "Listing Price" | **"List Price"** | RESO field: `ListPrice` |
+| "Ask Price" | **"List Price"** | Same as above |
+| "Original Price" | **"Original List Price"** | RESO field: `OriginalListPrice` |
+| "Previous Price" | **"Previous List Price"** | If tracking price changes |
+
+#### Date Fields
+
+| Current (Non-RESO) | RESO Data Dictionary Term | Notes |
+|---|---|---|
+| "Sold Date" | **"Close Date"** | RESO field: `CloseDate` |
+| "Closing Date" | **"Close Date"** | Same as above |
+| "Listed" or "List Date" | **"Listing Date"** | RESO field: `ListingContractDate` or `OnMarketDate` |
+| "Expiration" | **"Expiration Date"** | RESO field: `ExpirationDate` |
+
+#### Status Values (RESO StandardStatus)
+
+| Current (Non-RESO) | RESO StandardStatus | Color Code (Spyglass) |
+|---|---|---|
+| "Sold" | **"Closed"** | Red (#EF4444) |
+| "Active" | **"Active"** | Green (#22C55E) ✅ Already correct |
+| "For Sale" | **"Active"** | Green |
+| "Under Contract" | **"Active Under Contract"** | Orange (#F97316) |
+| "Pending" | **"Pending"** | Gray (#6B7280) ✅ Already correct |
+| "Coming Soon" | **"Coming Soon"** | Blue (#3B82F6) (if applicable) |
+| "Withdrawn" | **"Withdrawn"** | Gray |
+| "Expired" | **"Expired"** | Gray |
+| "Canceled" | **"Canceled"** | Gray |
+
+#### Property Fields
+
+| Current (Non-RESO) | RESO Data Dictionary Term | Notes |
+|---|---|---|
+| "Square Footage" | **"Living Area"** | RESO field: `LivingArea`. "SqFt" abbreviation OK in compact UI |
+| "Square Feet" | **"Living Area"** | Same as above |
+| "# of Bedrooms" | **"Bedrooms"** or **"Beds"** | RESO field: `BedroomsTotal` |
+| "# of Bathrooms" | **"Bathrooms"** or **"Baths"** | RESO field: `BathroomsTotalInteger` |
+| "Year Built" | **"Year Built"** | ✅ Already correct. RESO field: `YearBuilt` |
+| "Lot Size" | **"Lot Size Area"** | RESO field: `LotSizeArea` (with units) |
+| "Garage" | **"Garage Spaces"** | RESO field: `GarageSpaces` |
+
+#### Property Classification (IMPORTANT)
+
+| Term | RESO Meaning | Example Values | Notes |
+|---|---|---|---|
+| **Property Type** | The CLASS of property | Residential, Commercial, Land | RESO field: `PropertyType` |
+| **Property Sub Type** | The SPECIFIC type | Single Family Residence, Condominium, Townhouse | RESO field: `PropertySubType` |
+
+**Current behavior:** We display `listing.details.style` (e.g., "Single Family Residence") with the label "Property Type". Per strict RESO, this should be labeled "Property Sub Type". However, this is confusing for agents. **Decision: Keep "Property Type" as the label for now — revisit with Ryan.**
+
+#### Agent/Office Fields
+
+| Current (Non-RESO) | RESO Data Dictionary Term | Notes |
+|---|---|---|
+| "Listing Agent" | **"List Agent"** | RESO field: `ListAgentFullName` |
+| "Selling Agent" | **"Buyer Agent"** | RESO field: `BuyerAgentFullName` |
+| "Listing Office" | **"List Office"** | RESO field: `ListOfficeName` |
+| "Selling Office" | **"Buyer Office"** | RESO field: `BuyerOfficeName` |
+
+#### Market Analytics Fields
+
+| Current (Non-RESO) | RESO Data Dictionary Term | Notes |
+|---|---|---|
+| "Days on Market" | **"Days on Market"** | ✅ Already correct. RESO field: `DaysOnMarket` |
+| "DOM" | **"DOM"** | ✅ Acceptable abbreviation |
+| "CDOM" | **"CDOM"** | Cumulative Days on Market — acceptable |
+| "MLS#" or "MLS #" | **"MLS #"** | ✅ Acceptable display. RESO field: `ListingId` |
+| "MLS Number" | **"MLS #"** | Use shorter form |
+
+---
+
+## PHASE 2: RESO Common Format (RCF) Alignment
+
+Reference: https://www.reso.org/reso-common-format/
+
+The RESO Common Format standardizes how listing data is structured in JSON payloads. While we use Repliers' format internally, we should align where practical.
+
+### 2A. Audit Data Transport Structure
+
+Run this diagnostic to check how we structure listing data internally:
+
+```bash
+echo "=== Internal Listing Data Structure ==="
+echo "--- Check TypeScript interfaces for listing data ---"
+grep -rn 'interface.*Listing\|type.*Listing\|interface.*Property\|type.*Property' client/src/ shared/ --include="*.ts" --include="*.tsx" | grep -v node_modules | head -20
+
+echo ""
+echo "--- Check how listing data is normalized in routes ---"
+grep -n 'listPrice\|soldPrice\|closePrice\|listDate\|soldDate\|closeDate\|daysOnMarket\|simpleDaysOnMarket\|sqFt\|livingArea\|propertyType\|propertySubType' server/routes.ts | head -40
+
+echo ""
+echo "--- Check shared types ---"
+grep -rn 'interface\|type ' shared/ --include="*.ts" | head -20
+```
+
+### 2B. RCF Key Conventions to Follow
+
+Per RCF, listing data payloads should follow these conventions. Check if our internal data objects align:
+
+1. **Field naming convention:** RCF uses PascalCase for field names (e.g., `ListPrice`, `CloseDate`, `LivingArea`). Our internal variables use camelCase (e.g., `listPrice`, `soldPrice`, `sqFt`) which is standard JavaScript convention — this is acceptable as long as display labels use RESO terms.
+
+2. **Enumeration values:** RCF defines standard enum values for fields like StandardStatus. Check that our status mappings use RESO values:
+
+```bash
+echo "=== Status Enum Mapping ==="
+grep -rn "status.*===\|status.*==\|status.*:\|statusMap\|statusColor\|getStatus" client/src/ server/ --include="*.ts" --include="*.tsx" | grep -v node_modules | grep -i "sold\|active\|pending\|closed\|contract" | head -30
+```
+
+3. **Media (Photos):** RCF structures media as arrays with `MediaURL`, `MediaCategory`, `Order`, `ShortDescription`. Check our photo handling:
+
+```bash
+echo "=== Photo/Media Structure ==="
+grep -rn 'photo\|image\|media\|thumbnail' server/routes.ts | grep -v node_modules | head -20
+```
+
+4. **Address structure:** RCF uses `StreetNumber`, `StreetName`, `StreetSuffix`, `City`, `StateOrProvince`, `PostalCode`. Check our address handling:
+
+```bash
+echo "=== Address Field Structure ==="
+grep -rn 'address\.\|streetNumber\|streetName\|streetSuffix\|city\|state\|zip\|postalCode' server/routes.ts | head -20
+```
+
+---
+
+## PHASE 3: Apply All Fixes
+
+### 3A. Fix Priority Order
+
+1. **HIGH — Price labels:** "Sold Price"/"Sale Price" → "Close Price" everywhere
+2. **HIGH — Date labels:** "Sold Date"/"Closing Date" → "Close Date" everywhere
+3. **HIGH — Status text:** "Sold" → "Closed" in ALL status badges, pills, legends, filters
+4. **MEDIUM — Other price labels:** "Original Price" → "Original List Price"
+5. **MEDIUM — Area labels:** "Square Feet"/"Square Footage" → "Living Area" (keep "SqFt" in compact UI)
+6. **LOW — Agent labels:** "Listing Agent" → "List Agent" (only if widely displayed)
+7. **SKIP — Property Sub Type:** Keep "Property Type" label for now (revisit with Ryan)
+
+### 3B. Files to Check (Complete List)
+
+```bash
+echo "=== All files that likely contain listing labels ==="
+find client/src/ -name "*.tsx" -o -name "*.ts" | xargs grep -l "Price\|Date\|Status\|Square\|Sold\|Listed\|Living Area\|DOM\|Agent\|Office" 2>/dev/null | grep -v node_modules | grep -v '.test.' | sort
+```
+
+Key files to audit manually:
+
+**Properties Module:**
+- `client/src/components/properties/AustinMetroListings.tsx` — Properties listing + modal
+
+**CMA Module:**
+- `client/src/components/cma-presentation/widgets/PropertyDetailModal.tsx` — CMA property detail
+- `client/src/components/cma-presentation/widgets/TimeToSellWidget.tsx` — Market analytics
+- `client/src/components/cma-presentation/widgets/ComparableGrid.tsx` — Comp grid
+- `client/src/components/cma-presentation/widgets/MarketTrendsWidget.tsx` — Charts
+- `client/src/components/cma-presentation/cma-presentation.tsx` — Main CMA presentation
+- `client/src/components/CMAReport.tsx` — PDF report generation
+
+**Admin / Dashboard:**
+- `client/src/pages/admin-dashboards/transactions.tsx` — Transaction table headers
+
+**Share Links:**
+- Any files under `client/src/pages/share/` or `client/src/components/share/`
+
+**Server-Side:**
+- `server/routes.ts` — Backend data normalization (labels in response objects)
+- `server/siteContentDefaults.ts` — Default content/labels
+
+### 3C. Execution Steps
+
+**Step 1:** Run the Phase 1 diagnostic (Section 1A above) and capture all findings.
+
+**Step 2:** For each finding, change ONLY the display label text. Examples:
+
+```tsx
+// ✅ CORRECT — Change label text, keep variable name
+<span className="label">Close Price:</span>
+<span className="value">${formatPrice(listing.soldPrice)}</span>
+
+// ✅ CORRECT — Chart axis label
+<XAxis dataKey="soldPrice" label="Close Price" />
+
+// ✅ CORRECT — Table column header
+<th>Close Date</th>
+<td>{formatDate(comp.soldDate)}</td>
+
+// ✅ CORRECT — Status badge
+<Badge color={getStatusColor(listing.status)}>
+  {listing.status === 'Sold' ? 'Closed' : listing.status}
+</Badge>
+
+// ❌ WRONG — Do NOT rename the variable
+const closePrice = listing.closePrice; // Repliers doesn't have this field!
+```
+
+**Step 3:** Run verification to ensure no variable renames:
+
+```bash
+git diff --stat
+git diff | grep -E "^[-+].*soldPrice|^[-+].*soldDate|^[-+].*listPrice" | grep -v "Close Price\|Close Date\|List Price\|Original List Price" | head -20
+```
+
+If the diff shows changes to actual variable assignments (not string labels), revert those lines.
+
+**Step 4:** Run the app and verify no build errors:
+
+```bash
+npm run build 2>&1 | tail -20
+```
+
+**Step 5:** Commit with RESO-specific message:
+
+```bash
+git add -A
+git commit -m "RESO: Full Data Dictionary compliance audit — display labels only
+
+RESO Data Dictionary + Common Format alignment:
+- 'Sold Price' / 'Sale Price' → 'Close Price' (all UI labels)
+- 'Sold Date' / 'Closing Date' → 'Close Date' (all UI labels)
+- 'Original Price' → 'Original List Price' (all UI labels)
+- 'Square Feet' / 'Square Footage' → 'Living Area' (full labels)
+- Status 'Sold' → 'Closed' (badges, pills, legends, filters)
+- 'Listing Agent' → 'List Agent' (where applicable)
+
+References:
+- RESO Data Dictionary: https://ddwiki.reso.org
+- RESO Common Format: https://www.reso.org/reso-common-format/
+
+No TypeScript variables, interfaces, or API field names changed.
+Only user-facing JSX/HTML display text updated."
+git push origin main
+```
+
+**Step 6:** Post the commit hash in Slack.
+
+---
+
+## PHASE 4: Validation Tests
+
+After deployment, verify these manually:
+
+### Properties Module
+- [ ] Click any Active listing → Modal shows "List Price:" (not "Listing Price")
+- [ ] Click any Closed listing → Modal shows "Close Price:" and "Close Date:"
+- [ ] Status badge shows "Closed" (not "Sold") for closed/sold listings
+- [ ] Status badge shows "Active Under Contract" (not "Under Contract")
+- [ ] "Living Area" label appears (not "Square Feet") in full-label contexts
+- [ ] "SqFt" abbreviation still OK in compact card views
+- [ ] All dates display as MM/DD/YYYY format
+- [ ] "Original List Price:" label (not "Original Price")
+- [ ] "Listing Date:" label (not "Listed" or "List Date")
+
+### CMA Presentation
+- [ ] Property Detail Modal uses "Close Price", "Close Date", "Living Area"
+- [ ] Comparable grid column headers use RESO terms
+- [ ] Time to Sell widget uses "Original List Price"
+- [ ] Market trends charts use RESO labels on axes
+
+### PDF / Share Links
+- [ ] Generated CMA PDFs show "Close Price" not "Sold Price"
+- [ ] Share link pages use RESO-compliant labels
+- [ ] Listing brochure PDFs use correct terminology
+
+### Admin Dashboard
+- [ ] Transactions table headers use "Close Price", "Close Date"
+- [ ] No column says "Sale Price" or "Sold Date"
+
+---
+
+## ACCEPTANCE CRITERIA
+
+1. Zero instances of "Sold Price", "Sale Price", "Closing Date", "Listing Price", "Ask Price", or "Square Footage" as user-facing labels anywhere in the application
+2. All status displays use RESO StandardStatus values (Active, Active Under Contract, Closed, Pending)
+3. No "Sold" status text visible to users — replaced with "Closed"
+4. All dates formatted as MM/DD/YYYY
+5. No TypeScript variable names, interface properties, or API field names were changed
+6. Application builds and runs without errors
+7. Repliers API field names (`soldPrice`, `soldDate`, `simpleDaysOnMarket`, etc.) remain unchanged in code logic
+
+---
+
+## LOGGING / INSTRUMENTATION
+
+Add a comment block at the top of any file that was modified:
+
+```tsx
+// RESO Data Dictionary Compliance: Display labels updated per RESO v2.0
+// Reference: https://ddwiki.reso.org | https://www.reso.org/reso-common-format/
+// Internal variable names unchanged — only UI label text modified
+```
+
+---
+
+## BLOCKERS
+
+- **Property Sub Type vs Property Type:** Deferred — requires Ryan's decision on agent-facing terminology
+- **RCF payload restructuring:** Not needed for internal use — Repliers format is fine internally
+- **RESO Web API compliance:** Not applicable — we consume Repliers, not expose a RESO API
