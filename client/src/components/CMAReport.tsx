@@ -1654,9 +1654,9 @@ export function CMAReport({
                             <XAxis 
                               type="number" 
                               dataKey="sqft" 
-                              name="Square Feet"
+                              name="Living Area"
                               tickFormatter={(value) => value.toLocaleString()}
-                              label={{ value: 'Square feet', position: 'bottom', offset: 20 }}
+                              label={{ value: 'Living Area (SqFt)', position: 'bottom', offset: 20 }}
                             />
                             <YAxis 
                               type="number" 
@@ -2089,7 +2089,7 @@ export function CMAReport({
                           </div>
                           {isSold && property.closePrice && (
                             <div className="flex justify-between">
-                              <span className="text-muted-foreground">Sold Price</span>
+                              <span className="text-muted-foreground">Close Price</span>
                               <span className="font-medium">${Number(property.closePrice).toLocaleString()}</span>
                             </div>
                           )}

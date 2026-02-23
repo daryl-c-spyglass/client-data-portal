@@ -1,0 +1,157 @@
+# RESO Data Dictionary — Fix Remaining 10 Display Labels
+
+## Scope
+Fix 10 non-compliant display labels across 7 files to align with RESO Data Dictionary v2.0 standards. Change ONLY user-facing JSX/HTML label text. Do NOT rename any TypeScript variables, interface properties, database columns, or API field names.
+
+**References:**
+- RESO Data Dictionary: https://ddwiki.reso.org/display/DDW/RESO+Data+Dictionary+Wiki
+- RESO Common Format: https://www.reso.org/reso-common-format/
+
+---
+
+## Tasks
+
+### Task 1 — "Sold Price" / "Sale Price" → "Close Price" (5 labels, 4 files)
+
+1. `client/src/components/cma-presentation/widgets/AdjustmentsSection.tsx` line ~247
+   - Find the table row header `"Sale Price"` → change to `"Close Price"`
+
+2. `client/src/components/cma-presentation/widgets/PropertyDetailModal.tsx` line ~241
+   - Find `"Sold Price"` detail label → change to `"Close Price"`
+
+3. `client/src/components/CMAReport.tsx` line ~2092
+   - Find `"Sold Price"` in property detail section → change to `"Close Price"`
+
+4. `client/src/components/cma-presentation/CMAPresentationBuilder.tsx` line ~1539
+   - Find `"Sale Price"` table column header → change to `"Close Price"`
+
+5. `client/src/components/cma-presentation/CMAPresentationBuilder.tsx` line ~2070
+   - Find `"Sale Price"` table column header → change to `"Close Price"`
+
+### Task 2 — "Square Feet" → "Living Area" (3 labels, 3 files)
+
+6. `client/src/components/cma-presentation/widgets/CMAStatsView.tsx` line ~658
+   - Find `name="Square Feet"` (scatter chart data series) → change to `name="Living Area"`
+   - Also check nearby axis labels — any `"Square feet"` (lowercase) → `"Living Area"`
+
+7. `client/src/components/CMAReport.tsx` line ~1657
+   - Find `name="Square Feet"` (scatter chart data series) → change to `name="Living Area"`
+   - Also check nearby axis labels — any `"Square feet"` (lowercase) → `"Living Area"`
+
+8. `server/openai-client.ts` line ~207
+   - Find `"Square Feet:"` in AI prompt context string → change to `"Living Area:"`
+
+### Task 3 — "Listed" → "Listing Date" (1 label, 1 file)
+
+9. `client/src/components/PropertyDetail.tsx` line ~633
+   - Find the label `"Listed"` → change to `"Listing Date"`
+
+### Task 4 — "Under Contract" → "Active Under Contract" (1 label, 1 file)
+
+10. `client/src/components/cma-presentation/presentation/MapboxCMAMap.tsx` line ~243
+    - Find `"Under Contract"` in the map legend → change to `"Active Under Contract"`
+
+---
+
+## Critical Rules
+
+- **ONLY change the display text string** — the label users see on screen
+- **Do NOT rename** any variables like `soldPrice`, `soldDate`, `sqFt`, `underContract`, etc.
+- **Do NOT change** any data comparisons like `status === 'Sold'` or `comp.status === 'Under Contract'` — those are checking API data values, not display labels
+- Keep `"SqFt"` abbreviation anywhere it's already used in compact UI — only change the full `"Square Feet"` / `"Square Footage"` labels
+- If a line uses a variable to display status text directly (e.g., `{comp.status}`), leave it alone — that's rendering API data, not a hardcoded label
+
+**Correct example:**
+```tsx
+// ✅ Change label text, keep variable reference
+<span>Close Price:</span> {formatPrice(listing.soldPrice)}
+<span>Living Area:</span> {listing.sqFt} SqFt
+```
+
+**Wrong example:**
+```tsx
+// ❌ Do NOT rename the variable
+const closePrice = listing.closePrice; // This field doesn't exist in Repliers!
+```
+
+---
+
+## Acceptance Criteria
+
+- [ ] AC-1: Zero instances of `"Sold Price"` or `"Sale Price"` as user-facing labels (grep confirms 0 matches)
+- [ ] AC-2: Zero instances of `"Square Feet"` or `"Square Footage"` as full display labels (grep confirms 0 matches)
+- [ ] AC-3: `"Listed"` label replaced with `"Listing Date"` in PropertyDetail.tsx
+- [ ] AC-4: Map legend shows `"Active Under Contract"` instead of `"Under Contract"`
+- [ ] AC-5: `npm run build` succeeds with zero errors
+- [ ] AC-6: No TypeScript variable names, interface properties, or API field names were changed
+
+---
+
+## Validation Tests
+
+After making changes, run these commands:
+
+```bash
+# Test 1: No remaining "Sold Price" / "Sale Price" labels
+grep -rn '"Sold Price"\|"Sale Price"\|Sold Price:\|Sale Price:' client/src/ server/ --include="*.tsx" --include="*.ts" | grep -v node_modules
+# Expected: 0 results
+
+# Test 2: No remaining "Square Feet" full labels
+grep -rn '"Square Feet"\|"Square Footage"\|"Square feet"\|Square Feet:' client/src/ server/ --include="*.tsx" --include="*.ts" | grep -v node_modules
+# Expected: 0 results
+
+# Test 3: No remaining bare "Listed" label (but "Listing Date" is fine)
+grep -rn '"Listed"' client/src/components/PropertyDetail.tsx
+# Expected: 0 results
+
+# Test 4: Map legend uses full RESO term
+grep -rn '"Under Contract"' client/src/components/cma-presentation/presentation/MapboxCMAMap.tsx | grep -v "Active Under Contract"
+# Expected: 0 results
+
+# Test 5: Verify no variable renames happened
+git diff | grep -E "^[-+].*(soldPrice|soldDate|sqFt|underContract)" | grep -v "Close Price\|Close Date\|Living Area\|Active Under Contract" | head -20
+# Expected: 0 results (only string label changes, no variable changes)
+
+# Test 6: Build check
+npm run build 2>&1 | tail -5
+# Expected: Build successful
+```
+
+---
+
+## Logging
+
+No runtime logging needed — these are static label text changes only.
+
+---
+
+## Commit Message
+
+```
+RESO: Fix remaining 10 display labels — Close Price, Living Area, Listing Date, Active Under Contract
+
+- "Sold Price" / "Sale Price" → "Close Price" (5 labels across 4 CMA files)
+- "Square Feet" → "Living Area" (3 labels across 3 files including chart axes)
+- "Listed" → "Listing Date" (1 label in PropertyDetail.tsx)
+- "Under Contract" → "Active Under Contract" (1 label in MapboxCMAMap legend)
+
+References: RESO Data Dictionary v2.0, RESO Common Format
+No TypeScript variables, interfaces, or API field names changed.
+```
+
+---
+
+## Files Impacted
+
+1. `client/src/components/cma-presentation/widgets/AdjustmentsSection.tsx`
+2. `client/src/components/cma-presentation/widgets/PropertyDetailModal.tsx`
+3. `client/src/components/CMAReport.tsx`
+4. `client/src/components/cma-presentation/CMAPresentationBuilder.tsx`
+5. `client/src/components/cma-presentation/widgets/CMAStatsView.tsx`
+6. `server/openai-client.ts`
+7. `client/src/components/PropertyDetail.tsx`
+8. `client/src/components/cma-presentation/presentation/MapboxCMAMap.tsx`
+
+## Blockers
+
+None — all changes are simple string replacements in known file locations.

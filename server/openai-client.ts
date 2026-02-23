@@ -204,7 +204,7 @@ Property Details:
 - Address: ${context.subjectProperty.address}
 - List Price: $${context.subjectProperty.price.toLocaleString()}
 - Beds/Baths: ${context.subjectProperty.beds}/${context.subjectProperty.baths}
-- Square Feet: ${context.subjectProperty.sqft.toLocaleString()}
+- Living Area: ${context.subjectProperty.sqft.toLocaleString()} SqFt
 ${context.subjectProperty.description ? `- Description: ${context.subjectProperty.description}` : ''}
 
 Market Analysis Summary:

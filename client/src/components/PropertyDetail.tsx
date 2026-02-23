@@ -630,7 +630,7 @@ export function PropertyDetail({
               )}
               {property.listingContractDate && (
                 <div className="flex justify-between">
-                  <span className="text-muted-foreground">Listed</span>
+                  <span className="text-muted-foreground">Listing Date</span>
                   <span className="font-medium">
                     {new Date(property.listingContractDate).toLocaleDateString()}
                   </span>

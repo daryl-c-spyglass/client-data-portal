@@ -244,7 +244,7 @@ export function AdjustmentsSection({
             </thead>
             <tbody>
               <tr className="bg-muted/30">
-                <td className="border p-2 font-medium">Sale Price</td>
+                <td className="border p-2 font-medium">Close Price</td>
                 <td className="border p-2 text-center bg-blue-50 dark:bg-blue-900/20">—</td>
                 {calculatedResults.map((result) => (
                   <td key={result.compId} colSpan={2} className="border p-2 text-center font-medium">

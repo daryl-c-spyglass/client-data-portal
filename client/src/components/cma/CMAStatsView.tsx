@@ -655,10 +655,10 @@ function AveragePricePerSqftSection({
                   <XAxis 
                     type="number" 
                     dataKey="x" 
-                    name="Square Feet"
+                    name="Living Area"
                     tickFormatter={(v) => v.toLocaleString()}
                     tick={{ fontSize: 11 }}
-                    label={{ value: 'Square feet', position: 'bottom', offset: 20, fontSize: 12 }}
+                    label={{ value: 'Living Area (SqFt)', position: 'bottom', offset: 20, fontSize: 12 }}
                   />
                   <YAxis 
                     type="number" 

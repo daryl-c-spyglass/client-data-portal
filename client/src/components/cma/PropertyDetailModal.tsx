@@ -238,7 +238,7 @@ export function PropertyDetailModal({
               )}
               {property.closePrice && (
                 <div>
-                  <p className="text-xs text-muted-foreground">Sold Price</p>
+                  <p className="text-xs text-muted-foreground">Close Price</p>
                   <p className="text-sm font-medium" data-testid="text-sold-price">{formatPrice(Number(property.closePrice))}</p>
                 </div>
               )}
