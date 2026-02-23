@@ -1536,7 +1536,7 @@ export default function CMAPresentationBuilder() {
                             header={
                               <tr className="border-b">
                                 <th className="text-left p-1.5 font-medium">Property</th>
-                                <th className="text-right p-1.5 font-medium">Sale Price</th>
+                                <th className="text-right p-1.5 font-medium">Close Price</th>
                                 <th className="text-right p-1.5 font-medium">Adj. Total</th>
                                 <th className="text-right p-1.5 font-medium">Adj. Price</th>
                               </tr>
@@ -2067,7 +2067,7 @@ export default function CMAPresentationBuilder() {
                       <thead>
                         <tr className="border-b">
                           <th className="text-left p-2 font-medium">Property</th>
-                          <th className="text-right p-2 font-medium">Sale Price</th>
+                          <th className="text-right p-2 font-medium">Close Price</th>
                           {displayFeatures.map(feature => (
                             <th key={feature} className="text-right p-2 font-medium">{getFeatureLabel(feature)}</th>
                           ))}

@@ -1668,7 +1668,7 @@ export function CMAReport({
                             <RechartsTooltip 
                               formatter={(value: number, name: string) => {
                                 if (name === 'Price') return [`$${value.toLocaleString()}`, 'Price'];
-                                if (name === 'Square Feet') return [value.toLocaleString(), 'Sq Ft'];
+                                if (name === 'Living Area') return [value.toLocaleString(), 'Sq Ft'];
                                 return [value, name];
                               }}
                               labelFormatter={(label, payload) => {
@@ -1858,7 +1858,7 @@ export function CMAReport({
                                 </div>
                                 {closePrice > 0 && (
                                   <div className="flex justify-between">
-                                    <span className="text-muted-foreground">Sold Price {soldPriceRatio && <span className="text-xs">({soldPriceRatio}%)</span>}</span>
+                                    <span className="text-muted-foreground">Close Price {soldPriceRatio && <span className="text-xs">({soldPriceRatio}%)</span>}</span>
                                     <span className="font-medium">${closePrice.toLocaleString()}</span>
                                   </div>
                                 )}
