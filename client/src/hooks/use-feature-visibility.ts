@@ -28,7 +28,7 @@ export function useFeatureVisibility() {
 
   const updateFeature = useMutation({
     mutationFn: async (update: { featureKey: string; isVisible: boolean; status: string; hiddenMessage?: string }) => {
-      const res = await apiRequest('PUT', `/api/feature-visibility/${update.featureKey}`, update);
+      const res = await apiRequest(`/api/feature-visibility/${update.featureKey}`, 'PUT', update);
       return res.json();
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['/api/feature-visibility'] }),
@@ -36,7 +36,7 @@ export function useFeatureVisibility() {
 
   const bulkUpdate = useMutation({
     mutationFn: async (updates: Array<{ featureKey: string; isVisible: boolean; status: string; hiddenMessage?: string }>) => {
-      const res = await apiRequest('PUT', '/api/feature-visibility/bulk', { updates });
+      const res = await apiRequest('/api/feature-visibility/bulk', 'PUT', { updates });
       return res.json();
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['/api/feature-visibility'] }),

@@ -1,0 +1,338 @@
+# 🔧 REPLIT PROMPT: Fix Feature Visibility Save Error
+
+## PROJECT
+**Client Data Portal** (IDX + CMA on Replit)  
+**URL:** https://client-data-portal-nine.vercel.app
+
+---
+
+## ISSUE
+
+When clicking "Save Changes" on the Feature Visibility page (`/admin/feature-visibility`), the save fails with error toast: **"Failed to save settings"**
+
+The UI works correctly (toggles, status dropdowns), but the API call to persist changes is failing.
+
+---
+
+## DEBUGGING TASKS
+
+### Task 1: Check API Endpoint Exists
+
+Verify the feature visibility API routes are registered:
+
+```typescript
+// server/index.ts - Verify this route is registered
+import featureVisibilityRoutes from './routes/feature-visibility';
+app.use('/api/feature-visibility', featureVisibilityRoutes);
+```
+
+**If missing:** Add the route registration.
+
+---
+
+### Task 2: Check Database Table Exists
+
+```sql
+-- Run this query to verify table exists
+SELECT * FROM feature_visibility LIMIT 5;
+
+-- If table doesn't exist, create it:
+CREATE TABLE IF NOT EXISTS feature_visibility (
+  id SERIAL PRIMARY KEY,
+  feature_key VARCHAR(50) UNIQUE NOT NULL,
+  feature_label VARCHAR(100) NOT NULL,
+  route VARCHAR(100) NOT NULL,
+  section VARCHAR(50) NOT NULL,
+  is_visible BOOLEAN DEFAULT true,
+  status VARCHAR(20) DEFAULT 'live',
+  hidden_message TEXT DEFAULT 'This feature is currently under development.',
+  updated_by UUID REFERENCES users(id),
+  updated_at TIMESTAMP DEFAULT NOW(),
+  created_at TIMESTAMP DEFAULT NOW()
+);
+
+-- Insert default records if empty
+INSERT INTO feature_visibility (feature_key, feature_label, route, section, is_visible, status) VALUES
+  ('dashboard', 'Dashboard', '/', 'application', true, 'live'),
+  ('properties', 'Properties', '/properties', 'application', true, 'live'),
+  ('cmas', 'CMAs', '/cmas', 'application', true, 'live'),
+  ('seller_updates', 'Seller Updates', '/seller-updates', 'application', true, 'live'),
+  ('buyer_search', 'Buyer Search', '/buyer-search', 'application', true, 'live'),
+  ('clients', 'Clients', '/clients', 'application', true, 'live'),
+  ('analytics', 'Analytics', '/analytics', 'application', true, 'live'),
+  ('settings', 'Settings', '/settings', 'application', true, 'live')
+ON CONFLICT (feature_key) DO NOTHING;
+```
+
+---
+
+### Task 3: Check API Route Implementation
+
+**File:** `server/routes/feature-visibility.ts`
+
+Verify the PUT endpoint handles both single and bulk updates:
+
+```typescript
+import { Router } from 'express';
+import { db } from '../db';
+import { featureVisibility } from '../db/schema';
+import { eq } from 'drizzle-orm';
+import { requireAuth, requireRole } from '../middleware/auth';
+
+const router = Router();
+
+// PUT /api/feature-visibility/:featureKey - Update single feature
+router.put('/:featureKey', requireAuth, requireRole(['developer']), async (req, res) => {
+  try {
+    const { featureKey } = req.params;
+    const { isVisible, status, hiddenMessage } = req.body;
+    
+    console.log(`[FeatureVisibility] Updating ${featureKey}:`, { isVisible, status });
+    
+    const [updated] = await db
+      .update(featureVisibility)
+      .set({
+        isVisible,
+        status,
+        hiddenMessage,
+        updatedBy: req.user?.id,
+        updatedAt: new Date(),
+      })
+      .where(eq(featureVisibility.featureKey, featureKey))
+      .returning();
+    
+    if (!updated) {
+      console.error(`[FeatureVisibility] Feature not found: ${featureKey}`);
+      return res.status(404).json({ error: 'Feature not found' });
+    }
+    
+    console.log(`[FeatureVisibility] Updated successfully:`, updated);
+    res.json(updated);
+  } catch (error) {
+    console.error('[FeatureVisibility] Error updating feature:', error);
+    res.status(500).json({ error: 'Failed to update feature visibility', details: error.message });
+  }
+});
+
+// PUT /api/feature-visibility/bulk - Bulk update (must be BEFORE /:featureKey route)
+router.put('/bulk', requireAuth, requireRole(['developer']), async (req, res) => {
+  try {
+    const { updates } = req.body;
+    
+    console.log(`[FeatureVisibility] Bulk updating ${updates?.length} features`);
+    
+    if (!updates || !Array.isArray(updates)) {
+      return res.status(400).json({ error: 'Invalid updates array' });
+    }
+    
+    const results = await Promise.all(
+      updates.map(async (update: any) => {
+        const [updated] = await db
+          .update(featureVisibility)
+          .set({
+            isVisible: update.isVisible,
+            status: update.status,
+            updatedBy: req.user?.id,
+            updatedAt: new Date(),
+          })
+          .where(eq(featureVisibility.featureKey, update.featureKey))
+          .returning();
+        return updated;
+      })
+    );
+    
+    console.log(`[FeatureVisibility] Bulk update complete:`, results.length);
+    res.json(results);
+  } catch (error) {
+    console.error('[FeatureVisibility] Error bulk updating:', error);
+    res.status(500).json({ error: 'Failed to bulk update', details: error.message });
+  }
+});
+
+export default router;
+```
+
+**⚠️ CRITICAL:** The `/bulk` route MUST be defined BEFORE `/:featureKey` route, otherwise Express will match "bulk" as a featureKey parameter.
+
+---
+
+### Task 4: Check Frontend API Call
+
+**File:** `client/src/pages/admin/FeatureVisibilitySettings.tsx` (or similar)
+
+Verify the save function is sending correct payload:
+
+```typescript
+const handleSave = async () => {
+  try {
+    // Option A: Bulk update
+    const updates = localFeatures.map(f => ({
+      featureKey: f.featureKey,
+      isVisible: f.isVisible,
+      status: f.status,
+    }));
+    
+    console.log('[FeatureVisibility] Saving:', updates);
+    
+    const response = await fetch('/api/feature-visibility/bulk', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({ updates }),
+    });
+    
+    if (!response.ok) {
+      const errorData = await response.json();
+      console.error('[FeatureVisibility] Save failed:', errorData);
+      throw new Error(errorData.error || 'Failed to save');
+    }
+    
+    const result = await response.json();
+    console.log('[FeatureVisibility] Save success:', result);
+    
+    toast.success('Settings saved successfully');
+    setHasChanges(false);
+  } catch (error) {
+    console.error('[FeatureVisibility] Save error:', error);
+    toast.error('Failed to save settings');
+  }
+};
+```
+
+---
+
+### Task 5: Check Drizzle Schema Match
+
+**File:** `server/db/schema.ts`
+
+Ensure the schema matches the database table:
+
+```typescript
+import { pgTable, serial, varchar, boolean, text, uuid, timestamp } from 'drizzle-orm/pg-core';
+
+export const featureVisibility = pgTable('feature_visibility', {
+  id: serial('id').primaryKey(),
+  featureKey: varchar('feature_key', { length: 50 }).unique().notNull(),
+  featureLabel: varchar('feature_label', { length: 100 }).notNull(),
+  route: varchar('route', { length: 100 }).notNull(),
+  section: varchar('section', { length: 50 }).notNull(),
+  isVisible: boolean('is_visible').default(true),
+  status: varchar('status', { length: 20 }).default('live'),
+  hiddenMessage: text('hidden_message').default('This feature is currently under development.'),
+  updatedBy: uuid('updated_by').references(() => users.id),
+  updatedAt: timestamp('updated_at').defaultNow(),
+  createdAt: timestamp('created_at').defaultNow(),
+});
+```
+
+---
+
+### Task 6: Check Role Middleware
+
+Verify the `requireRole` middleware correctly identifies Developer role:
+
+```typescript
+// server/middleware/auth.ts
+export function requireRole(allowedRoles: string[]) {
+  return (req: Request, res: Response, next: NextFunction) => {
+    const userRole = req.user?.role;
+    
+    console.log(`[Auth] Role check - User: ${req.user?.email}, Role: ${userRole}, Required: ${allowedRoles}`);
+    
+    if (!userRole || !allowedRoles.includes(userRole)) {
+      return res.status(403).json({ error: 'Insufficient permissions' });
+    }
+    
+    next();
+  };
+}
+```
+
+---
+
+### Task 7: Add Console Logging for Debugging
+
+Add these logs to trace the issue:
+
+**Backend (server/routes/feature-visibility.ts):**
+```typescript
+router.put('/bulk', requireAuth, requireRole(['developer']), async (req, res) => {
+  console.log('[FeatureVisibility] Bulk update request received');
+  console.log('[FeatureVisibility] User:', req.user?.email, req.user?.role);
+  console.log('[FeatureVisibility] Body:', JSON.stringify(req.body, null, 2));
+  // ... rest of handler
+});
+```
+
+**Frontend (before fetch call):**
+```typescript
+console.log('[FeatureVisibility] Sending save request...');
+console.log('[FeatureVisibility] Payload:', JSON.stringify({ updates }, null, 2));
+```
+
+---
+
+## COMMON ISSUES & FIXES
+
+| Issue | Symptom | Fix |
+|-------|---------|-----|
+| Route order wrong | `/bulk` matched as `/:featureKey` | Move `/bulk` route BEFORE `/:featureKey` |
+| Table doesn't exist | 500 error with "relation does not exist" | Run CREATE TABLE SQL |
+| Schema mismatch | Column name errors | Align Drizzle schema with DB |
+| Role check failing | 403 Forbidden | Verify user has `developer` role |
+| Missing Content-Type | Empty req.body | Add `Content-Type: application/json` header |
+| CORS issue | Network error | Check CORS middleware allows credentials |
+
+---
+
+## ACCEPTANCE CRITERIA
+
+| # | Criteria | Test |
+|---|----------|------|
+| 1 | Toggle Clients to "Development" + OFF | UI updates, no error |
+| 2 | Click "Save Changes" | Success toast, no error |
+| 3 | Refresh page | Settings persist |
+| 4 | Check console logs | No errors |
+| 5 | Non-developer can't see Clients in sidebar | Login as Agent, verify |
+
+---
+
+## VALIDATION
+
+After fix, test with:
+
+```bash
+# Check if table has data
+psql -c "SELECT feature_key, is_visible, status FROM feature_visibility;"
+
+# Test API directly
+curl -X PUT http://localhost:5000/api/feature-visibility/bulk \
+  -H "Content-Type: application/json" \
+  -H "Cookie: <your-session-cookie>" \
+  -d '{"updates":[{"featureKey":"clients","isVisible":false,"status":"development"}]}'
+```
+
+---
+
+## LOGGING TO ADD
+
+```
+[FeatureVisibility] Bulk update request received
+[FeatureVisibility] User: daryl@spyglassrealty.com, Role: developer
+[FeatureVisibility] Body: {"updates":[...]}
+[FeatureVisibility] Updating clients: isVisible=false, status=development
+[FeatureVisibility] Update complete: 8 features
+```
+
+---
+
+## FILES TO CHECK/MODIFY
+
+| File | Action |
+|------|--------|
+| `server/index.ts` | Verify route registration |
+| `server/routes/feature-visibility.ts` | Fix route order, add logging |
+| `server/db/schema.ts` | Verify schema matches DB |
+| `server/middleware/auth.ts` | Check requireRole |
+| `client/src/pages/admin/FeatureVisibilitySettings.tsx` | Check save function |
+| Database | Verify table exists with data |
