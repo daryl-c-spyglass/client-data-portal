@@ -17,7 +17,9 @@ import { requireAuth, requireRole, requireMinimumRole, requirePermission } from 
 import { isSuperAdminEmail, INITIAL_SUPER_ADMIN_EMAILS } from "@shared/permissions";
 import { fetchExternalUsers, fetchFromExternalApi } from "./external-api";
 import { logAdminActivity, getActivityLogs, type AdminAction } from "./admin-activity-service";
+import { logActivity, type ActivityAction } from "./activity-logger";
 import type { PropertyStatistics, TimelineDataPoint } from "@shared/schema";
+import { featureVisibility, activityLogs } from "@shared/schema";
 import { neighborhoodService } from "./neighborhood-service";
 import { registerWordPressRoutes } from "./wordpress-routes";
 import { registerWidgetRoutes } from "./widget-routes";
@@ -8431,6 +8433,309 @@ OUTPUT JSON:
     } catch (error: any) {
       console.error("[Admin Users] Error inviting:", error.message);
       res.status(500).json({ error: "Failed to invite user" });
+    }
+  });
+
+  // ============================================
+  // Feature Visibility API Endpoints
+  // ============================================
+
+  app.get("/api/feature-visibility", requireAuth, async (req, res) => {
+    try {
+      const { drizzle } = await import("drizzle-orm/node-postgres");
+      const pgModule = await import("pg");
+      const pool = new pgModule.default.Pool({ connectionString: process.env.DATABASE_URL!, ssl: { rejectUnauthorized: false } });
+      const db = drizzle(pool);
+
+      const features = await db.select().from(featureVisibility);
+      const userRole = (req as any).user?.role;
+
+      if (userRole === 'developer') {
+        console.log(`[FeatureVisibility] Fetched ${features.length} features for ${(req as any).user?.email} (role: ${userRole})`);
+        return res.json(features);
+      }
+
+      const visibleFeatures = features.filter(f => f.isVisible);
+      console.log(`[FeatureVisibility] Fetched ${visibleFeatures.length} visible features for ${(req as any).user?.email} (role: ${userRole})`);
+      return res.json(visibleFeatures);
+    } catch (error) {
+      console.error('[FeatureVisibility] Error fetching features:', error);
+      res.status(500).json({ error: 'Failed to fetch feature visibility settings' });
+    }
+  });
+
+  app.get("/api/feature-visibility/check/:route(*)", requireAuth, async (req, res) => {
+    try {
+      const route = '/' + req.params.route;
+      const userRole = (req as any).user?.role;
+
+      if (userRole === 'developer') {
+        return res.json({ accessible: true, isDeveloper: true });
+      }
+
+      const { drizzle } = await import("drizzle-orm/node-postgres");
+      const { eq } = await import("drizzle-orm");
+      const pgModule = await import("pg");
+      const pool = new pgModule.default.Pool({ connectionString: process.env.DATABASE_URL!, ssl: { rejectUnauthorized: false } });
+      const db = drizzle(pool);
+
+      const [feature] = await db.select().from(featureVisibility).where(eq(featureVisibility.route, route));
+
+      if (!feature) {
+        return res.json({ accessible: true });
+      }
+
+      if (!feature.isVisible) {
+        return res.json({ accessible: false, message: feature.hiddenMessage, status: feature.status });
+      }
+
+      return res.json({ accessible: true });
+    } catch (error) {
+      console.error('[FeatureVisibility] Error checking route:', error);
+      res.status(500).json({ error: 'Failed to check route accessibility' });
+    }
+  });
+
+  const featureVisibilityUpdateSchema = z.object({
+    featureKey: z.string().min(1),
+    isVisible: z.boolean(),
+    status: z.enum(['live', 'development', 'disabled']),
+    hiddenMessage: z.string().optional(),
+  });
+
+  const featureVisibilityBulkSchema = z.object({
+    updates: z.array(featureVisibilityUpdateSchema).min(1),
+  });
+
+  app.put("/api/feature-visibility/bulk", requireAuth, requireMinimumRole('developer'), async (req, res) => {
+    try {
+      const parsed = featureVisibilityBulkSchema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ error: 'Invalid request body', details: parsed.error.issues });
+      }
+      const { updates } = parsed.data;
+      const { drizzle } = await import("drizzle-orm/node-postgres");
+      const { eq } = await import("drizzle-orm");
+      const pgModule = await import("pg");
+      const pool = new pgModule.default.Pool({ connectionString: process.env.DATABASE_URL!, ssl: { rejectUnauthorized: false } });
+      const db = drizzle(pool);
+
+      const results = await Promise.all(
+        updates.map(async (update) => {
+          const [updated] = await db
+            .update(featureVisibility)
+            .set({
+              isVisible: update.isVisible,
+              status: update.status,
+              hiddenMessage: update.hiddenMessage,
+              updatedBy: (req as any).user?.id,
+              updatedAt: new Date(),
+            })
+            .where(eq(featureVisibility.featureKey, update.featureKey))
+            .returning();
+          return updated;
+        })
+      );
+
+      await logActivity({
+        userId: (req as any).user?.id,
+        action: 'FEATURE_VISIBILITY_BULK_UPDATE',
+        resource: 'feature_visibility',
+        details: { updatedCount: updates.length, updates },
+        req,
+      });
+
+      console.log(`[FeatureVisibility] ${(req as any).user?.email} bulk updated ${updates.length} features`);
+      res.json(results);
+    } catch (error) {
+      console.error('[FeatureVisibility] Error bulk updating:', error);
+      res.status(500).json({ error: 'Failed to bulk update' });
+    }
+  });
+
+  const featureVisibilitySingleUpdateSchema = z.object({
+    isVisible: z.boolean(),
+    status: z.enum(['live', 'development', 'disabled']),
+    hiddenMessage: z.string().optional(),
+  });
+
+  app.put("/api/feature-visibility/:featureKey", requireAuth, requireMinimumRole('developer'), async (req, res) => {
+    try {
+      const { featureKey } = req.params;
+      const parsed = featureVisibilitySingleUpdateSchema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ error: 'Invalid request body', details: parsed.error.issues });
+      }
+      const { isVisible, status, hiddenMessage } = parsed.data;
+      const { drizzle } = await import("drizzle-orm/node-postgres");
+      const { eq } = await import("drizzle-orm");
+      const pgModule = await import("pg");
+      const pool = new pgModule.default.Pool({ connectionString: process.env.DATABASE_URL!, ssl: { rejectUnauthorized: false } });
+      const db = drizzle(pool);
+
+      const [previous] = await db.select().from(featureVisibility).where(eq(featureVisibility.featureKey, featureKey));
+
+      const [updated] = await db
+        .update(featureVisibility)
+        .set({
+          isVisible,
+          status,
+          hiddenMessage,
+          updatedBy: (req as any).user?.id,
+          updatedAt: new Date(),
+        })
+        .where(eq(featureVisibility.featureKey, featureKey))
+        .returning();
+
+      if (!updated) {
+        return res.status(404).json({ error: 'Feature not found' });
+      }
+
+      await logActivity({
+        userId: (req as any).user?.id,
+        action: 'FEATURE_VISIBILITY_CHANGED',
+        resource: 'feature_visibility',
+        resourceId: featureKey,
+        details: {
+          featureKey,
+          previousVisible: previous?.isVisible,
+          newVisible: isVisible,
+          previousStatus: previous?.status,
+          newStatus: status,
+        },
+        req,
+      });
+
+      console.log(`[FeatureVisibility] ${(req as any).user?.email} changed ${featureKey}: visible=${isVisible}, status=${status}`);
+      res.json(updated);
+    } catch (error) {
+      console.error('[FeatureVisibility] Error updating feature:', error);
+      res.status(500).json({ error: 'Failed to update feature visibility' });
+    }
+  });
+
+  // ============================================
+  // Activity Logs API Endpoints (Developer Only)
+  // ============================================
+
+  app.get("/api/activity-logs", requireAuth, requireMinimumRole('developer'), async (req, res) => {
+    try {
+      const { drizzle } = await import("drizzle-orm/node-postgres");
+      const { eq, desc, and, gte, lte, sql, count } = await import("drizzle-orm");
+      const pgModule = await import("pg");
+      const pool = new pgModule.default.Pool({ connectionString: process.env.DATABASE_URL!, ssl: { rejectUnauthorized: false } });
+      const db = drizzle(pool);
+
+      const page = parseInt(req.query.page as string) || 1;
+      const limit = Math.min(parseInt(req.query.limit as string) || 50, 100);
+      const offset = (page - 1) * limit;
+
+      const conditions: any[] = [];
+
+      if (req.query.action) {
+        conditions.push(eq(activityLogs.action, req.query.action as string));
+      }
+      if (req.query.userId) {
+        conditions.push(eq(activityLogs.userId, req.query.userId as string));
+      }
+      if (req.query.resource) {
+        conditions.push(eq(activityLogs.resource, req.query.resource as string));
+      }
+      if (req.query.status) {
+        conditions.push(eq(activityLogs.status, req.query.status as string));
+      }
+      if (req.query.startDate) {
+        conditions.push(gte(activityLogs.createdAt, new Date(req.query.startDate as string)));
+      }
+      if (req.query.endDate) {
+        conditions.push(lte(activityLogs.createdAt, new Date(req.query.endDate as string)));
+      }
+
+      const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
+
+      const [logs, totalResult] = await Promise.all([
+        db.select()
+          .from(activityLogs)
+          .where(whereClause)
+          .orderBy(desc(activityLogs.createdAt))
+          .limit(limit)
+          .offset(offset),
+        db.select({ count: count() })
+          .from(activityLogs)
+          .where(whereClause),
+      ]);
+
+      const total = totalResult[0]?.count || 0;
+
+      console.log(`[ActivityLogs] Fetched ${logs.length} logs (page ${page}, total: ${total}) with filters: ${JSON.stringify(req.query)}`);
+      res.json({
+        logs,
+        pagination: {
+          page,
+          limit,
+          total,
+          totalPages: Math.ceil(Number(total) / limit),
+        },
+      });
+    } catch (error) {
+      console.error('[ActivityLogs] Error fetching logs:', error);
+      res.status(500).json({ error: 'Failed to fetch activity logs' });
+    }
+  });
+
+  app.get("/api/activity-logs/stats", requireAuth, requireMinimumRole('developer'), async (req, res) => {
+    try {
+      const { drizzle } = await import("drizzle-orm/node-postgres");
+      const { sql, gte, desc, count } = await import("drizzle-orm");
+      const pgModule = await import("pg");
+      const pool = new pgModule.default.Pool({ connectionString: process.env.DATABASE_URL!, ssl: { rejectUnauthorized: false } });
+      const db = drizzle(pool);
+
+      const days = parseInt(req.query.days as string) || 30;
+      const startDate = new Date();
+      startDate.setDate(startDate.getDate() - days);
+
+      const [totalResult] = await db.select({ count: count() }).from(activityLogs).where(gte(activityLogs.createdAt, startDate));
+      const totalLogs = Number(totalResult?.count || 0);
+
+      const uniqueUsersResult = await db.execute(
+        sql`SELECT COUNT(DISTINCT user_id) as count FROM activity_logs WHERE created_at >= ${startDate}`
+      );
+      const uniqueUsers = Number((uniqueUsersResult as any).rows?.[0]?.count || 0);
+
+      const errorCountResult = await db.execute(
+        sql`SELECT COUNT(*) as count FROM activity_logs WHERE status = 'error' AND created_at >= ${startDate}`
+      );
+      const errorCount = Number((errorCountResult as any).rows?.[0]?.count || 0);
+      const errorRate = totalLogs > 0 ? ((errorCount / totalLogs) * 100).toFixed(1) : '0.0';
+
+      const actionCountsResult = await db.execute(
+        sql`SELECT action, COUNT(*) as count FROM activity_logs WHERE created_at >= ${startDate} GROUP BY action ORDER BY count DESC LIMIT 10`
+      );
+      const actionCounts = (actionCountsResult as any).rows || [];
+
+      const dailyActivityResult = await db.execute(
+        sql`SELECT DATE(created_at) as date, COUNT(*) as count FROM activity_logs WHERE created_at >= ${startDate} GROUP BY DATE(created_at) ORDER BY date ASC`
+      );
+      const dailyActivity = (dailyActivityResult as any).rows || [];
+
+      const recentUsersResult = await db.execute(
+        sql`SELECT DISTINCT ON (user_email) user_email, user_id, action, created_at FROM activity_logs WHERE user_email IS NOT NULL AND created_at >= ${startDate} ORDER BY user_email, created_at DESC LIMIT 10`
+      );
+      const recentUsers = (recentUsersResult as any).rows || [];
+
+      const stats = {
+        summary: { totalLogs, uniqueUsers, errorCount, errorRate },
+        actionCounts,
+        dailyActivity,
+        recentUsers,
+      };
+
+      console.log(`[ActivityLogs] Stats generated for ${days} days: total=${totalLogs}, users=${uniqueUsers}, errors=${errorCount}`);
+      res.json(stats);
+    } catch (error) {
+      console.error('[ActivityLogs] Error generating stats:', error);
+      res.status(500).json({ error: 'Failed to generate activity log stats' });
     }
   });
 

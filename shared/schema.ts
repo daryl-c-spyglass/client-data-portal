@@ -1083,3 +1083,50 @@ export const insertCmaReportTemplateSchema = createInsertSchema(cmaReportTemplat
 });
 export type InsertCmaReportTemplate = z.infer<typeof insertCmaReportTemplateSchema>;
 export type CmaReportTemplate = typeof cmaReportTemplates.$inferSelect;
+
+// Feature Visibility Schema - Controls which nav items/pages are visible to non-Developer users
+export const featureVisibility = pgTable("feature_visibility", {
+  id: serial("id").primaryKey(),
+  featureKey: varchar("feature_key", { length: 50 }).unique().notNull(),
+  featureLabel: varchar("feature_label", { length: 100 }).notNull(),
+  route: varchar("route", { length: 100 }).notNull(),
+  section: varchar("section", { length: 50 }).notNull(),
+  isVisible: boolean("is_visible").default(true),
+  status: varchar("status", { length: 20 }).default("live"),
+  hiddenMessage: text("hidden_message").default("This feature is currently under development."),
+  updatedBy: varchar("updated_by").references(() => users.id, { onDelete: "set null" }),
+  updatedAt: timestamp("updated_at").defaultNow(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertFeatureVisibilitySchema = createInsertSchema(featureVisibility).omit({
+  id: true,
+  createdAt: true,
+});
+export type InsertFeatureVisibility = z.infer<typeof insertFeatureVisibilitySchema>;
+export type FeatureVisibility = typeof featureVisibility.$inferSelect;
+
+// Activity Logs Schema - Comprehensive tracking of all user and system events
+export const activityLogs = pgTable("activity_logs", {
+  id: serial("id").primaryKey(),
+  userId: varchar("user_id").references(() => users.id, { onDelete: "set null" }),
+  userEmail: varchar("user_email", { length: 255 }),
+  action: varchar("action", { length: 100 }).notNull(),
+  resource: varchar("resource", { length: 100 }),
+  resourceId: varchar("resource_id", { length: 255 }),
+  details: jsonb("details"),
+  ipAddress: varchar("ip_address", { length: 45 }),
+  userAgent: text("user_agent"),
+  sessionId: varchar("session_id", { length: 255 }),
+  durationMs: integer("duration_ms"),
+  status: varchar("status", { length: 20 }).default("success"),
+  errorMessage: text("error_message"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertActivityLogSchema = createInsertSchema(activityLogs).omit({
+  id: true,
+  createdAt: true,
+});
+export type InsertActivityLog = z.infer<typeof insertActivityLogSchema>;
+export type ActivityLog = typeof activityLogs.$inferSelect;

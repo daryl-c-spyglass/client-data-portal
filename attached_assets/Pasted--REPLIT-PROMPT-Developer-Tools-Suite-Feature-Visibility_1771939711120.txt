@@ -1,0 +1,1139 @@
+# 🎯 REPLIT PROMPT: Developer Tools Suite (Feature Visibility Control + Activity Log Dashboard)
+
+## PROJECT
+**Client Data Portal** (IDX + CMA on Replit)  
+**URL:** https://client-data-portal-nine.vercel.app
+
+---
+
+## OVERVIEW
+
+This prompt implements **two interconnected Developer-only features**:
+
+| Feature | Purpose |
+|---------|---------|
+| **Feature Visibility Control** | Hide/show navigation sections from non-Developer users |
+| **Activity Log Dashboard** | Track all user activities, system events, and provide analytics |
+
+Both features are **Developer-only** and work together to provide observability and control over the application.
+
+---
+
+# PART 1: FEATURE VISIBILITY CONTROL
+
+## Scope
+
+Implement a **Developer-only Feature Visibility Control** system that allows Developers to hide/show navigation sections and pages. When a feature is hidden:
+1. Non-Developer users cannot see it in the sidebar navigation
+2. Direct URL access shows an "Under Development" page
+3. Developers can still see and access all features (with visual indicator for hidden items)
+
+---
+
+## Navigation Structure to Control
+
+| Section | Item | Route | Default Visibility |
+|---------|------|-------|-------------------|
+| **Application** | Dashboard | `/dashboard` | Visible |
+| Application | Properties | `/properties` | Visible |
+| Application | CMAs | `/cmas` | Visible |
+| Application | Seller Updates | `/seller-updates` | Visible |
+| Application | Buyer Search | `/buyer-search` | Visible |
+| Application | Clients | `/clients` | Configurable |
+| Application | Analytics | `/analytics` | Configurable |
+| Application | Settings | `/settings` | Visible |
+| **Admin** | User Management | `/admin/users` | Visible (Super Admin+) |
+| Admin | Activity Logs | `/admin/activity` | Visible (Super Admin+) |
+| Admin | Feature Visibility | `/admin/feature-visibility` | Developer Only |
+| **Follow Up Boss** | Calendar | `/calendar` | Visible |
+| Follow Up Boss | Leads | `/leads` | Visible |
+
+---
+
+## Task 1.1: Database Schema for Feature Visibility
+
+```sql
+-- Create feature_visibility table
+CREATE TABLE IF NOT EXISTS feature_visibility (
+  id SERIAL PRIMARY KEY,
+  feature_key VARCHAR(50) UNIQUE NOT NULL,
+  feature_label VARCHAR(100) NOT NULL,
+  route VARCHAR(100) NOT NULL,
+  section VARCHAR(50) NOT NULL,
+  is_visible BOOLEAN DEFAULT true,
+  status VARCHAR(20) DEFAULT 'live', -- 'live', 'development', 'disabled'
+  hidden_message TEXT DEFAULT 'This feature is currently under development.',
+  updated_by UUID REFERENCES users(id),
+  updated_at TIMESTAMP DEFAULT NOW(),
+  created_at TIMESTAMP DEFAULT NOW()
+);
+
+-- Insert default feature records
+INSERT INTO feature_visibility (feature_key, feature_label, route, section, is_visible, status) VALUES
+  ('dashboard', 'Dashboard', '/dashboard', 'application', true, 'live'),
+  ('properties', 'Properties', '/properties', 'application', true, 'live'),
+  ('cmas', 'CMAs', '/cmas', 'application', true, 'live'),
+  ('seller_updates', 'Seller Updates', '/seller-updates', 'application', true, 'live'),
+  ('buyer_search', 'Buyer Search', '/buyer-search', 'application', true, 'live'),
+  ('clients', 'Clients', '/clients', 'application', true, 'live'),
+  ('analytics', 'Analytics', '/analytics', 'application', true, 'live'),
+  ('settings', 'Settings', '/settings', 'application', true, 'live'),
+  ('user_management', 'User Management', '/admin/users', 'admin', true, 'live'),
+  ('activity_logs', 'Activity Logs', '/admin/activity', 'admin', true, 'live'),
+  ('feature_visibility', 'Feature Visibility', '/admin/feature-visibility', 'admin', true, 'live'),
+  ('calendar', 'Calendar', '/calendar', 'followupboss', true, 'live'),
+  ('leads', 'Leads', '/leads', 'followupboss', true, 'live')
+ON CONFLICT (feature_key) DO NOTHING;
+
+-- Create indexes
+CREATE INDEX idx_feature_visibility_route ON feature_visibility(route);
+CREATE INDEX idx_feature_visibility_section ON feature_visibility(section);
+```
+
+**Drizzle Schema (`server/db/schema.ts`):**
+
+```typescript
+export const featureVisibility = pgTable('feature_visibility', {
+  id: serial('id').primaryKey(),
+  featureKey: varchar('feature_key', { length: 50 }).unique().notNull(),
+  featureLabel: varchar('feature_label', { length: 100 }).notNull(),
+  route: varchar('route', { length: 100 }).notNull(),
+  section: varchar('section', { length: 50 }).notNull(),
+  isVisible: boolean('is_visible').default(true),
+  status: varchar('status', { length: 20 }).default('live'),
+  hiddenMessage: text('hidden_message').default('This feature is currently under development.'),
+  updatedBy: uuid('updated_by').references(() => users.id),
+  updatedAt: timestamp('updated_at').defaultNow(),
+  createdAt: timestamp('created_at').defaultNow(),
+});
+```
+
+---
+
+## Task 1.2: Feature Visibility API Endpoints
+
+**File:** `server/routes/feature-visibility.ts`
+
+```typescript
+import { Router } from 'express';
+import { db } from '../db';
+import { featureVisibility } from '../db/schema';
+import { eq } from 'drizzle-orm';
+import { requireAuth, requireRole } from '../middleware/auth';
+import { logActivity } from '../services/activity-logger';
+
+const router = Router();
+
+// GET /api/feature-visibility - Get all features (filtered for non-developers)
+router.get('/', requireAuth, async (req, res) => {
+  try {
+    const features = await db.select().from(featureVisibility);
+    const userRole = req.user?.role;
+    
+    if (userRole === 'developer') {
+      return res.json(features);
+    }
+    
+    // Non-developers only see visible features
+    const visibleFeatures = features.filter(f => f.isVisible);
+    return res.json(visibleFeatures);
+  } catch (error) {
+    console.error('[FeatureVisibility] Error fetching features:', error);
+    res.status(500).json({ error: 'Failed to fetch feature visibility settings' });
+  }
+});
+
+// GET /api/feature-visibility/check/:route - Check route accessibility
+router.get('/check/:route(*)', requireAuth, async (req, res) => {
+  try {
+    const route = '/' + req.params.route;
+    const userRole = req.user?.role;
+    
+    if (userRole === 'developer') {
+      return res.json({ accessible: true, isDeveloper: true });
+    }
+    
+    const [feature] = await db
+      .select()
+      .from(featureVisibility)
+      .where(eq(featureVisibility.route, route));
+    
+    if (!feature) {
+      return res.json({ accessible: true });
+    }
+    
+    if (!feature.isVisible) {
+      return res.json({ 
+        accessible: false, 
+        message: feature.hiddenMessage,
+        status: feature.status
+      });
+    }
+    
+    return res.json({ accessible: true });
+  } catch (error) {
+    console.error('[FeatureVisibility] Error checking route:', error);
+    res.status(500).json({ error: 'Failed to check route accessibility' });
+  }
+});
+
+// PUT /api/feature-visibility/:featureKey - Update (Developer only)
+router.put('/:featureKey', requireAuth, requireRole(['developer']), async (req, res) => {
+  try {
+    const { featureKey } = req.params;
+    const { isVisible, status, hiddenMessage } = req.body;
+    
+    // Get previous state for logging
+    const [previous] = await db
+      .select()
+      .from(featureVisibility)
+      .where(eq(featureVisibility.featureKey, featureKey));
+    
+    const [updated] = await db
+      .update(featureVisibility)
+      .set({
+        isVisible,
+        status,
+        hiddenMessage,
+        updatedBy: req.user?.id,
+        updatedAt: new Date(),
+      })
+      .where(eq(featureVisibility.featureKey, featureKey))
+      .returning();
+    
+    if (!updated) {
+      return res.status(404).json({ error: 'Feature not found' });
+    }
+    
+    // Log activity
+    await logActivity({
+      userId: req.user?.id,
+      action: 'FEATURE_VISIBILITY_CHANGED',
+      resource: 'feature_visibility',
+      resourceId: featureKey,
+      details: {
+        featureKey,
+        previousVisible: previous?.isVisible,
+        newVisible: isVisible,
+        previousStatus: previous?.status,
+        newStatus: status,
+      },
+      req,
+    });
+    
+    console.log(`[FeatureVisibility] ${req.user?.email} changed ${featureKey}: visible=${isVisible}, status=${status}`);
+    
+    res.json(updated);
+  } catch (error) {
+    console.error('[FeatureVisibility] Error updating feature:', error);
+    res.status(500).json({ error: 'Failed to update feature visibility' });
+  }
+});
+
+// PUT /api/feature-visibility/bulk - Bulk update (Developer only)
+router.put('/bulk', requireAuth, requireRole(['developer']), async (req, res) => {
+  try {
+    const { updates } = req.body;
+    
+    const results = await Promise.all(
+      updates.map(async (update: any) => {
+        const [updated] = await db
+          .update(featureVisibility)
+          .set({
+            isVisible: update.isVisible,
+            status: update.status,
+            updatedBy: req.user?.id,
+            updatedAt: new Date(),
+          })
+          .where(eq(featureVisibility.featureKey, update.featureKey))
+          .returning();
+        return updated;
+      })
+    );
+    
+    // Log bulk activity
+    await logActivity({
+      userId: req.user?.id,
+      action: 'FEATURE_VISIBILITY_BULK_UPDATE',
+      resource: 'feature_visibility',
+      details: { updatedCount: updates.length, updates },
+      req,
+    });
+    
+    console.log(`[FeatureVisibility] ${req.user?.email} bulk updated ${updates.length} features`);
+    
+    res.json(results);
+  } catch (error) {
+    console.error('[FeatureVisibility] Error bulk updating:', error);
+    res.status(500).json({ error: 'Failed to bulk update' });
+  }
+});
+
+export default router;
+```
+
+---
+
+## Task 1.3: Frontend Hook for Feature Visibility
+
+**File:** `client/src/hooks/use-feature-visibility.ts`
+
+```typescript
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useAuth } from './use-auth';
+
+interface FeatureVisibility {
+  id: number;
+  featureKey: string;
+  featureLabel: string;
+  route: string;
+  section: string;
+  isVisible: boolean;
+  status: 'live' | 'development' | 'disabled';
+  hiddenMessage: string;
+}
+
+export function useFeatureVisibility() {
+  const { user } = useAuth();
+  const queryClient = useQueryClient();
+  const isDeveloper = user?.role === 'developer';
+
+  const { data: features = [], isLoading } = useQuery<FeatureVisibility[]>({
+    queryKey: ['feature-visibility'],
+    queryFn: async () => {
+      const res = await fetch('/api/feature-visibility', { credentials: 'include' });
+      if (!res.ok) throw new Error('Failed to fetch');
+      return res.json();
+    },
+    staleTime: 1000 * 60 * 5,
+  });
+
+  const updateFeature = useMutation({
+    mutationFn: async (update: { featureKey: string; isVisible: boolean; status: string }) => {
+      const res = await fetch(`/api/feature-visibility/${update.featureKey}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify(update),
+      });
+      if (!res.ok) throw new Error('Failed to update');
+      return res.json();
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['feature-visibility'] }),
+  });
+
+  const bulkUpdate = useMutation({
+    mutationFn: async (updates: Array<{ featureKey: string; isVisible: boolean; status: string }>) => {
+      const res = await fetch('/api/feature-visibility/bulk', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ updates }),
+      });
+      if (!res.ok) throw new Error('Failed to bulk update');
+      return res.json();
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['feature-visibility'] }),
+  });
+
+  const isFeatureVisible = (featureKey: string): boolean => {
+    if (isDeveloper) return true;
+    const feature = features.find(f => f.featureKey === featureKey);
+    return feature?.isVisible ?? true;
+  };
+
+  const isRouteAccessible = (route: string): boolean => {
+    if (isDeveloper) return true;
+    const feature = features.find(f => f.route === route);
+    return feature?.isVisible ?? true;
+  };
+
+  const getFeaturesBySection = (section: string) => features.filter(f => f.section === section);
+
+  return {
+    features,
+    isLoading,
+    isDeveloper,
+    isFeatureVisible,
+    isRouteAccessible,
+    getFeaturesBySection,
+    updateFeature,
+    bulkUpdate,
+  };
+}
+```
+
+---
+
+## Task 1.4: Under Development Component
+
+**File:** `client/src/components/UnderDevelopment.tsx`
+
+```typescript
+import { Construction, AlertTriangle, ArrowLeft } from 'lucide-react';
+import { Link } from 'wouter';
+
+interface UnderDevelopmentProps {
+  featureName?: string;
+  message?: string;
+}
+
+export function UnderDevelopment({ 
+  featureName = 'This feature', 
+  message = 'This feature is currently under development and will be available soon.' 
+}: UnderDevelopmentProps) {
+  return (
+    <div className="min-h-[60vh] flex items-center justify-center">
+      <div className="text-center max-w-md px-6">
+        <div className="inline-flex items-center justify-center w-20 h-20 bg-amber-100 rounded-full mb-6">
+          <Construction className="w-10 h-10 text-amber-600" />
+        </div>
+        
+        <h1 className="text-2xl font-bold text-gray-900 mb-3">Under Development</h1>
+        
+        <p className="text-gray-600 mb-6">{message}</p>
+        
+        <div className="inline-flex items-center gap-2 px-4 py-2 bg-amber-50 border border-amber-200 rounded-lg text-amber-700 text-sm mb-8">
+          <AlertTriangle className="w-4 h-4" />
+          <span>Coming Soon</span>
+        </div>
+        
+        <div>
+          <Link href="/dashboard">
+            <a className="inline-flex items-center gap-2 text-blue-600 hover:text-blue-700 font-medium">
+              <ArrowLeft className="w-4 h-4" />
+              Back to Dashboard
+            </a>
+          </Link>
+        </div>
+      </div>
+    </div>
+  );
+}
+```
+
+---
+
+## Task 1.5: Feature Gate HOC
+
+**File:** `client/src/components/FeatureGate.tsx`
+
+```typescript
+import { ReactNode } from 'react';
+import { useFeatureVisibility } from '@/hooks/use-feature-visibility';
+import { UnderDevelopment } from './UnderDevelopment';
+import { Loader2 } from 'lucide-react';
+
+interface FeatureGateProps {
+  featureKey: string;
+  children: ReactNode;
+}
+
+export function FeatureGate({ featureKey, children }: FeatureGateProps) {
+  const { features, isLoading, isDeveloper } = useFeatureVisibility();
+  
+  if (isLoading) {
+    return (
+      <div className="min-h-[60vh] flex items-center justify-center">
+        <Loader2 className="w-8 h-8 animate-spin text-gray-400" />
+      </div>
+    );
+  }
+  
+  if (isDeveloper) return <>{children}</>;
+  
+  const feature = features.find(f => f.featureKey === featureKey);
+  
+  if (!feature) return <>{children}</>;
+  
+  if (!feature.isVisible) {
+    return (
+      <UnderDevelopment 
+        featureName={feature.featureLabel}
+        message={feature.hiddenMessage}
+      />
+    );
+  }
+  
+  return <>{children}</>;
+}
+```
+
+---
+
+## Task 1.6: Update Sidebar Navigation
+
+**File:** `client/src/components/Sidebar.tsx` - Update to use feature visibility:
+
+```typescript
+import { useFeatureVisibility } from '@/hooks/use-feature-visibility';
+import { EyeOff } from 'lucide-react';
+
+export function Sidebar() {
+  const { features, isDeveloper, isFeatureVisible } = useFeatureVisibility();
+  
+  const applicationItems = [
+    { key: 'dashboard', label: 'Dashboard', icon: Home, path: '/dashboard' },
+    { key: 'properties', label: 'Properties', icon: Search, path: '/properties' },
+    { key: 'cmas', label: 'CMAs', icon: FileText, path: '/cmas' },
+    { key: 'seller_updates', label: 'Seller Updates', icon: Mail, path: '/seller-updates' },
+    { key: 'buyer_search', label: 'Buyer Search', icon: TrendingUp, path: '/buyer-search' },
+    { key: 'clients', label: 'Clients', icon: Users, path: '/clients' },
+    { key: 'analytics', label: 'Analytics', icon: BarChart3, path: '/analytics' },
+    { key: 'settings', label: 'Settings', icon: Settings, path: '/settings' },
+  ];
+  
+  const renderNavItem = (item: typeof applicationItems[0]) => {
+    const isVisible = isFeatureVisible(item.key);
+    
+    // Non-developers don't see hidden items
+    if (!isDeveloper && !isVisible) return null;
+    
+    return (
+      <Link key={item.key} href={item.path}>
+        <a className={`flex items-center gap-3 px-3 py-2 rounded-lg transition-colors ${
+          !isVisible 
+            ? 'opacity-50 border border-dashed border-gray-600' 
+            : 'hover:bg-gray-800'
+        }`}>
+          <item.icon className="w-5 h-5" />
+          <span>{item.label}</span>
+          
+          {/* Developer indicator for hidden items */}
+          {isDeveloper && !isVisible && (
+            <span className="ml-auto flex items-center gap-1">
+              <EyeOff className="w-3 h-3 text-amber-500" />
+              <span className="text-xs bg-amber-600 text-white px-1.5 py-0.5 rounded">DEV</span>
+            </span>
+          )}
+        </a>
+      </Link>
+    );
+  };
+  
+  return (
+    <nav>
+      <div className="mb-4">
+        <p className="px-3 text-xs text-gray-500 uppercase tracking-wider mb-2">Application</p>
+        {applicationItems.map(renderNavItem)}
+      </div>
+      {/* ... rest of sections */}
+    </nav>
+  );
+}
+```
+
+---
+
+## Task 1.7: Feature Visibility Settings Page
+
+**File:** `client/src/pages/admin/FeatureVisibilitySettings.tsx`
+
+Create a full settings page where Developers can toggle feature visibility with status dropdowns, toggle switches, and bulk save functionality. Include sections for Application, Admin, and Follow Up Boss navigation groups.
+
+---
+
+# PART 2: DEVELOPER ACTIVITY LOG DASHBOARD
+
+## Scope
+
+Create a comprehensive **Developer-only Activity Log Dashboard** that tracks all user activities, system events, and provides analytics without requiring external log reports from Render.
+
+---
+
+## Task 2.1: Database Schema for Activity Logs
+
+```sql
+-- Create activity_logs table
+CREATE TABLE IF NOT EXISTS activity_logs (
+  id SERIAL PRIMARY KEY,
+  user_id UUID REFERENCES users(id),
+  user_email VARCHAR(255),
+  action VARCHAR(100) NOT NULL,
+  resource VARCHAR(100),
+  resource_id VARCHAR(255),
+  details JSONB,
+  ip_address VARCHAR(45),
+  user_agent TEXT,
+  session_id VARCHAR(255),
+  duration_ms INTEGER,
+  status VARCHAR(20) DEFAULT 'success', -- 'success', 'error', 'warning'
+  error_message TEXT,
+  created_at TIMESTAMP DEFAULT NOW()
+);
+
+-- Indexes for efficient querying
+CREATE INDEX idx_activity_logs_user_id ON activity_logs(user_id);
+CREATE INDEX idx_activity_logs_action ON activity_logs(action);
+CREATE INDEX idx_activity_logs_resource ON activity_logs(resource);
+CREATE INDEX idx_activity_logs_created_at ON activity_logs(created_at DESC);
+CREATE INDEX idx_activity_logs_status ON activity_logs(status);
+
+-- Create activity_log_summaries for pre-aggregated stats (optional performance optimization)
+CREATE TABLE IF NOT EXISTS activity_log_summaries (
+  id SERIAL PRIMARY KEY,
+  date DATE NOT NULL,
+  user_id UUID REFERENCES users(id),
+  action VARCHAR(100) NOT NULL,
+  count INTEGER DEFAULT 0,
+  UNIQUE(date, user_id, action)
+);
+
+CREATE INDEX idx_activity_summaries_date ON activity_log_summaries(date DESC);
+```
+
+**Drizzle Schema (`server/db/schema.ts`):**
+
+```typescript
+export const activityLogs = pgTable('activity_logs', {
+  id: serial('id').primaryKey(),
+  userId: uuid('user_id').references(() => users.id),
+  userEmail: varchar('user_email', { length: 255 }),
+  action: varchar('action', { length: 100 }).notNull(),
+  resource: varchar('resource', { length: 100 }),
+  resourceId: varchar('resource_id', { length: 255 }),
+  details: jsonb('details'),
+  ipAddress: varchar('ip_address', { length: 45 }),
+  userAgent: text('user_agent'),
+  sessionId: varchar('session_id', { length: 255 }),
+  durationMs: integer('duration_ms'),
+  status: varchar('status', { length: 20 }).default('success'),
+  errorMessage: text('error_message'),
+  createdAt: timestamp('created_at').defaultNow(),
+});
+```
+
+---
+
+## Task 2.2: Activity Logging Service
+
+**File:** `server/services/activity-logger.ts`
+
+```typescript
+import { db } from '../db';
+import { activityLogs } from '../db/schema';
+import { Request } from 'express';
+
+export type ActivityAction =
+  // Auth events
+  | 'USER_LOGIN'
+  | 'USER_LOGOUT'
+  | 'USER_SESSION_EXPIRED'
+  // CMA events
+  | 'CMA_CREATED'
+  | 'CMA_UPDATED'
+  | 'CMA_DELETED'
+  | 'CMA_VIEWED'
+  | 'CMA_EXPORTED_PDF'
+  | 'CMA_SHARED'
+  // Property events
+  | 'PROPERTY_SEARCH'
+  | 'PROPERTY_VIEWED'
+  | 'PROPERTY_FAVORITED'
+  // Buyer Search events
+  | 'BUYER_SEARCH_CREATED'
+  | 'BUYER_SEARCH_UPDATED'
+  | 'BUYER_SEARCH_DELETED'
+  // Seller Update events
+  | 'SELLER_UPDATE_CREATED'
+  | 'SELLER_UPDATE_SENT'
+  // Admin events
+  | 'USER_ROLE_CHANGED'
+  | 'USER_DISABLED'
+  | 'USER_ENABLED'
+  | 'FEATURE_VISIBILITY_CHANGED'
+  | 'FEATURE_VISIBILITY_BULK_UPDATE'
+  // System events
+  | 'API_ERROR'
+  | 'RATE_LIMIT_EXCEEDED';
+
+export interface LogActivityParams {
+  userId?: string;
+  userEmail?: string;
+  action: ActivityAction;
+  resource?: string;
+  resourceId?: string;
+  details?: Record<string, any>;
+  status?: 'success' | 'error' | 'warning';
+  errorMessage?: string;
+  durationMs?: number;
+  req?: Request;
+}
+
+export async function logActivity({
+  userId,
+  userEmail,
+  action,
+  resource,
+  resourceId,
+  details,
+  status = 'success',
+  errorMessage,
+  durationMs,
+  req,
+}: LogActivityParams): Promise<void> {
+  try {
+    await db.insert(activityLogs).values({
+      userId,
+      userEmail: userEmail || req?.user?.email,
+      action,
+      resource,
+      resourceId,
+      details,
+      status,
+      errorMessage,
+      durationMs,
+      ipAddress: req?.ip || req?.headers['x-forwarded-for']?.toString(),
+      userAgent: req?.headers['user-agent'],
+      sessionId: req?.sessionID,
+    });
+  } catch (error) {
+    // Don't throw - logging should never break the main flow
+    console.error('[ActivityLogger] Failed to log activity:', error);
+  }
+}
+
+// Helper for timing operations
+export function createActivityTimer() {
+  const start = Date.now();
+  return () => Date.now() - start;
+}
+```
+
+---
+
+## Task 2.3: Activity Log API Endpoints
+
+**File:** `server/routes/activity-logs.ts`
+
+```typescript
+import { Router } from 'express';
+import { db } from '../db';
+import { activityLogs, users } from '../db/schema';
+import { eq, desc, and, gte, lte, sql, count } from 'drizzle-orm';
+import { requireAuth, requireRole } from '../middleware/auth';
+
+const router = Router();
+
+// GET /api/activity-logs - Get paginated activity logs (Developer only)
+router.get('/', requireAuth, requireRole(['developer']), async (req, res) => {
+  try {
+    const { 
+      page = '1', 
+      limit = '50', 
+      userId, 
+      action, 
+      resource,
+      status,
+      startDate, 
+      endDate 
+    } = req.query;
+    
+    const pageNum = parseInt(page as string);
+    const limitNum = Math.min(parseInt(limit as string), 100);
+    const offset = (pageNum - 1) * limitNum;
+    
+    // Build where conditions
+    const conditions = [];
+    if (userId) conditions.push(eq(activityLogs.userId, userId as string));
+    if (action) conditions.push(eq(activityLogs.action, action as string));
+    if (resource) conditions.push(eq(activityLogs.resource, resource as string));
+    if (status) conditions.push(eq(activityLogs.status, status as string));
+    if (startDate) conditions.push(gte(activityLogs.createdAt, new Date(startDate as string)));
+    if (endDate) conditions.push(lte(activityLogs.createdAt, new Date(endDate as string)));
+    
+    const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
+    
+    // Get logs with user info
+    const logs = await db
+      .select({
+        id: activityLogs.id,
+        userId: activityLogs.userId,
+        userEmail: activityLogs.userEmail,
+        action: activityLogs.action,
+        resource: activityLogs.resource,
+        resourceId: activityLogs.resourceId,
+        details: activityLogs.details,
+        status: activityLogs.status,
+        errorMessage: activityLogs.errorMessage,
+        ipAddress: activityLogs.ipAddress,
+        durationMs: activityLogs.durationMs,
+        createdAt: activityLogs.createdAt,
+      })
+      .from(activityLogs)
+      .where(whereClause)
+      .orderBy(desc(activityLogs.createdAt))
+      .limit(limitNum)
+      .offset(offset);
+    
+    // Get total count
+    const [{ total }] = await db
+      .select({ total: count() })
+      .from(activityLogs)
+      .where(whereClause);
+    
+    res.json({
+      logs,
+      pagination: {
+        page: pageNum,
+        limit: limitNum,
+        total,
+        totalPages: Math.ceil(total / limitNum),
+      },
+    });
+  } catch (error) {
+    console.error('[ActivityLogs] Error fetching logs:', error);
+    res.status(500).json({ error: 'Failed to fetch activity logs' });
+  }
+});
+
+// GET /api/activity-logs/stats - Get activity statistics (Developer only)
+router.get('/stats', requireAuth, requireRole(['developer']), async (req, res) => {
+  try {
+    const { days = '7' } = req.query;
+    const daysNum = parseInt(days as string);
+    const startDate = new Date();
+    startDate.setDate(startDate.getDate() - daysNum);
+    
+    // Total logs in period
+    const [{ totalLogs }] = await db
+      .select({ totalLogs: count() })
+      .from(activityLogs)
+      .where(gte(activityLogs.createdAt, startDate));
+    
+    // Unique users in period
+    const [{ uniqueUsers }] = await db
+      .select({ uniqueUsers: sql<number>`COUNT(DISTINCT ${activityLogs.userId})` })
+      .from(activityLogs)
+      .where(gte(activityLogs.createdAt, startDate));
+    
+    // Actions by type
+    const actionCounts = await db
+      .select({
+        action: activityLogs.action,
+        count: count(),
+      })
+      .from(activityLogs)
+      .where(gte(activityLogs.createdAt, startDate))
+      .groupBy(activityLogs.action)
+      .orderBy(desc(count()));
+    
+    // Errors in period
+    const [{ errorCount }] = await db
+      .select({ errorCount: count() })
+      .from(activityLogs)
+      .where(and(
+        gte(activityLogs.createdAt, startDate),
+        eq(activityLogs.status, 'error')
+      ));
+    
+    // Activity by day
+    const dailyActivity = await db
+      .select({
+        date: sql<string>`DATE(${activityLogs.createdAt})`,
+        count: count(),
+      })
+      .from(activityLogs)
+      .where(gte(activityLogs.createdAt, startDate))
+      .groupBy(sql`DATE(${activityLogs.createdAt})`)
+      .orderBy(sql`DATE(${activityLogs.createdAt})`);
+    
+    // Most active users
+    const topUsers = await db
+      .select({
+        userEmail: activityLogs.userEmail,
+        count: count(),
+      })
+      .from(activityLogs)
+      .where(gte(activityLogs.createdAt, startDate))
+      .groupBy(activityLogs.userEmail)
+      .orderBy(desc(count()))
+      .limit(10);
+    
+    res.json({
+      period: { days: daysNum, startDate },
+      summary: {
+        totalLogs,
+        uniqueUsers,
+        errorCount,
+        errorRate: totalLogs > 0 ? ((errorCount / totalLogs) * 100).toFixed(2) : 0,
+      },
+      actionCounts,
+      dailyActivity,
+      topUsers,
+    });
+  } catch (error) {
+    console.error('[ActivityLogs] Error fetching stats:', error);
+    res.status(500).json({ error: 'Failed to fetch activity stats' });
+  }
+});
+
+// GET /api/activity-logs/user/:userId - Get logs for specific user (Developer only)
+router.get('/user/:userId', requireAuth, requireRole(['developer']), async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const { limit = '50' } = req.query;
+    
+    const logs = await db
+      .select()
+      .from(activityLogs)
+      .where(eq(activityLogs.userId, userId))
+      .orderBy(desc(activityLogs.createdAt))
+      .limit(parseInt(limit as string));
+    
+    res.json(logs);
+  } catch (error) {
+    console.error('[ActivityLogs] Error fetching user logs:', error);
+    res.status(500).json({ error: 'Failed to fetch user activity logs' });
+  }
+});
+
+// GET /api/activity-logs/actions - Get distinct actions for filter dropdown
+router.get('/actions', requireAuth, requireRole(['developer']), async (req, res) => {
+  try {
+    const actions = await db
+      .selectDistinct({ action: activityLogs.action })
+      .from(activityLogs)
+      .orderBy(activityLogs.action);
+    
+    res.json(actions.map(a => a.action));
+  } catch (error) {
+    console.error('[ActivityLogs] Error fetching actions:', error);
+    res.status(500).json({ error: 'Failed to fetch actions' });
+  }
+});
+
+export default router;
+```
+
+---
+
+## Task 2.4: Integrate Activity Logging Throughout App
+
+Add logging calls to existing routes:
+
+```typescript
+// Example: server/routes/cmas.ts
+import { logActivity, createActivityTimer } from '../services/activity-logger';
+
+// POST /api/cmas - Create CMA
+router.post('/', requireAuth, async (req, res) => {
+  const timer = createActivityTimer();
+  try {
+    // ... existing CMA creation logic ...
+    
+    await logActivity({
+      userId: req.user?.id,
+      action: 'CMA_CREATED',
+      resource: 'cma',
+      resourceId: newCma.id,
+      details: { address: req.body.address, subdivision: req.body.subdivision },
+      durationMs: timer(),
+      req,
+    });
+    
+    res.json(newCma);
+  } catch (error) {
+    await logActivity({
+      userId: req.user?.id,
+      action: 'CMA_CREATED',
+      resource: 'cma',
+      status: 'error',
+      errorMessage: error.message,
+      durationMs: timer(),
+      req,
+    });
+    throw error;
+  }
+});
+
+// Example: server/routes/auth.ts
+router.post('/login', async (req, res) => {
+  // ... existing login logic ...
+  
+  await logActivity({
+    userId: user.id,
+    action: 'USER_LOGIN',
+    resource: 'auth',
+    details: { method: 'google_oauth' },
+    req,
+  });
+});
+```
+
+---
+
+## Task 2.5: Activity Log Dashboard UI
+
+**File:** `client/src/pages/admin/ActivityLogDashboard.tsx`
+
+Create a comprehensive dashboard with:
+
+1. **Stats Cards** - Total events, unique users, error rate, most common action
+2. **Activity Chart** - Line/bar chart showing activity over time
+3. **Filters** - Date range, user, action type, status, resource
+4. **Log Table** - Paginated table with columns: Time, User, Action, Resource, Status, Duration
+5. **User Activity Breakdown** - Top users by activity count
+6. **Error Log Section** - Recent errors with stack traces
+7. **Export Options** - Export filtered logs to CSV
+
+```typescript
+// Key component structure
+export function ActivityLogDashboard() {
+  const [filters, setFilters] = useState({
+    startDate: subDays(new Date(), 7),
+    endDate: new Date(),
+    userId: '',
+    action: '',
+    status: '',
+  });
+  
+  const { data: stats } = useQuery({
+    queryKey: ['activity-stats', filters.startDate, filters.endDate],
+    queryFn: () => fetchActivityStats(filters),
+  });
+  
+  const { data: logs, isLoading } = useQuery({
+    queryKey: ['activity-logs', filters],
+    queryFn: () => fetchActivityLogs(filters),
+  });
+  
+  return (
+    <div className="p-6 space-y-6">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold">Activity Log Dashboard</h1>
+          <p className="text-gray-600">Monitor user activities and system events</p>
+        </div>
+        <div className="flex items-center gap-2 px-3 py-1.5 bg-green-100 border border-green-300 rounded-full">
+          <Shield className="w-4 h-4 text-green-700" />
+          <span className="text-sm font-medium text-green-700">Developer Only</span>
+        </div>
+      </div>
+      
+      {/* Stats Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <StatCard title="Total Events" value={stats?.summary.totalLogs} icon={Activity} />
+        <StatCard title="Unique Users" value={stats?.summary.uniqueUsers} icon={Users} />
+        <StatCard title="Error Rate" value={`${stats?.summary.errorRate}%`} icon={AlertTriangle} />
+        <StatCard title="Top Action" value={stats?.actionCounts[0]?.action} icon={TrendingUp} />
+      </div>
+      
+      {/* Activity Chart */}
+      <ActivityChart data={stats?.dailyActivity} />
+      
+      {/* Filters */}
+      <ActivityFilters filters={filters} onChange={setFilters} />
+      
+      {/* Log Table */}
+      <ActivityLogTable logs={logs} isLoading={isLoading} />
+    </div>
+  );
+}
+```
+
+---
+
+## Task 2.6: Add Route and Sidebar Link
+
+```typescript
+// Add to routes
+<Route path="/admin/activity">
+  <ActivityLogDashboard />
+</Route>
+
+// Sidebar - Admin section (Developer/Super Admin)
+<Link href="/admin/activity">
+  <a className="flex items-center gap-3 px-3 py-2">
+    <Activity className="w-5 h-5" />
+    <span>Activity Logs</span>
+  </a>
+</Link>
+```
+
+---
+
+# ACCEPTANCE CRITERIA
+
+## Feature Visibility Control
+
+| # | Criteria | Test Method |
+|---|----------|-------------|
+| 1 | Database table `feature_visibility` exists with all 13 features | `SELECT * FROM feature_visibility;` |
+| 2 | Non-Developers cannot see hidden nav items | Login as Agent, toggle Clients to hidden |
+| 3 | Non-Developers see "Under Development" for hidden routes | Direct URL to `/clients` when hidden |
+| 4 | Developers see ALL nav items with DEV badge for hidden | Login as Developer |
+| 5 | Developers can access hidden pages normally | Navigate to `/clients` when hidden |
+| 6 | Feature Visibility Settings page works | Go to `/admin/feature-visibility` |
+| 7 | Changes persist after refresh | Toggle, refresh, verify |
+| 8 | Activity logged when visibility changed | Check activity_logs table |
+
+## Activity Log Dashboard
+
+| # | Criteria | Test Method |
+|---|----------|-------------|
+| 9 | Database table `activity_logs` exists | `SELECT * FROM activity_logs LIMIT 5;` |
+| 10 | Login events are logged | Login, check logs |
+| 11 | CMA create/view/export events logged | Create CMA, check logs |
+| 12 | Stats endpoint returns correct data | `GET /api/activity-logs/stats` |
+| 13 | Dashboard displays stats cards | View `/admin/activity` |
+| 14 | Filters work correctly | Filter by date, action, user |
+| 15 | Pagination works | Navigate through pages |
+| 16 | Error logs captured with stack trace | Trigger error, check logs |
+
+---
+
+# VALIDATION TESTS
+
+```bash
+# Feature Visibility
+psql -c "SELECT feature_key, is_visible, status FROM feature_visibility;"
+curl -X PUT http://localhost:5000/api/feature-visibility/clients \
+  -H "Content-Type: application/json" \
+  -d '{"isVisible": false, "status": "development"}'
+
+# Activity Logs
+psql -c "SELECT action, COUNT(*) FROM activity_logs GROUP BY action;"
+curl http://localhost:5000/api/activity-logs/stats?days=7
+curl http://localhost:5000/api/activity-logs?page=1&limit=20
+```
+
+---
+
+# LOGGING REQUIREMENTS
+
+```
+[FeatureVisibility] Fetched {count} features for {email} (role: {role})
+[FeatureVisibility] {email} changed {featureKey}: visible={bool}, status={status}
+[ActivityLogger] Logged {action} for {email} on {resource}:{resourceId}
+[ActivityLogs] Fetched {count} logs with filters: {filters}
+[ActivityLogs] Stats generated for {days} days: {summary}
+```
+
+---
+
+# FILES IMPACTED
+
+| File | Action |
+|------|--------|
+| `server/db/schema.ts` | Add featureVisibility, activityLogs tables |
+| `server/routes/feature-visibility.ts` | Create |
+| `server/routes/activity-logs.ts` | Create |
+| `server/services/activity-logger.ts` | Create |
+| `server/index.ts` | Register routes |
+| `server/routes/cmas.ts` | Add logging |
+| `server/routes/auth.ts` | Add logging |
+| `client/src/hooks/use-feature-visibility.ts` | Create |
+| `client/src/components/UnderDevelopment.tsx` | Create |
+| `client/src/components/FeatureGate.tsx` | Create |
+| `client/src/components/Sidebar.tsx` | Update |
+| `client/src/pages/admin/FeatureVisibilitySettings.tsx` | Create |
+| `client/src/pages/admin/ActivityLogDashboard.tsx` | Create |
+| `client/src/App.tsx` | Add routes |
+
+---
+
+# BLOCKERS
+
+None identified.

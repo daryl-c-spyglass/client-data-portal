@@ -37,6 +37,8 @@ import InventoryAudit from "@/pages/InventoryAudit";
 import AdminPage from "@/pages/AdminPage";
 import UserManagement from "@/pages/UserManagement";
 import ActivityLogs from "@/pages/ActivityLogs";
+import FeatureVisibilitySettings from "@/pages/FeatureVisibilitySettings";
+import ActivityLogDashboard from "@/pages/ActivityLogDashboard";
 import Login from "@/pages/Login";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { useEffect } from "react";
@@ -136,6 +138,20 @@ function Router() {
       <Route path="/admin" component={AdminPage} />
       <Route path="/admin/users" component={UserManagement} />
       <Route path="/admin/activity-logs" component={ActivityLogs} />
+      <Route path="/admin/feature-visibility">
+        {() => (
+          <ProtectedRoute minimumRole="developer" fallbackPath="/">
+            <FeatureVisibilitySettings />
+          </ProtectedRoute>
+        )}
+      </Route>
+      <Route path="/admin/activity-log-dashboard">
+        {() => (
+          <ProtectedRoute minimumRole="developer" fallbackPath="/">
+            <ActivityLogDashboard />
+          </ProtectedRoute>
+        )}
+      </Route>
       <Route component={NotFound} />
     </Switch>
   );
