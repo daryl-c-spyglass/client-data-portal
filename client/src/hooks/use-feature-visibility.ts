@@ -45,13 +45,26 @@ export function useFeatureVisibility() {
   const isFeatureVisible = (featureKey: string): boolean => {
     if (isDeveloper) return true;
     const feature = features.find(f => f.featureKey === featureKey);
-    return feature?.isVisible ?? true;
+    if (!feature) return true;
+    return feature.isVisible && feature.status === 'live';
+  };
+
+  const isFeatureHidden = (featureKey: string): boolean => {
+    const feature = features.find(f => f.featureKey === featureKey);
+    if (!feature) return false;
+    return !feature.isVisible || feature.status !== 'live';
   };
 
   const isRouteAccessible = (route: string): boolean => {
     if (isDeveloper) return true;
     const feature = features.find(f => f.route === route);
-    return feature?.isVisible ?? true;
+    if (!feature) return true;
+    return feature.isVisible && feature.status === 'live';
+  };
+
+  const getHiddenMessage = (featureKey: string): string => {
+    const feature = features.find(f => f.featureKey === featureKey);
+    return feature?.hiddenMessage || 'This feature is currently under development.';
   };
 
   const getFeaturesBySection = (section: string) => features.filter(f => f.section === section);
@@ -63,9 +76,11 @@ export function useFeatureVisibility() {
     isLoading,
     isDeveloper,
     isFeatureVisible,
+    isFeatureHidden,
     isRouteAccessible,
     getFeaturesBySection,
     getFeature,
+    getHiddenMessage,
     updateFeature,
     bulkUpdate,
   };

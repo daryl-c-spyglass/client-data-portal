@@ -41,6 +41,7 @@ import FeatureVisibilitySettings from "@/pages/FeatureVisibilitySettings";
 import ActivityLogDashboard from "@/pages/ActivityLogDashboard";
 import Login from "@/pages/Login";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
+import { FeatureGate } from "@/components/FeatureGate";
 import { useEffect } from "react";
 
 function AuthGuard({ children }: { children: React.ReactNode }) {
@@ -105,35 +106,39 @@ function AuthGuard({ children }: { children: React.ReactNode }) {
 function Router() {
   return (
     <Switch>
-      <Route path="/" component={Dashboard} />
-      <Route path="/properties" component={Properties} />
+      <Route path="/">{() => <FeatureGate featureKey="dashboard"><Dashboard /></FeatureGate>}</Route>
+      <Route path="/properties">{() => <FeatureGate featureKey="properties"><Properties /></FeatureGate>}</Route>
       <Route path="/properties/:id" component={PropertyDetailPage} />
-      <Route path="/cmas" component={CMAs} />
+      <Route path="/cmas">{() => <FeatureGate featureKey="cmas"><CMAs /></FeatureGate>}</Route>
       <Route path="/cmas/new" component={CMANew} />
       <Route path="/cmas/:id" component={CMADetailPage} />
       <Route path="/cmas/:id/presentation" component={CMAPresentationBuilder} />
-      <Route path="/seller-updates" component={SellerUpdates} />
+      <Route path="/seller-updates">{() => <FeatureGate featureKey="seller_updates"><SellerUpdates /></FeatureGate>}</Route>
       <Route path="/seller-updates/new" component={SellerUpdateNew} />
       <Route path="/seller-updates/:id/preview" component={SellerUpdatePreview} />
-      <Route path="/buyer-search" component={BuyerSearch} />
+      <Route path="/buyer-search">{() => <FeatureGate featureKey="buyer_search"><BuyerSearch /></FeatureGate>}</Route>
       <Route path="/embed-code" component={EmbedCodeGenerator} />
       <Route path="/clients">
         {() => (
           <ProtectedRoute minimumRole="super_admin" fallbackPath="/">
-            <Clients />
+            <FeatureGate featureKey="clients">
+              <Clients />
+            </FeatureGate>
           </ProtectedRoute>
         )}
       </Route>
       <Route path="/analytics">
         {() => (
           <ProtectedRoute minimumRole="super_admin" fallbackPath="/">
-            <Analytics />
+            <FeatureGate featureKey="analytics">
+              <Analytics />
+            </FeatureGate>
           </ProtectedRoute>
         )}
       </Route>
-      <Route path="/settings" component={Settings} />
-      <Route path="/calendar" component={CalendarPage} />
-      <Route path="/leads" component={LeadsPage} />
+      <Route path="/settings">{() => <FeatureGate featureKey="settings"><Settings /></FeatureGate>}</Route>
+      <Route path="/calendar">{() => <FeatureGate featureKey="calendar"><CalendarPage /></FeatureGate>}</Route>
+      <Route path="/leads">{() => <FeatureGate featureKey="leads"><LeadsPage /></FeatureGate>}</Route>
       <Route path="/inventory-audit" component={InventoryAudit} />
       <Route path="/admin" component={AdminPage} />
       <Route path="/admin/users" component={UserManagement} />

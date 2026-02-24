@@ -1,0 +1,474 @@
+# 🔧 REPLIT PROMPT: Fix Sidebar Not Respecting Feature Visibility Settings
+
+## PROJECT
+**Client Data Portal** (IDX + CMA on Replit)  
+**URL:** https://client-data-portal-nine.vercel.app
+
+---
+
+## ISSUE
+
+Feature Visibility settings are saved correctly (Clients and Analytics set to "Disabled"), but:
+
+1. ❌ **Sidebar still shows** Clients and Analytics to all users
+2. ❌ **Routes still accessible** - Users can navigate to `/clients` and `/analytics`
+3. ❌ **No "Under Development" page** shown for disabled features
+
+**Expected Behavior:**
+- Non-Developer users should NOT see Clients/Analytics in sidebar when disabled
+- Non-Developer users accessing `/clients` or `/analytics` directly should see "Under Development" page
+- Developer users should see ALL items with a visual indicator (DEV badge, opacity) for hidden ones
+
+---
+
+## ROOT CAUSE
+
+The Sidebar component is rendering a static list of navigation items and NOT checking the `feature_visibility` table/API to determine what to show.
+
+---
+
+## TASKS
+
+### Task 1: Create/Update Feature Visibility Hook
+
+**File:** `client/src/hooks/use-feature-visibility.ts`
+
+```typescript
+import { useQuery } from '@tanstack/react-query';
+import { useAuth } from './use-auth';
+
+interface FeatureVisibility {
+  id: number;
+  featureKey: string;
+  featureLabel: string;
+  route: string;
+  section: string;
+  isVisible: boolean;
+  status: 'live' | 'development' | 'disabled';
+  hiddenMessage: string;
+}
+
+export function useFeatureVisibility() {
+  const { user } = useAuth();
+  const isDeveloper = user?.role === 'developer';
+
+  const { data: features = [], isLoading } = useQuery<FeatureVisibility[]>({
+    queryKey: ['feature-visibility'],
+    queryFn: async () => {
+      const res = await fetch('/api/feature-visibility', { credentials: 'include' });
+      if (!res.ok) throw new Error('Failed to fetch feature visibility');
+      return res.json();
+    },
+    staleTime: 1000 * 60 * 5, // Cache for 5 minutes
+  });
+
+  // Check if a feature should be visible in the sidebar
+  const isFeatureVisible = (featureKey: string): boolean => {
+    // Developers always see everything
+    if (isDeveloper) return true;
+    
+    const feature = features.find(f => f.featureKey === featureKey);
+    
+    // If feature not in system, default to visible
+    if (!feature) return true;
+    
+    // Check both isVisible flag AND status
+    // Hidden if: isVisible is false OR status is 'disabled' or 'development'
+    return feature.isVisible && feature.status === 'live';
+  };
+
+  // Check if a feature is hidden (for showing DEV badge to developers)
+  const isFeatureHidden = (featureKey: string): boolean => {
+    const feature = features.find(f => f.featureKey === featureKey);
+    if (!feature) return false;
+    return !feature.isVisible || feature.status !== 'live';
+  };
+
+  // Check if a route is accessible
+  const isRouteAccessible = (route: string): boolean => {
+    if (isDeveloper) return true;
+    
+    const feature = features.find(f => f.route === route);
+    if (!feature) return true;
+    
+    return feature.isVisible && feature.status === 'live';
+  };
+
+  // Get hidden message for a feature
+  const getHiddenMessage = (featureKey: string): string => {
+    const feature = features.find(f => f.featureKey === featureKey);
+    return feature?.hiddenMessage || 'This feature is currently under development.';
+  };
+
+  return {
+    features,
+    isLoading,
+    isDeveloper,
+    isFeatureVisible,
+    isFeatureHidden,
+    isRouteAccessible,
+    getHiddenMessage,
+  };
+}
+```
+
+---
+
+### Task 2: Update Sidebar to Use Feature Visibility
+
+**File:** `client/src/components/Sidebar.tsx` (or `Layout.tsx` or wherever sidebar is defined)
+
+Find the sidebar navigation rendering and update it to check feature visibility:
+
+```typescript
+import { useFeatureVisibility } from '@/hooks/use-feature-visibility';
+import { EyeOff } from 'lucide-react';
+
+export function Sidebar() {
+  const { isDeveloper, isFeatureVisible, isFeatureHidden } = useFeatureVisibility();
+  
+  // Define navigation items with their feature keys
+  const applicationItems = [
+    { key: 'dashboard', label: 'Dashboard', icon: Home, path: '/dashboard' },
+    { key: 'properties', label: 'Properties', icon: Search, path: '/properties' },
+    { key: 'cmas', label: 'CMAs', icon: FileText, path: '/cmas' },
+    { key: 'seller_updates', label: 'Seller Updates', icon: Mail, path: '/seller-updates' },
+    { key: 'buyer_search', label: 'Buyer Search', icon: TrendingUp, path: '/buyer-search' },
+    { key: 'clients', label: 'Clients', icon: Users, path: '/clients' },
+    { key: 'analytics', label: 'Analytics', icon: BarChart3, path: '/analytics' },
+    { key: 'settings', label: 'Settings', icon: Settings, path: '/settings' },
+  ];
+
+  const renderNavItem = (item: typeof applicationItems[0]) => {
+    const isVisible = isFeatureVisible(item.key);
+    const isHidden = isFeatureHidden(item.key);
+    
+    // Non-developers don't see hidden items AT ALL
+    if (!isDeveloper && !isVisible) {
+      return null;
+    }
+    
+    return (
+      <Link key={item.key} href={item.path}>
+        <a className={`flex items-center gap-3 px-3 py-2 rounded-lg transition-colors ${
+          isHidden 
+            ? 'opacity-50 border border-dashed border-gray-500' 
+            : 'hover:bg-gray-800'
+        } ${location === item.path ? 'bg-gray-800' : ''}`}>
+          <item.icon className="w-5 h-5" />
+          <span>{item.label}</span>
+          
+          {/* Show DEV badge for developers on hidden items */}
+          {isDeveloper && isHidden && (
+            <span className="ml-auto flex items-center gap-1">
+              <EyeOff className="w-3 h-3 text-amber-500" />
+              <span className="text-xs bg-amber-600 text-white px-1.5 py-0.5 rounded">
+                HIDDEN
+              </span>
+            </span>
+          )}
+        </a>
+      </Link>
+    );
+  };
+
+  return (
+    <nav className="...">
+      {/* Application Section */}
+      <div className="mb-4">
+        <p className="px-3 text-xs text-gray-500 uppercase tracking-wider mb-2">
+          Application
+        </p>
+        {applicationItems.map(renderNavItem)}
+      </div>
+      
+      {/* ... rest of sections (Admin, Follow Up Boss) */}
+    </nav>
+  );
+}
+```
+
+---
+
+### Task 3: Create Under Development Component
+
+**File:** `client/src/components/UnderDevelopment.tsx`
+
+```typescript
+import { Construction, AlertTriangle, ArrowLeft } from 'lucide-react';
+import { Link } from 'wouter';
+
+interface UnderDevelopmentProps {
+  featureName?: string;
+  message?: string;
+}
+
+export function UnderDevelopment({ 
+  featureName = 'This feature', 
+  message = 'This feature is currently under development and will be available soon.' 
+}: UnderDevelopmentProps) {
+  return (
+    <div className="min-h-[60vh] flex items-center justify-center">
+      <div className="text-center max-w-md px-6">
+        {/* Icon */}
+        <div className="inline-flex items-center justify-center w-20 h-20 bg-amber-100 rounded-full mb-6">
+          <Construction className="w-10 h-10 text-amber-600" />
+        </div>
+        
+        {/* Title */}
+        <h1 className="text-2xl font-bold text-gray-900 mb-3">
+          Under Development
+        </h1>
+        
+        {/* Message */}
+        <p className="text-gray-600 mb-6">{message}</p>
+        
+        {/* Status Badge */}
+        <div className="inline-flex items-center gap-2 px-4 py-2 bg-amber-50 border border-amber-200 rounded-lg text-amber-700 text-sm mb-8">
+          <AlertTriangle className="w-4 h-4" />
+          <span>Coming Soon</span>
+        </div>
+        
+        {/* Back Button */}
+        <div>
+          <Link href="/dashboard">
+            <a className="inline-flex items-center gap-2 text-blue-600 hover:text-blue-700 font-medium">
+              <ArrowLeft className="w-4 h-4" />
+              Back to Dashboard
+            </a>
+          </Link>
+        </div>
+      </div>
+    </div>
+  );
+}
+```
+
+---
+
+### Task 4: Create Feature Gate Component for Route Protection
+
+**File:** `client/src/components/FeatureGate.tsx`
+
+```typescript
+import { ReactNode } from 'react';
+import { useFeatureVisibility } from '@/hooks/use-feature-visibility';
+import { UnderDevelopment } from './UnderDevelopment';
+import { Loader2 } from 'lucide-react';
+
+interface FeatureGateProps {
+  featureKey: string;
+  children: ReactNode;
+}
+
+export function FeatureGate({ featureKey, children }: FeatureGateProps) {
+  const { features, isLoading, isDeveloper, isFeatureVisible, getHiddenMessage } = useFeatureVisibility();
+  
+  // Show loading state while fetching visibility settings
+  if (isLoading) {
+    return (
+      <div className="min-h-[60vh] flex items-center justify-center">
+        <Loader2 className="w-8 h-8 animate-spin text-gray-400" />
+      </div>
+    );
+  }
+  
+  // Developers always have access
+  if (isDeveloper) {
+    return <>{children}</>;
+  }
+  
+  // Check if feature is visible
+  if (!isFeatureVisible(featureKey)) {
+    const feature = features.find(f => f.featureKey === featureKey);
+    return (
+      <UnderDevelopment 
+        featureName={feature?.featureLabel}
+        message={getHiddenMessage(featureKey)}
+      />
+    );
+  }
+  
+  return <>{children}</>;
+}
+```
+
+---
+
+### Task 5: Wrap Protected Pages with FeatureGate
+
+Update each page that should respect feature visibility:
+
+**File:** `client/src/pages/Clients.tsx`
+
+```typescript
+import { FeatureGate } from '@/components/FeatureGate';
+
+export function ClientsPage() {
+  return (
+    <FeatureGate featureKey="clients">
+      {/* Existing page content */}
+      <div className="p-6">
+        <h1>Clients</h1>
+        {/* ... rest of page */}
+      </div>
+    </FeatureGate>
+  );
+}
+```
+
+**File:** `client/src/pages/Analytics.tsx`
+
+```typescript
+import { FeatureGate } from '@/components/FeatureGate';
+
+export function AnalyticsPage() {
+  return (
+    <FeatureGate featureKey="analytics">
+      {/* Existing page content */}
+      <div className="p-6">
+        <h1>Analytics</h1>
+        {/* ... rest of page */}
+      </div>
+    </FeatureGate>
+  );
+}
+```
+
+**Repeat for all pages that should be controllable:**
+- `/dashboard` → featureKey="dashboard"
+- `/properties` → featureKey="properties"
+- `/cmas` → featureKey="cmas"
+- `/seller-updates` → featureKey="seller_updates"
+- `/buyer-search` → featureKey="buyer_search"
+- `/clients` → featureKey="clients"
+- `/analytics` → featureKey="analytics"
+- `/settings` → featureKey="settings"
+
+---
+
+### Task 6: Verify Feature Keys Match Database
+
+Ensure the feature keys in the sidebar match the `feature_key` values in the database:
+
+```sql
+-- Check current feature keys in database
+SELECT feature_key, feature_label, route, is_visible, status 
+FROM feature_visibility 
+ORDER BY section, feature_key;
+```
+
+**Expected mapping:**
+
+| Sidebar Key | Database feature_key | Route |
+|-------------|---------------------|-------|
+| dashboard | dashboard | / or /dashboard |
+| properties | properties | /properties |
+| cmas | cmas | /cmas |
+| seller_updates | seller_updates | /seller-updates |
+| buyer_search | buyer_search | /buyer-search |
+| clients | clients | /clients |
+| analytics | analytics | /analytics |
+| settings | settings | /settings |
+
+If there's a mismatch (e.g., database has `seller-updates` but sidebar uses `seller_updates`), update one to match the other.
+
+---
+
+### Task 7: Update Backend to Return Correct Visibility
+
+**File:** `server/routes/feature-visibility.ts`
+
+Ensure the GET endpoint filters correctly for non-developers:
+
+```typescript
+// GET /api/feature-visibility
+router.get('/', requireAuth, async (req, res) => {
+  try {
+    const features = await db.select().from(featureVisibility);
+    const userRole = req.user?.role;
+    
+    console.log(`[FeatureVisibility] Fetching for ${req.user?.email} (role: ${userRole})`);
+    
+    // Developers see everything with full details
+    if (userRole === 'developer') {
+      console.log(`[FeatureVisibility] Returning all ${features.length} features for developer`);
+      return res.json(features);
+    }
+    
+    // Non-developers see all features but the isVisible/status determines rendering
+    // This allows the frontend to know about ALL features and filter appropriately
+    console.log(`[FeatureVisibility] Returning all ${features.length} features for ${userRole}`);
+    return res.json(features);
+  } catch (error) {
+    console.error('[FeatureVisibility] Error:', error);
+    res.status(500).json({ error: 'Failed to fetch feature visibility' });
+  }
+});
+```
+
+---
+
+## ACCEPTANCE CRITERIA
+
+| # | Criteria | Test Method |
+|---|----------|-------------|
+| 1 | Set Clients to "Disabled", non-developer cannot see it in sidebar | Login as Agent, check sidebar |
+| 2 | Set Analytics to "Disabled", non-developer cannot see it in sidebar | Login as Agent, check sidebar |
+| 3 | Non-developer navigating to `/clients` sees "Under Development" page | Direct URL access |
+| 4 | Non-developer navigating to `/analytics` sees "Under Development" page | Direct URL access |
+| 5 | Developer CAN see Clients/Analytics in sidebar with "HIDDEN" badge | Login as Developer |
+| 6 | Developer CAN access `/clients` and `/analytics` normally | Direct URL access |
+| 7 | Setting feature back to "Live" makes it visible again | Toggle, verify |
+
+---
+
+## VALIDATION TESTS
+
+```bash
+# 1. Check database has correct feature keys
+psql -c "SELECT feature_key, is_visible, status FROM feature_visibility WHERE feature_key IN ('clients', 'analytics');"
+
+# 2. Test API returns visibility data
+curl http://localhost:5000/api/feature-visibility -H "Cookie: <session>"
+
+# 3. As non-developer, verify /clients shows under development
+# Login as agent@spyglassrealty.com, navigate to /clients
+```
+
+---
+
+## LOGGING TO ADD
+
+```
+[FeatureVisibility] Checking visibility for 'clients': isVisible=false, status=disabled
+[Sidebar] Hiding 'clients' for non-developer user
+[FeatureGate] Blocking access to 'clients' for agent@spyglassrealty.com
+[FeatureGate] Showing UnderDevelopment page for 'clients'
+```
+
+---
+
+## FILES TO MODIFY
+
+| File | Action |
+|------|--------|
+| `client/src/hooks/use-feature-visibility.ts` | Create or update |
+| `client/src/components/Sidebar.tsx` | Update to use hook |
+| `client/src/components/UnderDevelopment.tsx` | Create |
+| `client/src/components/FeatureGate.tsx` | Create |
+| `client/src/pages/Clients.tsx` | Wrap with FeatureGate |
+| `client/src/pages/Analytics.tsx` | Wrap with FeatureGate |
+| Other page components | Wrap with FeatureGate as needed |
+
+---
+
+## SUMMARY
+
+The Feature Visibility settings page saves correctly, but the **sidebar and routes are not reading from those settings**. This prompt adds:
+
+1. **Hook** to fetch and check feature visibility
+2. **Sidebar update** to filter items based on visibility
+3. **UnderDevelopment component** for blocked routes
+4. **FeatureGate HOC** to protect individual pages
+5. **Page wrapping** to enforce visibility on each route

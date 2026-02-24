@@ -25,7 +25,7 @@ export function FeatureGate({ featureKey, children }: FeatureGateProps) {
 
   if (!feature) return <>{children}</>;
 
-  if (!feature.isVisible) {
+  if (!feature.isVisible || feature.status !== 'live') {
     return (
       <UnderDevelopment
         featureName={feature.featureLabel}

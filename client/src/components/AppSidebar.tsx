@@ -50,7 +50,7 @@ const calendarItems: NavItem[] = [
   { title: "Leads", url: "/leads", icon: UserCircle, testId: "link-leads", featureKey: "leads" },
 ];
 
-function NavItemRenderer({ item, location, isDeveloper, isVisible }: { item: NavItem; location: string; isDeveloper: boolean; isVisible: boolean }) {
+function NavItemRenderer({ item, location, isDeveloper, isVisible, isHidden }: { item: NavItem; location: string; isDeveloper: boolean; isVisible: boolean; isHidden: boolean }) {
   if (!isDeveloper && !isVisible) return null;
 
   const isActive = location === item.url || (item.url !== "/" && location.startsWith(item.url));
@@ -59,12 +59,12 @@ function NavItemRenderer({ item, location, isDeveloper, isVisible }: { item: Nav
     <SidebarMenuItem>
       <SidebarMenuButton
         asChild
-        className={`${isActive ? "bg-sidebar-accent" : ""} ${!isVisible ? "opacity-50 border border-dashed border-muted-foreground" : ""}`}
+        className={`${isActive ? "bg-sidebar-accent" : ""} ${isHidden ? "opacity-50 border border-dashed border-muted-foreground" : ""}`}
       >
         <Link href={item.url} data-testid={item.testId}>
           <item.icon className="w-4 h-4" />
           <span className="flex-1">{item.title}</span>
-          {isDeveloper && !isVisible && (
+          {isDeveloper && isHidden && (
             <span className="flex items-center gap-1 ml-auto">
               <EyeOff className="w-3 h-3 text-amber-500" />
               <Badge variant="outline" className="text-[10px] px-1 py-0 h-4 bg-amber-600 text-white border-amber-600 no-default-hover-elevate no-default-active-elevate">
@@ -82,7 +82,7 @@ export function AppSidebar() {
   const [location] = useLocation();
   const { openChat } = useChat();
   const { canAccessAdmin, isDeveloper } = usePermissions();
-  const { isFeatureVisible } = useFeatureVisibility();
+  const { isFeatureVisible, isFeatureHidden } = useFeatureVisibility();
 
   return (
     <Sidebar>
@@ -108,6 +108,7 @@ export function AppSidebar() {
                   location={location}
                   isDeveloper={isDeveloper}
                   isVisible={isFeatureVisible(item.featureKey)}
+                  isHidden={isFeatureHidden(item.featureKey)}
                 />
               ))}
             </SidebarMenu>
@@ -129,6 +130,7 @@ export function AppSidebar() {
                     location={location}
                     isDeveloper={isDeveloper}
                     isVisible={isFeatureVisible(item.featureKey)}
+                    isHidden={isFeatureHidden(item.featureKey)}
                   />
                 ))}
               </SidebarMenu>
@@ -147,6 +149,7 @@ export function AppSidebar() {
                   location={location}
                   isDeveloper={isDeveloper}
                   isVisible={isFeatureVisible(item.featureKey)}
+                  isHidden={isFeatureHidden(item.featureKey)}
                 />
               ))}
             </SidebarMenu>
