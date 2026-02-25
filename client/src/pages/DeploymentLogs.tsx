@@ -148,6 +148,34 @@ export default function DeploymentLogsPage() {
     onError: () => toast({ title: "Failed to delete entry", variant: "destructive" }),
   });
 
+  const syncVercelMutation = useMutation({
+    mutationFn: () => fetch("/api/deployment-logs/sync/vercel", { method: "POST", credentials: "include" }).then(async r => {
+      const d = await r.json();
+      if (!r.ok) throw new Error(d.error || "Sync failed");
+      return d;
+    }),
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/deployment-logs"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/deployment-logs/stats"] });
+      toast({ title: "Vercel sync complete", description: `${data.synced} new · ${data.updated} updated · ${data.skipped} unchanged` });
+    },
+    onError: (err: Error) => toast({ title: err.message === "VERCEL_API_TOKEN not configured" ? "VERCEL_API_TOKEN not set" : "Vercel sync failed", description: err.message === "VERCEL_API_TOKEN not configured" ? "Add VERCEL_API_TOKEN to your environment secrets" : undefined, variant: "destructive" }),
+  });
+
+  const syncGithubMutation = useMutation({
+    mutationFn: () => fetch("/api/deployment-logs/sync/github", { method: "POST", credentials: "include" }).then(async r => {
+      const d = await r.json();
+      if (!r.ok) throw new Error(d.error || "Sync failed");
+      return d;
+    }),
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/deployment-logs"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/deployment-logs/stats"] });
+      toast({ title: "GitHub sync complete", description: `${data.synced} new · ${data.skipped} already tracked` });
+    },
+    onError: (err: Error) => toast({ title: err.message.includes("not configured") ? "GitHub env vars not set" : "GitHub sync failed", description: err.message.includes("not configured") ? "Add GITHUB_TOKEN and GITHUB_REPO to your environment secrets" : undefined, variant: "destructive" }),
+  });
+
   const setFilter = (key: keyof Filters, value: string) => setFilters(f => ({ ...f, [key]: value, page: 1 }));
 
   return (
@@ -178,34 +206,58 @@ export default function DeploymentLogsPage() {
         </div>
       </div>
 
-      {/* Webhook Health */}
+      {/* Sync Panel */}
       <Card>
-        <CardContent className="pt-4 pb-3">
-          <div className="flex flex-wrap items-center gap-6">
-            <p className="text-sm font-medium">Webhook Status</p>
-            <div className="flex flex-wrap items-center gap-4">
-              {(["github", "vercel", "render"] as const).map(service => {
-                const cfg = webhookHealth?.health?.[service];
-                const activity = webhookHealth?.recentActivity?.find(a => a.source === service);
-                return (
-                  <div key={service} className="flex items-center gap-2" data-testid={`webhook-status-${service}`}>
-                    <div className={`w-2 h-2 rounded-full shrink-0 ${cfg?.configured ? "bg-green-500" : "bg-muted-foreground/30"}`} />
-                    <span className="text-sm capitalize">{service}</span>
-                    {activity ? (
-                      <span className="text-xs text-muted-foreground">({activity.count} today)</span>
-                    ) : cfg && !cfg.configured ? (
-                      <span className="text-xs text-muted-foreground">(not configured)</span>
-                    ) : null}
-                  </div>
-                );
-              })}
+        <CardContent className="pt-4 pb-3 space-y-3">
+          <div className="flex flex-wrap items-center justify-between gap-4">
+            <div className="flex flex-wrap items-center gap-6">
+              <p className="text-sm font-medium">Webhook Status</p>
+              <div className="flex flex-wrap items-center gap-4">
+                {(["github", "vercel", "render"] as const).map(service => {
+                  const cfg = webhookHealth?.health?.[service];
+                  const activity = webhookHealth?.recentActivity?.find(a => a.source === service);
+                  return (
+                    <div key={service} className="flex items-center gap-2" data-testid={`webhook-status-${service}`}>
+                      <div className={`w-2 h-2 rounded-full shrink-0 ${cfg?.configured ? "bg-green-500" : "bg-muted-foreground/30"}`} />
+                      <span className="text-sm capitalize">{service}</span>
+                      {activity ? (
+                        <span className="text-xs text-muted-foreground">({activity.count} today)</span>
+                      ) : cfg && !cfg.configured ? (
+                        <span className="text-xs text-muted-foreground">(not configured)</span>
+                      ) : null}
+                    </div>
+                  );
+                })}
+              </div>
             </div>
-            {webhookHealth && !Object.values(webhookHealth.health).some(h => h.configured) && (
-              <p className="text-xs text-amber-600 dark:text-amber-400 ml-auto">
-                Add webhook secrets to enable automatic tracking
-              </p>
-            )}
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => syncVercelMutation.mutate()}
+                disabled={syncVercelMutation.isPending}
+                data-testid="button-sync-vercel"
+              >
+                {syncVercelMutation.isPending ? <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5 mr-1.5" />}
+                Sync Vercel
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => syncGithubMutation.mutate()}
+                disabled={syncGithubMutation.isPending}
+                data-testid="button-sync-github"
+              >
+                {syncGithubMutation.isPending ? <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" /> : <GitCommit className="w-3.5 h-3.5 mr-1.5" />}
+                Sync GitHub
+              </Button>
+            </div>
           </div>
+          {webhookHealth && !Object.values(webhookHealth.health).some(h => h.configured) && (
+            <p className="text-xs text-muted-foreground">
+              No webhooks configured — use the sync buttons above for on-demand updates, or add webhook secrets for real-time automatic tracking.
+            </p>
+          )}
         </CardContent>
       </Card>
 

@@ -1,0 +1,538 @@
+# 🔧 REPLIT PROMPT: Automatic Deployment Tracking (No Webhooks Required)
+
+## PROJECT
+**Client Data Portal** (IDX + CMA on Replit)  
+**URL:** https://client-data-portal-nine.vercel.app
+
+---
+
+## OVERVIEW
+
+Instead of configuring external webhooks, use **API polling** or **on-demand sync** to fetch deployment/commit data directly from Vercel and GitHub APIs.
+
+---
+
+## OPTION 1: "Sync Now" Button (Recommended - Simplest)
+
+Add a **"Sync Deployments"** button that fetches recent deployments from Vercel API on-demand.
+
+### How It Works
+
+```
+Developer clicks "Sync Deployments"
+           │
+           ▼
+┌─────────────────────────────────┐
+│ Call Vercel API                 │
+│ GET /v6/deployments             │
+│ → Returns last 20 deployments   │
+└─────────────────────────────────┘
+           │
+           ▼
+┌─────────────────────────────────┐
+│ For each deployment:            │
+│ - Check if already in DB        │
+│ - If not, insert new record     │
+│ - If yes, update status         │
+└─────────────────────────────────┘
+           │
+           ▼
+┌─────────────────────────────────┐
+│ Dashboard shows synced data     │
+│ "Synced 5 new deployments"      │
+└─────────────────────────────────┘
+```
+
+### Implementation
+
+**File:** `server/routes/deployment-logs.ts` - Add sync endpoint:
+
+```typescript
+import fetch from 'node-fetch';
+
+// POST /api/deployment-logs/sync/vercel - Sync from Vercel API
+router.post('/sync/vercel', requireAuth, requireRole(['developer']), async (req, res) => {
+  try {
+    const vercelToken = process.env.VERCEL_API_TOKEN;
+    const vercelTeamId = process.env.VERCEL_TEAM_ID; // Optional
+    const vercelProjectId = process.env.VERCEL_PROJECT_ID; // Optional
+    
+    if (!vercelToken) {
+      return res.status(400).json({ error: 'VERCEL_API_TOKEN not configured' });
+    }
+    
+    // Fetch recent deployments from Vercel
+    let url = 'https://api.vercel.com/v6/deployments?limit=20';
+    if (vercelProjectId) url += `&projectId=${vercelProjectId}`;
+    if (vercelTeamId) url += `&teamId=${vercelTeamId}`;
+    
+    const response = await fetch(url, {
+      headers: {
+        'Authorization': `Bearer ${vercelToken}`,
+      },
+    });
+    
+    if (!response.ok) {
+      const error = await response.text();
+      console.error('[Sync:Vercel] API error:', error);
+      return res.status(500).json({ error: 'Failed to fetch from Vercel API' });
+    }
+    
+    const data = await response.json();
+    const deployments = data.deployments || [];
+    
+    let synced = 0;
+    let updated = 0;
+    let skipped = 0;
+    
+    for (const deployment of deployments) {
+      const {
+        uid: deploymentId,
+        url: deploymentUrl,
+        state,
+        created: createdAt,
+        ready: readyAt,
+        meta,
+        creator,
+      } = deployment;
+      
+      const commitSha = meta?.githubCommitSha;
+      const commitMessage = meta?.githubCommitMessage;
+      const commitRef = meta?.githubCommitRef || 'main';
+      const authorName = meta?.githubCommitAuthorName || creator?.username;
+      
+      // Map Vercel state to our status
+      const statusMap: Record<string, string> = {
+        'BUILDING': 'in_progress',
+        'INITIALIZING': 'pending',
+        'QUEUED': 'pending',
+        'READY': 'deployed',
+        'ERROR': 'failed',
+        'CANCELED': 'failed',
+      };
+      const status = statusMap[state] || 'pending';
+      
+      // Check if deployment already exists (by deploymentId or commitHash)
+      const existing = await db
+        .select()
+        .from(deploymentLogs)
+        .where(
+          or(
+            eq(deploymentLogs.deploymentId, deploymentId),
+            commitSha ? eq(deploymentLogs.commitHash, commitSha.substring(0, 7)) : sql`false`
+          )
+        )
+        .limit(1);
+      
+      if (existing.length > 0) {
+        // Update existing record if status changed
+        if (existing[0].status !== status) {
+          await db
+            .update(deploymentLogs)
+            .set({
+              status,
+              deploymentUrl: `https://${deploymentUrl}`,
+              deployedAt: status === 'deployed' && readyAt ? new Date(readyAt) : existing[0].deployedAt,
+              updatedAt: new Date(),
+            })
+            .where(eq(deploymentLogs.id, existing[0].id));
+          updated++;
+        } else {
+          skipped++;
+        }
+      } else {
+        // Insert new deployment
+        await db.insert(deploymentLogs).values({
+          commitHash: commitSha?.substring(0, 7),
+          commitMessage: commitMessage?.substring(0, 255),
+          commitUrl: meta?.githubCommitUrl,
+          branch: commitRef?.replace('refs/heads/', ''),
+          deploymentTarget: 'vercel',
+          deploymentUrl: `https://${deploymentUrl}`,
+          deploymentId,
+          environment: 'production',
+          changeType: detectChangeType(commitMessage),
+          changeDescription: commitMessage || `Vercel deployment ${deploymentId}`,
+          requestedByName: authorName || 'Unknown',
+          requestSource: 'vercel-api',
+          status,
+          requestedAt: new Date(createdAt),
+          deployedAt: status === 'deployed' && readyAt ? new Date(readyAt) : null,
+        });
+        synced++;
+      }
+    }
+    
+    console.log(`[Sync:Vercel] Synced: ${synced}, Updated: ${updated}, Skipped: ${skipped}`);
+    
+    res.json({
+      success: true,
+      synced,
+      updated,
+      skipped,
+      total: deployments.length,
+    });
+  } catch (error) {
+    console.error('[Sync:Vercel] Error:', error);
+    res.status(500).json({ error: 'Sync failed' });
+  }
+});
+
+// POST /api/deployment-logs/sync/github - Sync commits from GitHub API
+router.post('/sync/github', requireAuth, requireRole(['developer']), async (req, res) => {
+  try {
+    const githubToken = process.env.GITHUB_TOKEN;
+    const githubRepo = process.env.GITHUB_REPO; // e.g., "spyglass-realty/client-data-portal"
+    
+    if (!githubToken || !githubRepo) {
+      return res.status(400).json({ error: 'GITHUB_TOKEN or GITHUB_REPO not configured' });
+    }
+    
+    // Fetch recent commits from GitHub
+    const response = await fetch(
+      `https://api.github.com/repos/${githubRepo}/commits?per_page=20`,
+      {
+        headers: {
+          'Authorization': `Bearer ${githubToken}`,
+          'Accept': 'application/vnd.github.v3+json',
+        },
+      }
+    );
+    
+    if (!response.ok) {
+      const error = await response.text();
+      console.error('[Sync:GitHub] API error:', error);
+      return res.status(500).json({ error: 'Failed to fetch from GitHub API' });
+    }
+    
+    const commits = await response.json();
+    
+    let synced = 0;
+    let skipped = 0;
+    
+    for (const commit of commits) {
+      const {
+        sha,
+        commit: commitData,
+        html_url: commitUrl,
+        author,
+      } = commit;
+      
+      const commitHash = sha.substring(0, 7);
+      
+      // Check if commit already exists
+      const existing = await db
+        .select()
+        .from(deploymentLogs)
+        .where(eq(deploymentLogs.commitHash, commitHash))
+        .limit(1);
+      
+      if (existing.length > 0) {
+        skipped++;
+        continue;
+      }
+      
+      // Insert new commit (status will be updated by Vercel sync)
+      await db.insert(deploymentLogs).values({
+        commitHash,
+        commitMessage: commitData.message?.substring(0, 255),
+        commitUrl,
+        branch: 'main', // GitHub API doesn't include branch in commits endpoint
+        deploymentTarget: 'github',
+        environment: 'production',
+        changeType: detectChangeType(commitData.message),
+        changeDescription: commitData.message || 'GitHub commit',
+        requestedByName: commitData.author?.name || author?.login || 'Unknown',
+        requestSource: 'github-api',
+        status: 'pending',
+        requestedAt: new Date(commitData.author?.date || Date.now()),
+      });
+      synced++;
+    }
+    
+    console.log(`[Sync:GitHub] Synced: ${synced}, Skipped: ${skipped}`);
+    
+    res.json({
+      success: true,
+      synced,
+      skipped,
+      total: commits.length,
+    });
+  } catch (error) {
+    console.error('[Sync:GitHub] Error:', error);
+    res.status(500).json({ error: 'Sync failed' });
+  }
+});
+
+// Helper function (add if not exists)
+function detectChangeType(message: string | undefined): string {
+  if (!message) return 'feature';
+  const lower = message.toLowerCase();
+  if (lower.includes('fix') || lower.includes('bug')) return 'bugfix';
+  if (lower.includes('hotfix')) return 'hotfix';
+  if (lower.includes('refactor')) return 'refactor';
+  if (lower.includes('config') || lower.includes('env')) return 'config';
+  if (lower.includes('doc')) return 'documentation';
+  return 'feature';
+}
+```
+
+### Frontend: Add Sync Button
+
+**File:** `client/src/pages/admin/DeploymentLogs.tsx`
+
+```typescript
+const syncVercel = useMutation({
+  mutationFn: async () => {
+    const res = await fetch('/api/deployment-logs/sync/vercel', {
+      method: 'POST',
+      credentials: 'include',
+    });
+    if (!res.ok) throw new Error('Sync failed');
+    return res.json();
+  },
+  onSuccess: (data) => {
+    queryClient.invalidateQueries({ queryKey: ['deployment-logs'] });
+    toast.success(`Synced ${data.synced} new, updated ${data.updated}`);
+  },
+  onError: () => {
+    toast.error('Failed to sync from Vercel');
+  },
+});
+
+// In the header/toolbar:
+<button
+  onClick={() => syncVercel.mutate()}
+  disabled={syncVercel.isPending}
+  className="flex items-center gap-2 px-4 py-2 bg-black text-white rounded-lg hover:bg-gray-800 disabled:opacity-50"
+>
+  {syncVercel.isPending ? (
+    <Loader2 className="w-4 h-4 animate-spin" />
+  ) : (
+    <RefreshCw className="w-4 h-4" />
+  )}
+  Sync from Vercel
+</button>
+```
+
+### Environment Variables Needed
+
+```bash
+# Vercel API Token (from vercel.com/account/tokens)
+VERCEL_API_TOKEN=your-vercel-api-token
+
+# Optional: Filter to specific project
+VERCEL_PROJECT_ID=prj_xxxxx
+VERCEL_TEAM_ID=team_xxxxx
+
+# GitHub Token (from github.com/settings/tokens)
+GITHUB_TOKEN=ghp_xxxxx
+GITHUB_REPO=spyglass-realty/client-data-portal
+```
+
+---
+
+## OPTION 2: Scheduled Auto-Sync (Background Job)
+
+Run sync automatically every 5 minutes using a cron job or interval.
+
+### Implementation
+
+**File:** `server/jobs/deployment-sync.ts`
+
+```typescript
+import cron from 'node-cron';
+import { syncVercelDeployments, syncGitHubCommits } from '../services/deployment-sync';
+
+// Run every 5 minutes
+cron.schedule('*/5 * * * *', async () => {
+  console.log('[Cron] Running deployment sync...');
+  
+  try {
+    const vercelResult = await syncVercelDeployments();
+    console.log(`[Cron] Vercel sync: ${vercelResult.synced} new`);
+    
+    const githubResult = await syncGitHubCommits();
+    console.log(`[Cron] GitHub sync: ${githubResult.synced} new`);
+  } catch (error) {
+    console.error('[Cron] Sync failed:', error);
+  }
+});
+
+console.log('[Cron] Deployment sync scheduled (every 5 minutes)');
+```
+
+**File:** `server/index.ts` - Add at bottom:
+
+```typescript
+// Start background jobs
+import './jobs/deployment-sync';
+```
+
+---
+
+## OPTION 3: Git Log Parsing (Local Only)
+
+Parse the local `.git` history in Replit - no external API calls needed.
+
+### Implementation
+
+```typescript
+import { execSync } from 'child_process';
+
+// GET /api/deployment-logs/sync/git-local
+router.post('/sync/git-local', requireAuth, requireRole(['developer']), async (req, res) => {
+  try {
+    // Get last 20 commits from local git
+    const gitLog = execSync(
+      'git log --pretty=format:"%H|%s|%an|%ae|%aI" -n 20',
+      { encoding: 'utf-8' }
+    );
+    
+    const commits = gitLog.split('\n').filter(Boolean).map(line => {
+      const [hash, message, authorName, authorEmail, date] = line.split('|');
+      return { hash, message, authorName, authorEmail, date };
+    });
+    
+    let synced = 0;
+    
+    for (const commit of commits) {
+      const commitHash = commit.hash.substring(0, 7);
+      
+      // Check if exists
+      const existing = await db
+        .select()
+        .from(deploymentLogs)
+        .where(eq(deploymentLogs.commitHash, commitHash))
+        .limit(1);
+      
+      if (existing.length === 0) {
+        await db.insert(deploymentLogs).values({
+          commitHash,
+          commitMessage: commit.message?.substring(0, 255),
+          branch: 'main',
+          deploymentTarget: 'replit',
+          environment: 'development',
+          changeType: detectChangeType(commit.message),
+          changeDescription: commit.message,
+          requestedByName: commit.authorName,
+          requestSource: 'git-local',
+          status: 'deployed', // Local commits are already "deployed" to Replit
+          requestedAt: new Date(commit.date),
+          deployedAt: new Date(commit.date),
+        });
+        synced++;
+      }
+    }
+    
+    res.json({ success: true, synced, total: commits.length });
+  } catch (error) {
+    console.error('[Sync:GitLocal] Error:', error);
+    res.status(500).json({ error: 'Git sync failed' });
+  }
+});
+```
+
+---
+
+## OPTION 4: Build Script Hook (Zero Config)
+
+Add a logging call to your build/deploy script that runs automatically.
+
+### Implementation
+
+**File:** `scripts/log-deployment.ts`
+
+```typescript
+#!/usr/bin/env ts-node
+import { execSync } from 'child_process';
+
+async function logDeployment() {
+  // Get current commit info
+  const commitHash = execSync('git rev-parse --short HEAD', { encoding: 'utf-8' }).trim();
+  const commitMessage = execSync('git log -1 --pretty=%s', { encoding: 'utf-8' }).trim();
+  const authorName = execSync('git log -1 --pretty=%an', { encoding: 'utf-8' }).trim();
+  
+  // Log to API (or directly to DB)
+  const response = await fetch('http://localhost:5000/api/deployment-logs/internal', {
+    method: 'POST',
+    headers: { 
+      'Content-Type': 'application/json',
+      'X-Internal-Key': process.env.INTERNAL_API_KEY || '',
+    },
+    body: JSON.stringify({
+      commitHash,
+      commitMessage,
+      deploymentTarget: process.env.DEPLOY_TARGET || 'replit',
+      environment: process.env.NODE_ENV || 'development',
+      requestedByName: authorName,
+      requestSource: 'build-script',
+      status: 'in_progress',
+    }),
+  });
+  
+  console.log(`[Deploy] Logged deployment: ${commitHash}`);
+}
+
+logDeployment().catch(console.error);
+```
+
+**package.json:**
+
+```json
+{
+  "scripts": {
+    "build": "npm run log-deploy && vite build",
+    "log-deploy": "ts-node scripts/log-deployment.ts",
+    "deploy": "npm run build && npm run log-deploy-complete"
+  }
+}
+```
+
+---
+
+## COMPARISON
+
+| Option | Setup Effort | Auto? | External Config? | Best For |
+|--------|--------------|-------|------------------|----------|
+| **Sync Button** | Low | No (manual click) | API tokens only | Simple, on-demand |
+| **Scheduled Sync** | Medium | Yes (every 5 min) | API tokens only | Automatic, slight delay |
+| **Git Local** | Low | No | None | Replit-only development |
+| **Build Hook** | Low | Yes (on build) | None | Every build logged |
+| **Webhooks** | High | Yes (real-time) | GitHub/Vercel dashboards | Real-time, production |
+
+---
+
+## RECOMMENDATION
+
+**Start with Option 1 (Sync Button)** - it's the simplest:
+
+1. Add `VERCEL_API_TOKEN` to Replit Secrets
+2. Add the sync endpoint
+3. Add "Sync from Vercel" button to dashboard
+4. Click it whenever you want to update the log
+
+Later, upgrade to **Option 2 (Scheduled)** if you want it fully automatic without external webhook config.
+
+---
+
+## ENVIRONMENT VARIABLES NEEDED
+
+```bash
+# For Vercel API sync
+VERCEL_API_TOKEN=your-token-from-vercel-dashboard
+
+# For GitHub API sync (optional)
+GITHUB_TOKEN=ghp_your-personal-access-token
+GITHUB_REPO=owner/repo-name
+```
+
+**To get Vercel API Token:**
+1. Go to https://vercel.com/account/tokens
+2. Create new token with read access
+3. Copy and add to Replit Secrets
+
+**To get GitHub Token:**
+1. Go to https://github.com/settings/tokens
+2. Generate new token (classic) with `repo` scope
+3. Copy and add to Replit Secrets

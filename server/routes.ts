@@ -8932,6 +8932,186 @@ OUTPUT JSON:
     }
   });
 
+  // POST /api/deployment-logs/sync/vercel - Pull recent deployments from Vercel API
+  app.post("/api/deployment-logs/sync/vercel", requireAuth, requireMinimumRole("developer"), async (req, res) => {
+    try {
+      const vercelToken = process.env.VERCEL_API_TOKEN;
+      if (!vercelToken) {
+        return res.status(400).json({ error: "VERCEL_API_TOKEN not configured" });
+      }
+
+      const { drizzle } = await import("drizzle-orm/node-postgres");
+      const { eq, or, sql: drizzleSql } = await import("drizzle-orm");
+      const pgModule = await import("pg");
+      const pool = new pgModule.default.Pool({ connectionString: process.env.DATABASE_URL!, ssl: { rejectUnauthorized: false } });
+      const db = drizzle(pool);
+
+      const vercelProjectId = process.env.VERCEL_PROJECT_ID;
+      const vercelTeamId = process.env.VERCEL_TEAM_ID;
+      let url = "https://api.vercel.com/v6/deployments?limit=20";
+      if (vercelProjectId) url += `&projectId=${vercelProjectId}`;
+      if (vercelTeamId) url += `&teamId=${vercelTeamId}`;
+
+      const response = await fetch(url, { headers: { Authorization: `Bearer ${vercelToken}` } });
+      if (!response.ok) {
+        const errText = await response.text();
+        console.error("[Sync:Vercel] API error:", errText);
+        return res.status(500).json({ error: "Failed to fetch from Vercel API" });
+      }
+
+      const data: any = await response.json();
+      const deployments: any[] = data.deployments || [];
+
+      const statusMap: Record<string, string> = {
+        BUILDING: "in_progress",
+        INITIALIZING: "pending",
+        QUEUED: "pending",
+        READY: "deployed",
+        ERROR: "failed",
+        CANCELED: "failed",
+      };
+
+      function detectChangeTypeLocal(message: string | undefined): string {
+        if (!message) return "feature";
+        const lower = message.toLowerCase();
+        if (lower.includes("fix") || lower.includes("bug")) return "bugfix";
+        if (lower.includes("hotfix")) return "hotfix";
+        if (lower.includes("refactor")) return "refactor";
+        if (lower.includes("config") || lower.includes("env")) return "config";
+        if (lower.includes("doc")) return "documentation";
+        return "feature";
+      }
+
+      let synced = 0, updated = 0, skipped = 0;
+
+      for (const deployment of deployments) {
+        const { uid: deploymentId, url: deployUrl, state, created: createdAt, ready: readyAt, meta, creator } = deployment;
+        const commitSha: string | undefined = meta?.githubCommitSha;
+        const commitMessage: string | undefined = meta?.githubCommitMessage;
+        const commitRef: string = meta?.githubCommitRef || "main";
+        const authorName: string = meta?.githubCommitAuthorName || creator?.username || "Unknown";
+        const status = statusMap[state] || "pending";
+        const shortHash = commitSha?.substring(0, 7);
+
+        const whereClause = shortHash
+          ? or(eq(deploymentLogs.deploymentId, deploymentId), eq(deploymentLogs.commitHash, shortHash))
+          : eq(deploymentLogs.deploymentId, deploymentId);
+
+        const existing = await db.select().from(deploymentLogs).where(whereClause!).limit(1);
+
+        if (existing.length > 0) {
+          if (existing[0].status !== status) {
+            const updateData: any = { status, updatedAt: new Date() };
+            if (deployUrl) updateData.deploymentUrl = `https://${deployUrl}`;
+            if (deploymentId) updateData.deploymentId = deploymentId;
+            if (status === "deployed" && readyAt) updateData.deployedAt = new Date(readyAt);
+            await db.update(deploymentLogs).set(updateData).where(eq(deploymentLogs.id, existing[0].id));
+            updated++;
+          } else {
+            skipped++;
+          }
+        } else {
+          await db.insert(deploymentLogs).values({
+            commitHash: shortHash,
+            commitMessage: commitMessage?.substring(0, 255),
+            commitUrl: meta?.githubCommitUrl,
+            branch: commitRef.replace("refs/heads/", ""),
+            deploymentTarget: "vercel",
+            deploymentUrl: deployUrl ? `https://${deployUrl}` : undefined,
+            deploymentId,
+            environment: "production",
+            changeType: detectChangeTypeLocal(commitMessage),
+            changeDescription: commitMessage || `Vercel deployment ${deploymentId}`,
+            requestedByName: authorName,
+            requestSource: "vercel-api",
+            status,
+            requestedAt: new Date(createdAt),
+            deployedAt: status === "deployed" && readyAt ? new Date(readyAt) : undefined,
+          });
+          synced++;
+        }
+      }
+
+      console.log(`[Sync:Vercel] Synced: ${synced}, Updated: ${updated}, Skipped: ${skipped}`);
+      res.json({ success: true, synced, updated, skipped, total: deployments.length });
+    } catch (error) {
+      console.error("[Sync:Vercel] Error:", error);
+      res.status(500).json({ error: "Sync failed" });
+    }
+  });
+
+  // POST /api/deployment-logs/sync/github - Pull recent commits from GitHub API
+  app.post("/api/deployment-logs/sync/github", requireAuth, requireMinimumRole("developer"), async (req, res) => {
+    try {
+      const githubToken = process.env.GITHUB_TOKEN;
+      const githubRepo = process.env.GITHUB_REPO;
+      if (!githubToken || !githubRepo) {
+        return res.status(400).json({ error: "GITHUB_TOKEN or GITHUB_REPO not configured" });
+      }
+
+      const { drizzle } = await import("drizzle-orm/node-postgres");
+      const { eq } = await import("drizzle-orm");
+      const pgModule = await import("pg");
+      const pool = new pgModule.default.Pool({ connectionString: process.env.DATABASE_URL!, ssl: { rejectUnauthorized: false } });
+      const db = drizzle(pool);
+
+      const response = await fetch(`https://api.github.com/repos/${githubRepo}/commits?per_page=20`, {
+        headers: { Authorization: `Bearer ${githubToken}`, Accept: "application/vnd.github.v3+json" },
+      });
+
+      if (!response.ok) {
+        const errText = await response.text();
+        console.error("[Sync:GitHub] API error:", errText);
+        return res.status(500).json({ error: "Failed to fetch from GitHub API" });
+      }
+
+      const commits: any[] = await response.json();
+
+      function detectChangeTypeLocal(message: string | undefined): string {
+        if (!message) return "feature";
+        const lower = message.toLowerCase();
+        if (lower.includes("fix") || lower.includes("bug")) return "bugfix";
+        if (lower.includes("hotfix")) return "hotfix";
+        if (lower.includes("refactor")) return "refactor";
+        if (lower.includes("config") || lower.includes("env")) return "config";
+        if (lower.includes("doc")) return "documentation";
+        return "feature";
+      }
+
+      let synced = 0, skipped = 0;
+
+      for (const commit of commits) {
+        const { sha, commit: commitData, html_url: commitUrl, author } = commit;
+        const commitHash = sha.substring(0, 7);
+
+        const existing = await db.select().from(deploymentLogs).where(eq(deploymentLogs.commitHash, commitHash)).limit(1);
+        if (existing.length > 0) { skipped++; continue; }
+
+        await db.insert(deploymentLogs).values({
+          commitHash,
+          commitMessage: commitData.message?.substring(0, 255),
+          commitUrl,
+          branch: "main",
+          deploymentTarget: "github",
+          environment: "production",
+          changeType: detectChangeTypeLocal(commitData.message),
+          changeDescription: commitData.message || "GitHub commit",
+          requestedByName: commitData.author?.name || author?.login || "Unknown",
+          requestSource: "github-api",
+          status: "pending",
+          requestedAt: new Date(commitData.author?.date || Date.now()),
+        });
+        synced++;
+      }
+
+      console.log(`[Sync:GitHub] Synced: ${synced}, Skipped: ${skipped}`);
+      res.json({ success: true, synced, skipped, total: commits.length });
+    } catch (error) {
+      console.error("[Sync:GitHub] Error:", error);
+      res.status(500).json({ error: "Sync failed" });
+    }
+  });
+
   const httpServer = createServer(app);
 
   return httpServer;
