@@ -27,6 +27,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
   DialogFooter,
@@ -101,14 +102,28 @@ export default function DeploymentLogsPage() {
   if (filters.search) queryParams.set("search", filters.search);
   queryParams.set("page", String(filters.page));
 
-  const { data, isLoading } = useQuery<{ logs: DeploymentLog[]; pagination: { page: number; totalPages: number; total: number } }>({
+  const { data, isLoading, refetch, dataUpdatedAt } = useQuery<{ logs: DeploymentLog[]; pagination: { page: number; totalPages: number; total: number } }>({
     queryKey: ["/api/deployment-logs", filters],
     queryFn: () => fetch(`/api/deployment-logs?${queryParams}`, { credentials: "include" }).then(r => r.json()),
+    refetchInterval: 30000,
   });
 
   const { data: stats } = useQuery<any>({
     queryKey: ["/api/deployment-logs/stats"],
     queryFn: () => fetch("/api/deployment-logs/stats?days=30", { credentials: "include" }).then(r => r.json()),
+    refetchInterval: 30000,
+  });
+
+  const { data: webhookHealth } = useQuery<{
+    health: {
+      github: { configured: boolean; webhookUrl: string };
+      vercel: { configured: boolean; webhookUrl: string };
+      render: { configured: boolean; webhookUrl: string };
+    };
+    recentActivity: { source: string; count: number; lastActivity: string }[];
+  }>({
+    queryKey: ["/api/webhooks/health"],
+    queryFn: () => fetch("/api/webhooks/health", { credentials: "include" }).then(r => r.json()),
   });
 
   const updateStatusMutation = useMutation({
@@ -140,13 +155,59 @@ export default function DeploymentLogsPage() {
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Deployment Log</h1>
-          <p className="text-sm text-muted-foreground mt-0.5">Track code changes and deployments across all environments</p>
+          <p className="text-sm text-muted-foreground mt-0.5">Automatically tracks commits and deployments across all environments</p>
         </div>
-        <Button onClick={() => setShowAddModal(true)} data-testid="button-add-deployment">
-          <Plus className="w-4 h-4 mr-2" />
-          Log Deployment
-        </Button>
+        <div className="flex items-center gap-2 flex-wrap">
+          <span className="text-xs text-muted-foreground flex items-center gap-1.5">
+            <RefreshCw className="w-3 h-3" />
+            Auto-updates every 30s
+            {dataUpdatedAt ? (
+              <span className="text-muted-foreground/70">
+                · synced {new Date(dataUpdatedAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+              </span>
+            ) : null}
+          </span>
+          <Button variant="outline" size="sm" onClick={() => refetch()} data-testid="button-refresh">
+            <RefreshCw className="w-4 h-4 mr-2" />
+            Refresh
+          </Button>
+          <Button onClick={() => setShowAddModal(true)} data-testid="button-add-deployment" size="sm">
+            <Plus className="w-4 h-4 mr-2" />
+            Log Manually
+          </Button>
+        </div>
       </div>
+
+      {/* Webhook Health */}
+      <Card>
+        <CardContent className="pt-4 pb-3">
+          <div className="flex flex-wrap items-center gap-6">
+            <p className="text-sm font-medium">Webhook Status</p>
+            <div className="flex flex-wrap items-center gap-4">
+              {(["github", "vercel", "render"] as const).map(service => {
+                const cfg = webhookHealth?.health?.[service];
+                const activity = webhookHealth?.recentActivity?.find(a => a.source === service);
+                return (
+                  <div key={service} className="flex items-center gap-2" data-testid={`webhook-status-${service}`}>
+                    <div className={`w-2 h-2 rounded-full shrink-0 ${cfg?.configured ? "bg-green-500" : "bg-muted-foreground/30"}`} />
+                    <span className="text-sm capitalize">{service}</span>
+                    {activity ? (
+                      <span className="text-xs text-muted-foreground">({activity.count} today)</span>
+                    ) : cfg && !cfg.configured ? (
+                      <span className="text-xs text-muted-foreground">(not configured)</span>
+                    ) : null}
+                  </div>
+                );
+              })}
+            </div>
+            {webhookHealth && !Object.values(webhookHealth.health).some(h => h.configured) && (
+              <p className="text-xs text-amber-600 dark:text-amber-400 ml-auto">
+                Add webhook secrets to enable automatic tracking
+              </p>
+            )}
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Stats */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -342,6 +403,7 @@ export default function DeploymentLogsPage() {
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Update Deployment Status</DialogTitle>
+            <DialogDescription>Change the current status of this deployment entry.</DialogDescription>
           </DialogHeader>
           <div className="space-y-3 py-2">
             <Label>New Status</Label>
@@ -529,6 +591,7 @@ function AddDeploymentModal({ onClose, onSuccess }: { onClose: () => void; onSuc
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Log New Deployment</DialogTitle>
+          <DialogDescription>Record a code change or deployment manually.</DialogDescription>
         </DialogHeader>
         <form
           onSubmit={(e) => { e.preventDefault(); mutation.mutate(form); }}

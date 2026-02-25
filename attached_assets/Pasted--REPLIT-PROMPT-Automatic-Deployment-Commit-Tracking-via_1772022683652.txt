@@ -1,0 +1,593 @@
+# 🔧 REPLIT PROMPT: Automatic Deployment & Commit Tracking via Webhooks
+
+## PROJECT
+**Client Data Portal** (IDX + CMA on Replit)  
+**URL:** https://client-data-portal-nine.vercel.app
+
+---
+
+## SCOPE
+
+Convert the Deployment Log from **manual entry** to **automatic tracking** by integrating with:
+
+1. **Vercel Webhooks** - Auto-capture all Vercel deployments
+2. **GitHub Webhooks** - Auto-capture commits and pushes
+3. **Render Webhooks** - Auto-capture Render deployments (if used)
+
+The system should automatically log every deployment with commit hash, timestamp, status, and who triggered it — no manual entry required.
+
+---
+
+## ARCHITECTURE
+
+```
+┌─────────────┐     ┌─────────────┐     ┌─────────────┐
+│   GitHub    │     │   Vercel    │     │   Render    │
+│  (commits)  │     │ (deploys)   │     │ (deploys)   │
+└──────┬──────┘     └──────┬──────┘     └──────┬──────┘
+       │                   │                   │
+       │ webhook           │ webhook           │ webhook
+       ▼                   ▼                   ▼
+┌─────────────────────────────────────────────────────┐
+│           Client Data Portal API                     │
+│  POST /api/webhooks/github                          │
+│  POST /api/webhooks/vercel                          │
+│  POST /api/webhooks/render                          │
+└─────────────────────────────────────────────────────┘
+       │
+       ▼
+┌─────────────────────────────────────────────────────┐
+│              deployment_logs table                   │
+│  (auto-populated from webhook events)               │
+└─────────────────────────────────────────────────────┘
+       │
+       ▼
+┌─────────────────────────────────────────────────────┐
+│           Deployment Log Dashboard                   │
+│  (real-time view of all deployments)                │
+└─────────────────────────────────────────────────────┘
+```
+
+---
+
+## TASK 1: Create Webhook Endpoints
+
+**File:** `server/routes/webhooks.ts`
+
+```typescript
+import { Router } from 'express';
+import crypto from 'crypto';
+import { db } from '../db';
+import { deploymentLogs } from '../db/schema';
+
+const router = Router();
+
+// Verify webhook signatures for security
+function verifyGitHubSignature(payload: string, signature: string, secret: string): boolean {
+  const hmac = crypto.createHmac('sha256', secret);
+  const digest = 'sha256=' + hmac.update(payload).digest('hex');
+  return crypto.timingSafeEqual(Buffer.from(signature), Buffer.from(digest));
+}
+
+function verifyVercelSignature(payload: string, signature: string, secret: string): boolean {
+  const hmac = crypto.createHmac('sha1', secret);
+  const digest = hmac.update(payload).digest('hex');
+  return signature === digest;
+}
+
+// ============================================
+// GITHUB WEBHOOK - Captures commits/pushes
+// ============================================
+router.post('/github', async (req, res) => {
+  try {
+    const signature = req.headers['x-hub-signature-256'] as string;
+    const event = req.headers['x-github-event'] as string;
+    const payload = JSON.stringify(req.body);
+    
+    // Verify signature (optional but recommended)
+    const secret = process.env.GITHUB_WEBHOOK_SECRET;
+    if (secret && signature) {
+      if (!verifyGitHubSignature(payload, signature, secret)) {
+        console.error('[Webhook:GitHub] Invalid signature');
+        return res.status(401).json({ error: 'Invalid signature' });
+      }
+    }
+    
+    console.log(`[Webhook:GitHub] Received event: ${event}`);
+    
+    // Handle push events (commits)
+    if (event === 'push') {
+      const { commits, ref, pusher, repository, head_commit } = req.body;
+      const branch = ref?.replace('refs/heads/', '') || 'main';
+      
+      // Log the head commit (most recent)
+      if (head_commit) {
+        await db.insert(deploymentLogs).values({
+          commitHash: head_commit.id?.substring(0, 7),
+          commitMessage: head_commit.message?.substring(0, 255),
+          commitUrl: head_commit.url,
+          branch,
+          deploymentTarget: 'github',
+          environment: branch === 'main' ? 'production' : 'development',
+          changeType: detectChangeType(head_commit.message),
+          changeDescription: head_commit.message,
+          filesChanged: [
+            ...(head_commit.added || []),
+            ...(head_commit.modified || []),
+            ...(head_commit.removed || []),
+          ],
+          requestedByName: pusher?.name || head_commit.author?.name,
+          requestSource: 'github',
+          requestReference: repository?.html_url,
+          status: 'pending', // Will be updated by Vercel webhook
+        });
+        
+        console.log(`[Webhook:GitHub] Logged commit: ${head_commit.id?.substring(0, 7)}`);
+      }
+    }
+    
+    res.status(200).json({ received: true });
+  } catch (error) {
+    console.error('[Webhook:GitHub] Error:', error);
+    res.status(500).json({ error: 'Webhook processing failed' });
+  }
+});
+
+// ============================================
+// VERCEL WEBHOOK - Captures deployments
+// ============================================
+router.post('/vercel', async (req, res) => {
+  try {
+    const signature = req.headers['x-vercel-signature'] as string;
+    const payload = JSON.stringify(req.body);
+    
+    // Verify signature (optional but recommended)
+    const secret = process.env.VERCEL_WEBHOOK_SECRET;
+    if (secret && signature) {
+      if (!verifyVercelSignature(payload, signature, secret)) {
+        console.error('[Webhook:Vercel] Invalid signature');
+        return res.status(401).json({ error: 'Invalid signature' });
+      }
+    }
+    
+    const { type, payload: eventPayload } = req.body;
+    
+    console.log(`[Webhook:Vercel] Received event: ${type}`);
+    
+    // Handle deployment events
+    if (type === 'deployment.created' || type === 'deployment.succeeded' || type === 'deployment.error') {
+      const deployment = eventPayload?.deployment || eventPayload;
+      const { 
+        id: deploymentId,
+        url: deploymentUrl,
+        meta,
+        state,
+        createdAt,
+        ready,
+        creator
+      } = deployment;
+      
+      const commitSha = meta?.githubCommitSha || meta?.gitlabCommitSha || meta?.bitbucketCommitSha;
+      const commitMessage = meta?.githubCommitMessage || meta?.gitlabCommitMessage;
+      const commitRef = meta?.githubCommitRef || meta?.gitlabCommitRef || 'main';
+      const authorName = meta?.githubCommitAuthorName || meta?.gitlabCommitAuthorName || creator?.username;
+      
+      // Map Vercel state to our status
+      const statusMap: Record<string, string> = {
+        'BUILDING': 'in_progress',
+        'INITIALIZING': 'pending',
+        'QUEUED': 'pending',
+        'READY': 'deployed',
+        'ERROR': 'failed',
+        'CANCELED': 'failed',
+      };
+      
+      const status = statusMap[state] || 'pending';
+      
+      // Check if we already have this deployment (from GitHub webhook)
+      const existingLog = commitSha ? await db
+        .select()
+        .from(deploymentLogs)
+        .where(eq(deploymentLogs.commitHash, commitSha.substring(0, 7)))
+        .limit(1) : [];
+      
+      if (existingLog.length > 0) {
+        // Update existing record
+        await db
+          .update(deploymentLogs)
+          .set({
+            deploymentTarget: 'vercel',
+            deploymentUrl: `https://${deploymentUrl}`,
+            deploymentId,
+            status,
+            deployedAt: status === 'deployed' ? new Date() : null,
+            updatedAt: new Date(),
+          })
+          .where(eq(deploymentLogs.id, existingLog[0].id));
+        
+        console.log(`[Webhook:Vercel] Updated deployment: ${commitSha?.substring(0, 7)} -> ${status}`);
+      } else {
+        // Create new record
+        await db.insert(deploymentLogs).values({
+          commitHash: commitSha?.substring(0, 7),
+          commitMessage: commitMessage?.substring(0, 255),
+          commitUrl: meta?.githubCommitUrl,
+          branch: commitRef?.replace('refs/heads/', ''),
+          deploymentTarget: 'vercel',
+          deploymentUrl: `https://${deploymentUrl}`,
+          deploymentId,
+          environment: 'production',
+          changeType: detectChangeType(commitMessage),
+          changeDescription: commitMessage || 'Vercel deployment',
+          requestedByName: authorName,
+          requestSource: 'vercel',
+          status,
+          deployedAt: status === 'deployed' ? new Date() : null,
+        });
+        
+        console.log(`[Webhook:Vercel] Created deployment: ${commitSha?.substring(0, 7)} -> ${status}`);
+      }
+    }
+    
+    res.status(200).json({ received: true });
+  } catch (error) {
+    console.error('[Webhook:Vercel] Error:', error);
+    res.status(500).json({ error: 'Webhook processing failed' });
+  }
+});
+
+// ============================================
+// RENDER WEBHOOK - Captures Render deployments
+// ============================================
+router.post('/render', async (req, res) => {
+  try {
+    const { type, service, deploy } = req.body;
+    
+    console.log(`[Webhook:Render] Received event: ${type}`);
+    
+    if (type === 'deploy' && deploy) {
+      const {
+        id: deploymentId,
+        commit,
+        status,
+        finishedAt,
+        createdAt,
+      } = deploy;
+      
+      const statusMap: Record<string, string> = {
+        'created': 'pending',
+        'build_in_progress': 'in_progress',
+        'update_in_progress': 'in_progress',
+        'live': 'deployed',
+        'deactivated': 'failed',
+        'build_failed': 'failed',
+        'canceled': 'failed',
+      };
+      
+      const mappedStatus = statusMap[status] || 'pending';
+      
+      // Check if we already have this commit
+      const existingLog = commit?.id ? await db
+        .select()
+        .from(deploymentLogs)
+        .where(eq(deploymentLogs.commitHash, commit.id.substring(0, 7)))
+        .limit(1) : [];
+      
+      if (existingLog.length > 0) {
+        await db
+          .update(deploymentLogs)
+          .set({
+            deploymentTarget: 'render',
+            deploymentId,
+            status: mappedStatus,
+            deployedAt: mappedStatus === 'deployed' ? new Date(finishedAt) : null,
+            updatedAt: new Date(),
+          })
+          .where(eq(deploymentLogs.id, existingLog[0].id));
+        
+        console.log(`[Webhook:Render] Updated deployment: ${commit?.id?.substring(0, 7)} -> ${mappedStatus}`);
+      } else {
+        await db.insert(deploymentLogs).values({
+          commitHash: commit?.id?.substring(0, 7),
+          commitMessage: commit?.message?.substring(0, 255),
+          branch: 'main',
+          deploymentTarget: 'render',
+          deploymentId,
+          environment: 'production',
+          changeType: detectChangeType(commit?.message),
+          changeDescription: commit?.message || 'Render deployment',
+          requestedByName: commit?.author || 'Unknown',
+          requestSource: 'render',
+          status: mappedStatus,
+          deployedAt: mappedStatus === 'deployed' ? new Date(finishedAt) : null,
+        });
+        
+        console.log(`[Webhook:Render] Created deployment: ${commit?.id?.substring(0, 7)} -> ${mappedStatus}`);
+      }
+    }
+    
+    res.status(200).json({ received: true });
+  } catch (error) {
+    console.error('[Webhook:Render] Error:', error);
+    res.status(500).json({ error: 'Webhook processing failed' });
+  }
+});
+
+// ============================================
+// HELPER: Detect change type from commit message
+// ============================================
+function detectChangeType(message: string | undefined): string {
+  if (!message) return 'feature';
+  
+  const lowerMessage = message.toLowerCase();
+  
+  if (lowerMessage.includes('fix') || lowerMessage.includes('bug')) return 'bugfix';
+  if (lowerMessage.includes('hotfix') || lowerMessage.includes('urgent')) return 'hotfix';
+  if (lowerMessage.includes('refactor') || lowerMessage.includes('cleanup')) return 'refactor';
+  if (lowerMessage.includes('config') || lowerMessage.includes('env')) return 'config';
+  if (lowerMessage.includes('doc') || lowerMessage.includes('readme')) return 'documentation';
+  if (lowerMessage.includes('feat') || lowerMessage.includes('add')) return 'feature';
+  
+  return 'feature';
+}
+
+export default router;
+```
+
+---
+
+## TASK 2: Register Webhook Routes
+
+**File:** `server/index.ts`
+
+```typescript
+import webhookRoutes from './routes/webhooks';
+
+// Webhook routes (no auth required - they use signature verification)
+app.use('/api/webhooks', webhookRoutes);
+```
+
+---
+
+## TASK 3: Add Import for eq
+
+**File:** `server/routes/webhooks.ts` - Add at top:
+
+```typescript
+import { eq } from 'drizzle-orm';
+```
+
+---
+
+## TASK 4: Environment Variables
+
+Add these to your Replit Secrets / Environment:
+
+```bash
+# GitHub Webhook Secret (set when creating webhook)
+GITHUB_WEBHOOK_SECRET=your-github-webhook-secret
+
+# Vercel Webhook Secret (from Vercel dashboard)
+VERCEL_WEBHOOK_SECRET=your-vercel-webhook-secret
+
+# Render Webhook Secret (optional - Render uses different auth)
+RENDER_WEBHOOK_SECRET=your-render-webhook-secret
+```
+
+---
+
+## TASK 5: Configure Webhooks in External Services
+
+### GitHub Webhook Setup
+
+1. Go to your GitHub repo → **Settings** → **Webhooks** → **Add webhook**
+2. Configure:
+   - **Payload URL:** `https://client-data-portal-nine.vercel.app/api/webhooks/github`
+   - **Content type:** `application/json`
+   - **Secret:** Generate a secret and save to `GITHUB_WEBHOOK_SECRET`
+   - **Events:** Select "Just the push event" or specific events
+3. Click **Add webhook**
+
+### Vercel Webhook Setup
+
+1. Go to Vercel Dashboard → **Settings** → **Webhooks**
+2. Click **Add Webhook**
+3. Configure:
+   - **URL:** `https://client-data-portal-nine.vercel.app/api/webhooks/vercel`
+   - **Events:** Select deployment events (created, succeeded, error)
+4. Copy the signing secret to `VERCEL_WEBHOOK_SECRET`
+
+### Render Webhook Setup (if using Render)
+
+1. Go to Render Dashboard → Your Service → **Settings** → **Deploy Hooks**
+2. Or use Render's notification settings to send to your webhook URL
+3. **URL:** `https://client-data-portal-nine.vercel.app/api/webhooks/render`
+
+---
+
+## TASK 6: Update Dashboard to Show Auto-Populated Data
+
+**File:** `client/src/pages/admin/DeploymentLogs.tsx`
+
+Update the dashboard to:
+- Remove or minimize the "Log Deployment" manual button (keep for edge cases)
+- Add real-time refresh capability
+- Add "Last synced" timestamp
+- Show webhook status/health
+
+```typescript
+// Add auto-refresh every 30 seconds
+const { data, isLoading, refetch } = useQuery({
+  queryKey: ['deployment-logs', filters],
+  queryFn: fetchDeploymentLogs,
+  refetchInterval: 30000, // Auto-refresh every 30 seconds
+});
+
+// Add last updated indicator
+<div className="flex items-center gap-2 text-sm text-gray-500">
+  <RefreshCw className="w-4 h-4" />
+  <span>Auto-updates every 30s</span>
+  <button onClick={() => refetch()} className="text-blue-600 hover:underline">
+    Refresh now
+  </button>
+</div>
+```
+
+---
+
+## TASK 7: Add Webhook Health Check Endpoint
+
+**File:** `server/routes/webhooks.ts` - Add:
+
+```typescript
+// GET /api/webhooks/health - Check webhook configuration
+router.get('/health', requireAuth, requireRole(['developer']), async (req, res) => {
+  const health = {
+    github: {
+      configured: !!process.env.GITHUB_WEBHOOK_SECRET,
+      endpoint: '/api/webhooks/github',
+    },
+    vercel: {
+      configured: !!process.env.VERCEL_WEBHOOK_SECRET,
+      endpoint: '/api/webhooks/vercel',
+    },
+    render: {
+      configured: !!process.env.RENDER_WEBHOOK_SECRET,
+      endpoint: '/api/webhooks/render',
+    },
+  };
+  
+  // Get recent webhook activity
+  const recentLogs = await db
+    .select({
+      source: deploymentLogs.requestSource,
+      count: count(),
+      lastActivity: sql<Date>`MAX(${deploymentLogs.createdAt})`,
+    })
+    .from(deploymentLogs)
+    .where(gte(deploymentLogs.createdAt, sql`NOW() - INTERVAL '24 hours'`))
+    .groupBy(deploymentLogs.requestSource);
+  
+  res.json({ health, recentActivity: recentLogs });
+});
+```
+
+---
+
+## TASK 8: Add Webhook Status to Dashboard
+
+Show webhook connection status in the dashboard:
+
+```typescript
+// In DeploymentLogs.tsx
+const { data: webhookHealth } = useQuery({
+  queryKey: ['webhook-health'],
+  queryFn: async () => {
+    const res = await fetch('/api/webhooks/health', { credentials: 'include' });
+    return res.json();
+  },
+});
+
+// Display status indicators
+<div className="flex items-center gap-4 mb-4">
+  <WebhookStatus name="GitHub" configured={webhookHealth?.health.github.configured} />
+  <WebhookStatus name="Vercel" configured={webhookHealth?.health.vercel.configured} />
+  <WebhookStatus name="Render" configured={webhookHealth?.health.render.configured} />
+</div>
+
+function WebhookStatus({ name, configured }: { name: string; configured: boolean }) {
+  return (
+    <div className="flex items-center gap-2">
+      <div className={`w-2 h-2 rounded-full ${configured ? 'bg-green-500' : 'bg-gray-300'}`} />
+      <span className="text-sm text-gray-600">{name}</span>
+    </div>
+  );
+}
+```
+
+---
+
+## WHAT HAPPENS NOW (AUTOMATIC FLOW)
+
+```
+Developer pushes code to GitHub
+        │
+        ▼
+┌─────────────────────────────────────┐
+│  GitHub fires webhook to            │
+│  /api/webhooks/github               │
+│  → Logs commit with status: pending │
+└─────────────────────────────────────┘
+        │
+        ▼
+┌─────────────────────────────────────┐
+│  Vercel starts deployment           │
+│  → Fires webhook: deployment.created│
+│  → Updates status: in_progress      │
+└─────────────────────────────────────┘
+        │
+        ▼
+┌─────────────────────────────────────┐
+│  Vercel deployment succeeds         │
+│  → Fires webhook: deployment.succeeded│
+│  → Updates status: deployed         │
+│  → Sets deployedAt timestamp        │
+└─────────────────────────────────────┘
+        │
+        ▼
+┌─────────────────────────────────────┐
+│  Dashboard auto-refreshes           │
+│  → Shows new deployment entry       │
+│  → Commit hash, message, who pushed │
+│  → Status: ✅ Deployed              │
+└─────────────────────────────────────┘
+```
+
+---
+
+## ACCEPTANCE CRITERIA
+
+| # | Criteria | Test |
+|---|----------|------|
+| 1 | Push to GitHub → Deployment log created automatically | Push code, check dashboard |
+| 2 | Vercel deployment updates status → in_progress → deployed | Watch status change |
+| 3 | Commit hash, message, author captured correctly | Verify data matches GitHub |
+| 4 | Deployment URL captured from Vercel | Click link, opens deployment |
+| 5 | Failed deployments show status: failed | Break build intentionally |
+| 6 | Dashboard auto-refreshes every 30s | Wait and watch |
+| 7 | Webhook health shows green status | Check indicators |
+| 8 | No manual entry required for normal flow | Just push code |
+
+---
+
+## FILES TO CREATE/MODIFY
+
+| File | Action |
+|------|--------|
+| `server/routes/webhooks.ts` | Create |
+| `server/index.ts` | Register webhook routes |
+| `client/src/pages/admin/DeploymentLogs.tsx` | Add auto-refresh, health status |
+| Replit Secrets | Add webhook secrets |
+| GitHub Settings | Configure webhook |
+| Vercel Settings | Configure webhook |
+
+---
+
+## KEEP MANUAL ENTRY AS FALLBACK
+
+Keep the "Log Deployment" button for edge cases:
+- Replit-only deployments (no GitHub push)
+- Manual hotfixes
+- Database migrations
+- Config changes without code
+
+But the **primary flow** is now fully automatic!
+
+---
+
+## SECURITY NOTES
+
+1. **Always verify webhook signatures** in production
+2. **Webhook endpoints don't require user auth** (they use signature verification instead)
+3. **Keep webhook secrets secure** - never commit to git
+4. **Rate limit webhook endpoints** to prevent abuse

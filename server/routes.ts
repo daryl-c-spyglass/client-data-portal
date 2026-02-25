@@ -23,6 +23,7 @@ import { featureVisibility, activityLogs, deploymentLogs } from "@shared/schema"
 import { neighborhoodService } from "./neighborhood-service";
 import { registerWordPressRoutes } from "./wordpress-routes";
 import { registerWidgetRoutes } from "./widget-routes";
+import { registerWebhookRoutes } from "./webhooks";
 
 // Calculate match tier for AI Image Search results
 // Score is relative to number of imageSearchItems (1.0 per item = perfect match)
@@ -223,6 +224,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Register WordPress API routes with CORS
   registerWordPressRoutes(app);
   registerWidgetRoutes(app);
+  registerWebhookRoutes(app);
 
   // Track sync timestamps for system status (shared across all endpoints)
   const syncTimestamps = {
