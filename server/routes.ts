@@ -19,7 +19,7 @@ import { fetchExternalUsers, fetchFromExternalApi } from "./external-api";
 import { logAdminActivity, getActivityLogs, type AdminAction } from "./admin-activity-service";
 import { logActivity, type ActivityAction } from "./activity-logger";
 import type { PropertyStatistics, TimelineDataPoint } from "@shared/schema";
-import { featureVisibility, activityLogs } from "@shared/schema";
+import { featureVisibility, activityLogs, deploymentLogs } from "@shared/schema";
 import { neighborhoodService } from "./neighborhood-service";
 import { registerWordPressRoutes } from "./wordpress-routes";
 import { registerWidgetRoutes } from "./widget-routes";
@@ -8736,6 +8736,197 @@ OUTPUT JSON:
     } catch (error) {
       console.error('[ActivityLogs] Error generating stats:', error);
       res.status(500).json({ error: 'Failed to generate activity log stats' });
+    }
+  });
+
+  // ============================================================
+  // DEPLOYMENT LOGS API (Developer only)
+  // ============================================================
+
+  app.get("/api/deployment-logs", requireAuth, requireMinimumRole("developer"), async (req, res) => {
+    try {
+      const { drizzle } = await import("drizzle-orm/node-postgres");
+      const { eq, desc, and, gte, lte, sql, count } = await import("drizzle-orm");
+      const pgModule = await import("pg");
+      const pool = new pgModule.default.Pool({ connectionString: process.env.DATABASE_URL!, ssl: { rejectUnauthorized: false } });
+      const db = drizzle(pool);
+
+      const { page = "1", limit = "20", status, changeType, deploymentTarget, environment, startDate, endDate, search } = req.query;
+      const pageNum = parseInt(page as string);
+      const limitNum = Math.min(parseInt(limit as string), 100);
+      const offset = (pageNum - 1) * limitNum;
+
+      const conditions: any[] = [];
+      if (status) conditions.push(eq(deploymentLogs.status, status as string));
+      if (changeType) conditions.push(eq(deploymentLogs.changeType, changeType as string));
+      if (deploymentTarget) conditions.push(eq(deploymentLogs.deploymentTarget, deploymentTarget as string));
+      if (environment) conditions.push(eq(deploymentLogs.environment, environment as string));
+      if (startDate) conditions.push(gte(deploymentLogs.requestedAt, new Date(startDate as string)));
+      if (endDate) conditions.push(lte(deploymentLogs.requestedAt, new Date(endDate as string)));
+      if (search) {
+        conditions.push(
+          sql`(${deploymentLogs.commitHash} ILIKE ${`%${search}%`} OR ${deploymentLogs.changeDescription} ILIKE ${`%${search}%`} OR ${deploymentLogs.commitMessage} ILIKE ${`%${search}%`})`
+        );
+      }
+      const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
+
+      const logs = await db.select().from(deploymentLogs).where(whereClause).orderBy(desc(deploymentLogs.requestedAt)).limit(limitNum).offset(offset);
+      const [{ total }] = await db.select({ total: count() }).from(deploymentLogs).where(whereClause);
+
+      res.json({ logs, pagination: { page: pageNum, limit: limitNum, total, totalPages: Math.ceil(total / limitNum) } });
+    } catch (error) {
+      console.error("[DeploymentLogs] Error fetching logs:", error);
+      res.status(500).json({ error: "Failed to fetch deployment logs" });
+    }
+  });
+
+  app.get("/api/deployment-logs/stats", requireAuth, requireMinimumRole("developer"), async (req, res) => {
+    try {
+      const { drizzle } = await import("drizzle-orm/node-postgres");
+      const { eq, desc, and, gte, sql, count } = await import("drizzle-orm");
+      const pgModule = await import("pg");
+      const pool = new pgModule.default.Pool({ connectionString: process.env.DATABASE_URL!, ssl: { rejectUnauthorized: false } });
+      const db = drizzle(pool);
+
+      const { days = "30" } = req.query;
+      const daysNum = parseInt(days as string);
+      const startDate = new Date();
+      startDate.setDate(startDate.getDate() - daysNum);
+
+      const [{ totalDeployments }] = await db.select({ totalDeployments: count() }).from(deploymentLogs).where(gte(deploymentLogs.requestedAt, startDate));
+      const [{ failedCount }] = await db.select({ failedCount: count() }).from(deploymentLogs).where(and(gte(deploymentLogs.requestedAt, startDate), eq(deploymentLogs.status, "failed")));
+
+      const statusCounts = await db.select({ status: deploymentLogs.status, count: count() }).from(deploymentLogs).where(gte(deploymentLogs.requestedAt, startDate)).groupBy(deploymentLogs.status);
+      const targetCounts = await db.select({ target: deploymentLogs.deploymentTarget, count: count() }).from(deploymentLogs).where(gte(deploymentLogs.requestedAt, startDate)).groupBy(deploymentLogs.deploymentTarget);
+      const changeTypeCounts = await db.select({ changeType: deploymentLogs.changeType, count: count() }).from(deploymentLogs).where(gte(deploymentLogs.requestedAt, startDate)).groupBy(deploymentLogs.changeType);
+      const dailyActivity = await db.select({ date: sql<string>`DATE(${deploymentLogs.requestedAt})`, count: count() }).from(deploymentLogs).where(gte(deploymentLogs.requestedAt, startDate)).groupBy(sql`DATE(${deploymentLogs.requestedAt})`).orderBy(sql`DATE(${deploymentLogs.requestedAt})`);
+      const topRequesters = await db.select({ requestedByName: deploymentLogs.requestedByName, count: count() }).from(deploymentLogs).where(gte(deploymentLogs.requestedAt, startDate)).groupBy(deploymentLogs.requestedByName).orderBy(desc(count())).limit(5);
+
+      res.json({
+        period: { days: daysNum, startDate },
+        summary: {
+          totalDeployments,
+          failedCount,
+          successRate: totalDeployments > 0 ? (((totalDeployments - failedCount) / totalDeployments) * 100).toFixed(1) : "100",
+        },
+        statusCounts,
+        targetCounts,
+        changeTypeCounts,
+        dailyActivity,
+        topRequesters,
+      });
+    } catch (error) {
+      console.error("[DeploymentLogs] Error fetching stats:", error);
+      res.status(500).json({ error: "Failed to fetch deployment stats" });
+    }
+  });
+
+  app.get("/api/deployment-logs/recent", requireAuth, requireMinimumRole("developer"), async (req, res) => {
+    try {
+      const { drizzle } = await import("drizzle-orm/node-postgres");
+      const { desc } = await import("drizzle-orm");
+      const pgModule = await import("pg");
+      const pool = new pgModule.default.Pool({ connectionString: process.env.DATABASE_URL!, ssl: { rejectUnauthorized: false } });
+      const db = drizzle(pool);
+
+      const { limit = "5" } = req.query;
+      const logs = await db.select().from(deploymentLogs).orderBy(desc(deploymentLogs.requestedAt)).limit(parseInt(limit as string));
+      res.json(logs);
+    } catch (error) {
+      console.error("[DeploymentLogs] Error fetching recent:", error);
+      res.status(500).json({ error: "Failed to fetch recent deployments" });
+    }
+  });
+
+  app.post("/api/deployment-logs", requireAuth, requireMinimumRole("developer"), async (req, res) => {
+    try {
+      const { drizzle } = await import("drizzle-orm/node-postgres");
+      const pgModule = await import("pg");
+      const pool = new pgModule.default.Pool({ connectionString: process.env.DATABASE_URL!, ssl: { rejectUnauthorized: false } });
+      const db = drizzle(pool);
+
+      const { commitHash, commitMessage, commitUrl, branch, deploymentTarget, deploymentUrl, deploymentId, environment, changeType, changeDescription, filesChanged, requestedByName, requestSource, requestReference, notes } = req.body;
+
+      if (!deploymentTarget || !changeType || !changeDescription) {
+        return res.status(400).json({ error: "deploymentTarget, changeType, and changeDescription are required" });
+      }
+
+      const user = req.user as any;
+      const autoName = requestedByName || (user?.firstName ? `${user.firstName} ${user.lastName || ""}`.trim() : user?.email) || null;
+
+      const [newLog] = await db.insert(deploymentLogs).values({
+        commitHash: commitHash || null,
+        commitMessage: commitMessage || null,
+        commitUrl: commitUrl || null,
+        branch: branch || "main",
+        deploymentTarget,
+        deploymentUrl: deploymentUrl || null,
+        deploymentId: deploymentId || null,
+        environment: environment || "production",
+        changeType,
+        changeDescription,
+        filesChanged: filesChanged || null,
+        requestedBy: user?.id || null,
+        requestedByName: autoName,
+        requestSource: requestSource || "manual",
+        requestReference: requestReference || null,
+        status: "pending",
+        notes: notes || null,
+      }).returning();
+
+      console.log(`[DeploymentLogs] New deployment logged by ${user?.email}: ${changeType} - ${changeDescription.substring(0, 50)}`);
+      res.status(201).json(newLog);
+    } catch (error) {
+      console.error("[DeploymentLogs] Error creating log:", error);
+      res.status(500).json({ error: "Failed to create deployment log" });
+    }
+  });
+
+  app.put("/api/deployment-logs/:id/status", requireAuth, requireMinimumRole("developer"), async (req, res) => {
+    try {
+      const { drizzle } = await import("drizzle-orm/node-postgres");
+      const { eq } = await import("drizzle-orm");
+      const pgModule = await import("pg");
+      const pool = new pgModule.default.Pool({ connectionString: process.env.DATABASE_URL!, ssl: { rejectUnauthorized: false } });
+      const db = drizzle(pool);
+
+      const { id } = req.params;
+      const { status, errorMessage, deploymentUrl, deploymentId } = req.body;
+
+      if (!status) return res.status(400).json({ error: "status is required" });
+
+      const updateData: any = { status, updatedAt: new Date() };
+      if (status === "deployed") updateData.deployedAt = new Date();
+      if (errorMessage) updateData.errorMessage = errorMessage;
+      if (deploymentUrl) updateData.deploymentUrl = deploymentUrl;
+      if (deploymentId) updateData.deploymentId = deploymentId;
+
+      const [updated] = await db.update(deploymentLogs).set(updateData).where(eq(deploymentLogs.id, parseInt(id))).returning();
+      if (!updated) return res.status(404).json({ error: "Deployment log not found" });
+
+      console.log(`[DeploymentLogs] Status updated: id=${id} -> ${status}`);
+      res.json(updated);
+    } catch (error) {
+      console.error("[DeploymentLogs] Error updating status:", error);
+      res.status(500).json({ error: "Failed to update deployment status" });
+    }
+  });
+
+  app.delete("/api/deployment-logs/:id", requireAuth, requireMinimumRole("developer"), async (req, res) => {
+    try {
+      const { drizzle } = await import("drizzle-orm/node-postgres");
+      const { eq } = await import("drizzle-orm");
+      const pgModule = await import("pg");
+      const pool = new pgModule.default.Pool({ connectionString: process.env.DATABASE_URL!, ssl: { rejectUnauthorized: false } });
+      const db = drizzle(pool);
+
+      const { id } = req.params;
+      const [deleted] = await db.delete(deploymentLogs).where(eq(deploymentLogs.id, parseInt(id))).returning();
+      if (!deleted) return res.status(404).json({ error: "Deployment log not found" });
+      res.json({ success: true });
+    } catch (error) {
+      console.error("[DeploymentLogs] Error deleting log:", error);
+      res.status(500).json({ error: "Failed to delete deployment log" });
     }
   });
 

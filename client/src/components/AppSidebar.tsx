@@ -1,4 +1,4 @@
-import { Home, Search, FileText, Users, Settings, BarChart3, Mail, Filter, Calendar, UserCircle, MessageCircle, UsersRound, ClipboardList, Eye, EyeOff, Activity } from "lucide-react";
+import { Home, Search, FileText, Users, Settings, BarChart3, Mail, Filter, Calendar, UserCircle, MessageCircle, UsersRound, ClipboardList, Eye, EyeOff, Activity, Rocket } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import {
   Sidebar,
@@ -43,6 +43,7 @@ const adminItems: NavItem[] = [
   { title: "Activity Logs", url: "/admin/activity-logs", icon: ClipboardList, testId: "link-activity-logs", featureKey: "activity_logs" },
   { title: "Feature Visibility", url: "/admin/feature-visibility", icon: Eye, testId: "link-feature-visibility", featureKey: "feature_visibility" },
   { title: "Activity Dashboard", url: "/admin/activity-log-dashboard", icon: Activity, testId: "link-activity-dashboard", featureKey: "activity_dashboard" },
+  { title: "Deployment Log", url: "/admin/deployment-logs", icon: Rocket, testId: "link-deployment-logs", featureKey: "deployment_logs" },
 ];
 
 const calendarItems: NavItem[] = [
@@ -121,7 +122,7 @@ export function AppSidebar() {
             <SidebarGroupContent>
               <SidebarMenu>
                 {adminItems.filter(item => {
-                  if (item.featureKey === 'feature_visibility' || item.featureKey === 'activity_dashboard') return isDeveloper;
+                  if (item.featureKey === 'feature_visibility' || item.featureKey === 'activity_dashboard' || item.featureKey === 'deployment_logs') return isDeveloper;
                   return true;
                 }).map((item) => (
                   <NavItemRenderer

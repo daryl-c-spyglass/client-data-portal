@@ -1130,3 +1130,53 @@ export const insertActivityLogSchema = createInsertSchema(activityLogs).omit({
 });
 export type InsertActivityLog = z.infer<typeof insertActivityLogSchema>;
 export type ActivityLog = typeof activityLogs.$inferSelect;
+
+// Deployment Logs Schema - Tracks code changes and deployment activity for developers
+export const deploymentLogs = pgTable("deployment_logs", {
+  id: serial("id").primaryKey(),
+
+  // Commit Information
+  commitHash: varchar("commit_hash", { length: 40 }),
+  commitMessage: text("commit_message"),
+  commitUrl: varchar("commit_url", { length: 500 }),
+  branch: varchar("branch", { length: 100 }).default("main"),
+
+  // Deployment Information
+  deploymentTarget: varchar("deployment_target", { length: 50 }).notNull(),
+  deploymentUrl: varchar("deployment_url", { length: 500 }),
+  deploymentId: varchar("deployment_id", { length: 255 }),
+  environment: varchar("environment", { length: 50 }).default("production"),
+
+  // Change Details
+  changeType: varchar("change_type", { length: 50 }).notNull(),
+  changeDescription: text("change_description").notNull(),
+  filesChanged: text("files_changed").array(),
+
+  // Request Information
+  requestedBy: varchar("requested_by").references(() => users.id, { onDelete: "set null" }),
+  requestedByName: varchar("requested_by_name", { length: 255 }),
+  requestedAt: timestamp("requested_at").defaultNow(),
+  requestSource: varchar("request_source", { length: 100 }),
+  requestReference: varchar("request_reference", { length: 255 }),
+
+  // Status
+  status: varchar("status", { length: 20 }).default("pending"),
+  deployedAt: timestamp("deployed_at"),
+
+  // Additional Context
+  notes: text("notes"),
+  errorMessage: text("error_message"),
+  rollbackCommit: varchar("rollback_commit", { length: 40 }),
+
+  // Metadata
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertDeploymentLogSchema = createInsertSchema(deploymentLogs).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export type InsertDeploymentLog = z.infer<typeof insertDeploymentLogSchema>;
+export type DeploymentLog = typeof deploymentLogs.$inferSelect;

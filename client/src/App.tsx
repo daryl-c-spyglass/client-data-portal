@@ -39,6 +39,7 @@ import UserManagement from "@/pages/UserManagement";
 import ActivityLogs from "@/pages/ActivityLogs";
 import FeatureVisibilitySettings from "@/pages/FeatureVisibilitySettings";
 import ActivityLogDashboard from "@/pages/ActivityLogDashboard";
+import DeploymentLogsPage from "@/pages/DeploymentLogs";
 import Login from "@/pages/Login";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { FeatureGate } from "@/components/FeatureGate";
@@ -154,6 +155,13 @@ function Router() {
         {() => (
           <ProtectedRoute minimumRole="developer" fallbackPath="/">
             <ActivityLogDashboard />
+          </ProtectedRoute>
+        )}
+      </Route>
+      <Route path="/admin/deployment-logs">
+        {() => (
+          <ProtectedRoute minimumRole="developer" fallbackPath="/">
+            <DeploymentLogsPage />
           </ProtectedRoute>
         )}
       </Route>

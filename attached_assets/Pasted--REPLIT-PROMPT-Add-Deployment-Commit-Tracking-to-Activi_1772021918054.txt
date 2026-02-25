@@ -1,0 +1,1124 @@
+# 🔧 REPLIT PROMPT: Add Deployment & Commit Tracking to Activity Log Dashboard
+
+## PROJECT
+**Client Data Portal** (IDX + CMA on Replit)  
+**URL:** https://client-data-portal-nine.vercel.app
+
+---
+
+## SCOPE
+
+Add a **Deployment & Commit Log** feature to the existing Activity Dashboard that tracks:
+
+1. All code changes/commits with commit hash
+2. Deployment target (Replit, Vercel, Render)
+3. Timestamp of deployment
+4. Who requested the change
+5. Description of what was changed
+6. Status (pending, in_progress, deployed, failed)
+
+This creates an audit trail of all development activity for the Developer team.
+
+---
+
+## DATABASE SCHEMA
+
+### Task 1: Create Deployment Logs Table
+
+```sql
+-- Create deployment_logs table
+CREATE TABLE IF NOT EXISTS deployment_logs (
+  id SERIAL PRIMARY KEY,
+  
+  -- Commit Information
+  commit_hash VARCHAR(40),
+  commit_message TEXT,
+  commit_url VARCHAR(500),
+  branch VARCHAR(100) DEFAULT 'main',
+  
+  -- Deployment Information
+  deployment_target VARCHAR(50) NOT NULL, -- 'replit', 'vercel', 'render', 'github'
+  deployment_url VARCHAR(500),
+  deployment_id VARCHAR(255),
+  environment VARCHAR(50) DEFAULT 'production', -- 'development', 'staging', 'production'
+  
+  -- Change Details
+  change_type VARCHAR(50) NOT NULL, -- 'feature', 'bugfix', 'hotfix', 'refactor', 'config', 'documentation'
+  change_description TEXT NOT NULL,
+  files_changed TEXT[], -- Array of file paths
+  
+  -- Request Information
+  requested_by UUID REFERENCES users(id),
+  requested_by_name VARCHAR(255),
+  requested_at TIMESTAMP DEFAULT NOW(),
+  request_source VARCHAR(100), -- 'slack', 'github', 'manual', 'scheduled'
+  request_reference VARCHAR(255), -- Slack message ID, GitHub issue #, etc.
+  
+  -- Status
+  status VARCHAR(20) DEFAULT 'pending', -- 'pending', 'in_progress', 'deployed', 'failed', 'rolled_back'
+  deployed_at TIMESTAMP,
+  
+  -- Additional Context
+  notes TEXT,
+  error_message TEXT,
+  rollback_commit VARCHAR(40),
+  
+  -- Metadata
+  created_at TIMESTAMP DEFAULT NOW(),
+  updated_at TIMESTAMP DEFAULT NOW()
+);
+
+-- Indexes for efficient querying
+CREATE INDEX idx_deployment_logs_commit_hash ON deployment_logs(commit_hash);
+CREATE INDEX idx_deployment_logs_deployment_target ON deployment_logs(deployment_target);
+CREATE INDEX idx_deployment_logs_status ON deployment_logs(status);
+CREATE INDEX idx_deployment_logs_requested_by ON deployment_logs(requested_by);
+CREATE INDEX idx_deployment_logs_requested_at ON deployment_logs(requested_at DESC);
+CREATE INDEX idx_deployment_logs_change_type ON deployment_logs(change_type);
+```
+
+### Task 2: Add Drizzle Schema
+
+**File:** `server/db/schema.ts`
+
+```typescript
+export const deploymentLogs = pgTable('deployment_logs', {
+  id: serial('id').primaryKey(),
+  
+  // Commit Information
+  commitHash: varchar('commit_hash', { length: 40 }),
+  commitMessage: text('commit_message'),
+  commitUrl: varchar('commit_url', { length: 500 }),
+  branch: varchar('branch', { length: 100 }).default('main'),
+  
+  // Deployment Information
+  deploymentTarget: varchar('deployment_target', { length: 50 }).notNull(),
+  deploymentUrl: varchar('deployment_url', { length: 500 }),
+  deploymentId: varchar('deployment_id', { length: 255 }),
+  environment: varchar('environment', { length: 50 }).default('production'),
+  
+  // Change Details
+  changeType: varchar('change_type', { length: 50 }).notNull(),
+  changeDescription: text('change_description').notNull(),
+  filesChanged: text('files_changed').array(),
+  
+  // Request Information
+  requestedBy: uuid('requested_by').references(() => users.id),
+  requestedByName: varchar('requested_by_name', { length: 255 }),
+  requestedAt: timestamp('requested_at').defaultNow(),
+  requestSource: varchar('request_source', { length: 100 }),
+  requestReference: varchar('request_reference', { length: 255 }),
+  
+  // Status
+  status: varchar('status', { length: 20 }).default('pending'),
+  deployedAt: timestamp('deployed_at'),
+  
+  // Additional Context
+  notes: text('notes'),
+  errorMessage: text('error_message'),
+  rollbackCommit: varchar('rollback_commit', { length: 40 }),
+  
+  // Metadata
+  createdAt: timestamp('created_at').defaultNow(),
+  updatedAt: timestamp('updated_at').defaultNow(),
+});
+```
+
+---
+
+## API ENDPOINTS
+
+### Task 3: Create Deployment Logs API
+
+**File:** `server/routes/deployment-logs.ts`
+
+```typescript
+import { Router } from 'express';
+import { db } from '../db';
+import { deploymentLogs } from '../db/schema';
+import { eq, desc, and, gte, lte, sql, count, ilike } from 'drizzle-orm';
+import { requireAuth, requireRole } from '../middleware/auth';
+
+const router = Router();
+
+// GET /api/deployment-logs - Get paginated deployment logs (Developer only)
+router.get('/', requireAuth, requireRole(['developer']), async (req, res) => {
+  try {
+    const {
+      page = '1',
+      limit = '20',
+      status,
+      changeType,
+      deploymentTarget,
+      environment,
+      startDate,
+      endDate,
+      search,
+    } = req.query;
+
+    const pageNum = parseInt(page as string);
+    const limitNum = Math.min(parseInt(limit as string), 100);
+    const offset = (pageNum - 1) * limitNum;
+
+    // Build where conditions
+    const conditions = [];
+    if (status) conditions.push(eq(deploymentLogs.status, status as string));
+    if (changeType) conditions.push(eq(deploymentLogs.changeType, changeType as string));
+    if (deploymentTarget) conditions.push(eq(deploymentLogs.deploymentTarget, deploymentTarget as string));
+    if (environment) conditions.push(eq(deploymentLogs.environment, environment as string));
+    if (startDate) conditions.push(gte(deploymentLogs.requestedAt, new Date(startDate as string)));
+    if (endDate) conditions.push(lte(deploymentLogs.requestedAt, new Date(endDate as string)));
+    if (search) {
+      conditions.push(
+        sql`(${deploymentLogs.commitHash} ILIKE ${`%${search}%`} OR 
+             ${deploymentLogs.changeDescription} ILIKE ${`%${search}%`} OR
+             ${deploymentLogs.commitMessage} ILIKE ${`%${search}%`})`
+      );
+    }
+
+    const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
+
+    const logs = await db
+      .select()
+      .from(deploymentLogs)
+      .where(whereClause)
+      .orderBy(desc(deploymentLogs.requestedAt))
+      .limit(limitNum)
+      .offset(offset);
+
+    const [{ total }] = await db
+      .select({ total: count() })
+      .from(deploymentLogs)
+      .where(whereClause);
+
+    res.json({
+      logs,
+      pagination: {
+        page: pageNum,
+        limit: limitNum,
+        total,
+        totalPages: Math.ceil(total / limitNum),
+      },
+    });
+  } catch (error) {
+    console.error('[DeploymentLogs] Error fetching logs:', error);
+    res.status(500).json({ error: 'Failed to fetch deployment logs' });
+  }
+});
+
+// GET /api/deployment-logs/stats - Get deployment statistics (Developer only)
+router.get('/stats', requireAuth, requireRole(['developer']), async (req, res) => {
+  try {
+    const { days = '30' } = req.query;
+    const daysNum = parseInt(days as string);
+    const startDate = new Date();
+    startDate.setDate(startDate.getDate() - daysNum);
+
+    // Total deployments
+    const [{ totalDeployments }] = await db
+      .select({ totalDeployments: count() })
+      .from(deploymentLogs)
+      .where(gte(deploymentLogs.requestedAt, startDate));
+
+    // Deployments by status
+    const statusCounts = await db
+      .select({
+        status: deploymentLogs.status,
+        count: count(),
+      })
+      .from(deploymentLogs)
+      .where(gte(deploymentLogs.requestedAt, startDate))
+      .groupBy(deploymentLogs.status);
+
+    // Deployments by target
+    const targetCounts = await db
+      .select({
+        target: deploymentLogs.deploymentTarget,
+        count: count(),
+      })
+      .from(deploymentLogs)
+      .where(gte(deploymentLogs.requestedAt, startDate))
+      .groupBy(deploymentLogs.deploymentTarget);
+
+    // Deployments by change type
+    const changeTypeCounts = await db
+      .select({
+        changeType: deploymentLogs.changeType,
+        count: count(),
+      })
+      .from(deploymentLogs)
+      .where(gte(deploymentLogs.requestedAt, startDate))
+      .groupBy(deploymentLogs.changeType);
+
+    // Daily deployment activity
+    const dailyActivity = await db
+      .select({
+        date: sql<string>`DATE(${deploymentLogs.requestedAt})`,
+        count: count(),
+      })
+      .from(deploymentLogs)
+      .where(gte(deploymentLogs.requestedAt, startDate))
+      .groupBy(sql`DATE(${deploymentLogs.requestedAt})`)
+      .orderBy(sql`DATE(${deploymentLogs.requestedAt})`);
+
+    // Top requesters
+    const topRequesters = await db
+      .select({
+        requestedByName: deploymentLogs.requestedByName,
+        count: count(),
+      })
+      .from(deploymentLogs)
+      .where(gte(deploymentLogs.requestedAt, startDate))
+      .groupBy(deploymentLogs.requestedByName)
+      .orderBy(desc(count()))
+      .limit(10);
+
+    // Failed deployments
+    const [{ failedCount }] = await db
+      .select({ failedCount: count() })
+      .from(deploymentLogs)
+      .where(and(
+        gte(deploymentLogs.requestedAt, startDate),
+        eq(deploymentLogs.status, 'failed')
+      ));
+
+    res.json({
+      period: { days: daysNum, startDate },
+      summary: {
+        totalDeployments,
+        failedCount,
+        successRate: totalDeployments > 0 
+          ? (((totalDeployments - failedCount) / totalDeployments) * 100).toFixed(1) 
+          : 100,
+      },
+      statusCounts,
+      targetCounts,
+      changeTypeCounts,
+      dailyActivity,
+      topRequesters,
+    });
+  } catch (error) {
+    console.error('[DeploymentLogs] Error fetching stats:', error);
+    res.status(500).json({ error: 'Failed to fetch deployment stats' });
+  }
+});
+
+// POST /api/deployment-logs - Create new deployment log entry (Developer only)
+router.post('/', requireAuth, requireRole(['developer']), async (req, res) => {
+  try {
+    const {
+      commitHash,
+      commitMessage,
+      commitUrl,
+      branch,
+      deploymentTarget,
+      deploymentUrl,
+      deploymentId,
+      environment,
+      changeType,
+      changeDescription,
+      filesChanged,
+      requestedByName,
+      requestSource,
+      requestReference,
+      notes,
+    } = req.body;
+
+    const [newLog] = await db
+      .insert(deploymentLogs)
+      .values({
+        commitHash,
+        commitMessage,
+        commitUrl,
+        branch: branch || 'main',
+        deploymentTarget,
+        deploymentUrl,
+        deploymentId,
+        environment: environment || 'production',
+        changeType,
+        changeDescription,
+        filesChanged,
+        requestedBy: req.user?.id,
+        requestedByName: requestedByName || req.user?.name || req.user?.email,
+        requestSource: requestSource || 'manual',
+        requestReference,
+        status: 'pending',
+        notes,
+      })
+      .returning();
+
+    console.log(`[DeploymentLogs] New deployment logged: ${commitHash} by ${req.user?.email}`);
+    res.status(201).json(newLog);
+  } catch (error) {
+    console.error('[DeploymentLogs] Error creating log:', error);
+    res.status(500).json({ error: 'Failed to create deployment log' });
+  }
+});
+
+// PUT /api/deployment-logs/:id/status - Update deployment status (Developer only)
+router.put('/:id/status', requireAuth, requireRole(['developer']), async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { status, errorMessage, deploymentUrl, deploymentId } = req.body;
+
+    const updateData: any = {
+      status,
+      updatedAt: new Date(),
+    };
+
+    if (status === 'deployed') {
+      updateData.deployedAt = new Date();
+    }
+    if (errorMessage) {
+      updateData.errorMessage = errorMessage;
+    }
+    if (deploymentUrl) {
+      updateData.deploymentUrl = deploymentUrl;
+    }
+    if (deploymentId) {
+      updateData.deploymentId = deploymentId;
+    }
+
+    const [updated] = await db
+      .update(deploymentLogs)
+      .set(updateData)
+      .where(eq(deploymentLogs.id, parseInt(id)))
+      .returning();
+
+    if (!updated) {
+      return res.status(404).json({ error: 'Deployment log not found' });
+    }
+
+    console.log(`[DeploymentLogs] Status updated: ${id} -> ${status}`);
+    res.json(updated);
+  } catch (error) {
+    console.error('[DeploymentLogs] Error updating status:', error);
+    res.status(500).json({ error: 'Failed to update deployment status' });
+  }
+});
+
+// GET /api/deployment-logs/recent - Get most recent deployments (Developer only)
+router.get('/recent', requireAuth, requireRole(['developer']), async (req, res) => {
+  try {
+    const { limit = '5' } = req.query;
+
+    const logs = await db
+      .select()
+      .from(deploymentLogs)
+      .orderBy(desc(deploymentLogs.requestedAt))
+      .limit(parseInt(limit as string));
+
+    res.json(logs);
+  } catch (error) {
+    console.error('[DeploymentLogs] Error fetching recent:', error);
+    res.status(500).json({ error: 'Failed to fetch recent deployments' });
+  }
+});
+
+export default router;
+```
+
+### Task 4: Register Routes
+
+**File:** `server/index.ts`
+
+```typescript
+import deploymentLogsRoutes from './routes/deployment-logs';
+// ...
+app.use('/api/deployment-logs', deploymentLogsRoutes);
+```
+
+---
+
+## FRONTEND COMPONENTS
+
+### Task 5: Create Deployment Log Dashboard Tab/Section
+
+**File:** `client/src/pages/admin/DeploymentLogs.tsx`
+
+```typescript
+import { useState } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { 
+  GitCommit, 
+  GitBranch, 
+  Rocket, 
+  Clock, 
+  User, 
+  CheckCircle, 
+  XCircle, 
+  AlertCircle,
+  Loader2,
+  Plus,
+  Filter,
+  Search,
+  ExternalLink,
+  RefreshCw
+} from 'lucide-react';
+import { format, formatDistanceToNow } from 'date-fns';
+import { toast } from 'sonner';
+
+interface DeploymentLog {
+  id: number;
+  commitHash: string | null;
+  commitMessage: string | null;
+  commitUrl: string | null;
+  branch: string;
+  deploymentTarget: string;
+  deploymentUrl: string | null;
+  environment: string;
+  changeType: string;
+  changeDescription: string;
+  filesChanged: string[] | null;
+  requestedByName: string | null;
+  requestedAt: string;
+  requestSource: string | null;
+  requestReference: string | null;
+  status: string;
+  deployedAt: string | null;
+  notes: string | null;
+  errorMessage: string | null;
+}
+
+const statusConfig = {
+  pending: { icon: Clock, color: 'text-yellow-600 bg-yellow-100', label: 'Pending' },
+  in_progress: { icon: Loader2, color: 'text-blue-600 bg-blue-100', label: 'In Progress' },
+  deployed: { icon: CheckCircle, color: 'text-green-600 bg-green-100', label: 'Deployed' },
+  failed: { icon: XCircle, color: 'text-red-600 bg-red-100', label: 'Failed' },
+  rolled_back: { icon: RefreshCw, color: 'text-orange-600 bg-orange-100', label: 'Rolled Back' },
+};
+
+const changeTypeConfig = {
+  feature: { color: 'bg-purple-100 text-purple-700', label: 'Feature' },
+  bugfix: { color: 'bg-red-100 text-red-700', label: 'Bug Fix' },
+  hotfix: { color: 'bg-orange-100 text-orange-700', label: 'Hotfix' },
+  refactor: { color: 'bg-blue-100 text-blue-700', label: 'Refactor' },
+  config: { color: 'bg-gray-100 text-gray-700', label: 'Config' },
+  documentation: { color: 'bg-teal-100 text-teal-700', label: 'Docs' },
+};
+
+const targetConfig = {
+  replit: { color: 'bg-orange-100 text-orange-700', label: 'Replit' },
+  vercel: { color: 'bg-black text-white', label: 'Vercel' },
+  render: { color: 'bg-emerald-100 text-emerald-700', label: 'Render' },
+  github: { color: 'bg-gray-800 text-white', label: 'GitHub' },
+};
+
+export function DeploymentLogs() {
+  const [filters, setFilters] = useState({
+    status: '',
+    changeType: '',
+    deploymentTarget: '',
+    search: '',
+  });
+  const [showAddModal, setShowAddModal] = useState(false);
+  const queryClient = useQueryClient();
+
+  const { data, isLoading } = useQuery({
+    queryKey: ['deployment-logs', filters],
+    queryFn: async () => {
+      const params = new URLSearchParams();
+      if (filters.status) params.append('status', filters.status);
+      if (filters.changeType) params.append('changeType', filters.changeType);
+      if (filters.deploymentTarget) params.append('deploymentTarget', filters.deploymentTarget);
+      if (filters.search) params.append('search', filters.search);
+      
+      const res = await fetch(`/api/deployment-logs?${params}`, { credentials: 'include' });
+      if (!res.ok) throw new Error('Failed to fetch');
+      return res.json();
+    },
+  });
+
+  const { data: stats } = useQuery({
+    queryKey: ['deployment-stats'],
+    queryFn: async () => {
+      const res = await fetch('/api/deployment-logs/stats?days=30', { credentials: 'include' });
+      if (!res.ok) throw new Error('Failed to fetch');
+      return res.json();
+    },
+  });
+
+  return (
+    <div className="space-y-6">
+      {/* Stats Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <StatCard
+          title="Total Deployments"
+          value={stats?.summary.totalDeployments || 0}
+          subtitle="Last 30 days"
+          icon={Rocket}
+        />
+        <StatCard
+          title="Success Rate"
+          value={`${stats?.summary.successRate || 100}%`}
+          subtitle="Last 30 days"
+          icon={CheckCircle}
+          color="text-green-600"
+        />
+        <StatCard
+          title="Failed"
+          value={stats?.summary.failedCount || 0}
+          subtitle="Last 30 days"
+          icon={XCircle}
+          color="text-red-600"
+        />
+        <StatCard
+          title="Top Requester"
+          value={stats?.topRequesters?.[0]?.requestedByName || '-'}
+          subtitle={`${stats?.topRequesters?.[0]?.count || 0} requests`}
+          icon={User}
+        />
+      </div>
+
+      {/* Filters & Add Button */}
+      <div className="flex flex-wrap items-center gap-4">
+        <div className="flex-1 min-w-[200px]">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+            <input
+              type="text"
+              placeholder="Search commits, descriptions..."
+              value={filters.search}
+              onChange={(e) => setFilters(f => ({ ...f, search: e.target.value }))}
+              className="w-full pl-10 pr-4 py-2 border rounded-lg"
+            />
+          </div>
+        </div>
+        
+        <select
+          value={filters.status}
+          onChange={(e) => setFilters(f => ({ ...f, status: e.target.value }))}
+          className="px-3 py-2 border rounded-lg"
+        >
+          <option value="">All Status</option>
+          <option value="pending">Pending</option>
+          <option value="in_progress">In Progress</option>
+          <option value="deployed">Deployed</option>
+          <option value="failed">Failed</option>
+        </select>
+
+        <select
+          value={filters.changeType}
+          onChange={(e) => setFilters(f => ({ ...f, changeType: e.target.value }))}
+          className="px-3 py-2 border rounded-lg"
+        >
+          <option value="">All Types</option>
+          <option value="feature">Feature</option>
+          <option value="bugfix">Bug Fix</option>
+          <option value="hotfix">Hotfix</option>
+          <option value="refactor">Refactor</option>
+          <option value="config">Config</option>
+        </select>
+
+        <select
+          value={filters.deploymentTarget}
+          onChange={(e) => setFilters(f => ({ ...f, deploymentTarget: e.target.value }))}
+          className="px-3 py-2 border rounded-lg"
+        >
+          <option value="">All Targets</option>
+          <option value="replit">Replit</option>
+          <option value="vercel">Vercel</option>
+          <option value="render">Render</option>
+        </select>
+
+        <button
+          onClick={() => setShowAddModal(true)}
+          className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+        >
+          <Plus className="w-4 h-4" />
+          Log Deployment
+        </button>
+      </div>
+
+      {/* Deployment Log Table */}
+      <div className="bg-white rounded-lg border overflow-hidden">
+        <table className="w-full">
+          <thead className="bg-gray-50 border-b">
+            <tr>
+              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Commit</th>
+              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Description</th>
+              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Type</th>
+              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Target</th>
+              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Requested By</th>
+              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Time</th>
+              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y">
+            {isLoading ? (
+              <tr>
+                <td colSpan={8} className="px-4 py-8 text-center">
+                  <Loader2 className="w-6 h-6 animate-spin mx-auto text-gray-400" />
+                </td>
+              </tr>
+            ) : data?.logs?.length === 0 ? (
+              <tr>
+                <td colSpan={8} className="px-4 py-8 text-center text-gray-500">
+                  No deployment logs found
+                </td>
+              </tr>
+            ) : (
+              data?.logs?.map((log: DeploymentLog) => (
+                <DeploymentRow key={log.id} log={log} />
+              ))
+            )}
+          </tbody>
+        </table>
+      </div>
+
+      {/* Add Deployment Modal */}
+      {showAddModal && (
+        <AddDeploymentModal onClose={() => setShowAddModal(false)} />
+      )}
+    </div>
+  );
+}
+
+function DeploymentRow({ log }: { log: DeploymentLog }) {
+  const status = statusConfig[log.status as keyof typeof statusConfig] || statusConfig.pending;
+  const changeType = changeTypeConfig[log.changeType as keyof typeof changeTypeConfig];
+  const target = targetConfig[log.deploymentTarget as keyof typeof targetConfig];
+  const StatusIcon = status.icon;
+
+  return (
+    <tr className="hover:bg-gray-50">
+      {/* Status */}
+      <td className="px-4 py-3">
+        <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium ${status.color}`}>
+          <StatusIcon className={`w-3.5 h-3.5 ${log.status === 'in_progress' ? 'animate-spin' : ''}`} />
+          {status.label}
+        </span>
+      </td>
+
+      {/* Commit */}
+      <td className="px-4 py-3">
+        <div className="flex items-center gap-2">
+          <GitCommit className="w-4 h-4 text-gray-400" />
+          {log.commitHash ? (
+            <a
+              href={log.commitUrl || '#'}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="font-mono text-sm text-blue-600 hover:underline"
+            >
+              {log.commitHash.substring(0, 7)}
+            </a>
+          ) : (
+            <span className="text-gray-400 text-sm">-</span>
+          )}
+          {log.branch && log.branch !== 'main' && (
+            <span className="flex items-center gap-1 text-xs text-gray-500">
+              <GitBranch className="w-3 h-3" />
+              {log.branch}
+            </span>
+          )}
+        </div>
+      </td>
+
+      {/* Description */}
+      <td className="px-4 py-3">
+        <p className="text-sm text-gray-900 line-clamp-2 max-w-xs">
+          {log.changeDescription}
+        </p>
+        {log.commitMessage && (
+          <p className="text-xs text-gray-500 mt-0.5 line-clamp-1">
+            {log.commitMessage}
+          </p>
+        )}
+      </td>
+
+      {/* Type */}
+      <td className="px-4 py-3">
+        {changeType && (
+          <span className={`px-2 py-1 rounded text-xs font-medium ${changeType.color}`}>
+            {changeType.label}
+          </span>
+        )}
+      </td>
+
+      {/* Target */}
+      <td className="px-4 py-3">
+        <div className="flex items-center gap-2">
+          {target && (
+            <span className={`px-2 py-1 rounded text-xs font-medium ${target.color}`}>
+              {target.label}
+            </span>
+          )}
+          {log.deploymentUrl && (
+            <a
+              href={log.deploymentUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-gray-400 hover:text-blue-600"
+            >
+              <ExternalLink className="w-3.5 h-3.5" />
+            </a>
+          )}
+        </div>
+      </td>
+
+      {/* Requested By */}
+      <td className="px-4 py-3">
+        <div className="flex items-center gap-2">
+          <User className="w-4 h-4 text-gray-400" />
+          <div>
+            <p className="text-sm text-gray-900">{log.requestedByName || 'Unknown'}</p>
+            {log.requestSource && (
+              <p className="text-xs text-gray-500">via {log.requestSource}</p>
+            )}
+          </div>
+        </div>
+      </td>
+
+      {/* Time */}
+      <td className="px-4 py-3">
+        <div className="text-sm">
+          <p className="text-gray-900">
+            {format(new Date(log.requestedAt), 'MMM d, yyyy')}
+          </p>
+          <p className="text-xs text-gray-500">
+            {format(new Date(log.requestedAt), 'h:mm a')}
+          </p>
+          {log.deployedAt && (
+            <p className="text-xs text-green-600 mt-0.5">
+              Deployed {formatDistanceToNow(new Date(log.deployedAt), { addSuffix: true })}
+            </p>
+          )}
+        </div>
+      </td>
+
+      {/* Actions */}
+      <td className="px-4 py-3">
+        <button className="text-gray-400 hover:text-gray-600">
+          •••
+        </button>
+      </td>
+    </tr>
+  );
+}
+
+function StatCard({ title, value, subtitle, icon: Icon, color = 'text-gray-900' }) {
+  return (
+    <div className="bg-white rounded-lg border p-4">
+      <div className="flex items-center justify-between">
+        <p className="text-sm text-gray-500">{title}</p>
+        <Icon className="w-5 h-5 text-gray-400" />
+      </div>
+      <p className={`text-2xl font-bold mt-1 ${color}`}>{value}</p>
+      <p className="text-xs text-gray-500 mt-0.5">{subtitle}</p>
+    </div>
+  );
+}
+
+function AddDeploymentModal({ onClose }: { onClose: () => void }) {
+  const queryClient = useQueryClient();
+  const [formData, setFormData] = useState({
+    commitHash: '',
+    commitMessage: '',
+    commitUrl: '',
+    branch: 'main',
+    deploymentTarget: 'vercel',
+    environment: 'production',
+    changeType: 'feature',
+    changeDescription: '',
+    requestedByName: '',
+    requestSource: 'manual',
+    requestReference: '',
+    notes: '',
+  });
+
+  const createMutation = useMutation({
+    mutationFn: async (data: typeof formData) => {
+      const res = await fetch('/api/deployment-logs', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify(data),
+      });
+      if (!res.ok) throw new Error('Failed to create');
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['deployment-logs'] });
+      queryClient.invalidateQueries({ queryKey: ['deployment-stats'] });
+      toast.success('Deployment logged successfully');
+      onClose();
+    },
+    onError: () => {
+      toast.error('Failed to log deployment');
+    },
+  });
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    createMutation.mutate(formData);
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+      <div className="bg-white rounded-lg w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+        <div className="p-6 border-b">
+          <h2 className="text-xl font-semibold">Log New Deployment</h2>
+          <p className="text-sm text-gray-500 mt-1">Record a code change or deployment</p>
+        </div>
+        
+        <form onSubmit={handleSubmit} className="p-6 space-y-4">
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium mb-1">Commit Hash</label>
+              <input
+                type="text"
+                value={formData.commitHash}
+                onChange={(e) => setFormData(f => ({ ...f, commitHash: e.target.value }))}
+                placeholder="abc1234"
+                className="w-full px-3 py-2 border rounded-lg"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium mb-1">Branch</label>
+              <input
+                type="text"
+                value={formData.branch}
+                onChange={(e) => setFormData(f => ({ ...f, branch: e.target.value }))}
+                className="w-full px-3 py-2 border rounded-lg"
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium mb-1">Commit Message</label>
+            <input
+              type="text"
+              value={formData.commitMessage}
+              onChange={(e) => setFormData(f => ({ ...f, commitMessage: e.target.value }))}
+              placeholder="Fix feature visibility save error"
+              className="w-full px-3 py-2 border rounded-lg"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium mb-1">Change Description *</label>
+            <textarea
+              value={formData.changeDescription}
+              onChange={(e) => setFormData(f => ({ ...f, changeDescription: e.target.value }))}
+              placeholder="What was changed and why..."
+              rows={3}
+              required
+              className="w-full px-3 py-2 border rounded-lg"
+            />
+          </div>
+
+          <div className="grid grid-cols-3 gap-4">
+            <div>
+              <label className="block text-sm font-medium mb-1">Change Type *</label>
+              <select
+                value={formData.changeType}
+                onChange={(e) => setFormData(f => ({ ...f, changeType: e.target.value }))}
+                required
+                className="w-full px-3 py-2 border rounded-lg"
+              >
+                <option value="feature">Feature</option>
+                <option value="bugfix">Bug Fix</option>
+                <option value="hotfix">Hotfix</option>
+                <option value="refactor">Refactor</option>
+                <option value="config">Config</option>
+                <option value="documentation">Documentation</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium mb-1">Target *</label>
+              <select
+                value={formData.deploymentTarget}
+                onChange={(e) => setFormData(f => ({ ...f, deploymentTarget: e.target.value }))}
+                required
+                className="w-full px-3 py-2 border rounded-lg"
+              >
+                <option value="replit">Replit</option>
+                <option value="vercel">Vercel</option>
+                <option value="render">Render</option>
+                <option value="github">GitHub</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium mb-1">Environment</label>
+              <select
+                value={formData.environment}
+                onChange={(e) => setFormData(f => ({ ...f, environment: e.target.value }))}
+                className="w-full px-3 py-2 border rounded-lg"
+              >
+                <option value="development">Development</option>
+                <option value="staging">Staging</option>
+                <option value="production">Production</option>
+              </select>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium mb-1">Requested By</label>
+              <input
+                type="text"
+                value={formData.requestedByName}
+                onChange={(e) => setFormData(f => ({ ...f, requestedByName: e.target.value }))}
+                placeholder="Ryan Rodenbeck"
+                className="w-full px-3 py-2 border rounded-lg"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium mb-1">Request Source</label>
+              <select
+                value={formData.requestSource}
+                onChange={(e) => setFormData(f => ({ ...f, requestSource: e.target.value }))}
+                className="w-full px-3 py-2 border rounded-lg"
+              >
+                <option value="manual">Manual</option>
+                <option value="slack">Slack</option>
+                <option value="github">GitHub Issue</option>
+                <option value="scheduled">Scheduled</option>
+              </select>
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium mb-1">Reference (Slack link, Issue #)</label>
+            <input
+              type="text"
+              value={formData.requestReference}
+              onChange={(e) => setFormData(f => ({ ...f, requestReference: e.target.value }))}
+              placeholder="https://slack.com/... or #123"
+              className="w-full px-3 py-2 border rounded-lg"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium mb-1">Notes</label>
+            <textarea
+              value={formData.notes}
+              onChange={(e) => setFormData(f => ({ ...f, notes: e.target.value }))}
+              placeholder="Any additional notes..."
+              rows={2}
+              className="w-full px-3 py-2 border rounded-lg"
+            />
+          </div>
+
+          <div className="flex justify-end gap-3 pt-4 border-t">
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-4 py-2 border rounded-lg hover:bg-gray-50"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={createMutation.isPending}
+              className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
+            >
+              {createMutation.isPending && <Loader2 className="w-4 h-4 animate-spin" />}
+              Log Deployment
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+```
+
+---
+
+### Task 6: Add to Activity Dashboard as Tab or Separate Page
+
+**Option A: Add as tab in existing Activity Dashboard**
+
+```typescript
+// In ActivityLogDashboard.tsx, add tab navigation
+const [activeTab, setActiveTab] = useState<'activity' | 'deployments'>('activity');
+
+return (
+  <div>
+    {/* Tab Navigation */}
+    <div className="border-b mb-6">
+      <nav className="flex gap-4">
+        <button
+          onClick={() => setActiveTab('activity')}
+          className={`pb-3 px-1 border-b-2 font-medium ${
+            activeTab === 'activity' 
+              ? 'border-blue-600 text-blue-600' 
+              : 'border-transparent text-gray-500'
+          }`}
+        >
+          User Activity
+        </button>
+        <button
+          onClick={() => setActiveTab('deployments')}
+          className={`pb-3 px-1 border-b-2 font-medium ${
+            activeTab === 'deployments' 
+              ? 'border-blue-600 text-blue-600' 
+              : 'border-transparent text-gray-500'
+          }`}
+        >
+          Deployments & Commits
+        </button>
+      </nav>
+    </div>
+
+    {activeTab === 'activity' ? <ActivityLogs /> : <DeploymentLogs />}
+  </div>
+);
+```
+
+**Option B: Add as separate sidebar link**
+
+```typescript
+// In Sidebar.tsx, Admin section
+{ key: 'deployment_logs', label: 'Deployment Logs', icon: GitCommit, path: '/admin/deployments' }
+```
+
+---
+
+## ACCEPTANCE CRITERIA
+
+| # | Criteria | Test |
+|---|----------|------|
+| 1 | Database table `deployment_logs` exists | `SELECT * FROM deployment_logs LIMIT 5;` |
+| 2 | Can create new deployment log entry | Click "Log Deployment", fill form, submit |
+| 3 | Deployment logs display in table | View list with all columns |
+| 4 | Filters work (status, type, target, search) | Apply filters, verify results |
+| 5 | Stats cards show correct data | Compare with raw database counts |
+| 6 | Can update deployment status | Change pending → deployed |
+| 7 | Commit hash links to GitHub/commit URL | Click hash, opens in new tab |
+| 8 | "Requested By" shows correct person | Verify name displays |
+| 9 | Time & date display correctly | Check format, relative times |
+
+---
+
+## FILES TO CREATE/MODIFY
+
+| File | Action |
+|------|--------|
+| `server/db/schema.ts` | Add deploymentLogs table |
+| `server/routes/deployment-logs.ts` | Create |
+| `server/index.ts` | Register routes |
+| `client/src/pages/admin/DeploymentLogs.tsx` | Create |
+| `client/src/pages/admin/ActivityLogDashboard.tsx` | Add tab or import |
+| `client/src/components/Sidebar.tsx` | Add sidebar link (optional) |
+
+---
+
+## SAMPLE DATA
+
+```sql
+-- Insert sample deployment logs
+INSERT INTO deployment_logs (
+  commit_hash, commit_message, deployment_target, environment,
+  change_type, change_description, requested_by_name, request_source, status
+) VALUES
+  ('a1b2c3d', 'Fix feature visibility save error', 'vercel', 'production', 
+   'bugfix', 'Fixed API route order causing bulk update to fail', 'Daryl C.', 'slack', 'deployed'),
+  ('e4f5g6h', 'Add deployment logs feature', 'vercel', 'production',
+   'feature', 'New deployment tracking dashboard for developers', 'Ryan Rodenbeck', 'manual', 'in_progress'),
+  ('i7j8k9l', 'Update sidebar feature visibility', 'replit', 'development',
+   'bugfix', 'Sidebar now respects feature visibility settings', 'Daryl C.', 'slack', 'deployed');
+```
