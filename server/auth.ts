@@ -11,9 +11,14 @@ import {
   hasPermission, 
   isAtLeast, 
   normalizeRole,
+  getUserRole,
   isSuperAdminEmail 
 } from "@shared/permissions";
+<<<<<<< HEAD
 import { generateJWT, setJWTCookie, clearJWTCookie } from "./jwt";
+=======
+import { generateJWT, setJWTCookie, clearJWTCookie, requireJWTAuth } from "./jwt";
+>>>>>>> 5bb0ffc83975cd73d0751d6958c38a1c824f3e93
 
 const ALLOWED_EMAIL_DOMAIN = process.env.ALLOWED_EMAIL_DOMAIN || "spyglassrealty.com";
 const ALLOWED_EMAILS = process.env.ALLOWED_EMAILS?.split(",").map(e => e.trim().toLowerCase()) || [];
@@ -70,11 +75,9 @@ export function setupAuth() {
   if (googleClientId && googleClientSecret) {
     const callbackURL = process.env.GOOGLE_CALLBACK_URL || 
       process.env.GOOGLE_REDIRECT_URI || 
-      (process.env.REPLIT_DOMAINS 
-        ? `https://${process.env.REPLIT_DOMAINS.split(',')[0]}/auth/google/callback`
-        : process.env.REPLIT_DEV_DOMAIN
-          ? `https://${process.env.REPLIT_DEV_DOMAIN}/auth/google/callback`
-          : "http://localhost:5000/auth/google/callback");
+      (process.env.APP_URL
+        ? `${process.env.APP_URL}/auth/google/callback`
+        : "http://localhost:5000/auth/google/callback");
     
     console.log(`🔐 Google OAuth configured with callback: ${callbackURL}`);
     
@@ -105,16 +108,18 @@ export function setupAuth() {
             let user = await storage.getUserByEmail(email);
             
             if (!user) {
-              const assignedRole = isSuperAdminEmail(email) ? "super_admin" : "agent";
+              const isSuperAdmin = isSuperAdminEmail(email);
               user = await storage.createUser({
                 email,
                 firstName: profile.name?.givenName || null,
                 lastName: profile.name?.familyName || null,
                 googleId: profile.id,
                 picture: profile.photos?.[0]?.value || null,
-                role: assignedRole,
+                isAdmin: null,
+                isSuperAdmin: isSuperAdmin,
                 passwordHash: null,
               });
+              const assignedRole = isSuperAdmin ? "super_admin" : "agent";
               console.log(`👤 Created new user: ${email} with role: ${assignedRole}`);
             } else {
               user = await storage.updateUser(user.id, {
@@ -140,6 +145,7 @@ export function setupAuth() {
     console.log("Warning: Google OAuth not configured - missing GOOGLE_CLIENT_ID or GOOGLE_CLIENT_SECRET");
   }
 
+<<<<<<< HEAD
   // JWT-based auth - serialize/deserialize still needed for passport OAuth flow
   passport.serializeUser((authResult: Express.User, done) => {
     const result = authResult as any;
@@ -178,24 +184,25 @@ export function setupAuth() {
     } catch (error) {
       done(error);
     }
+=======
+  // JWT-based auth: No session serialization needed
+  // Passport is used only for OAuth strategies
+  passport.serializeUser((user: Express.User, done) => {
+    // This won't be called in JWT mode, but required by passport
+    done(null, (user as User).id);
+  });
+
+  passport.deserializeUser(async (id: string, done) => {
+    // This won't be called in JWT mode, but required by passport  
+    done(null, false);
+>>>>>>> 5bb0ffc83975cd73d0751d6958c38a1c824f3e93
   });
 }
 
+// Legacy function - redirects to JWT-based auth
 export function requireAuth(req: Request, res: Response, next: NextFunction) {
-  if (!req.isAuthenticated()) {
-    return res.status(401).json({ error: "Authentication required" });
-  }
-  
-  // Check if user account is active
-  const user = req.user as User;
-  if (user.isActive === false) {
-    req.logout((err) => {
-      if (err) console.error('[Auth] Logout error for disabled user:', err);
-    });
-    return res.status(403).json({ error: "Account is disabled. Please contact an administrator." });
-  }
-  
-  next();
+  console.warn('[Auth] DEPRECATED: requireAuth() is deprecated. Use requireJWTAuth() instead.');
+  return requireJWTAuth(req, res, next);
 }
 
 /**
@@ -210,7 +217,10 @@ export function requireRole(roles: string[]) {
     }
 
     const user = req.user as User;
-    const userRole = normalizeRole(user.role);
+    const userRole = normalizeRole({ 
+      isAdmin: user.isAdmin || undefined, 
+      isSuperAdmin: user.isSuperAdmin || undefined 
+    });
     if (!roles.includes(userRole)) {
       return res.status(403).json({ error: "Insufficient permissions" });
     }
@@ -226,7 +236,10 @@ export function requireMinimumRole(minimumRole: UserRole) {
     }
 
     const user = req.user as User;
-    const userRole = normalizeRole(user.role);
+    const userRole = normalizeRole({ 
+      isAdmin: user.isAdmin || undefined, 
+      isSuperAdmin: user.isSuperAdmin || undefined 
+    });
 
     if (!isAtLeast(userRole, minimumRole)) {
       console.log('[Auth] Access denied:', { 
@@ -248,7 +261,10 @@ export function requirePermission(permission: Permission) {
     }
 
     const user = req.user as User;
-    const userRole = normalizeRole(user.role);
+    const userRole = normalizeRole({ 
+      isAdmin: user.isAdmin || undefined, 
+      isSuperAdmin: user.isSuperAdmin || undefined 
+    });
 
     if (!hasPermission(userRole, permission)) {
       console.log('[Auth] Permission denied:', { 
@@ -286,8 +302,19 @@ export function setupAuthRoutes(app: any) {
   // Standard OAuth flow (redirect-based) for direct access
   app.get("/auth/google", (req: Request, res: Response, next: NextFunction) => {
     const nextUrl = sanitizeRedirectUrl(req.query.next as string);
-    (req.session as any).returnTo = nextUrl;
-    (req.session as any).isPopupAuth = false;
+    // Store return URL in a temporary cookie instead of session
+    res.cookie('auth-return-to', nextUrl, { 
+      httpOnly: true, 
+      maxAge: 10 * 60 * 1000, // 10 minutes
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax'
+    });
+    res.cookie('auth-is-popup', 'false', { 
+      httpOnly: true, 
+      maxAge: 10 * 60 * 1000,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax'
+    });
     next();
   }, passport.authenticate("google", { 
     scope: ["email", "profile"],
@@ -298,8 +325,13 @@ export function setupAuthRoutes(app: any) {
   // When app is embedded in iframe (e.g., Mission Control), Google blocks redirects
   // This route opens in a popup window instead
   app.get("/auth/google/popup", (req: Request, res: Response, next: NextFunction) => {
-    (req.session as any).isPopupAuth = true;
-    (req.session as any).returnTo = null;
+    res.cookie('auth-is-popup', 'true', { 
+      httpOnly: true, 
+      maxAge: 10 * 60 * 1000,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax'
+    });
+    res.clearCookie('auth-return-to');
     next();
   }, passport.authenticate("google", { 
     scope: ["email", "profile"],
@@ -309,11 +341,17 @@ export function setupAuthRoutes(app: any) {
 
   // Custom callback handler that supports both popup and redirect auth flows
   app.get("/auth/google/callback", (req: Request, res: Response, next: NextFunction) => {
-    const isPopupAuth = (req.session as any)?.isPopupAuth;
+    const isPopupAuth = req.cookies?.['auth-is-popup'] === 'true';
     
+<<<<<<< HEAD
     passport.authenticate("google", (err: Error | null, authResult: any, info: any) => {
       // Clean up session flags
       delete (req.session as any)?.isPopupAuth;
+=======
+    passport.authenticate("google", (err: Error | null, user: User | false, info: any) => {
+      // Clean up temporary cookies
+      res.clearCookie('auth-is-popup');
+>>>>>>> 5bb0ffc83975cd73d0751d6958c38a1c824f3e93
       
       const user = authResult?.user || authResult;
       const token = authResult?.token;
@@ -343,10 +381,12 @@ export function setupAuthRoutes(app: any) {
           `);
         } else {
           // Standard redirect flow
+          res.clearCookie('auth-return-to');
           return res.redirect("/login?error=access_denied");
         }
       }
       
+<<<<<<< HEAD
       // Log in the user and set JWT cookie
       req.logIn(authResult, (loginErr) => {
         if (loginErr) {
@@ -375,6 +415,12 @@ export function setupAuthRoutes(app: any) {
         if (token) {
           setJWTCookie(res, token);
         }
+=======
+      // Generate JWT token and set secure cookie
+      try {
+        const token = generateJWT(user as User);
+        setJWTCookie(res, token);
+>>>>>>> 5bb0ffc83975cd73d0751d6958c38a1c824f3e93
         
         if (isPopupAuth) {
           // For popup auth: send postMessage to parent window and close
@@ -398,11 +444,36 @@ export function setupAuthRoutes(app: any) {
           `);
         } else {
           // Standard redirect flow
-          const redirectTo = (req.session as any)?.returnTo || "/";
-          delete (req.session as any)?.returnTo;
+          const redirectTo = req.cookies?.['auth-return-to'] || "/";
+          res.clearCookie('auth-return-to');
           return res.redirect(redirectTo);
         }
-      });
+      } catch (jwtError) {
+        console.error('[Auth] JWT generation failed:', jwtError);
+        const errorMsg = 'Login failed';
+        
+        if (isPopupAuth) {
+          return res.send(`
+            <!DOCTYPE html>
+            <html>
+            <head><title>Login Failed</title></head>
+            <body>
+              <script>
+                if (window.opener) {
+                  window.opener.postMessage({ type: 'AUTH_FAILURE', error: '${errorMsg}' }, '*');
+                  window.close();
+                } else {
+                  window.location.href = '/login?error=login_failed';
+                }
+              </script>
+              <p>Login failed. This window should close automatically.</p>
+            </body>
+            </html>
+          `);
+        }
+        res.clearCookie('auth-return-to');
+        return res.redirect("/login?error=login_failed");
+      }
     })(req, res, next);
   });
 
@@ -429,6 +500,7 @@ export function setupAuthRoutes(app: any) {
   });
 
   app.post("/auth/logout", (req: Request, res: Response) => {
+<<<<<<< HEAD
     clearJWTCookie(res);
     req.logout((err) => {
       if (err) {
@@ -444,13 +516,16 @@ export function setupAuthRoutes(app: any) {
       res.clearCookie("connect.sid");
       res.json({ success: true });
     });
+=======
+    // Clear JWT cookie
+    clearJWTCookie(res);
+    res.json({ success: true });
+>>>>>>> 5bb0ffc83975cd73d0751d6958c38a1c824f3e93
   });
 
-  app.get("/api/auth/me", (req: Request, res: Response) => {
-    if (!req.isAuthenticated()) {
-      return res.status(401).json({ error: "Authentication required" });
-    }
+  app.get("/api/auth/me", requireJWTAuth, (req: Request, res: Response) => {
     const user = req.user as User;
+    // Remove sensitive data before sending
     const { passwordHash, ...safeUser } = user;
     res.json(safeUser);
   });

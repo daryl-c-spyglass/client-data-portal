@@ -14,7 +14,8 @@ import { z } from "zod";
 import bcrypt from "bcryptjs";
 import passport from "passport";
 import { requireAuth, requireRole, requireMinimumRole, requirePermission } from "./auth";
-import { isSuperAdminEmail, INITIAL_SUPER_ADMIN_EMAILS } from "@shared/permissions";
+import { requireJWTAuth, requireJWTAuthWithDBCheck } from "./jwt";
+import { getUserRole, isSuperAdminEmail, INITIAL_SUPER_ADMIN_EMAILS } from "@shared/permissions";
 import { fetchExternalUsers, fetchFromExternalApi } from "./external-api";
 import { logAdminActivity, getActivityLogs, type AdminAction } from "./admin-activity-service";
 import { logActivity, type ActivityAction } from "./activity-logger";
@@ -274,10 +275,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     });
   });
 
-  app.get("/api/auth/me", requireAuth, (req, res) => {
-    // req.user is already sanitized by passport.deserializeUser
-    res.json(req.user);
-  });
+  // Note: /api/auth/me is now defined in auth.ts with JWT auth
 
   // External API integration routes
   app.get("/api/external/users", async (req, res) => {
@@ -2840,7 +2838,7 @@ This email was sent by ${senderName} (${senderEmail}) via the Spyglass Realty Cl
         userId = user.id;
       } else {
         // For other userIds, verify the user exists
-        const existingUser = await storage.getUser(userId);
+        const existingUser = userId ? await storage.getUser(userId) : null;
         if (!existingUser) {
           // User doesn't exist - find or create by email instead
           let user = await storage.getUserByEmail(email);
@@ -2975,6 +2973,11 @@ This email was sent by ${senderName} (${senderEmail}) via the Spyglass Realty Cl
       const sellerUpdate = await storage.getSellerUpdate(req.params.id);
       if (!sellerUpdate) {
         res.status(404).json({ error: "Seller update not found" });
+        return;
+      }
+      
+      if (!sellerUpdate.userId) {
+        res.status(400).json({ error: "Seller update has no associated agent" });
         return;
       }
       
@@ -6473,7 +6476,7 @@ OUTPUT JSON:
   app.get("/api/fub/calendar", requireAuth, async (req, res) => {
     try {
       const user = req.user as any;
-      const userRole = user?.role || 'agent';
+      const userRole = getUserRole(user) || 'agent';
       const userEmail = user?.email;
       
       const { agentId, start, end, userId } = req.query as Record<string, string>;
@@ -6658,7 +6661,7 @@ OUTPUT JSON:
   app.get("/api/fub/leads", requireAuth, async (req, res) => {
     try {
       const user = req.user as any;
-      const userRole = user?.role || 'agent';
+      const userRole = getUserRole(user) || 'agent';
       const userEmail = user?.email;
       
       const { agentId, userId, limit = '50', offset = '0' } = req.query as Record<string, string>;
@@ -6862,7 +6865,7 @@ OUTPUT JSON:
         id: String(u.id),
         name: `${u.firstName || ''} ${u.lastName || ''}`.trim() || u.name || u.email || 'Unknown',
         email: u.email,
-        role: u.role,
+        role: getUserRole(u),
         active: u.isActive !== false,
       })).sort((a, b) => a.name.toLowerCase().localeCompare(b.name.toLowerCase()));
       
@@ -7647,7 +7650,7 @@ OUTPUT JSON:
         return res.status(401).json({ error: "Unauthorized" });
       }
       
-      const { updateAgentProfileSchema, updateUserSchema } = await import("@shared/schema");
+      const { updateAgentProfileSchema } = await import("@shared/schema");
       const profileData = updateAgentProfileSchema.partial().safeParse(req.body.profile || {});
       
       if (!profileData.success) {
@@ -7822,7 +7825,7 @@ OUTPUT JSON:
   // CMA Report Templates Routes
   app.get("/api/report-templates", requireAuth, async (req, res) => {
     try {
-      const userId = req.user!.id;
+      const userId = (req.user as any)?.id;
       const { cmaReportTemplates } = await import("@shared/schema");
       const { drizzle } = await import("drizzle-orm/node-postgres");
       const pgMod = await import("pg");
@@ -7847,7 +7850,7 @@ OUTPUT JSON:
 
   app.post("/api/report-templates", requireAuth, async (req, res) => {
     try {
-      const userId = req.user!.id;
+      const userId = (req.user as any)?.id;
       const { name, isDefault, config } = req.body;
       
       if (!name || typeof name !== 'string' || name.trim().length === 0) {
@@ -7929,7 +7932,7 @@ OUTPUT JSON:
 
   app.delete("/api/report-templates/:id", requireAuth, async (req, res) => {
     try {
-      const userId = req.user!.id;
+      const userId = (req.user as any)?.id;
       const { id } = req.params;
       
       const { cmaReportTemplates } = await import("@shared/schema");
@@ -7959,7 +7962,7 @@ OUTPUT JSON:
 
   app.get("/api/report-templates/default", requireAuth, async (req, res) => {
     try {
-      const userId = req.user!.id;
+      const userId = (req.user as any)?.id;
       const { cmaReportTemplates } = await import("@shared/schema");
       const { drizzle } = await import("drizzle-orm/node-postgres");
       const pgMod = await import("pg");
@@ -7997,7 +8000,7 @@ OUTPUT JSON:
           email: u.email,
           firstName: u.firstName,
           lastName: u.lastName,
-          role: u.role,
+          role: getUserRole(u),
           phone: u.phone,
           company: u.company,
           picture: u.picture,
@@ -8019,7 +8022,7 @@ OUTPUT JSON:
       const { id } = req.params;
       const { role: newRole } = req.body;
       const currentUser = req.user as any;
-      const adminRole = currentUser.role;
+      const adminRole = getUserRole(currentUser);
       
       if (!newRole || !["developer", "super_admin", "admin", "agent"].includes(newRole)) {
         return res.status(400).json({ error: "Invalid role. Must be 'developer', 'super_admin', 'admin', or 'agent'" });
@@ -8035,7 +8038,8 @@ OUTPUT JSON:
       }
       
       // Protection: Only Developers can modify Super Admin or Developer roles
-      if (targetUser.role === "super_admin" || targetUser.role === "developer") {
+      const targetUserRole = getUserRole(targetUser);
+      if (targetUserRole === "super_admin" || targetUserRole === "developer") {
         if (adminRole !== "developer") {
           return res.status(403).json({ 
             error: "Only Developers can modify Super Admin or Developer accounts" 
@@ -8049,6 +8053,7 @@ OUTPUT JSON:
       }
       
       // Protection: Cannot demote the last Developer
+<<<<<<< HEAD
       if (targetUser.role === "developer" && newRole !== "developer") {
         const schema = await import("@shared/schema");
         const { drizzle } = await import("drizzle-orm/node-postgres");
@@ -8062,12 +8067,27 @@ OUTPUT JSON:
           .where(eq(schema.users.role, "developer"));
         
         if (Number(developerCount[0]?.count || 0) <= 1) {
+=======
+      if (targetUserRole === "developer" && newRole !== "developer") {
+        // Developers are now determined by email, not database role
+        // This protection is less critical since developers are hardcoded by email
+        // But we could still check if this is the last developer email-based user
+        const { DEVELOPER_EMAILS } = await import("@shared/permissions");
+        if (DEVELOPER_EMAILS.length <= 1) {
+>>>>>>> 5bb0ffc83975cd73d0751d6958c38a1c824f3e93
           return res.status(403).json({ error: "Cannot remove the last Developer" });
         }
       }
       
-      const previousRole = targetUser.role;
-      const updatedUser = await storage.updateUser(id, { role: newRole });
+      const previousRole = getUserRole(targetUser);
+      
+      // Convert role string to boolean flags
+      const roleUpdate = {
+        isAdmin: newRole === 'admin' ? true : null,
+        isSuperAdmin: newRole === 'super_admin' ? true : false,
+      };
+      
+      const updatedUser = await storage.updateUser(id, roleUpdate);
       if (!updatedUser) {
         return res.status(404).json({ error: "User not found" });
       }
@@ -8096,7 +8116,7 @@ OUTPUT JSON:
       const { id } = req.params;
       const { isActive } = req.body;
       const currentUser = req.user as any;
-      const adminRole = currentUser.role;
+      const adminRole = getUserRole(currentUser);
       
       if (typeof isActive !== "boolean") {
         return res.status(400).json({ error: "isActive must be a boolean" });
@@ -8113,7 +8133,8 @@ OUTPUT JSON:
       }
       
       // Only Developers can disable Super Admins or Developers
-      if ((targetUser.role === "super_admin" || targetUser.role === "developer") && !isActive) {
+      const targetUserRole = getUserRole(targetUser);
+      if ((targetUserRole === "super_admin" || targetUserRole === "developer") && !isActive) {
         if (adminRole !== "developer") {
           return res.status(403).json({ error: "Only Developers can disable Super Admin or Developer accounts" });
         }
@@ -8148,7 +8169,7 @@ OUTPUT JSON:
     try {
       const { id } = req.params;
       const adminUser = req.user as any;
-      const adminRole = adminUser.role;
+      const adminRole = getUserRole(adminUser);
       
       // Get target user
       const targetUser = await storage.getUser(id);
@@ -8163,13 +8184,15 @@ OUTPUT JSON:
       }
       
       // Protection: Only Developers can delete Super Admins or Developers
-      if (targetUser.role === "super_admin" || targetUser.role === "developer") {
+      const targetUserRole = getUserRole(targetUser);
+      if (targetUserRole === "super_admin" || targetUserRole === "developer") {
         if (adminRole !== "developer") {
           return res.status(403).json({ error: "Only Developers can delete Super Admin or Developer accounts" });
         }
       }
       
       // Protection: Cannot delete the last Developer
+<<<<<<< HEAD
       if (targetUser.role === "developer") {
         const schema = await import("@shared/schema");
         const { drizzle } = await import("drizzle-orm/node-postgres");
@@ -8183,6 +8206,13 @@ OUTPUT JSON:
           .where(eq(schema.users.role, "developer"));
         
         if (Number(developerCount[0]?.count || 0) <= 1) {
+=======
+      if (targetUserRole === "developer") {
+        // Developers are now determined by email, not database role
+        // This protection is less critical since developers are hardcoded by email
+        const { DEVELOPER_EMAILS } = await import("@shared/permissions");
+        if (DEVELOPER_EMAILS.length <= 1) {
+>>>>>>> 5bb0ffc83975cd73d0751d6958c38a1c824f3e93
           return res.status(403).json({ error: "Cannot delete the last Developer" });
         }
       }
@@ -8195,7 +8225,7 @@ OUTPUT JSON:
         details: {
           deletedUserEmail: targetUser.email,
           deletedUserName: `${targetUser.firstName || ""} ${targetUser.lastName || ""}`.trim(),
-          deletedUserRole: targetUser.role,
+          deletedUserRole: targetUserRole,
         },
         req,
       });
@@ -8366,9 +8396,9 @@ OUTPUT JSON:
       const mergedUsers = fubResult.users.map(fubUser => ({
         ...fubUser,
         isRegistered: portalEmailSet.has(fubUser.email?.toLowerCase() || ''),
-        portalRole: portalUsers.find(
+        portalRole: getUserRole(portalUsers.find(
           p => p.email.toLowerCase() === fubUser.email?.toLowerCase()
-        )?.role || null,
+        )) || null,
       }));
       
       console.log(`[FUB Integration] Fetched ${fubResult.users.length} users, ${mergedUsers.filter(u => u.isRegistered).length} already registered`);

@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 import express, { type Request, Response, NextFunction } from "express";
 import session from "express-session";
 import cookieParser from "cookie-parser";
@@ -12,9 +13,14 @@ import { registerRoutes } from "./routes";
 import { serveStatic, log } from "./static";
 import { seedData } from "./seed-data";
 import { setupAuth, setupAuthRoutes } from "./auth";
+=======
+import { appReady } from "./app";
+import { setupVite, log } from "./vite";
+>>>>>>> 5bb0ffc83975cd73d0751d6958c38a1c824f3e93
 import { createMLSGridClient } from "./mlsgrid-client";
-import { startMLSGridScheduledSync, triggerManualSync } from "./mlsgrid-sync";
+import { startMLSGridScheduledSync } from "./mlsgrid-sync";
 import { startEmailScheduler } from "./email-scheduler";
+<<<<<<< HEAD
 import { startRepliersScheduledSync, registerRepliersSyncRoutes, triggerRepliersSync } from "./repliers-sync";
 import { registerObjectStorageRoutes } from "./replit_integrations/object_storage";
 import { validateConfig } from "./config";
@@ -210,19 +216,35 @@ app.use((req, res, next) => {
 });
 
 (async () => {
+=======
+import { startRepliersScheduledSync, triggerRepliersSync } from "./repliers-sync";
+
+(async () => {
+  const { app, server } = await appReady;
+
+  // ─── Background Schedulers (only for long-running server, NOT serverless) ──
+>>>>>>> 5bb0ffc83975cd73d0751d6958c38a1c824f3e93
   const mlsGridClient = createMLSGridClient();
 
   if (mlsGridClient && process.env.DATABASE_URL) {
+<<<<<<< HEAD
     logger.info("MLS Grid API configured - enabling scheduled sync");
     startMLSGridScheduledSync(mlsGridClient);
   } else if (!process.env.MLSGRID_API_TOKEN) {
     await seedData();
   }
 
+=======
+    console.log('🚀 MLS Grid API configured - enabling scheduled sync');
+    startMLSGridScheduledSync(mlsGridClient);
+  }
+  
+>>>>>>> 5bb0ffc83975cd73d0751d6958c38a1c824f3e93
   if (process.env.DATABASE_URL) {
     logger.info("Starting email scheduler for seller updates");
     startEmailScheduler();
   }
+<<<<<<< HEAD
 
   logger.info("Starting Repliers inventory scheduled sync");
   startRepliersScheduledSync();
@@ -345,6 +367,31 @@ app.use((req, res, next) => {
     process.on("SIGTERM", () => shutdown("SIGTERM"));
     process.on("SIGINT", () => shutdown("SIGINT"));
   }
+=======
+  
+  console.log('🏠 Starting Repliers inventory scheduled sync...');
+  startRepliersScheduledSync();
+
+  // Trigger initial Repliers inventory sync
+  triggerRepliersSync().catch(err => {
+    console.error('⚠️ Initial Repliers inventory sync failed:', err.message);
+  });
+
+  // Setup Vite dev server in development mode
+  if (app.get("env") === "development") {
+    await setupVite(app, server);
+  }
+
+  // Start listening
+  const port = parseInt(process.env.PORT || '5000', 10);
+  server.listen({
+    port,
+    host: "0.0.0.0",
+    reusePort: true,
+  }, () => {
+    log(`serving on port ${port}`);
+  });
+>>>>>>> 5bb0ffc83975cd73d0751d6958c38a1c824f3e93
 })();
 
 export default app;

@@ -1,6 +1,6 @@
 import axios, { AxiosInstance } from 'axios';
 
-const HOMEREVIEW_API_URL = process.env.HOMEREVIEW_API_URL || 'https://95f0a894-8940-4717-a771-851029450d05-00-3octfev6njpgb.spock.replit.dev';
+const HOMEREVIEW_API_URL = process.env.HOMEREVIEW_API_URL || 'http://localhost:3001';
 
 interface HomeReviewProperty {
   listingId: string;

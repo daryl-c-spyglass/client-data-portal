@@ -161,7 +161,8 @@ export const users = pgTable("users", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   email: text("email").notNull().unique(),
   passwordHash: text("password_hash"), // Optional for Google OAuth users
-  role: text("role").notNull().default("agent"),
+  isAdmin: varchar("is_admin"), // Maps to database is_admin column
+  isSuperAdmin: boolean("is_super_admin").default(false), // Maps to database is_super_admin column
   firstName: text("first_name"),
   lastName: text("last_name"),
   phone: text("phone"),

@@ -186,6 +186,11 @@ async function getAgentInfoForUpdate(userId: string): Promise<{ name: string; em
 async function processSellerUpdate(sellerUpdate: SellerUpdate): Promise<boolean> {
   console.log(`📧 Processing seller update: ${sellerUpdate.name} (ID: ${sellerUpdate.id})`);
 
+  if (!sellerUpdate.userId) {
+    console.error(`❌ Seller update ${sellerUpdate.id} has no userId`);
+    return false;
+  }
+
   const agent = await getAgentInfoForUpdate(sellerUpdate.userId);
   if (!agent) {
     console.error(`❌ Could not find agent for seller update ${sellerUpdate.id}`);

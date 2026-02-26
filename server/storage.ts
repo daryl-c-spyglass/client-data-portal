@@ -722,6 +722,9 @@ export class MemStorage implements IStorage {
       ...history,
       id,
       sentAt: history.sentAt || new Date(),
+      propertyCount: history.propertyCount ?? null,
+      errorMessage: history.errorMessage ?? null,
+      sendgridMessageId: history.sendgridMessageId ?? null,
     };
     this.sendHistory.set(id, newHistory);
     return newHistory;
@@ -1181,9 +1184,10 @@ export class DbStorage implements IStorage {
       conditions.push(or(...subdivisionConditions)!);
     }
 
-    if (criteria.neighborhood && criteria.neighborhood.length > 0) {
-      conditions.push(inArray(properties.neighborhood, criteria.neighborhood));
-    }
+    // Note: neighborhood filtering not yet supported in SearchCriteria schema
+    // if (criteria.neighborhood && criteria.neighborhood.length > 0) {
+    //   conditions.push(inArray(properties.neighborhood, criteria.neighborhood));
+    // }
 
     if (criteria.elementarySchools && criteria.elementarySchools.length > 0) {
       conditions.push(inArray(properties.elementarySchool, criteria.elementarySchools));

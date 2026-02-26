@@ -149,7 +149,7 @@ async function processSellerUpdate(update: SellerUpdate): Promise<EmailSendResul
     const htmlContent = generateSellerUpdateEmail({
       recipientName,
       updateName: update.name,
-      postalCode: update.postalCode,
+      postalCode: update.postalCode || '',
       elementarySchool: update.elementarySchool || undefined,
       propertySubType: update.propertySubType || undefined,
       properties: result.properties.slice(0, 10), // Show top 10 in email
@@ -160,7 +160,7 @@ async function processSellerUpdate(update: SellerUpdate): Promise<EmailSendResul
     const textContent = generateSellerUpdateTextEmail({
       recipientName,
       updateName: update.name,
-      postalCode: update.postalCode,
+      postalCode: update.postalCode || '',
       elementarySchool: update.elementarySchool || undefined,
       propertySubType: update.propertySubType || undefined,
       properties: result.properties.slice(0, 10),

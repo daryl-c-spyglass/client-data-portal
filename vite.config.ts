@@ -2,6 +2,7 @@ import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import path from "path";
 
+<<<<<<< HEAD
 const isReplit = process.env.REPL_ID !== undefined;
 
 export default defineConfig(async () => {
@@ -30,6 +31,15 @@ export default defineConfig(async () => {
         "@shared": path.resolve(import.meta.dirname, "shared"),
         "@assets": path.resolve(import.meta.dirname, "attached_assets"),
       },
+=======
+export default defineConfig({
+  plugins: [react()],
+  resolve: {
+    alias: {
+      "@": path.resolve(import.meta.dirname, "client", "src"),
+      "@shared": path.resolve(import.meta.dirname, "shared"),
+      "@assets": path.resolve(import.meta.dirname, "attached_assets"),
+>>>>>>> 5bb0ffc83975cd73d0751d6958c38a1c824f3e93
     },
     root: path.resolve(import.meta.dirname, "client"),
     build: {
