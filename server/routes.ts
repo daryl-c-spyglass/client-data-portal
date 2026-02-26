@@ -2533,14 +2533,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.delete("/api/cmas/:id", async (req, res) => {
+  app.delete("/api/cmas/:id", requireAuth, async (req, res) => {
     try {
+      const user = req.user as any;
+      const role = determineUserRole(user);
+      const cma = await storage.getCma(req.params.id);
+
+      if (!cma) {
+        res.status(404).json({ error: "CMA not found" });
+        return;
+      }
+
+      const canDelete = role === 'developer' || role === 'super_admin' || cma.userId === user.id;
+      if (!canDelete) {
+        res.status(403).json({ error: "Permission denied" });
+        return;
+      }
+
       const deleted = await storage.deleteCma(req.params.id);
       if (!deleted) {
         res.status(404).json({ error: "CMA not found" });
         return;
       }
-      res.status(204).send();
+      res.json({ success: true, message: "CMA deleted" });
     } catch (error) {
       res.status(500).json({ error: "Failed to delete CMA" });
     }
