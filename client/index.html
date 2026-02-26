@@ -14,11 +14,15 @@
     <script>
       // Flash prevention - apply theme before React loads to prevent flash of wrong theme
       (function() {
+        // 1. First priority: URL param from parent iframe (Mission Control)
+        var urlTheme = new URLSearchParams(window.location.search).get('theme');
+        // 2. Second priority: localStorage
         var saved = localStorage.getItem('cdp-theme');
+        var mode = urlTheme || saved;
         var prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
         
         // Apply dark class if: explicitly set to dark, OR set to system and system prefers dark
-        if (saved === 'dark' || (saved === 'system' && prefersDark) || (!saved && prefersDark)) {
+        if (mode === 'dark' || (mode === 'system' && prefersDark) || (!mode && prefersDark)) {
           document.documentElement.classList.add('dark');
         }
       })();
