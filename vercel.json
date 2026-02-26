@@ -3,6 +3,12 @@
   "installCommand": "npm install --include=dev",
   "buildCommand": "npm run build",
   "outputDirectory": "dist/public",
+  "functions": {
+    "api/index.js": {
+      "includeFiles": "dist/index.js",
+      "maxDuration": 30
+    }
+  },
   "headers": [
     {
       "source": "/(.*)",
