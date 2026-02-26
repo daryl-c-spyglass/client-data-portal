@@ -12,7 +12,8 @@ import {
   isAtLeast, 
   normalizeRole,
   getUserRole,
-  isSuperAdminEmail 
+  isSuperAdminEmail,
+  determineUserRole 
 } from "@shared/permissions";
 import { generateJWT, setJWTCookie, clearJWTCookie, requireJWTAuth } from "./jwt";
 
@@ -491,8 +492,8 @@ export function setupAuthRoutes(app: any) {
 
   app.get("/api/auth/me", requireJWTAuth, (req: Request, res: Response) => {
     const user = req.user as User;
-    // Remove sensitive data before sending
     const { passwordHash, ...safeUser } = user;
-    res.json(safeUser);
+    const role = determineUserRole(safeUser);
+    res.json({ ...safeUser, role });
   });
 }

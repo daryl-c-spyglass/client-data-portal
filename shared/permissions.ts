@@ -124,10 +124,10 @@ export function canManageRole(actorRole: UserRole, targetRole: UserRole): boolea
 
 export const DEVELOPER_EMAILS = [
   'daryl@spyglassrealty.com',
-  'ryan@spyglassrealty.com',
 ];
 
 export const INITIAL_SUPER_ADMIN_EMAILS = [
+  'ryan@spyglassrealty.com',
   'caleb@spyglassrealty.com',
 ];
 
@@ -146,14 +146,13 @@ export function getUserRole(user: { isAdmin?: string | boolean; isSuperAdmin?: b
 }
 
 export function determineUserRole(user: { email: string; isAdmin?: string | boolean; isSuperAdmin?: boolean }): UserRole {
-  // Check database role flags first
-  if (user.isSuperAdmin) return 'super_admin';
-  if (user.isAdmin && user.isAdmin !== 'false') return 'admin';
-  
-  // Fallback to email-based role assignment for developers
   if (DEVELOPER_EMAILS.includes(user.email.toLowerCase())) {
     return 'developer';
   }
+
+  if (user.isSuperAdmin) return 'super_admin';
+  if (user.isAdmin && user.isAdmin !== 'false') return 'admin';
+  
   if (INITIAL_SUPER_ADMIN_EMAILS.includes(user.email.toLowerCase())) {
     return 'super_admin';
   }
