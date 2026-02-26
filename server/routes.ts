@@ -15,7 +15,7 @@ import bcrypt from "bcryptjs";
 import passport from "passport";
 import { requireAuth, requireRole, requireMinimumRole, requirePermission } from "./auth";
 import { requireJWTAuth } from "./jwt";
-import { getUserRole, isSuperAdminEmail, INITIAL_SUPER_ADMIN_EMAILS } from "@shared/permissions";
+import { getUserRole, isSuperAdminEmail, INITIAL_SUPER_ADMIN_EMAILS, determineUserRole } from "@shared/permissions";
 import { fetchExternalUsers, fetchFromExternalApi } from "./external-api";
 import { logAdminActivity, getActivityLogs, type AdminAction } from "./admin-activity-service";
 import { logActivity, type ActivityAction } from "./activity-logger";
@@ -6476,7 +6476,7 @@ OUTPUT JSON:
   app.get("/api/fub/calendar", requireAuth, async (req, res) => {
     try {
       const user = req.user as any;
-      const userRole = getUserRole(user) || 'agent';
+      const userRole = determineUserRole(user) || 'agent';
       const userEmail = user?.email;
       
       const { agentId, start, end, userId } = req.query as Record<string, string>;
@@ -6661,7 +6661,7 @@ OUTPUT JSON:
   app.get("/api/fub/leads", requireAuth, async (req, res) => {
     try {
       const user = req.user as any;
-      const userRole = getUserRole(user) || 'agent';
+      const userRole = determineUserRole(user) || 'agent';
       const userEmail = user?.email;
       
       const { agentId, userId, limit = '50', offset = '0' } = req.query as Record<string, string>;
@@ -6865,7 +6865,7 @@ OUTPUT JSON:
         id: String(u.id),
         name: `${u.firstName || ''} ${u.lastName || ''}`.trim() || u.name || u.email || 'Unknown',
         email: u.email,
-        role: getUserRole(u),
+        role: determineUserRole(u),
         active: u.isActive !== false,
       })).sort((a, b) => a.name.toLowerCase().localeCompare(b.name.toLowerCase()));
       
@@ -8000,7 +8000,7 @@ OUTPUT JSON:
           email: u.email,
           firstName: u.firstName,
           lastName: u.lastName,
-          role: getUserRole(u),
+          role: determineUserRole(u),
           phone: u.phone,
           company: u.company,
           picture: u.picture,
@@ -8022,7 +8022,7 @@ OUTPUT JSON:
       const { id } = req.params;
       const { role: newRole } = req.body;
       const currentUser = req.user as any;
-      const adminRole = getUserRole(currentUser);
+      const adminRole = determineUserRole(currentUser);
       
       if (!newRole || !["developer", "super_admin", "admin", "agent"].includes(newRole)) {
         return res.status(400).json({ error: "Invalid role. Must be 'developer', 'super_admin', 'admin', or 'agent'" });
@@ -8038,7 +8038,7 @@ OUTPUT JSON:
       }
       
       // Protection: Only Developers can modify Super Admin or Developer roles
-      const targetUserRole = getUserRole(targetUser);
+      const targetUserRole = determineUserRole(targetUser);
       if (targetUserRole === "super_admin" || targetUserRole === "developer") {
         if (adminRole !== "developer") {
           return res.status(403).json({ 
@@ -8070,7 +8070,7 @@ OUTPUT JSON:
         }
       }
       
-      const previousRole = getUserRole(targetUser);
+      const previousRole = determineUserRole(targetUser);
       
       // Convert role string to boolean flags
       const roleUpdate = {
@@ -8107,7 +8107,7 @@ OUTPUT JSON:
       const { id } = req.params;
       const { isActive } = req.body;
       const currentUser = req.user as any;
-      const adminRole = getUserRole(currentUser);
+      const adminRole = determineUserRole(currentUser);
       
       if (typeof isActive !== "boolean") {
         return res.status(400).json({ error: "isActive must be a boolean" });
@@ -8124,7 +8124,7 @@ OUTPUT JSON:
       }
       
       // Only Developers can disable Super Admins or Developers
-      const targetUserRole = getUserRole(targetUser);
+      const targetUserRole = determineUserRole(targetUser);
       if ((targetUserRole === "super_admin" || targetUserRole === "developer") && !isActive) {
         if (adminRole !== "developer") {
           return res.status(403).json({ error: "Only Developers can disable Super Admin or Developer accounts" });
@@ -8160,7 +8160,7 @@ OUTPUT JSON:
     try {
       const { id } = req.params;
       const adminUser = req.user as any;
-      const adminRole = getUserRole(adminUser);
+      const adminRole = determineUserRole(adminUser);
       
       // Get target user
       const targetUser = await storage.getUser(id);
@@ -8175,7 +8175,7 @@ OUTPUT JSON:
       }
       
       // Protection: Only Developers can delete Super Admins or Developers
-      const targetUserRole = getUserRole(targetUser);
+      const targetUserRole = determineUserRole(targetUser);
       if (targetUserRole === "super_admin" || targetUserRole === "developer") {
         if (adminRole !== "developer") {
           return res.status(403).json({ error: "Only Developers can delete Super Admin or Developer accounts" });
@@ -8379,7 +8379,7 @@ OUTPUT JSON:
       const mergedUsers = fubResult.users.map(fubUser => ({
         ...fubUser,
         isRegistered: portalEmailSet.has(fubUser.email?.toLowerCase() || ''),
-        portalRole: getUserRole(portalUsers.find(
+        portalRole: determineUserRole(portalUsers.find(
           p => p.email.toLowerCase() === fubUser.email?.toLowerCase()
         )) || null,
       }));
@@ -8463,7 +8463,7 @@ OUTPUT JSON:
       const db = drizzle(pool);
 
       const features = await db.select().from(featureVisibility);
-      const userRole = (req as any).user?.role;
+      const userRole = determineUserRole((req as any).user);
 
       if (userRole === 'developer') {
         console.log(`[FeatureVisibility] Fetched ${features.length} features for ${(req as any).user?.email} (role: ${userRole})`);

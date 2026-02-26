@@ -215,6 +215,84 @@ export function CMABuilder({ onCreateCMA, initialData }: CMABuilderProps) {
   const [manualSubjectBeds, setManualSubjectBeds] = useState("");
   const [manualSubjectBaths, setManualSubjectBaths] = useState("");
   const [manualSubjectSqft, setManualSubjectSqft] = useState("");
+
+  const [addressSuggestions, setAddressSuggestions] = useState<any[]>([]);
+  const [showAddressSuggestions, setShowAddressSuggestions] = useState(false);
+  const [isSearchingAddress, setIsSearchingAddress] = useState(false);
+  const addressContainerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (addressContainerRef.current && !addressContainerRef.current.contains(event.target as Node)) {
+        setShowAddressSuggestions(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const [addressSearchDone, setAddressSearchDone] = useState(false);
+
+  useEffect(() => {
+    if (manualSubjectAddress.length < 3) {
+      setAddressSuggestions([]);
+      setShowAddressSuggestions(false);
+      setAddressSearchDone(false);
+      return;
+    }
+    setAddressSearchDone(false);
+    const timer = setTimeout(async () => {
+      setIsSearchingAddress(true);
+      try {
+        const res = await fetch(`/api/properties/autocomplete?q=${encodeURIComponent(manualSubjectAddress)}`);
+        const data = await res.json();
+        const results = data.suggestions || [];
+        setAddressSuggestions(results);
+        setShowAddressSuggestions(results.length > 0);
+        setAddressSearchDone(true);
+      } catch {
+        setAddressSuggestions([]);
+        setAddressSearchDone(true);
+      } finally {
+        setIsSearchingAddress(false);
+      }
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [manualSubjectAddress]);
+
+  const handleSelectAddressSuggestion = async (suggestion: any) => {
+    setShowAddressSuggestions(false);
+    setAddressSuggestions([]);
+    setManualSubjectAddress(suggestion.address || suggestion.label);
+    setManualSubjectCity(suggestion.city || "");
+    if (suggestion.price) setManualSubjectListPrice(String(suggestion.price));
+    if (suggestion.beds) setManualSubjectBeds(String(suggestion.beds));
+    if (suggestion.baths) setManualSubjectBaths(String(suggestion.baths));
+    if (suggestion.sqft) setManualSubjectSqft(String(suggestion.sqft));
+    const sublabelParts = (suggestion.sublabel || "").split("|")[0].trim().split(",");
+    if (sublabelParts.length >= 2) {
+      const stateZip = sublabelParts[sublabelParts.length - 1].trim().split(/\s+/);
+      if (stateZip[0]) setManualSubjectState(stateZip[0]);
+      if (stateZip[1]) setManualSubjectZip(stateZip[1]);
+    }
+    try {
+      const res = await fetch(`/api/search?mlsNumber=${encodeURIComponent(suggestion.mlsNumber)}&limit=1`);
+      const data = await res.json();
+      if (data.properties?.[0]) {
+        setSubjectProperty(data.properties[0]);
+        setManualSubjectAddress("");
+        setManualSubjectCity("");
+        setManualSubjectState("");
+        setManualSubjectZip("");
+        setManualSubjectListPrice("");
+        setManualSubjectBeds("");
+        setManualSubjectBaths("");
+        setManualSubjectSqft("");
+      }
+    } catch (err) {
+      console.error('Failed to fetch full property details:', err);
+    }
+  };
   
   const [searchCity, setSearchCity] = useState(sc.city || "");
   const [searchSubdivision, setSearchSubdivision] = useState(sc.subdivision || "");
@@ -1536,59 +1614,73 @@ export function CMABuilder({ onCreateCMA, initialData }: CMABuilderProps) {
             ) : (
               <div className="space-y-4">
                 <div className="space-y-2">
-                  <Label>Search by Address</Label>
-                  <div className="flex gap-2">
-                    <Input
-                      placeholder="Enter property address..."
-                      value={manualSubjectAddress}
-                      onChange={(e) => setManualSubjectAddress(e.target.value)}
-                      onKeyDown={async (e) => {
-                        if (e.key === 'Enter' && manualSubjectAddress.length > 5) {
-                          e.preventDefault();
-                          try {
-                            const res = await fetch(`/api/search?address=${encodeURIComponent(manualSubjectAddress)}&limit=1`);
-                            const data = await res.json();
-                            if (data.properties?.[0]) {
-                              setSubjectProperty(data.properties[0]);
-                              setManualSubjectAddress("");
-                              setManualSubjectCity("");
-                              setManualSubjectState("");
-                              setManualSubjectZip("");
+                  <Label>Search by Address or MLS #</Label>
+                  <div className="relative" ref={addressContainerRef}>
+                    <div className="relative">
+                      <Input
+                        placeholder="Start typing an address or MLS#..."
+                        value={manualSubjectAddress}
+                        onChange={(e) => setManualSubjectAddress(e.target.value)}
+                        onFocus={() => {
+                          if (addressSuggestions.length > 0) setShowAddressSuggestions(true);
+                        }}
+                        onKeyDown={async (e) => {
+                          if (e.key === 'Enter' && manualSubjectAddress.length > 3) {
+                            e.preventDefault();
+                            setShowAddressSuggestions(false);
+                            try {
+                              const query = manualSubjectAddress.trim();
+                              const isMlsLike = /^\d{5,}$/.test(query) || /^(ACT|MLS)/i.test(query);
+                              const searchParam = isMlsLike ? `mlsNumber=${encodeURIComponent(query)}` : `address=${encodeURIComponent(query)}`;
+                              const res = await fetch(`/api/search?${searchParam}&limit=1`);
+                              const data = await res.json();
+                              if (data.properties?.[0]) {
+                                setSubjectProperty(data.properties[0]);
+                                setManualSubjectAddress("");
+                                setManualSubjectCity("");
+                                setManualSubjectState("");
+                                setManualSubjectZip("");
+                                setManualSubjectListPrice("");
+                                setManualSubjectBeds("");
+                                setManualSubjectBaths("");
+                                setManualSubjectSqft("");
+                              }
+                            } catch (err) {
+                              console.error('Address search error:', err);
                             }
-                          } catch (err) {
-                            console.error('Address search error:', err);
                           }
-                        }
-                      }}
-                      autoComplete="off"
-                      data-testid="input-subject-address"
-                      className="flex-1"
-                    />
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="icon"
-                      onClick={async () => {
-                        if (manualSubjectAddress.length > 5) {
-                          try {
-                            const res = await fetch(`/api/search?address=${encodeURIComponent(manualSubjectAddress)}&limit=1`);
-                            const data = await res.json();
-                            if (data.properties?.[0]) {
-                              setSubjectProperty(data.properties[0]);
-                              setManualSubjectAddress("");
-                              setManualSubjectCity("");
-                              setManualSubjectState("");
-                              setManualSubjectZip("");
-                            }
-                          } catch (err) {
-                            console.error('Address search error:', err);
-                          }
-                        }
-                      }}
-                      data-testid="button-search-subject-address"
-                    >
-                      <Search className="w-4 h-4" />
-                    </Button>
+                        }}
+                        autoComplete="off"
+                        data-testid="input-subject-address"
+                      />
+                      {isSearchingAddress && (
+                        <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 animate-spin text-muted-foreground" />
+                      )}
+                    </div>
+                    {showAddressSuggestions && addressSuggestions.length > 0 && (
+                      <div className="absolute z-50 w-full mt-1 rounded-md border bg-popover shadow-lg max-h-60 overflow-y-auto" data-testid="address-suggestions-dropdown">
+                        {addressSuggestions.map((suggestion) => (
+                          <div
+                            key={suggestion.mlsNumber}
+                            className="px-3 py-2 cursor-pointer hover-elevate border-b last:border-b-0"
+                            onClick={() => handleSelectAddressSuggestion(suggestion)}
+                            data-testid={`suggestion-${suggestion.mlsNumber}`}
+                          >
+                            <p className="text-sm font-medium">{suggestion.label}</p>
+                            <p className="text-xs text-muted-foreground">{suggestion.sublabel}</p>
+                            <p className="text-xs text-muted-foreground">
+                              {suggestion.price ? `$${Number(suggestion.price).toLocaleString()}` : ''}
+                              {suggestion.beds ? ` · ${suggestion.beds} bd` : ''}
+                              {suggestion.baths ? ` · ${suggestion.baths} ba` : ''}
+                              {suggestion.sqft ? ` · ${Number(suggestion.sqft).toLocaleString()} sqft` : ''}
+                            </p>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    {manualSubjectAddress.length >= 3 && !isSearchingAddress && addressSearchDone && addressSuggestions.length === 0 && (
+                      <p className="text-xs text-muted-foreground mt-1">No MLS results found. Enter details manually below.</p>
+                    )}
                   </div>
                 </div>
                 <div className="grid grid-cols-3 gap-2">

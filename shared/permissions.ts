@@ -150,12 +150,12 @@ export function determineUserRole(user: { email: string; isAdmin?: string | bool
     return 'developer';
   }
 
-  if (user.isSuperAdmin) return 'super_admin';
-  if (user.isAdmin && user.isAdmin !== 'false') return 'admin';
-  
   if (INITIAL_SUPER_ADMIN_EMAILS.includes(user.email.toLowerCase())) {
     return 'super_admin';
   }
+
+  if (user.isSuperAdmin) return 'super_admin';
+  if (user.isAdmin && user.isAdmin !== 'false') return 'admin';
   
   return 'agent';
 }
