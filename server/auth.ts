@@ -14,11 +14,7 @@ import {
   getUserRole,
   isSuperAdminEmail 
 } from "@shared/permissions";
-<<<<<<< HEAD
-import { generateJWT, setJWTCookie, clearJWTCookie } from "./jwt";
-=======
 import { generateJWT, setJWTCookie, clearJWTCookie, requireJWTAuth } from "./jwt";
->>>>>>> 5bb0ffc83975cd73d0751d6958c38a1c824f3e93
 
 const ALLOWED_EMAIL_DOMAIN = process.env.ALLOWED_EMAIL_DOMAIN || "spyglassrealty.com";
 const ALLOWED_EMAILS = process.env.ALLOWED_EMAILS?.split(",").map(e => e.trim().toLowerCase()) || [];
@@ -145,7 +141,6 @@ export function setupAuth() {
     console.log("Warning: Google OAuth not configured - missing GOOGLE_CLIENT_ID or GOOGLE_CLIENT_SECRET");
   }
 
-<<<<<<< HEAD
   // JWT-based auth - serialize/deserialize still needed for passport OAuth flow
   passport.serializeUser((authResult: Express.User, done) => {
     const result = authResult as any;
@@ -184,18 +179,6 @@ export function setupAuth() {
     } catch (error) {
       done(error);
     }
-=======
-  // JWT-based auth: No session serialization needed
-  // Passport is used only for OAuth strategies
-  passport.serializeUser((user: Express.User, done) => {
-    // This won't be called in JWT mode, but required by passport
-    done(null, (user as User).id);
-  });
-
-  passport.deserializeUser(async (id: string, done) => {
-    // This won't be called in JWT mode, but required by passport  
-    done(null, false);
->>>>>>> 5bb0ffc83975cd73d0751d6958c38a1c824f3e93
   });
 }
 
@@ -343,15 +326,9 @@ export function setupAuthRoutes(app: any) {
   app.get("/auth/google/callback", (req: Request, res: Response, next: NextFunction) => {
     const isPopupAuth = req.cookies?.['auth-is-popup'] === 'true';
     
-<<<<<<< HEAD
     passport.authenticate("google", (err: Error | null, authResult: any, info: any) => {
       // Clean up session flags
       delete (req.session as any)?.isPopupAuth;
-=======
-    passport.authenticate("google", (err: Error | null, user: User | false, info: any) => {
-      // Clean up temporary cookies
-      res.clearCookie('auth-is-popup');
->>>>>>> 5bb0ffc83975cd73d0751d6958c38a1c824f3e93
       
       const user = authResult?.user || authResult;
       const token = authResult?.token;
@@ -386,7 +363,6 @@ export function setupAuthRoutes(app: any) {
         }
       }
       
-<<<<<<< HEAD
       // Log in the user and set JWT cookie
       req.logIn(authResult, (loginErr) => {
         if (loginErr) {
@@ -412,43 +388,38 @@ export function setupAuthRoutes(app: any) {
           return res.redirect("/login?error=login_failed");
         }
 
-        if (token) {
-          setJWTCookie(res, token);
-        }
-=======
-      // Generate JWT token and set secure cookie
-      try {
-        const token = generateJWT(user as User);
-        setJWTCookie(res, token);
->>>>>>> 5bb0ffc83975cd73d0751d6958c38a1c824f3e93
-        
-        if (isPopupAuth) {
-          // For popup auth: send postMessage to parent window and close
-          return res.send(`
-            <!DOCTYPE html>
-            <html>
-            <head><title>Authentication Successful</title></head>
-            <body>
-              <script>
-                if (window.opener) {
-                  window.opener.postMessage({ type: 'AUTH_SUCCESS' }, window.location.origin);
-                  setTimeout(function() { window.close(); }, 300);
-                } else {
-                  window.location.href = '/';
-                }
-              </script>
-              <p>Authentication successful! This window should close automatically.</p>
-              <p>If it doesn't, <a href="/" onclick="window.close(); return false;">click here</a>.</p>
-            </body>
-            </html>
-          `);
-        } else {
-          // Standard redirect flow
-          const redirectTo = req.cookies?.['auth-return-to'] || "/";
-          res.clearCookie('auth-return-to');
-          return res.redirect(redirectTo);
-        }
-      } catch (jwtError) {
+        try {
+          if (token) {
+            setJWTCookie(res, token);
+          }
+          
+          if (isPopupAuth) {
+            // For popup auth: send postMessage to parent window and close
+            return res.send(`
+              <!DOCTYPE html>
+              <html>
+              <head><title>Authentication Successful</title></head>
+              <body>
+                <script>
+                  if (window.opener) {
+                    window.opener.postMessage({ type: 'AUTH_SUCCESS' }, window.location.origin);
+                    setTimeout(function() { window.close(); }, 300);
+                  } else {
+                    window.location.href = '/';
+                  }
+                </script>
+                <p>Authentication successful! This window should close automatically.</p>
+                <p>If it doesn't, <a href="/" onclick="window.close(); return false;">click here</a>.</p>
+              </body>
+              </html>
+            `);
+          } else {
+            // Standard redirect flow
+            const redirectTo = req.cookies?.['auth-return-to'] || "/";
+            res.clearCookie('auth-return-to');
+            return res.redirect(redirectTo);
+          }
+        } catch (jwtError) {
         console.error('[Auth] JWT generation failed:', jwtError);
         const errorMsg = 'Login failed';
         
@@ -473,7 +444,8 @@ export function setupAuthRoutes(app: any) {
         }
         res.clearCookie('auth-return-to');
         return res.redirect("/login?error=login_failed");
-      }
+        }
+      });
     })(req, res, next);
   });
 
@@ -500,7 +472,6 @@ export function setupAuthRoutes(app: any) {
   });
 
   app.post("/auth/logout", (req: Request, res: Response) => {
-<<<<<<< HEAD
     clearJWTCookie(res);
     req.logout((err) => {
       if (err) {
@@ -516,11 +487,6 @@ export function setupAuthRoutes(app: any) {
       res.clearCookie("connect.sid");
       res.json({ success: true });
     });
-=======
-    // Clear JWT cookie
-    clearJWTCookie(res);
-    res.json({ success: true });
->>>>>>> 5bb0ffc83975cd73d0751d6958c38a1c824f3e93
   });
 
   app.get("/api/auth/me", requireJWTAuth, (req: Request, res: Response) => {

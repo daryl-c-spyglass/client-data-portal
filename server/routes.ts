@@ -14,7 +14,7 @@ import { z } from "zod";
 import bcrypt from "bcryptjs";
 import passport from "passport";
 import { requireAuth, requireRole, requireMinimumRole, requirePermission } from "./auth";
-import { requireJWTAuth, requireJWTAuthWithDBCheck } from "./jwt";
+import { requireJWTAuth } from "./jwt";
 import { getUserRole, isSuperAdminEmail, INITIAL_SUPER_ADMIN_EMAILS } from "@shared/permissions";
 import { fetchExternalUsers, fetchFromExternalApi } from "./external-api";
 import { logAdminActivity, getActivityLogs, type AdminAction } from "./admin-activity-service";
@@ -8053,7 +8053,6 @@ OUTPUT JSON:
       }
       
       // Protection: Cannot demote the last Developer
-<<<<<<< HEAD
       if (targetUser.role === "developer" && newRole !== "developer") {
         const schema = await import("@shared/schema");
         const { drizzle } = await import("drizzle-orm/node-postgres");
@@ -8067,14 +8066,6 @@ OUTPUT JSON:
           .where(eq(schema.users.role, "developer"));
         
         if (Number(developerCount[0]?.count || 0) <= 1) {
-=======
-      if (targetUserRole === "developer" && newRole !== "developer") {
-        // Developers are now determined by email, not database role
-        // This protection is less critical since developers are hardcoded by email
-        // But we could still check if this is the last developer email-based user
-        const { DEVELOPER_EMAILS } = await import("@shared/permissions");
-        if (DEVELOPER_EMAILS.length <= 1) {
->>>>>>> 5bb0ffc83975cd73d0751d6958c38a1c824f3e93
           return res.status(403).json({ error: "Cannot remove the last Developer" });
         }
       }
@@ -8192,7 +8183,6 @@ OUTPUT JSON:
       }
       
       // Protection: Cannot delete the last Developer
-<<<<<<< HEAD
       if (targetUser.role === "developer") {
         const schema = await import("@shared/schema");
         const { drizzle } = await import("drizzle-orm/node-postgres");
@@ -8206,13 +8196,6 @@ OUTPUT JSON:
           .where(eq(schema.users.role, "developer"));
         
         if (Number(developerCount[0]?.count || 0) <= 1) {
-=======
-      if (targetUserRole === "developer") {
-        // Developers are now determined by email, not database role
-        // This protection is less critical since developers are hardcoded by email
-        const { DEVELOPER_EMAILS } = await import("@shared/permissions");
-        if (DEVELOPER_EMAILS.length <= 1) {
->>>>>>> 5bb0ffc83975cd73d0751d6958c38a1c824f3e93
           return res.status(403).json({ error: "Cannot delete the last Developer" });
         }
       }

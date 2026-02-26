@@ -1,6 +1,5 @@
 {
   "version": 2,
-<<<<<<< HEAD
   "installCommand": "npm install --include=dev",
   "buildCommand": "npm run build",
   "outputDirectory": "dist/public",
@@ -21,20 +20,12 @@
       ]
     }
   ],
-=======
-  "buildCommand": "npm run build",
-  "outputDirectory": "dist/public",
->>>>>>> 5bb0ffc83975cd73d0751d6958c38a1c824f3e93
   "rewrites": [
     { "source": "/api/(.*)", "destination": "/api" },
     { "source": "/auth/(.*)", "destination": "/api" },
     { "source": "/health", "destination": "/api" },
-<<<<<<< HEAD
     { "source": "/share/(.*)", "destination": "/api" },
     { "source": "/(.*)", "destination": "/index.html" }
-=======
-    { "source": "/share/(.*)", "destination": "/api" }
->>>>>>> 5bb0ffc83975cd73d0751d6958c38a1c824f3e93
   ],
   "crons": [
     {
