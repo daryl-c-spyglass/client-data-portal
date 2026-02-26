@@ -36,7 +36,7 @@ export default function CMAs() {
 
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => {
-      await apiRequest("DELETE", `/api/cmas/${id}`);
+      await apiRequest(`/api/cmas/${id}`, "DELETE");
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/cmas'] });
