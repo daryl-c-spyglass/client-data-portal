@@ -220,10 +220,7 @@ export function requireMinimumRole(minimumRole: UserRole) {
     }
 
     const user = req.user as User;
-    const userRole = normalizeRole({ 
-      isAdmin: user.isAdmin || undefined, 
-      isSuperAdmin: user.isSuperAdmin || undefined 
-    });
+    const userRole = determineUserRole(user);
 
     if (!isAtLeast(userRole, minimumRole)) {
       console.log('[Auth] Access denied:', { 
@@ -245,10 +242,7 @@ export function requirePermission(permission: Permission) {
     }
 
     const user = req.user as User;
-    const userRole = normalizeRole({ 
-      isAdmin: user.isAdmin || undefined, 
-      isSuperAdmin: user.isSuperAdmin || undefined 
-    });
+    const userRole = determineUserRole(user);
 
     if (!hasPermission(userRole, permission)) {
       console.log('[Auth] Permission denied:', { 
