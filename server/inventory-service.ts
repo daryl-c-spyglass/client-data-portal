@@ -359,7 +359,8 @@ async function countLiveListingsUnified(repliersClient: any): Promise<{
           continue;
         }
         
-        const normalizedType = normalizePropertyType(listing.propertySubType || listing.type);
+        const rawSubtype = listing.details?.style || listing.propertySubType || 'Other';
+        const normalizedType = normalizePropertyType(rawSubtype);
         subtypeCounts[normalizedType] = (subtypeCounts[normalizedType] || 0) + 1;
       }
       
