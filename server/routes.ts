@@ -2173,9 +2173,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
               soldDate: listing.soldDate || null,
               modificationTimestamp: new Date().toISOString(),
               originatingSystemName: 'Repliers',
-              // DEV debug data: raw Repliers fields and fallback chain
               _debug: {
-                dataSource: 'Repliers API',
+                dataSource: 'MLS via Repliers',
                 fetchTimestamp: new Date().toISOString(),
                 rawFields: rawSubdivisionFields,
                 subdivisionSource: subdivisionSource,
@@ -2214,7 +2213,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           subdivisionName: subdivisionValue,
           neighborhood: null,  // MUST be resolved from boundary polygons, never from listing data
           _debug: {
-            dataSource: 'PostgreSQL Database',
+            dataSource: 'MLS (cached)',
             fetchTimestamp: new Date().toISOString(),
             rawFields: {
               'db.subdivision': property.subdivision || null,
@@ -2244,7 +2243,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           subdivisionName: subdivisionValue,
           neighborhood: null,  // MUST be resolved from boundary polygons, never from listing data
           _debug: {
-            dataSource: 'PostgreSQL Database',
+            dataSource: 'MLS (cached)',
             fetchTimestamp: new Date().toISOString(),
             rawFields: {
               'db.subdivision': propertyByListingId.subdivision || null,

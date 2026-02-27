@@ -22,7 +22,7 @@ import {
   LineChart,
   Line,
 } from "recharts";
-import { TrendingUp, BarChart3, Maximize2, X, Database, Cloud } from "lucide-react";
+import { TrendingUp, BarChart3, Maximize2, X, Globe } from "lucide-react";
 
 interface ListingsByMonth {
   month: string;
@@ -71,7 +71,7 @@ const CHART_SLIDES: ChartSlide[] = [
   {
     id: 'source-breakdown',
     title: 'Inventory by Status',
-    icon: Database,
+    icon: BarChart3,
     description: 'Current inventory counts by RESO status',
   },
   {
@@ -208,10 +208,10 @@ export function MarketingInsightsCarousel({
                   <div className="bg-background border rounded-md shadow-lg p-3">
                     <p className="font-semibold">{data.fullStatus}</p>
                     <p className="text-sm text-primary">
-                      Repliers: {data.repliers.toLocaleString()}
+                      MLS (Active): {data.repliers.toLocaleString()}
                     </p>
                     <p className="text-sm text-muted-foreground">
-                      Database: {data.database.toLocaleString()}
+                      MLS (Closed): {data.database.toLocaleString()}
                     </p>
                     <p className="text-sm font-medium border-t mt-1 pt-1">
                       Total: {data.total.toLocaleString()}
@@ -227,14 +227,14 @@ export function MarketingInsightsCarousel({
             dataKey="repliers" 
             stackId="a" 
             fill="hsl(var(--primary))" 
-            name="Repliers API"
+            name="MLS (Active)"
             radius={[0, 0, 0, 0]}
           />
           <Bar 
             dataKey="database" 
             stackId="a" 
             fill="hsl(var(--muted-foreground))" 
-            name="Database"
+            name="MLS (Closed)"
             radius={[0, 4, 4, 0]}
           />
         </BarChart>
@@ -349,7 +349,7 @@ export function MarketingInsightsCarousel({
     switch (chartId) {
       case 'source-breakdown':
         if (!sourceBreakdown) return null;
-        const closedSource = sourceBreakdown.database.Closed > 0 ? 'Database (fallback)' : 'Repliers API';
+        const closedSource = 'MLS';
         return {
           'Active Listings': sourceBreakdown.repliers.Active.toLocaleString(),
           'Active Under Contract': sourceBreakdown.repliers['Active Under Contract'].toLocaleString(),
@@ -491,12 +491,8 @@ export function MarketingInsightsCarousel({
                     </DialogTitle>
                     <div className="flex gap-2">
                       <Badge variant="outline" className="text-xs gap-1">
-                        <Cloud className="w-3 h-3" />
-                        Repliers API
-                      </Badge>
-                      <Badge variant="secondary" className="text-xs gap-1">
-                        <Database className="w-3 h-3" />
-                        Database
+                        <Globe className="w-3 h-3" />
+                        MLS Listings
                       </Badge>
                     </div>
                   </div>

@@ -14,7 +14,7 @@ import {
   XCircle, 
   ChevronDown, 
   ChevronUp,
-  Database,
+  Globe,
   AlertCircle,
   Search
 } from "lucide-react";
@@ -184,13 +184,13 @@ export default function InventoryAudit() {
 
           <Card>
             <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">Database</CardTitle>
+              <CardTitle className="text-sm font-medium text-muted-foreground">MLS Cache</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="flex items-center gap-2">
                 {audit?.diagnostics?.databaseConnected ? (
                   <>
-                    <Database className="h-5 w-5 text-green-500" />
+                    <Globe className="h-5 w-5 text-green-500" />
                     <span className="text-green-600 dark:text-green-400 font-medium">Connected</span>
                   </>
                 ) : (

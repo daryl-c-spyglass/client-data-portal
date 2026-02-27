@@ -95,6 +95,7 @@ interface RepliersListing {
   listDate?: string;
   soldDate?: string;
   daysOnMarket?: number;
+  simpleDaysOnMarket?: number;
   livingArea?: number;
   yearBuilt?: number;
   lotSizeSquareFeet?: number;
@@ -723,7 +724,7 @@ class RepliersClient {
       publicRemarks: description,
       listingContractDate: listing.listDate || listing.listingContractDate,
       closeDate: listing.soldDate || listing.closeDate,
-      daysOnMarket: listing.daysOnMarket,
+      daysOnMarket: listing.simpleDaysOnMarket ?? listing.daysOnMarket,
       listOfficeName: listing.office?.name || listing.listOfficeName,
       listOfficePhone: listing.office?.phone || listing.listOfficePhone,
       listAgentFullName: listing.agent?.name || listing.listAgentFullName,

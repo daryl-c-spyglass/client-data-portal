@@ -910,7 +910,7 @@ export function CMABuilder({ onCreateCMA, initialData }: CMABuilderProps) {
             </Button>
           </div>
           <CardDescription>
-            Find comparable properties from the Repliers database (30,000+ active listings)
+            Find comparable properties from MLS (30,000+ active listings)
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">

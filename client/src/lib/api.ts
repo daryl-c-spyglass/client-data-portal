@@ -334,9 +334,7 @@ export async function unifiedSearchWithMeta(criteria: SearchCriteria): Promise<S
     }
   });
   
-  // Determine data source based on statuses
-  const hasClosedOnly = data.statuses?.every(s => s === 'closed' || s === 'sold');
-  const dataSource = hasClosedOnly ? 'Database (Sold Records)' : 'Repliers API';
+  const dataSource = 'MLS Listings';
   
   return {
     properties,

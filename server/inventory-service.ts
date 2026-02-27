@@ -149,7 +149,7 @@ export async function getUnifiedInventory(forceRefresh = false): Promise<Invento
       'Other': 0,
     },
     rentalFilteredCount: 0,
-    dataSource: 'Repliers API + Database',
+    dataSource: 'MLS Listings',
     lastUpdatedAt: new Date().toISOString(),
     errors: [],
     isPartialData: false,

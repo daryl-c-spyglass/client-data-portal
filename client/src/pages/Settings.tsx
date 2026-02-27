@@ -29,7 +29,7 @@ import { useTheme } from "@/contexts/ThemeContext";
 import { 
   Settings as SettingsIcon, 
   User, 
-  Database, 
+  Globe, 
   Palette, 
   Bell, 
   Code2, 
@@ -44,7 +44,6 @@ import {
   Camera,
   Briefcase,
   FileText,
-  Globe,
   Loader2,
   Upload,
   Trash2,
@@ -636,7 +635,7 @@ export default function Settings() {
             <span className="hidden sm:inline">Profile</span>
           </TabsTrigger>
           <TabsTrigger value="data" className="flex items-center gap-2" data-testid="tab-data">
-            <Database className="w-4 h-4" />
+            <Globe className="w-4 h-4" />
             <span className="hidden sm:inline">Data & Sync</span>
           </TabsTrigger>
           <TabsTrigger value="display" className="flex items-center gap-2" data-testid="tab-display">

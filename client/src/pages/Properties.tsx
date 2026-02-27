@@ -10,7 +10,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Map as MapIcon, Search, Database, RotateCcw, List, Home, Building2, TreePine, Info, Save, Bookmark, Play, Trash2, Calendar, Filter, Loader2 } from "lucide-react";
+import { Map as MapIcon, Search, Globe, RotateCcw, List, Home, Building2, TreePine, Info, Save, Bookmark, Play, Trash2, Calendar, Filter, Loader2 } from "lucide-react";
 import { SearchCriteriaForm } from "@/components/SearchCriteria";
 import { PropertyResults } from "@/components/PropertyResults";
 import { PropertyMapView } from "@/components/PropertyMapView";
@@ -544,10 +544,13 @@ export default function Properties() {
                 <TooltipContent side="right" className="max-w-xs">
                   <div className="space-y-1 text-sm">
                     <p className="font-medium">
-                      Data Source: {searchResult?.dataSource || inventory?.dataSource || 'Unknown'}
+                      Data Source: {searchResult?.dataSource || inventory?.dataSource || 'MLS'}
                     </p>
                     <p className="text-muted-foreground">
-                      Data pulled from {searchResult?.dataSource || inventory?.dataSource || 'the configured API'}
+                      Property data sourced from MLS via Repliers API
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      Updated every 5-15 minutes
                     </p>
                     {inventory?.lastUpdatedAt && (
                       <p className="text-muted-foreground">
@@ -686,7 +689,7 @@ export default function Properties() {
             <div className="flex flex-wrap items-center gap-6">
               {/* Data Source */}
               <div className="flex items-center gap-2">
-                <Database className="w-4 h-4 text-muted-foreground" />
+                <Globe className="w-4 h-4 text-muted-foreground" />
                 <span className="text-sm font-medium">Data Source:</span>
                 <Badge variant="secondary" data-testid="badge-data-source">{searchResult.dataSource}</Badge>
               </div>

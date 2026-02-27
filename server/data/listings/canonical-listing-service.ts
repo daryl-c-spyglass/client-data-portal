@@ -288,7 +288,7 @@ class CanonicalListingServiceImpl {
       garageSpaces: prop.garageSpaces,
       elementarySchool: prop.elementarySchool,
       lastUpdated: prop.modificationTimestamp || new Date().toISOString(),
-      dataSource: 'Database',
+      dataSource: 'MLS',
     };
   }
 
