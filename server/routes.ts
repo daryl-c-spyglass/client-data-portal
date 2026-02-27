@@ -5,7 +5,7 @@ import { createMLSGridClient } from "./mlsgrid-client";
 import { triggerManualSync } from "./mlsgrid-sync";
 import { getHomeReviewClient, mapHomeReviewPropertyToSchema, type PropertySearchParams } from "./homereview-client";
 import { initRepliersClient, getRepliersClient, isRepliersConfigured } from "./repliers-client";
-import { getUnifiedInventory, getInventoryDebugData, getInventoryAudit } from "./inventory-service";
+import { getUnifiedInventory, getInventoryDebugData, getInventoryAudit, getInventoryCacheMeta } from "./inventory-service";
 import { geocodeAddress, geocodeProperties, isMapboxConfigured } from "./mapbox-geocoding";
 import { searchCriteriaSchema, insertCmaSchema, insertUserSchema, insertSellerUpdateSchema, updateSellerUpdateSchema, updateLeadGateSettingsSchema, isLikelyRentalProperty, filterOutRentalProperties } from "@shared/schema";
 import { filterByPropertySubtype, isLandOrLot, getPropertyTypeInfo } from "@shared/propertyTypeGuard";
@@ -5210,8 +5210,8 @@ OUTPUT JSON:
     try {
       const forceRefresh = req.query.refresh === 'true';
       const inventory = await getUnifiedInventory(forceRefresh);
+      const cacheMeta = getInventoryCacheMeta();
       
-      // Return data in format expected by both Dashboard and Properties pages
       res.json({
         dataSource: inventory.dataSource,
         totalCount: inventory.totalCount,
@@ -5222,6 +5222,7 @@ OUTPUT JSON:
         errors: inventory.errors,
         isPartialData: inventory.isPartialData,
         sourceBreakdown: inventory.sourceBreakdown,
+        cacheMeta,
       });
     } catch (error: any) {
       console.error("Inventory summary error:", error.message);

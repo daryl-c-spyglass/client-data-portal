@@ -464,6 +464,19 @@ export function clearInventoryCache() {
   console.log('[Inventory] Cache cleared');
 }
 
+export function getInventoryCacheMeta() {
+  if (!inventoryCache) {
+    return { cachedAt: null, cacheAgeSeconds: null, cacheTTLSeconds: INVENTORY_CACHE_TTL / 1000, nextRefreshInSeconds: 0 };
+  }
+  const ageMs = Date.now() - inventoryCache.timestamp;
+  return {
+    cachedAt: new Date(inventoryCache.timestamp).toISOString(),
+    cacheAgeSeconds: Math.round(ageMs / 1000),
+    cacheTTLSeconds: INVENTORY_CACHE_TTL / 1000,
+    nextRefreshInSeconds: Math.max(0, Math.round((INVENTORY_CACHE_TTL - ageMs) / 1000)),
+  };
+}
+
 // Comprehensive inventory audit data
 export interface InventoryAudit {
   source: string;

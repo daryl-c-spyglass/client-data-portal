@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useLocation, useSearch } from "wouter";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -22,12 +22,20 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import type { Property, Media, SearchCriteria, SavedSearch } from "@shared/schema";
 
 // Inventory summary interface from backend
+interface CacheMeta {
+  cachedAt: string | null;
+  cacheAgeSeconds: number | null;
+  cacheTTLSeconds: number;
+  nextRefreshInSeconds: number;
+}
+
 interface InventorySummary {
   dataSource: string;
   totalCount: number;
   countsByStatus: Record<string, number>;
   countsBySubtype: Record<string, number>;
   lastUpdatedAt: string;
+  cacheMeta?: CacheMeta;
 }
 
 // Safe number parser that returns undefined for invalid values
@@ -436,7 +444,6 @@ export default function Properties() {
   
   const properties = searchResult?.properties ?? [];
 
-  // Format timestamp for tooltip display
   const formatLastUpdated = (isoString: string) => {
     const date = new Date(isoString);
     return date.toLocaleString('en-US', {
@@ -448,6 +455,30 @@ export default function Properties() {
       hour12: true,
     });
   };
+
+  const formatRelativeTime = useCallback((isoString: string) => {
+    const seconds = Math.round((Date.now() - new Date(isoString).getTime()) / 1000);
+    if (seconds < 60) return 'just now';
+    const minutes = Math.floor(seconds / 60);
+    if (minutes < 60) return `${minutes}m ago`;
+    const hours = Math.floor(minutes / 60);
+    return `${hours}h ${minutes % 60}m ago`;
+  }, []);
+
+  useEffect(() => {
+    const handleFocus = () => {
+      if (!inventory?.cacheMeta?.cachedAt) {
+        queryClient.invalidateQueries({ queryKey: ['/api/inventory/summary'] });
+        return;
+      }
+      const ageMs = Date.now() - new Date(inventory.cacheMeta.cachedAt).getTime();
+      if (ageMs > 5 * 60 * 1000) {
+        queryClient.invalidateQueries({ queryKey: ['/api/inventory/summary'] });
+      }
+    };
+    window.addEventListener('focus', handleFocus);
+    return () => window.removeEventListener('focus', handleFocus);
+  }, [inventory?.cacheMeta?.cachedAt]);
 
   const handleSearch = (criteria: SearchCriteria) => {
     setSearchCriteria(criteria);
@@ -550,11 +581,19 @@ export default function Properties() {
                       Property data sourced from MLS via Repliers API
                     </p>
                     <p className="text-xs text-muted-foreground">
-                      Updated every 5-15 minutes
+                      MLS latency: 5-15 minutes | Cache TTL: {inventory?.cacheMeta?.cacheTTLSeconds ? `${Math.round(inventory.cacheMeta.cacheTTLSeconds / 60)}min` : '5min'}
                     </p>
+                    {inventory?.cacheMeta?.cachedAt && (
+                      <p className="text-xs text-muted-foreground">
+                        Cached: {formatLastUpdated(inventory.cacheMeta.cachedAt)}
+                        {inventory.cacheMeta.nextRefreshInSeconds !== undefined && (
+                          <> | Next refresh in {inventory.cacheMeta.nextRefreshInSeconds < 60 ? `${inventory.cacheMeta.nextRefreshInSeconds}s` : `${Math.round(inventory.cacheMeta.nextRefreshInSeconds / 60)}m`}</>
+                        )}
+                      </p>
+                    )}
                     {inventory?.lastUpdatedAt && (
-                      <p className="text-muted-foreground">
-                        Last updated: {formatLastUpdated(inventory.lastUpdatedAt)}
+                      <p className="text-xs text-muted-foreground">
+                        Data fetched: {formatLastUpdated(inventory.lastUpdatedAt)}
                       </p>
                     )}
                   </div>
@@ -575,6 +614,14 @@ export default function Properties() {
                 <span className="text-muted-foreground" data-testid="text-total-inventory">
                   {inventory.totalCount.toLocaleString()} properties in {inventory.dataSource}
                 </span>
+                {inventory.cacheMeta?.cachedAt && (
+                  <>
+                    <span className="text-muted-foreground">•</span>
+                    <span className="text-xs text-muted-foreground" data-testid="text-cache-age">
+                      Updated {formatRelativeTime(inventory.cacheMeta.cachedAt)}
+                    </span>
+                  </>
+                )}
                 <span className="text-muted-foreground">•</span>
                 <Badge variant="outline" className="bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200 text-xs" data-testid="badge-inventory-active">
                   Active: {(inventory.countsByStatus['Active'] || 0).toLocaleString()}

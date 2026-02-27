@@ -98,12 +98,20 @@ interface InventoryBySubtype {
 }
 
 // Unified inventory summary from canonical endpoint
+interface CacheMeta {
+  cachedAt: string | null;
+  cacheAgeSeconds: number | null;
+  cacheTTLSeconds: number;
+  nextRefreshInSeconds: number;
+}
+
 interface InventorySummary {
   dataSource: string;
   totalCount: number;
   countsByStatus: Record<string, number>;
   countsBySubtype: Record<string, number>;
   lastUpdatedAt: string;
+  cacheMeta?: CacheMeta;
   validation?: {
     statusSumMatchesTotal: boolean;
     subtypeSumMatchesTotal: boolean;
