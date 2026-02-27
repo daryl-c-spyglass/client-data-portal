@@ -48,5 +48,8 @@ outputType = "webview"
 HOMEREVIEW_API_URL = "https://95f0a894-8940-4717-a771-851029450d05-00-3octfev6njpgb.spock.replit.dev"
 ALLOWED_EMAIL_DOMAIN = "spyglassrealty.com"
 
+[userenv.development]
+APP_URL = "https://f58e6159-1bf8-4479-a256-c997461de361-00-1jv089vliph98.riker.replit.dev"
+
 [agent]
 integrations = ["javascript_openai:1.0.0", "javascript_object_storage:2.0.0"]
