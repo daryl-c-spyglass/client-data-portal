@@ -138,6 +138,6 @@
   "overrides": {
     "minimatch": "10.2.3",
     "rollup": "4.59.0",
-    "fast-xml-parser": "5.3.6"
+    "fast-xml-parser": "5.4.1"
   }
 }
